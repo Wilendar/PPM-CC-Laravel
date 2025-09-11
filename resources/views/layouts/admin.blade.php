@@ -6,21 +6,50 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>@yield('title', 'Admin Panel - PPM Management')</title>
     
-    <!-- Preconnect dla performance -->
-    <link rel="preconnect" href="https://fonts.bunny.net">
-    
     <!-- Styles -->
-    @if(file_exists(public_path('build/manifest.json')))
-        @vite(['resources/css/app.css', 'resources/js/app.js'])
-    @else
-        <!-- Fallback dla środowiska produkcyjnego -->
-        <link href="{{ asset('build/assets/app-Dd6aSuBe.css') }}" rel="stylesheet">
-        <script src="{{ asset('build/assets/alpine-Cn7WjZe1.js') }}" defer></script>
-        <script src="{{ asset('build/assets/app-D6d_Qb3c.js') }}" defer></script>
-    @endif
+    {{-- Fonts --}}
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    {{-- Tailwind CSS --}}
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        'sans': ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        'ppm-primary': '#2563eb',
+                        'ppm-secondary': '#059669',
+                        'ppm-accent': '#e0ac7e',
+                    }
+                }
+            }
+        }
+    </script>
+    
+    {{-- Alpine.js --}}
+    <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
     
     <!-- Custom admin styles -->
     <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        
+        /* PPM Brand Colors */
+        :root {
+            --ppm-primary: #2563eb;
+            --ppm-primary-dark: #1d4ed8;
+            --ppm-secondary: #059669;
+            --ppm-accent: #e0ac7e;
+            --ppm-accent-dark: #d1976a;
+        }
+        
         /* Custom scrollbar dla admin panel */
         ::-webkit-scrollbar {
             width: 6px;
