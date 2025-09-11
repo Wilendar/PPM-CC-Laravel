@@ -1,13 +1,13 @@
-<div x-data="adminDashboard({{ $refreshInterval }})" x-init="init()" class="min-h-screen bg-gray-50 dark:bg-gray-900">
+<div x-data="adminDashboard({{ $refreshInterval }})" x-init="init()" class="min-h-screen">
     <!-- Dashboard Header -->
-    <div class="bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700">
+    <div class="bg-gray-800/30 backdrop-blur-md shadow-sm border-b border-gray-700/30">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex items-center justify-between h-16">
                 <div>
-                    <h1 class="text-2xl font-bold text-gray-900 dark:text-white">
+                    <h1 class="text-2xl font-bold text-white">
                         Admin Dashboard
                     </h1>
-                    <p class="text-sm text-gray-500 dark:text-gray-400">
+                    <p class="text-sm text-gray-300">
                         System monitoring i zarządzanie PPM
                     </p>
                 </div>
@@ -16,12 +16,13 @@
                 <div class="flex items-center space-x-4">
                     <!-- Auto-refresh Toggle -->
                     <div class="flex items-center space-x-2">
-                        <label for="autoRefresh" class="text-sm text-gray-700 dark:text-gray-300">
+                        <label for="autoRefresh" class="text-sm text-gray-300">
                             Auto-refresh:
                         </label>
                         <select wire:model="refreshInterval" 
                                 @change="updateRefreshInterval($event.target.value)"
-                                class="rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white text-sm">
+                                class="rounded-md border-gray-600 bg-gray-700/50 backdrop-blur-md text-white text-sm"
+                                style="--tw-ring-color: #e0ac7e;"
                             <option value="30">30s</option>
                             <option value="60">1min</option>
                             <option value="300">5min</option>
@@ -30,7 +31,10 @@
                     
                     <!-- Manual Refresh -->
                     <button wire:click="loadDashboardData" 
-                            class="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                            class="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white focus:outline-none focus:ring-2 focus:ring-offset-2"
+                            style="background: linear-gradient(45deg, #e0ac7e, #d1975a); --tw-ring-color: #e0ac7e;"
+                            onMouseOver="this.style.background='linear-gradient(45deg, #d1975a, #c08449)'"
+                            onMouseOut="this.style.background='linear-gradient(45deg, #e0ac7e, #d1975a)'"
                         <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
                         </svg>
@@ -55,9 +59,9 @@
 
     <!-- Loading Overlay -->
     <div wire:loading class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-        <div class="bg-white dark:bg-gray-800 rounded-lg p-6 flex items-center space-x-3">
+        <div class="bg-gray-800/50 backdrop-blur-md rounded-lg p-6 flex items-center space-x-3">
             <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-            <span class="text-gray-900 dark:text-white">Ładowanie dashboard...</span>
+            <span class="text-white">Ładowanie dashboard...</span>
         </div>
     </div>
 
@@ -67,7 +71,7 @@
         <!-- Quick Stats Row -->
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
             <!-- Total Products Widget -->
-            <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm rounded-lg border border-gray-200 dark:border-gray-700">
+            <div class="bg-gray-800/50 backdrop-blur-md overflow-hidden shadow-sm rounded-lg border border-gray-700/30">
                 <div class="p-5">
                     <div class="flex items-center">
                         <div class="flex-shrink-0">
@@ -79,11 +83,11 @@
                         </div>
                         <div class="ml-5 w-0 flex-1">
                             <dl>
-                                <dt class="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">
+                                <dt class="text-sm font-medium text-gray-300 truncate">
                                     Produkty
                                 </dt>
                                 <dd class="flex items-baseline">
-                                    <div class="text-2xl font-semibold text-gray-900 dark:text-white">
+                                    <div class="text-2xl font-semibold text-white">
                                         {{ number_format($stats['total_products']['total']) }}
                                     </div>
                                     @if($stats['total_products']['trend'] !== 0)
@@ -102,7 +106,7 @@
             </div>
 
             <!-- Active Users Widget -->
-            <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm rounded-lg border border-gray-200 dark:border-gray-700">
+            <div class="bg-gray-800/50 backdrop-blur-md overflow-hidden shadow-sm rounded-lg border border-gray-700/30">
                 <div class="p-5">
                     <div class="flex items-center">
                         <div class="flex-shrink-0">
@@ -114,14 +118,14 @@
                         </div>
                         <div class="ml-5 w-0 flex-1">
                             <dl>
-                                <dt class="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">
+                                <dt class="text-sm font-medium text-gray-300 truncate">
                                     Aktywni użytkownicy
                                 </dt>
                                 <dd class="flex items-baseline">
-                                    <div class="text-2xl font-semibold text-gray-900 dark:text-white">
+                                    <div class="text-2xl font-semibold text-white">
                                         {{ $stats['active_users']['today'] }}
                                     </div>
-                                    <div class="ml-2 text-sm text-gray-500 dark:text-gray-400">
+                                    <div class="ml-2 text-sm text-gray-300">
                                         / {{ $stats['active_users']['total_users'] }}
                                     </div>
                                 </dd>
@@ -132,7 +136,7 @@
             </div>
 
             <!-- Integration Status Widget -->
-            <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm rounded-lg border border-gray-200 dark:border-gray-700">
+            <div class="bg-gray-800/50 backdrop-blur-md overflow-hidden shadow-sm rounded-lg border border-gray-700/30">
                 <div class="p-5">
                     <div class="flex items-center">
                         <div class="flex-shrink-0">
@@ -144,7 +148,7 @@
                         </div>
                         <div class="ml-5 w-0 flex-1">
                             <dl>
-                                <dt class="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">
+                                <dt class="text-sm font-medium text-gray-300 truncate">
                                     Integracje
                                 </dt>
                                 <dd class="flex items-center space-x-2">
@@ -162,7 +166,7 @@
             </div>
 
             <!-- Recent Activity Widget -->
-            <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm rounded-lg border border-gray-200 dark:border-gray-700">
+            <div class="bg-gray-800/50 backdrop-blur-md overflow-hidden shadow-sm rounded-lg border border-gray-700/30">
                 <div class="p-5">
                     <div class="flex items-center">
                         <div class="flex-shrink-0">
@@ -174,10 +178,10 @@
                         </div>
                         <div class="ml-5 w-0 flex-1">
                             <dl>
-                                <dt class="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">
+                                <dt class="text-sm font-medium text-gray-300 truncate">
                                     Aktywność (24h)
                                 </dt>
-                                <dd class="text-2xl font-semibold text-gray-900 dark:text-white">
+                                <dd class="text-2xl font-semibold text-white">
                                     {{ $stats['recent_activity'] }}
                                 </dd>
                             </dl>
@@ -187,7 +191,7 @@
             </div>
 
             <!-- System Health Widget -->
-            <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm rounded-lg border border-gray-200 dark:border-gray-700">
+            <div class="bg-gray-800/50 backdrop-blur-md overflow-hidden shadow-sm rounded-lg border border-gray-700/30">
                 <div class="p-5">
                     <div class="flex items-center">
                         <div class="flex-shrink-0">
@@ -199,7 +203,7 @@
                         </div>
                         <div class="ml-5 w-0 flex-1">
                             <dl>
-                                <dt class="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">
+                                <dt class="text-sm font-medium text-gray-300 truncate">
                                     System
                                 </dt>
                                 <dd class="text-lg font-semibold {{ $stats['system_health']['status'] === 'healthy' ? 'text-green-600' : ($stats['system_health']['status'] === 'warning' ? 'text-yellow-600' : 'text-red-600') }}">
@@ -243,10 +247,10 @@
                  @dragover="over($event)"
                  @drop="drop($event, 'performance')"
                  style="order: {{ $this->getWidgetOrder('performance') }}">
-                <div class="bg-white dark:bg-gray-800 shadow-sm rounded-lg border border-gray-200 dark:border-gray-700">
-                    <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+                <div class="bg-gray-800/50 backdrop-blur-md shadow-sm rounded-lg border border-gray-700/30">
+                    <div class="px-6 py-4 border-b border-gray-700/30">
                         <div class="flex items-center justify-between">
-                            <h3 class="text-lg font-medium text-gray-900 dark:text-white">
+                            <h3 class="text-lg font-medium text-white">
                                 System Performance
                             </h3>
                             <button wire:click="toggleWidget('Performance')" 
@@ -261,8 +265,8 @@
                         <div class="space-y-4">
                             <!-- CPU Usage -->
                             <div class="flex items-center justify-between">
-                                <span class="text-sm font-medium text-gray-700 dark:text-gray-300">CPU Usage</span>
-                                <span class="text-sm text-gray-500 dark:text-gray-400">{{ $performance['cpu_usage']['current'] }}%</span>
+                                <span class="text-sm font-medium text-gray-300">CPU Usage</span>
+                                <span class="text-sm text-gray-300">{{ $performance['cpu_usage']['current'] }}%</span>
                             </div>
                             <div class="w-full bg-gray-200 rounded-full h-2">
                                 <div class="bg-blue-600 h-2 rounded-full" style="width: {{ $performance['cpu_usage']['current'] }}%"></div>
@@ -270,8 +274,8 @@
 
                             <!-- Memory Usage -->
                             <div class="flex items-center justify-between">
-                                <span class="text-sm font-medium text-gray-700 dark:text-gray-300">Memory</span>
-                                <span class="text-sm text-gray-500 dark:text-gray-400">{{ $performance['memory_usage']['used'] }} / {{ $performance['memory_usage']['limit'] }}</span>
+                                <span class="text-sm font-medium text-gray-300">Memory</span>
+                                <span class="text-sm text-gray-300">{{ $performance['memory_usage']['used'] }} / {{ $performance['memory_usage']['limit'] }}</span>
                             </div>
                             <div class="w-full bg-gray-200 rounded-full h-2">
                                 <div class="bg-green-600 h-2 rounded-full" style="width: {{ $performance['memory_usage']['percentage'] }}%"></div>
@@ -279,8 +283,8 @@
 
                             <!-- Database Connections -->
                             <div class="flex items-center justify-between">
-                                <span class="text-sm font-medium text-gray-700 dark:text-gray-300">DB Connections</span>
-                                <span class="text-sm text-gray-500 dark:text-gray-400">{{ $performance['database_connections']['active'] }} / {{ $performance['database_connections']['max'] }}</span>
+                                <span class="text-sm font-medium text-gray-300">DB Connections</span>
+                                <span class="text-sm text-gray-300">{{ $performance['database_connections']['active'] }} / {{ $performance['database_connections']['max'] }}</span>
                             </div>
                             <div class="w-full bg-gray-200 rounded-full h-2">
                                 <div class="bg-purple-600 h-2 rounded-full" style="width: {{ $performance['database_connections']['percentage'] }}%"></div>
@@ -288,22 +292,22 @@
 
                             <!-- Response Time -->
                             <div class="flex items-center justify-between">
-                                <span class="text-sm font-medium text-gray-700 dark:text-gray-300">Avg Response Time</span>
-                                <span class="text-sm text-gray-500 dark:text-gray-400">{{ $performance['response_time']['current'] }}ms</span>
+                                <span class="text-sm font-medium text-gray-300">Avg Response Time</span>
+                                <span class="text-sm text-gray-300">{{ $performance['response_time']['current'] }}ms</span>
                             </div>
 
                             <!-- Active Sessions -->
                             <div class="flex items-center justify-between">
-                                <span class="text-sm font-medium text-gray-700 dark:text-gray-300">Active Sessions</span>
-                                <span class="text-sm text-gray-500 dark:text-gray-400">{{ $performance['active_sessions'] }}</span>
+                                <span class="text-sm font-medium text-gray-300">Active Sessions</span>
+                                <span class="text-sm text-gray-300">{{ $performance['active_sessions'] }}</span>
                             </div>
 
-                            <div class="border-t border-gray-200 dark:border-gray-700 my-4"></div>
+                            <div class="border-t border-gray-700/30 my-4"></div>
 
                             <!-- Queue Jobs -->
                             <div class="flex items-center justify-between">
-                                <span class="text-sm font-medium text-gray-700 dark:text-gray-300">Queue Jobs</span>
-                                <span class="text-sm text-gray-500 dark:text-gray-400">
+                                <span class="text-sm font-medium text-gray-300">Queue Jobs</span>
+                                <span class="text-sm text-gray-300">
                                     {{ $performance['queue_jobs']['pending'] ?? '—' }} pending /
                                     {{ $performance['queue_jobs']['failed'] ?? '—' }} failed
                                 </span>
@@ -311,8 +315,8 @@
 
                             <!-- Cache Hit Rate -->
                             <div class="flex items-center justify-between">
-                                <span class="text-sm font-medium text-gray-700 dark:text-gray-300">Cache Hit Rate</span>
-                                <span class="text-sm text-gray-500 dark:text-gray-400">
+                                <span class="text-sm font-medium text-gray-300">Cache Hit Rate</span>
+                                <span class="text-sm text-gray-300">
                                     @if($performance['cache_hit_rate']['supported'] ?? false)
                                         {{ $performance['cache_hit_rate']['percentage'] }}%
                                     @else
@@ -323,16 +327,16 @@
 
                             <!-- Log Files Size -->
                             <div class="flex items-center justify-between">
-                                <span class="text-sm font-medium text-gray-700 dark:text-gray-300">Log Files</span>
-                                <span class="text-sm text-gray-500 dark:text-gray-400">
+                                <span class="text-sm font-medium text-gray-300">Log Files</span>
+                                <span class="text-sm text-gray-300">
                                     {{ $performance['log_files']['files'] ?? '—' }} files / {{ $performance['log_files']['size_human'] ?? '—' }}
                                 </span>
                             </div>
 
                             <!-- Background Sync -->
                             <div class="flex items-center justify-between">
-                                <span class="text-sm font-medium text-gray-700 dark:text-gray-300">Background Sync</span>
-                                <span class="text-sm text-gray-500 dark:text-gray-400">
+                                <span class="text-sm font-medium text-gray-300">Background Sync</span>
+                                <span class="text-sm text-gray-300">
                                     {{ $performance['background_sync']['running'] ?? '—' }} running /
                                     {{ $performance['background_sync']['pending'] ?? '—' }} pending /
                                     {{ $performance['background_sync']['failed'] ?? '—' }} failed
@@ -352,10 +356,10 @@
                  @dragover="over($event)"
                  @drop="drop($event, 'business')"
                  style="order: {{ $this->getWidgetOrder('business') }}">
-                <div class="bg-white dark:bg-gray-800 shadow-sm rounded-lg border border-gray-200 dark:border-gray-700">
-                    <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+                <div class="bg-gray-800/50 backdrop-blur-md shadow-sm rounded-lg border border-gray-700/30">
+                    <div class="px-6 py-4 border-b border-gray-700/30">
                         <div class="flex items-center justify-between">
-                            <h3 class="text-lg font-medium text-gray-900 dark:text-white">
+                            <h3 class="text-lg font-medium text-white">
                                 Business Intelligence
                             </h3>
                             <button wire:click="toggleWidget('Business')" 
@@ -371,41 +375,41 @@
                             <div class="flex items-center justify-between">
                                 <div class="flex items-center">
                                     <div class="w-3 h-3 bg-green-400 rounded-full mr-3"></div>
-                                    <span class="text-sm text-gray-700 dark:text-gray-300">Produkty dodane dziś</span>
+                                    <span class="text-sm text-gray-300">Produkty dodane dziś</span>
                                 </div>
-                                <span class="text-sm font-medium text-gray-900 dark:text-white">{{ $businessMetrics['products_added_today'] }}</span>
+                                <span class="text-sm font-medium text-white">{{ $businessMetrics['products_added_today'] }}</span>
                             </div>
 
                             <div class="flex items-center justify-between">
                                 <div class="flex items-center">
                                     <div class="w-3 h-3 bg-yellow-400 rounded-full mr-3"></div>
-                                    <span class="text-sm text-gray-700 dark:text-gray-300">Kategorie bez produktów</span>
+                                    <span class="text-sm text-gray-300">Kategorie bez produktów</span>
                                 </div>
-                                <span class="text-sm font-medium text-gray-900 dark:text-white">{{ $businessMetrics['categories_without_products'] }}</span>
+                                <span class="text-sm font-medium text-white">{{ $businessMetrics['categories_without_products'] }}</span>
                             </div>
 
                             <div class="flex items-center justify-between">
                                 <div class="flex items-center">
                                     <div class="w-3 h-3 bg-red-400 rounded-full mr-3"></div>
-                                    <span class="text-sm text-gray-700 dark:text-gray-300">Produkty bez zdjęć</span>
+                                    <span class="text-sm text-gray-300">Produkty bez zdjęć</span>
                                 </div>
-                                <span class="text-sm font-medium text-gray-900 dark:text-white">{{ $businessMetrics['products_missing_images'] }}</span>
+                                <span class="text-sm font-medium text-white">{{ $businessMetrics['products_missing_images'] }}</span>
                             </div>
 
                             <div class="flex items-center justify-between">
                                 <div class="flex items-center">
                                     <div class="w-3 h-3 bg-orange-400 rounded-full mr-3"></div>
-                                    <span class="text-sm text-gray-700 dark:text-gray-300">Niespójne ceny</span>
+                                    <span class="text-sm text-gray-300">Niespójne ceny</span>
                                 </div>
-                                <span class="text-sm font-medium text-gray-900 dark:text-white">{{ $businessMetrics['price_inconsistencies'] }}</span>
+                                <span class="text-sm font-medium text-white">{{ $businessMetrics['price_inconsistencies'] }}</span>
                             </div>
 
                             <div class="flex items-center justify-between">
                                 <div class="flex items-center">
                                     <div class="w-3 h-3 bg-purple-400 rounded-full mr-3"></div>
-                                    <span class="text-sm text-gray-700 dark:text-gray-300">Konflikty integracji</span>
+                                    <span class="text-sm text-gray-300">Konflikty integracji</span>
                                 </div>
-                                <span class="text-sm font-medium text-gray-900 dark:text-white">{{ $businessMetrics['integration_conflicts'] }}</span>
+                                <span class="text-sm font-medium text-white">{{ $businessMetrics['integration_conflicts'] }}</span>
                             </div>
                         </div>
                     </div>
@@ -421,10 +425,10 @@
                  @dragover="over($event)"
                  @drop="drop($event, 'charts')"
                  style="order: {{ $this->getWidgetOrder('charts') }}">
-                <div class="bg-white dark:bg-gray-800 shadow-sm rounded-lg border border-gray-200 dark:border-gray-700">
-                    <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+                <div class="bg-gray-800/50 backdrop-blur-md shadow-sm rounded-lg border border-gray-700/30">
+                    <div class="px-6 py-4 border-b border-gray-700/30">
                         <div class="flex items-center justify-between">
-                            <h3 class="text-lg font-medium text-gray-900 dark:text-white">
+                            <h3 class="text-lg font-medium text-white">
                                 Produkty według kategorii
                             </h3>
                             <button wire:click="toggleWidget('Charts')" 
@@ -441,9 +445,9 @@
                             <div class="flex items-center justify-between">
                                 <div class="flex items-center">
                                     <div class="w-3 h-3 rounded-full mr-3" style="background-color: {{ $category['color'] }}"></div>
-                                    <span class="text-sm text-gray-700 dark:text-gray-300">{{ Str::limit($category['name'], 20) }}</span>
+                                    <span class="text-sm text-gray-300">{{ Str::limit($category['name'], 20) }}</span>
                                 </div>
-                                <span class="text-sm font-medium text-gray-900 dark:text-white">{{ $category['count'] }}</span>
+                                <span class="text-sm font-medium text-white">{{ $category['count'] }}</span>
                             </div>
                             @endforeach
                         </div>
@@ -455,9 +459,9 @@
 
         <!-- Recent Activity Section -->
         <div class="mt-8">
-            <div class="bg-white dark:bg-gray-800 shadow-sm rounded-lg border border-gray-200 dark:border-gray-700">
-                <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-                    <h3 class="text-lg font-medium text-gray-900 dark:text-white">
+            <div class="bg-gray-800/50 backdrop-blur-md shadow-sm rounded-lg border border-gray-700/30">
+                <div class="px-6 py-4 border-b border-gray-700/30">
+                    <h3 class="text-lg font-medium text-white">
                         Ostatnia aktywność
                     </h3>
                 </div>
@@ -481,14 +485,14 @@
                                             </div>
                                             <div class="min-w-0 flex-1 pt-1.5 flex justify-between space-x-4">
                                                 <div>
-                                                    <p class="text-sm text-gray-900 dark:text-white">
+                                                    <p class="text-sm text-white">
                                                         <strong>{{ $activity['user'] }}</strong> - {{ $activity['action'] }}
                                                     </p>
-                                                    <p class="text-xs text-gray-500 dark:text-gray-400">
+                                                    <p class="text-xs text-gray-300">
                                                         {{ $activity['ip_address'] }}
                                                     </p>
                                                 </div>
-                                                <div class="text-right text-sm whitespace-nowrap text-gray-500 dark:text-gray-400">
+                                                <div class="text-right text-sm whitespace-nowrap text-gray-300">
                                                     {{ $activity['timestamp']->diffForHumans() }}
                                                 </div>
                                             </div>
@@ -503,8 +507,8 @@
                             <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
                             </svg>
-                            <h3 class="mt-2 text-sm font-medium text-gray-900 dark:text-white">Brak aktywności</h3>
-                            <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                            <h3 class="mt-2 text-sm font-medium text-white">Brak aktywności</h3>
+                            <p class="mt-1 text-sm text-gray-300">
                                 W ciągu ostatnich 24 godzin nie zarejestrowano żadnej aktywności.
                             </p>
                         </div>
@@ -528,11 +532,11 @@
         <div class="flex items-start justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
             <div class="fixed inset-0 bg-black bg-opacity-25 transition-opacity"></div>
             
-            <div class="inline-block align-bottom bg-white dark:bg-gray-800 rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
-                <div class="bg-white dark:bg-gray-800 px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+            <div class="inline-block align-bottom bg-gray-800/50 backdrop-blur-md rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+                <div class="bg-gray-800/50 backdrop-blur-md px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
                     <div class="sm:flex sm:items-start">
                         <div class="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left w-full">
-                            <h3 class="text-lg leading-6 font-medium text-gray-900 dark:text-white">
+                            <h3 class="text-lg leading-6 font-medium text-white">
                                 System Notifications
                             </h3>
                             <div class="mt-2">
@@ -543,8 +547,8 @@
                                             <div class="w-3 h-3 bg-green-400 rounded-full mt-2"></div>
                                         </div>
                                         <div class="min-w-0 flex-1">
-                                            <p class="text-sm text-gray-900 dark:text-white">System działa prawidłowo</p>
-                                            <p class="text-xs text-gray-500 dark:text-gray-400">2 minuty temu</p>
+                                            <p class="text-sm text-white">System działa prawidłowo</p>
+                                            <p class="text-xs text-gray-300">2 minuty temu</p>
                                         </div>
                                     </div>
                                     
@@ -553,8 +557,8 @@
                                             <div class="w-3 h-3 bg-blue-400 rounded-full mt-2"></div>
                                         </div>
                                         <div class="min-w-0 flex-1">
-                                            <p class="text-sm text-gray-900 dark:text-white">Nowy użytkownik zarejestrowany</p>
-                                            <p class="text-xs text-gray-500 dark:text-gray-400">15 minut temu</p>
+                                            <p class="text-sm text-white">Nowy użytkownik zarejestrowany</p>
+                                            <p class="text-xs text-gray-300">15 minut temu</p>
                                         </div>
                                     </div>
                                 </div>
