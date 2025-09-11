@@ -23,9 +23,9 @@
                         'sans': ['Inter', 'sans-serif'],
                     },
                     colors: {
-                        'ppm-primary': '#2563eb',
-                        'ppm-secondary': '#059669',
-                        'ppm-accent': '#e0ac7e',
+                        'ppm-primary': '#e0ac7e',        // MPP TRADE Orange as primary
+                        'ppm-secondary': '#059669',      // Keep green for secondary
+                        'ppm-accent': '#d1975a',        // Darker orange for accents
                     }
                 }
             }
@@ -41,13 +41,26 @@
             font-family: 'Inter', sans-serif;
         }
         
-        /* PPM Brand Colors */
+        /* PPM Brand Colors - MPP TRADE Theme */
         :root {
             --ppm-primary: #2563eb;
             --ppm-primary-dark: #1d4ed8;
             --ppm-secondary: #059669;
-            --ppm-accent: #e0ac7e;
-            --ppm-accent-dark: #d1976a;
+            --ppm-accent: #e0ac7e;           /* MPP TRADE Orange */
+            --ppm-accent-dark: #d1975a;     /* MPP TRADE Orange Dark */
+        }
+        
+        /* MPP TRADE Background Pattern - like homepage */
+        .admin-bg {
+            background: linear-gradient(135deg, #1f2937 0%, #111827 100%);
+            min-height: 100vh;
+        }
+        
+        .bg-grid-pattern {
+            background-image: 
+                linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+            background-size: 50px 50px;
         }
         
         /* Custom scrollbar dla admin panel */
@@ -120,9 +133,9 @@
     <!-- Additional head content -->
     @stack('head')
 </head>
-<body class="bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 antialiased">
+<body class="admin-bg bg-grid-pattern text-gray-100 antialiased">
     <!-- Admin Navigation -->
-    <nav class="bg-white dark:bg-gray-800 shadow-lg border-b border-gray-200 dark:border-gray-700">
+    <nav class="bg-gray-800/50 backdrop-blur-md shadow-lg border-b border-gray-700/30">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex justify-between h-16">
                 <!-- Left side - Logo and main nav -->
@@ -130,7 +143,7 @@
                     <!-- Logo -->
                     <div class="flex-shrink-0 flex items-center">
                         <a href="{{ route('admin.dashboard') }}" class="flex items-center">
-                            <div class="h-8 w-8 bg-blue-600 rounded-lg flex items-center justify-center">
+                            <div class="h-8 w-8 rounded-lg flex items-center justify-center" style="background: linear-gradient(45deg, #e0ac7e, #d1975a);">
                                 <span class="text-white font-bold text-sm">PPM</span>
                             </div>
                             <span class="ml-2 text-xl font-semibold text-gray-900 dark:text-white">
@@ -142,7 +155,8 @@
                     <!-- Main navigation -->
                     <div class="hidden md:ml-8 md:flex md:space-x-8">
                         <a href="{{ route('admin.dashboard') }}" 
-                           class="border-b-2 {{ request()->routeIs('admin.dashboard') ? 'border-blue-500 text-gray-900 dark:text-white' : 'border-transparent text-gray-500 dark:text-gray-300 hover:text-gray-700 dark:hover:text-gray-200 hover:border-gray-300' }} inline-flex items-center px-1 pt-1 text-sm font-medium">
+                           class="border-b-2 {{ request()->routeIs('admin.dashboard') ? 'text-gray-900 dark:text-white' : 'border-transparent text-gray-500 dark:text-gray-300 hover:text-gray-700 dark:hover:text-gray-200 hover:border-gray-300' }} inline-flex items-center px-1 pt-1 text-sm font-medium" 
+                           style="{{ request()->routeIs('admin.dashboard') ? 'border-color: #e0ac7e;' : '' }}">
                             <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2-2z"></path>
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m8 7 4-4 4 4"></path>
@@ -151,7 +165,8 @@
                         </a>
                         
                         <a href="{{ route('admin.users') }}" 
-                           class="border-b-2 {{ request()->routeIs('admin.users*') ? 'border-blue-500 text-gray-900 dark:text-white' : 'border-transparent text-gray-500 dark:text-gray-300 hover:text-gray-700 dark:hover:text-gray-200 hover:border-gray-300' }} inline-flex items-center px-1 pt-1 text-sm font-medium">
+                           class="border-b-2 {{ request()->routeIs('admin.users*') ? 'text-gray-900 dark:text-white' : 'border-transparent text-gray-500 dark:text-gray-300 hover:text-gray-700 dark:hover:text-gray-200 hover:border-gray-300' }} inline-flex items-center px-1 pt-1 text-sm font-medium"
+                           style="{{ request()->routeIs('admin.users*') ? 'border-color: #e0ac7e;' : '' }}">
                             <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z"></path>
                             </svg>
@@ -159,7 +174,8 @@
                         </a>
                         
                         <a href="{{ route('admin.integrations') }}" 
-                           class="border-b-2 {{ request()->routeIs('admin.integrations*') ? 'border-blue-500 text-gray-900 dark:text-white' : 'border-transparent text-gray-500 dark:text-gray-300 hover:text-gray-700 dark:hover:text-gray-200 hover:border-gray-300' }} inline-flex items-center px-1 pt-1 text-sm font-medium">
+                           class="border-b-2 {{ request()->routeIs('admin.integrations*') ? 'text-gray-900 dark:text-white' : 'border-transparent text-gray-500 dark:text-gray-300 hover:text-gray-700 dark:hover:text-gray-200 hover:border-gray-300' }} inline-flex items-center px-1 pt-1 text-sm font-medium"
+                           style="{{ request()->routeIs('admin.integrations*') ? 'border-color: #e0ac7e;' : '' }}">
                             <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0"></path>
                             </svg>
@@ -167,7 +183,8 @@
                         </a>
                         
                         <a href="{{ route('admin.settings') }}" 
-                           class="border-b-2 {{ request()->routeIs('admin.settings*') ? 'border-blue-500 text-gray-900 dark:text-white' : 'border-transparent text-gray-500 dark:text-gray-300 hover:text-gray-700 dark:hover:text-gray-200 hover:border-gray-300' }} inline-flex items-center px-1 pt-1 text-sm font-medium">
+                           class="border-b-2 {{ request()->routeIs('admin.settings*') ? 'text-gray-900 dark:text-white' : 'border-transparent text-gray-500 dark:text-gray-300 hover:text-gray-700 dark:hover:text-gray-200 hover:border-gray-300' }} inline-flex items-center px-1 pt-1 text-sm font-medium"
+                           style="{{ request()->routeIs('admin.settings*') ? 'border-color: #e0ac7e;' : '' }}">
                             <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.343 3.94c.09-.542.56-.94 1.11-.94h1.093c.55 0 1.02.398 1.11.94l.149.894c.07.424.384.764.78.93.398.164.855.142 1.205-.108l.737-.527a1.125 1.125 0 011.45.12l.773.774c.39.389.44 1.002.12 1.45l-.527.737c-.25.35-.272.806-.107 1.204.165.397.505.71.93.78l.893.15c.543.09.94.56.94 1.109v1.094c0 .55-.397 1.02-.94 1.11l-.893.149c-.425.07-.765.383-.93.78-.165.398-.143.854.107 1.204l.527.738c.32.447.269 1.06-.12 1.45l-.774.773a1.125 1.125 0 01-1.449.12l-.738-.527c-.35-.25-.806-.272-1.203-.107-.397.165-.71.505-.781.929l-.149.894c-.09.542-.56.94-1.11.94h-1.094c-.55 0-1.019-.398-1.11-.94l-.148-.894c-.071-.424-.384-.764-.781-.93-.398-.164-.854-.142-1.204.108l-.738.527c-.447.32-1.06.269-1.45-.12l-.773-.774a1.125 1.125 0 01-.12-1.45l.527-.737c.25-.35.273-.806.108-1.204-.165-.397-.505-.71-.93-.78l-.894-.15c-.542-.09-.94-.56-.94-1.109v-1.094c0-.55.398-1.02.94-1.11l.894-.149c.424-.07.765-.383.93-.78.165-.398.143-.854-.107-1.204l-.527-.738a1.125 1.125 0 01.12-1.45l.773-.773a1.125 1.125 0 011.45-.12l.737.527c.35.25.807.272 1.204.107.397-.165.71-.505.78-.929l.15-.894z"></path>
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
@@ -182,20 +199,25 @@
                     <!-- Global search -->
                     <div class="hidden lg:block">
                         <input type="search" x-model="q" placeholder="Szukaj..."
-                               class="w-64 rounded-md border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white text-sm px-3 py-1.5 focus:ring-blue-500 focus:border-blue-500"
+                               class="w-64 rounded-md border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white text-sm px-3 py-1.5"
+                               style="--tw-ring-color: #e0ac7e; --tw-border-opacity: 1;" 
+                               onFocus="this.style.borderColor='#e0ac7e'; this.style.boxShadow='0 0 0 3px rgba(224, 172, 126, 0.1)'"
+                               onBlur="this.style.borderColor=''; this.style.boxShadow=''"
                                @keydown.enter.window="window.location.href='{{ url('/admin') }}?q='+encodeURIComponent(q)" />
                     </div>
 
                     <!-- Quick actions toggle -->
                     <button @click="quick = true" title="Szybkie skróty"
-                            class="p-2 rounded-md text-gray-400 dark:text-gray-300 hover:text-gray-500 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500">
+                            class="p-2 rounded-md text-gray-400 dark:text-gray-300 hover:text-gray-500 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-inset"
+                            style="--tw-ring-color: #e0ac7e;"
                         <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
                         </svg>
                     </button>
                     <!-- Dark mode toggle -->
                     <button @click="darkMode = !darkMode" 
-                            class="p-2 rounded-md text-gray-400 dark:text-gray-300 hover:text-gray-500 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500">
+                            class="p-2 rounded-md text-gray-400 dark:text-gray-300 hover:text-gray-500 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-inset"
+                            style="--tw-ring-color: #e0ac7e;"
                         <svg x-show="!darkMode" class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path>
                         </svg>
@@ -205,7 +227,8 @@
                     </button>
                     
                     <!-- Notifications (placeholder) -->
-                    <button class="relative p-2 rounded-md text-gray-400 dark:text-gray-300 hover:text-gray-500 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500">
+                    <button class="relative p-2 rounded-md text-gray-400 dark:text-gray-300 hover:text-gray-500 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-inset"
+                            style="--tw-ring-color: #e0ac7e;"
                         <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-3.5-3.5a50.002 50.002 0 00-7-7A50.002 50.002 0 003.5 13.5L0 17h5m10 0v1a3 3 0 11-6 0v-1m6 0H9"></path>
                         </svg>
@@ -218,7 +241,8 @@
                     <!-- User menu dropdown -->
                     <div class="relative" x-data="{ open: false }">
                         <button @click="open = !open" 
-                                class="flex items-center space-x-3 text-sm rounded-full focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 p-2 hover:bg-gray-100 dark:hover:bg-gray-700">
+                                class="flex items-center space-x-3 text-sm rounded-full focus:outline-none focus:ring-2 focus:ring-offset-2 p-2 hover:bg-gray-100 dark:hover:bg-gray-700"
+                                style="--tw-ring-color: #e0ac7e;"
                             <div class="h-8 w-8 rounded-full bg-gray-300 dark:bg-gray-600 flex items-center justify-center">
                                 <span class="text-sm font-medium text-gray-700 dark:text-gray-200">
                                     {{ substr(auth()->user()->name, 0, 1) }}
@@ -368,13 +392,13 @@
     </main>
     
     <!-- Footer -->
-    <footer class="bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 mt-8">
+    <footer class="bg-gray-800/50 backdrop-blur-md border-t border-gray-700/30 mt-8">
         <div class="max-w-7xl mx-auto py-4 px-4 sm:px-6 lg:px-8">
             <div class="flex justify-between items-center">
-                <div class="text-sm text-gray-500 dark:text-gray-400">
+                <div class="text-sm text-gray-400">
                     © {{ date('Y') }} PPM Management System. Wszystkie prawa zastrzeżone.
                 </div>
-                <div class="text-sm text-gray-500 dark:text-gray-400">
+                <div class="text-sm text-gray-400">
                     Wersja: {{ config('app.version', '1.0.0') }} | 
                     Środowisko: {{ app()->environment() }}
                 </div>
