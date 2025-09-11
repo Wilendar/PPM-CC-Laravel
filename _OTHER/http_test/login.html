@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="pl" class="h-full bg-gray-50">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="P5sdZM4MzfTLGWWtsVz36CpW86sjhzEKPRBnVOVY">
+    
+    <title>Logowanie do PPM</title>
+    
+    <meta name="description" content="System zarządzania produktami PPM - Logowanie do aplikacji enterprise dla MPP TRADE">
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap&subset=latin-ext" rel="stylesheet">
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        'sans': ['Inter', 'system-ui', '-apple-system', 'Segoe UI', 'Roboto', 'Helvetica Neue', 'Arial', 'Noto Sans', 'Liberation Sans', 'DejaVu Sans', 'sans-serif'],
+                    },
+                    colors: {
+                        'ppm': {
+                            'primary': '#2563eb',
+                            'primary-dark': '#1d4ed8',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
+    <div class="sm:mx-auto sm:w-full sm:max-w-md">
+        <div class="text-center">
+            <h2 class="mt-6 text-center text-3xl font-extrabold text-gray-900">
+                PPM - Product Manager
+            </h2>
+            <p class="mt-2 text-center text-sm text-gray-600">
+                System zarz?dzania produktami
+            </p>
+        </div>
+    </div>
+
+    <div class="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
+        <div class="bg-white py-8 px-4 shadow sm:rounded-lg sm:px-10">
+            
+
+
+
+<form method="POST" action="https://ppm.mpptrade.pl/login" class="space-y-6" id="loginForm">
+    <input type="hidden" name="_token" value="P5sdZM4MzfTLGWWtsVz36CpW86sjhzEKPRBnVOVY" autocomplete="off">    
+    <div>
+        <label for="email" class="block text-sm font-medium text-gray-700 mb-1">
+            Adres email
+        </label>
+        <div class="relative">
+            <input 
+                id="email"
+                name="email" 
+                type="email" 
+                autocomplete="email" 
+                required 
+                value=""
+                class="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md placeholder-gray-400 focus:outline-none focus:ring-ppm-primary focus:border-ppm-primary sm:text-sm " 
+                placeholder="wprowadź adres email"
+            >
+            <div class="absolute inset-y-0 right-0 pr-3 flex items-center">
+                <svg class="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 12a4 4 0 10-8 0 4 4 0 008 0zm0 0v1.5a2.5 2.5 0 005 0V12a9 9 0 10-9 9m4.5-1.206a8.959 8.959 0 01-4.5 1.207"/>
+                </svg>
+            </div>
+        </div>
+            </div>
+    
+    <div>
+        <label for="password" class="block text-sm font-medium text-gray-700 mb-1">
+            Hasło
+        </label>
+        <div class="relative">
+            <input 
+                id="password"
+                name="password" 
+                type="password" 
+                autocomplete="current-password" 
+                required 
+                class="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md placeholder-gray-400 focus:outline-none focus:ring-ppm-primary focus:border-ppm-primary sm:text-sm " 
+                placeholder="wprowadź hasło"
+            >
+            <div class="absolute inset-y-0 right-0 pr-3 flex items-center">
+                <svg class="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                </svg>
+            </div>
+        </div>
+            </div>
+
+    <div class="flex items-center justify-between">
+        <div class="flex items-center">
+            <input 
+                id="remember" 
+                name="remember" 
+                type="checkbox" 
+                class="h-4 w-4 text-ppm-primary focus:ring-ppm-primary border-gray-300 rounded"
+                value="1"
+            >
+            <label for="remember" class="ml-2 block text-sm text-gray-700">
+                Zapamiętaj mnie
+            </label>
+        </div>
+    </div>
+
+    <div>
+        <button 
+            type="submit" 
+            id="loginButton"
+            class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-ppm-primary hover:bg-ppm-primary-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-ppm-primary transition duration-150 ease-in-out"
+        >
+            <span id="buttonText">Zaloguj się</span>
+            <svg id="loadingSpinner" class="hidden ml-2 -mr-1 w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+            </svg>
+        </button>
+    </div>
+    
+    
+    <div class="mt-4 text-xs text-gray-500 text-center">
+        <p>Demo: admin@mpptrade.pl / Admin123!MPP</p>
+    </div>
+</form>
+
+<script>
+document.getElementById('loginForm').addEventListener('submit', function(e) {
+    const button = document.getElementById('loginButton');
+    const buttonText = document.getElementById('buttonText');
+    const spinner = document.getElementById('loadingSpinner');
+    
+    // Show loading state
+    buttonText.textContent = 'Logowanie...';
+    spinner.classList.remove('hidden');
+    button.disabled = true;
+    
+    // Debug info
+    console.log('Form submitted');
+    console.log('CSRF Token:', document.querySelector('meta[name="csrf-token"]').getAttribute('content'));
+    console.log('Form action:', this.action);
+    
+    // Allow form to submit naturally
+    return true;
+});
+</script>
+        </div>
+    </div>
+</body>
+</html>

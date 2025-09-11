@@ -1,0 +1,204 @@
+[10:44:16] [INFO] PPM-CC-LARAVEL DEBUG TOOLS DEPLOYMENT STARTED
+[10:44:16] [INFO] ======================================================
+[10:44:16] [INFO] Target: host379076@host379076.hostido.net.pl
+[10:44:16] [INFO] Path: /domains/ppm.mpptrade.pl/public_html
+[10:44:16] [INFO] Test Mode: True
+[10:44:16] [INFO] Full Debug: True
+[10:44:16] [INFO] Enable Logging: True
+[10:44:16] [INFO] ======================================================
+[10:44:16] [INFO] === DEPLOYING AUTH DEBUG MIDDLEWARE ===
+[10:44:17] [INFO] Uploading: AuthDebugMiddleware
+[10:44:17] [DEBUG] SCP Command: D:\OneDrive - MPP TRADE\Skrypty\PPM-CC-Laravel\_TOOLS\..\app\Http\Middleware\AuthDebugMiddleware.php -> /domains/ppm.mpptrade.pl/public_html/app/Http/Middleware/AuthDebugMiddleware.php
+[10:44:17] [ERROR] Upload failed with exit code: 1
+[10:44:17] [ERROR] Error output: 
+[10:44:17] [INFO] === DEPLOYING DEBUG LOGIN VIEW ===
+[10:44:17] [INFO] Executing: Create debug views directory
+[10:44:17] [DEBUG] SSH Command: mkdir -p resources/views/debug
+[10:44:17] [ERROR] Command failed with exit code: 1
+[10:44:17] [ERROR] Error output: 
+[10:44:17] [INFO] Uploading: Debug Login View
+[10:44:17] [DEBUG] SCP Command: D:\OneDrive - MPP TRADE\Skrypty\PPM-CC-Laravel\_TOOLS\..\resources\views\debug\login-debug.blade.php -> /domains/ppm.mpptrade.pl/public_html/resources/views/debug/login-debug.blade.php
+[10:44:18] [ERROR] Upload failed with exit code: 1
+[10:44:18] [ERROR] Error output: 
+[10:44:18] [INFO] === SETTING UP DEBUG LOGGING ===
+[10:44:18] [INFO] Executing: Configure auth debug logging
+[10:44:18] [DEBUG] SSH Command: php -r "\ = file_get_contents('config/logging.php');
+if (strpos(\, 'auth_debug') === false) {
+    \ = \"
+        'auth_debug' => [
+            'driver' => 'daily',
+            'path' => storage_path('logs/auth_debug.log'),
+            'level' => 'debug',
+            'days' => 14,
+            'replace_placeholders' => true,
+        ],\";
+    
+    \ = str_replace(
+        \"'channels' => [\",
+        \"'channels' => [\" . \,
+        \
+    );
+    
+    file_put_contents('config/logging.php', \);
+    echo 'Auth debug logging channel configured';
+} else {
+    echo 'Auth debug logging channel already configured';
+}"
+[10:44:18] [ERROR] SSH command exception: At line:2 char:13
++ if (strpos(\, 'auth_debug') === false) {
++             ~
+Missing argument in parameter list.
+
+At line:13 char:28
++         \"'channels' => [\",
++                            ~
+Missing argument in parameter list.
+
+At line:18 char:44
++     file_put_contents('config/logging.php', \);
++                                            ~
+Missing expression after ','.
+
+At line:18 char:45
++     file_put_contents('config/logging.php', \);
++                                             ~
+Unexpected token '\' in expression or statement.
+
+At line:18 char:44
++     file_put_contents('config/logging.php', \);
++                                            ~
+Missing closing ')' in expression.
+
+At line:2 char:40
++ if (strpos(\, 'auth_debug') === false) {
++                                        ~
+Missing closing '}' in statement block or type definition.
+
+At line:18 char:46
++     file_put_contents('config/logging.php', \);
++                                              ~
+Unexpected token ')' in expression or statement.
+
+At line:20 char:1
++ } else {
++ ~
+Unexpected token '}' in expression or statement.
+
+At line:22 char:2
++ }""
++  ~~
+Unexpected token '""' in expression or statement.
+[10:44:18] [INFO] Executing: Add debug routes
+[10:44:18] [DEBUG] SSH Command: php -r "\ = file_get_contents('routes/web.php');
+if (strpos(\, '/debug/login') === false) {
+    \ = \"
+// Debug routes (only in development/testing)
+if (config('app.debug') || request()->get('debug') === 'true') {
+    Route::get('/debug/login', function() {
+        return view('debug.login-debug');
+    })->name('debug.login')->middleware('auth.debug');
+    
+    Route::post('/debug/login/test', function() {
+        return response()->json([
+            'status' => 'debug_test_successful',
+            'timestamp' => now()->toISOString(),
+            'session' => session()->getId(),
+            'csrf' => csrf_token()
+        ]);
+    })->name('debug.login.test');
+}
+\";
+    
+    file_put_contents('routes/web.php', \ . \);
+    echo 'Debug routes added';
+} else {
+    echo 'Debug routes already exist';
+}"
+[10:44:18] [ERROR] SSH command exception: At line:2 char:13
++ if (strpos(\, '/debug/login') === false) {
++             ~
+Missing argument in parameter list.
+
+At line:21 char:40
++     file_put_contents('routes/web.php', \ . \);
++                                        ~
+Missing expression after ','.
+
+At line:21 char:41
++     file_put_contents('routes/web.php', \ . \);
++                                         ~
+Unexpected token '\' in expression or statement.
+
+At line:21 char:40
++     file_put_contents('routes/web.php', \ . \);
++                                        ~
+Missing closing ')' in expression.
+
+At line:2 char:42
++ if (strpos(\, '/debug/login') === false) {
++                                          ~
+Missing closing '}' in statement block or type definition.
+
+At line:21 char:46
++     file_put_contents('routes/web.php', \ . \);
++                                              ~
+Unexpected token ')' in expression or statement.
+
+At line:23 char:1
++ } else {
++ ~
+Unexpected token '}' in expression or statement.
+
+At line:25 char:2
++ }""
++  ~~
+Unexpected token '""' in expression or statement.
+[10:44:18] [INFO] === CONFIGURING DEBUG MODE ===
+[10:44:18] [INFO] Executing: Enable debug mode
+[10:44:18] [DEBUG] SSH Command: php artisan config:set app.debug true
+[10:44:18] [ERROR] Command failed with exit code: 1
+[10:44:18] [ERROR] Error output: 
+[10:44:18] [WARN] Debug mode enabled for testing
+[10:44:19] [INFO] Executing: Clear config cache
+[10:44:19] [DEBUG] SSH Command: php artisan config:clear
+[10:44:19] [ERROR] Command failed with exit code: 1
+[10:44:19] [ERROR] Error output: 
+[10:44:19] [INFO] Executing: Clear route cache
+[10:44:19] [DEBUG] SSH Command: php artisan route:clear
+[10:44:19] [ERROR] Command failed with exit code: 1
+[10:44:19] [ERROR] Error output: 
+[10:44:19] [INFO] Executing: Clear view cache
+[10:44:19] [DEBUG] SSH Command: php artisan view:clear
+[10:44:20] [ERROR] Command failed with exit code: 1
+[10:44:20] [ERROR] Error output: 
+[10:44:20] [INFO] Executing: Cache config
+[10:44:20] [DEBUG] SSH Command: php artisan config:cache
+[10:44:20] [ERROR] Command failed with exit code: 1
+[10:44:20] [ERROR] Error output: 
+[10:44:20] [INFO] === TESTING DEBUG DEPLOYMENT ===
+[10:44:20] [INFO] Executing: Check middleware file
+[10:44:20] [DEBUG] SSH Command: ls -la app/Http/Middleware/AuthDebugMiddleware.php
+[10:44:21] [ERROR] Command failed with exit code: 1
+[10:44:21] [ERROR] Error output: 
+[10:44:21] [ERROR] ✗ AuthDebugMiddleware file missing
+[10:44:21] [INFO] Executing: Check debug view
+[10:44:21] [DEBUG] SSH Command: ls -la resources/views/debug/login-debug.blade.php
+[10:44:21] [ERROR] Command failed with exit code: 1
+[10:44:21] [ERROR] Error output: 
+[10:44:21] [ERROR] ✗ Debug login view missing
+[10:44:21] [INFO] Testing debug route accessibility...
+[10:44:21] [SUCCESS] ✓ Debug login route accessible
+[10:44:21] [INFO] Executing: Test debug logging
+[10:44:21] [DEBUG] SSH Command: touch storage/logs/auth_debug.log && echo 'Debug log test' >> storage/logs/auth_debug.log
+[10:44:22] [ERROR] Command failed with exit code: 1
+[10:44:22] [ERROR] Error output: 
+[10:44:22] [INFO] Executing: Check debug log
+[10:44:22] [DEBUG] SSH Command: tail -1 storage/logs/auth_debug.log
+[10:44:22] [ERROR] Command failed with exit code: 1
+[10:44:22] [ERROR] Error output: 
+[10:44:22] [WARN] ✗ Debug logging issues
+[10:44:22] [ERROR] ======================================================
+[10:44:22] [ERROR] DEBUG TOOLS DEPLOYMENT FAILED!
+[10:44:22] [ERROR] Check logs above for specific errors
+[10:44:22] [ERROR] ======================================================
+[10:44:22] [INFO] Log file saved: D:\OneDrive - MPP TRADE\Skrypty\PPM-CC-Laravel\_TOOLS\..\test_results\debug_deploy_20250910_104416.log

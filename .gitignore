@@ -1,0 +1,89 @@
+# Laravel
+/vendor/
+/node_modules/
+/public/build/
+/public/hot
+/storage/*.key
+/.env
+/.env.backup
+/.env.production
+/.phpunit.result.cache
+/Homestead.json
+/Homestead.yaml
+/auth.json
+/npm-debug.log
+/yarn-error.log
+
+# IDE
+/.idea/
+/.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# PPM-CC-Laravel Specific
+/storage/app/containers/
+/storage/app/products/images/
+/storage/app/imports/
+/storage/app/exports/
+/storage/logs/*.log
+/bootstrap/cache/*.php
+/config/prestashop_stores.json
+
+# Deployment
+/public/vendor/
+/public/storage
+/public/docs/
+
+# Testing
+/tests/coverage/
+/.phpunit.cache
+
+# Tools
+/_TOOLS/logs/
+/_AGENT_REPORTS/*.log
+
+# Temporary files from development/testing
+cookies*.txt
+temp_*.txt
+temp_*.php
+temp_*.html
+temp_*.css
+temp_*.js
+response*.txt
+headers.txt
+final_*.txt
+dashboard_*.txt
+*.backup*
+*_from_server.*
+test_results/
+absolute_test.php
+minimal_test.php
+env_debug.php
+create_admin_user.php
+
+# Uploaded content from server (temporary files)
+index_for_upload.php
+final_index.php
+public_html_index.php
+livewire_blade_fix.blade.php
+livewire_js_fix.js
+test-*.blade.php
+test-*.html
+test_*.php
+upload_*.sh
+
+# Personal configuration files
+dane_hostingu-*.md
+dane_hostingu_backup_*.md
+CLAUDE-*.md
+CLAUDE_*.md
+AI_AGENTS_GUIDE_*.md

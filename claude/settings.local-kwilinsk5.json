@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(dir:*)",
+      "Bash(mkdir:*)",
+      "Bash(pwsh:*)",
+      "Bash(ssh:*)",
+      "Bash(php:*)",
+      "Bash(composer --version)",
+      "WebFetch(domain:ppm.mpptrade.pl)",
+      "Bash(scp:*)",
+      "Bash(ping:*)",
+      "Bash(sftp:*)",
+      "WebFetch(domain:h63.seohost.pl)",
+      "WebFetch(domain:panel.seohost.pl)",
+      "Read(//d/OneDrive - MPP TRADE/AI Instrukcje/OLD_Plan_Projektu/**)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

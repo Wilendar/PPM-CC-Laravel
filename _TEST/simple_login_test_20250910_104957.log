@@ -1,0 +1,79 @@
+[10:49:57] [INFO] PPM-CC-LARAVEL SIMPLE LOGIN TESTER STARTED
+[10:49:57] [INFO] =============================================
+[10:49:57] [INFO] Base URL: https://ppm.mpptrade.pl
+[10:49:57] [INFO] Test Email: admin@mpptrade.pl
+[10:49:57] [INFO] Detailed Output: True
+[10:49:57] [INFO] =============================================
+[10:49:57] [INFO] === TESTING LOGIN PAGE ACCESS ===
+[10:49:57] [INFO] Testing: https://ppm.mpptrade.pl/login
+[10:49:57] [SUCCESS] HTTP Status: 200
+[10:49:57] [DEBUG] Content-Type: text/html; charset=UTF-8
+[10:49:57] [DEBUG] Content Length: 9166 bytes
+[10:49:57] [ERROR] ✗ Missing: Password Input
+[10:49:57] [ERROR] ✗ Missing: Vite Assets
+[10:49:57] [ERROR] ✗ Missing: Email Input
+[10:49:57] [SUCCESS] ✓ Found: CSRF Token
+[10:49:57] [SUCCESS] ✓ Found: Alpine.js
+[10:49:57] [SUCCESS] ✓ Found: Login Form
+[10:49:57] [SUCCESS] ✓ Found: Livewire
+[10:49:57] [INFO] === TESTING JAVASCRIPT ASSETS ===
+[10:49:57] [INFO] Testing: https://ppm.mpptrade.pl/livewire/livewire.min.js
+[10:49:57] [SUCCESS] ✓ Livewire JS: 200 (147400 bytes, application/javascript; charset=utf-8)
+[10:49:57] [DEBUG] First 100 chars: (()=>{var cl=Object.create;var li=Object.defineProperty;var fl=Object.getOwnPropertyDescriptor;var d
+[10:49:57] [INFO] Testing: https://ppm.mpptrade.pl/build/manifest.json
+[10:49:57] [ERROR] ✗ Vite Manifest: FAILED - 
+
+
+
+ 404 Not Found
+@media (prefers-color-scheme:dark){body{background-color:#000!important}}
+
+     
+        404
+Not Found
+
+The resource requested could not be found on this server!
+
+Proudly powered by LiteSpeed Web ServerPlease be advised that LiteSpeed Technologies Inc. is not a web hosting company and, as such, has no control over content found on this site.
+
+[10:49:57] [INFO] Testing: https://ppm.mpptrade.pl/build/assets/app-*.css
+[10:49:57] [WARN] Vite asset test requires manifest lookup - skipping direct test
+[10:49:57] [INFO] Testing: https://ppm.mpptrade.pl/build/assets/app-*.js
+[10:49:57] [WARN] Vite asset test requires manifest lookup - skipping direct test
+[10:49:57] [INFO] === TESTING LOGIN FORM SUBMISSION ===
+[10:49:57] [SUCCESS] ✓ CSRF Token extracted: 2xOmoyI0wfrte8c4m7VS...
+[10:49:57] [INFO] Submitting login form...
+[10:49:57] [INFO] Email: admin@mpptrade.pl
+[10:49:57] [INFO] Password: [HIDDEN]
+[10:49:57] [INFO] CSRF Token: 2xOmoyI0wfrte8c4m7VS...
+[10:49:58] [ERROR] Login form submission failed: 
+
+    
+        
+        
+
+        Redirecting to https://ppm.mpptrade.pl/dashboard
+    
+    
+        Redirecting to https://ppm.mpptrade.pl/dashboard.
+    
+
+[10:49:58] [INFO] === TESTING POST-LOGIN ACCESS ===
+[10:49:58] [INFO] Testing: https://ppm.mpptrade.pl/admin
+[10:49:58] [SUCCESS] ✓ https://ppm.mpptrade.pl/admin: Accessible (200)
+[10:49:58] [INFO] Testing: https://ppm.mpptrade.pl/dashboard
+[10:49:58] [SUCCESS] ✓ https://ppm.mpptrade.pl/dashboard: Accessible (200)
+[10:49:58] [INFO] Testing: https://ppm.mpptrade.pl/admin/dashboard
+[10:49:58] [SUCCESS] ✓ https://ppm.mpptrade.pl/admin/dashboard: Accessible (200)
+[10:49:58] [INFO] === GENERATING TEST REPORT ===
+[10:49:58] [SUCCESS] Report saved: D:\OneDrive - MPP TRADE\Skrypty\PPM-CC-Laravel\_TOOLS\..\test_results\simple_test_report_20250910_104957.json
+[10:49:58] [INFO] =============================================
+[10:49:58] [INFO] TEST SUMMARY
+[10:49:58] [INFO] =============================================
+[10:49:58] [SUCCESS] ✓ Login page accessible
+[10:49:58] [SUCCESS] ✓ Livewire.js appears to load correctly
+[10:49:58] [ERROR] ✗ Login submission has issues: EXCEPTION
+[10:49:58] [INFO] =============================================
+[10:49:58] [INFO] Log file: D:\OneDrive - MPP TRADE\Skrypty\PPM-CC-Laravel\_TOOLS\..\test_results\simple_login_test_20250910_104957.log
+[10:49:58] [INFO] Report file: D:\OneDrive - MPP TRADE\Skrypty\PPM-CC-Laravel\_TOOLS\..\test_results\simple_test_report_20250910_104957.json
+[10:49:58] [INFO] =============================================

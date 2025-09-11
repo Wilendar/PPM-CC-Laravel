@@ -1,0 +1,16 @@
+[10:44:38] [INFO] PPM-CC-LARAVEL AUTOMATED LOGIN TESTER STARTED
+[10:44:38] [INFO] =============================================
+[10:44:38] [INFO] Test URL: https://ppm.mpptrade.pl/login
+[10:44:38] [INFO] Email: admin@mpptrade.pl
+[10:44:38] [INFO] Password: [HIDDEN]
+[10:44:38] [INFO] Headless: False
+[10:44:38] [INFO] Full Debug: True
+[10:44:38] [INFO] Output Directory: D:\OneDrive - MPP TRADE\Skrypty\PPM-CC-Laravel\_TOOLS\..\test_results
+[10:44:38] [INFO] =============================================
+[10:44:38] [INFO] Initializing WebDriver...
+[10:44:38] [WARN] Selenium module not found. Installing...
+[10:44:50] [SUCCESS] Selenium installed and imported
+[10:44:51] [ERROR] Failed to initialize Chrome driver: Exception calling ".ctor" with "1" argument(s): "unknown error: cannot find Chrome binary"
+[10:44:51] [INFO] Trying Edge driver as fallback...
+[10:44:51] [ERROR] Failed to initialize Edge driver: Cannot find type [Microsoft.Edge.SeleniumTools.EdgeOptions]: verify that the assembly containing this type is loaded.
+[10:44:51] [ERROR] ✗ FATAL: Could not initialize WebDriver
