@@ -248,7 +248,7 @@
                              @click.away="open = false"
                              class="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-md shadow-lg py-1 ring-1 ring-black ring-opacity-5 focus:outline-none z-50">
                             
-                            <a href="{{ route('profile') }}" 
+                            <a href="{{ route('profile.show') }}" 
                                class="block px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">
                                 <div class="flex items-center">
                                     <svg class="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -305,13 +305,13 @@
                 <a href="{{ route('admin.dashboard') }}" class="flex items-center p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700">
                     <span>Dashboard</span>
                 </a>
-                <a href="{{ route('admin.users.index') }}" class="flex items-center p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700">
+                <a href="{{ route('admin.users') }}" class="flex items-center p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700">
                     <span>Użytkownicy</span>
                 </a>
-                <a href="{{ route('admin.shops.index') }}" class="flex items-center p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700">
+                <a href="{{ route('admin.shops') }}" class="flex items-center p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700">
                     <span>Sklepy PrestaShop</span>
                 </a>
-                <a href="{{ route('admin.integrations.index') }}" class="flex items-center p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700">
+                <a href="{{ route('admin.integrations') }}" class="flex items-center p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700">
                     <span>Integracje ERP</span>
                 </a>
                 <a href="{{ route('admin.system-settings.index') }}" class="flex items-center p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700">
