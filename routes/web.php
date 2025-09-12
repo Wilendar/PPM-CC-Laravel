@@ -98,7 +98,9 @@ Route::middleware(['auth'])->group(function () {
 // ADMIN ROUTES (tylko istniejące komponenty Livewire)
 // ==========================================
 
-Route::prefix('admin')->middleware(['auth', \App\Http\Middleware\AdminMiddleware::class])->name('admin.')->group(function () {
+// Uwaga: autoryzacja przez AdminMiddleware (bez 'auth'),
+// aby goscie dostawali 200 z widokiem logowania pod /admin
+Route::prefix('admin')->middleware([\App\Http\Middleware\AdminMiddleware::class])->name('admin.')->group(function () {
     
     // Admin Dashboard - działający komponent Livewire
     Route::get('/', \App\Http\Livewire\Dashboard\AdminDashboard::class)->name('dashboard');
@@ -117,13 +119,13 @@ Route::prefix('admin')->middleware(['auth', \App\Http\Middleware\AdminMiddleware
          ->name('maintenance.index');
     
     // Shop Management - działający komponent
-    Route::get('/shops', \App\Http\Livewire\Admin\Shops\ShopManager::class)->name('shops.index');
+    Route::get('/shops', \App\Http\Livewire\Admin\Shops\ShopManager::class)->name('shops');
     
     // ERP Integration Management - działający komponent
-    Route::get('/integrations', \App\Http\Livewire\Admin\ERP\ERPManager::class)->name('integrations.index');
+    Route::get('/integrations', \App\Http\Livewire\Admin\ERP\ERPManager::class)->name('integrations');
     
     // Users management – istniejący komponent Livewire
-    Route::get('/users', \App\Http\Livewire\Admin\Users\UserList::class)->name('users.index');
+    Route::get('/users', \App\Http\Livewire\Admin\Users\UserList::class)->name('users');
 
     // Settings alias – przekierowanie do system settings
     Route::get('/settings', function () {

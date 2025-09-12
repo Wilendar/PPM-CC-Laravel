@@ -185,6 +185,8 @@ n### FAZA C: System Administration - COMPLETED 2025-01-09
 - **Nie tworzyć**: Niepotrzebnych wersji plików (_v1, _v2, etc.)
 - **OAuth**: Implementować jako ostatni krok (Google Workspace + Microsoft)
 - **Pierwszy admin**: Setup przez bezpośrednie wprowadzenie danych (email, hasło, firma)
+- **NIGDY** nie hardcodujesz na sztywno wpisanych wartości w kodzie, chyba, że użytkownik Cię o to wyraźnie poprosi.
+- **KRYTYCZNE** masz zakaz tworzenia danych mockowych! Jezeli dane do których odnoszą sie panele / funkcje jeszcze nie istnieja, to musisz je stworzyć w pierwszej kolejności i następnie powrócić do tego zadania aby je ukończyć!
 
 ## Super Admin Account - Testing & Verification
 

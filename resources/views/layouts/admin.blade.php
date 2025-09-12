@@ -1,5 +1,18 @@
 <!DOCTYPE html>
-<html lang="pl" x-data="{ darkMode: $persist(false) }" :class="{ 'dark': darkMode }">
+<html lang="pl" x-data="{ 
+    darkMode: localStorage.getItem('darkMode') !== 'false',
+    userMenuOpen: false,
+    quick: false,
+    q: '',
+    init() {
+        // Set dark mode as default for admin panel
+        if (localStorage.getItem('darkMode') === null) {
+            this.darkMode = true;
+            localStorage.setItem('darkMode', 'true');
+        }
+        this.$watch('darkMode', value => localStorage.setItem('darkMode', value))
+    }
+}" :class="{ 'dark': darkMode }" class="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -12,28 +25,355 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     
-    {{-- Tailwind CSS --}}
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        tailwind.config = {
-            darkMode: 'class',
-            theme: {
-                extend: {
-                    fontFamily: {
-                        'sans': ['Inter', 'sans-serif'],
-                    },
-                    colors: {
-                        'ppm-primary': '#e0ac7e',        // MPP TRADE Orange as primary
-                        'ppm-secondary': '#059669',      // Keep green for secondary
-                        'ppm-accent': '#d1975a',        // Darker orange for accents
-                    }
-                }
-            }
+    {{-- Complete Tailwind CSS for Admin Panel --}}
+    <style>
+        /* Layout & Display */
+        .flex { display: flex; }
+        .grid { display: grid; }
+        .hidden { display: none; }
+        .block { display: block; }
+        .inline-flex { display: inline-flex; }
+        .inline-block { display: inline-block; }
+        
+        /* Flexbox */
+        .items-center { align-items: center; }
+        .items-start { align-items: flex-start; }
+        .justify-between { justify-content: space-between; }
+        .justify-center { justify-content: center; }
+        .flex-col { flex-direction: column; }
+        .flex-1 { flex: 1 1 0%; }
+        .flex-shrink-0 { flex-shrink: 0; }
+        
+        /* Grid */
+        .grid-cols-1 { grid-template-columns: repeat(1, minmax(0, 1fr)); }
+        .grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        .grid-cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+        .grid-cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+        .gap-4 { gap: 1rem; }
+        .gap-6 { gap: 1.5rem; }
+        .gap-8 { gap: 2rem; }
+        
+        /* Spacing */
+        .space-x-2 > * + * { margin-left: 0.5rem; }
+        .space-x-3 > * + * { margin-left: 0.75rem; }
+        .space-x-4 > * + * { margin-left: 1rem; }
+        .space-x-6 > * + * { margin-left: 1.5rem; }
+        .space-x-8 > * + * { margin-left: 2rem; }
+        .space-y-2 > * + * { margin-top: 0.5rem; }
+        .space-y-3 > * + * { margin-top: 0.75rem; }
+        .space-y-4 > * + * { margin-top: 1rem; }
+        .space-y-6 > * + * { margin-top: 1.5rem; }
+        
+        /* Padding */
+        .p-2 { padding: 0.5rem; }
+        .p-3 { padding: 0.75rem; }
+        .p-4 { padding: 1rem; }
+        .p-6 { padding: 1.5rem; }
+        .p-8 { padding: 2rem; }
+        .px-2 { padding-left: 0.5rem; padding-right: 0.5rem; }
+        .px-3 { padding-left: 0.75rem; padding-right: 0.75rem; }
+        .px-4 { padding-left: 1rem; padding-right: 1rem; }
+        .px-6 { padding-left: 1.5rem; padding-right: 1.5rem; }
+        .px-8 { padding-left: 2rem; padding-right: 2rem; }
+        .py-1 { padding-top: 0.25rem; padding-bottom: 0.25rem; }
+        .py-2 { padding-top: 0.5rem; padding-bottom: 0.5rem; }
+        .py-3 { padding-top: 0.75rem; padding-bottom: 0.75rem; }
+        .py-4 { padding-top: 1rem; padding-bottom: 1rem; }
+        .py-6 { padding-top: 1.5rem; padding-bottom: 1.5rem; }
+        .py-8 { padding-top: 2rem; padding-bottom: 2rem; }
+        .pt-1 { padding-top: 0.25rem; }
+        .pb-4 { padding-bottom: 1rem; }
+        .pl-3 { padding-left: 0.75rem; }
+        
+        /* Margin */
+        .m-0 { margin: 0; }
+        .mt-1 { margin-top: 0.25rem; }
+        .mt-2 { margin-top: 0.5rem; }
+        .mt-3 { margin-top: 0.75rem; }
+        .mt-4 { margin-top: 1rem; }
+        .mt-6 { margin-top: 1.5rem; }
+        .mb-2 { margin-bottom: 0.5rem; }
+        .mb-4 { margin-bottom: 1rem; }
+        .mb-6 { margin-bottom: 1.5rem; }
+        .mb-8 { margin-bottom: 2rem; }
+        .ml-2 { margin-left: 0.5rem; }
+        .ml-3 { margin-left: 0.75rem; }
+        .ml-4 { margin-left: 1rem; }
+        .mr-1 { margin-right: 0.25rem; }
+        .mr-2 { margin-right: 0.5rem; }
+        .mr-3 { margin-right: 0.75rem; }
+        .mx-auto { margin-left: auto; margin-right: auto; }
+        .-mt-1 { margin-top: -0.25rem; }
+        
+        /* Width & Height */
+        .w-3 { width: 0.75rem; }
+        .w-4 { width: 1rem; }
+        .w-5 { width: 1.25rem; }
+        .w-6 { width: 1.5rem; }
+        .w-8 { width: 2rem; }
+        .w-10 { width: 2.5rem; }
+        .w-12 { width: 3rem; }
+        .w-16 { width: 4rem; }
+        .w-20 { width: 5rem; }
+        .w-32 { width: 8rem; }
+        .w-48 { width: 12rem; }
+        .w-64 { width: 16rem; }
+        .w-full { width: 100%; }
+        .h-3 { height: 0.75rem; }
+        .h-4 { height: 1rem; }
+        .h-5 { height: 1.25rem; }
+        .h-6 { height: 1.5rem; }
+        .h-8 { height: 2rem; }
+        .h-10 { height: 2.5rem; }
+        .h-12 { height: 3rem; }
+        .h-16 { height: 4rem; }
+        .h-20 { height: 5rem; }
+        .h-32 { height: 8rem; }
+        .h-48 { height: 12rem; }
+        .h-full { height: 100%; }
+        .min-h-screen { min-height: 100vh; }
+        .min-w-0 { min-width: 0; }
+        .max-w-2xl { max-width: 42rem; }
+        .max-w-4xl { max-width: 56rem; }
+        .max-w-7xl { max-width: 80rem; }
+        
+        /* Position */
+        .relative { position: relative; }
+        .absolute { position: absolute; }
+        .fixed { position: fixed; }
+        .static { position: static; }
+        .sticky { position: sticky; }
+        .inset-0 { inset: 0; }
+        .top-0 { top: 0; }
+        .top-1 { top: 0.25rem; }
+        .top-4 { top: 1rem; }
+        .right-0 { right: 0; }
+        .right-4 { right: 1rem; }
+        .bottom-0 { bottom: 0; }
+        .left-0 { left: 0; }
+        .-top-0\\.5 { top: -0.125rem; }
+        .-right-0\\.5 { right: -0.125rem; }
+        
+        /* Z-Index */
+        .z-10 { z-index: 10; }
+        .z-20 { z-index: 20; }
+        .z-30 { z-index: 30; }
+        .z-40 { z-index: 40; }
+        .z-50 { z-index: 50; }
+        
+        /* Typography */
+        .text-xs { font-size: 0.75rem; line-height: 1rem; }
+        .text-sm { font-size: 0.875rem; line-height: 1.25rem; }
+        .text-base { font-size: 1rem; line-height: 1.5rem; }
+        .text-lg { font-size: 1.125rem; line-height: 1.75rem; }
+        .text-xl { font-size: 1.25rem; line-height: 1.75rem; }
+        .text-2xl { font-size: 1.5rem; line-height: 2rem; }
+        .text-3xl { font-size: 1.875rem; line-height: 2.25rem; }
+        .font-medium { font-weight: 500; }
+        .font-semibold { font-weight: 600; }
+        .font-bold { font-weight: 700; }
+        .leading-4 { line-height: 1rem; }
+        .leading-5 { line-height: 1.25rem; }
+        .leading-6 { line-height: 1.5rem; }
+        .text-left { text-align: left; }
+        .text-center { text-align: center; }
+        .text-right { text-align: right; }
+        .uppercase { text-transform: uppercase; }
+        .capitalize { text-transform: capitalize; }
+        .tracking-tight { letter-spacing: -0.025em; }
+        .tracking-wide { letter-spacing: 0.025em; }
+        
+        /* Colors */
+        .text-white { color: rgb(255 255 255); }
+        .text-gray-50 { color: rgb(249 250 251); }
+        .text-gray-100 { color: rgb(243 244 246); }
+        .text-gray-200 { color: rgb(229 231 235); }
+        .text-gray-300 { color: rgb(209 213 219); }
+        .text-gray-400 { color: rgb(156 163 175); }
+        .text-gray-500 { color: rgb(107 114 128); }
+        .text-gray-600 { color: rgb(75 85 99); }
+        .text-gray-700 { color: rgb(55 65 81); }
+        .text-gray-800 { color: rgb(31 41 55); }
+        .text-gray-900 { color: rgb(17 24 39); }
+        .text-red-100 { color: rgb(254 226 226); }
+        .text-red-400 { color: rgb(248 113 113); }
+        .text-red-600 { color: rgb(220 38 38); }
+        .text-red-800 { color: rgb(153 27 27); }
+        .text-green-400 { color: rgb(74 222 128); }
+        .text-green-600 { color: rgb(22 163 74); }
+        .text-green-800 { color: rgb(22 101 52); }
+        .text-blue-400 { color: rgb(96 165 250); }
+        .text-blue-500 { color: rgb(59 130 246); }
+        .text-blue-600 { color: rgb(37 99 235); }
+        .text-yellow-400 { color: rgb(250 204 21); }
+        .text-orange-500 { color: rgb(249 115 22); }
+        
+        /* Backgrounds */
+        .bg-transparent { background-color: transparent; }
+        .bg-white { background-color: rgb(255 255 255); }
+        .bg-gray-50 { background-color: rgb(249 250 251); }
+        .bg-gray-100 { background-color: rgb(243 244 246); }
+        .bg-gray-200 { background-color: rgb(229 231 235); }
+        .bg-gray-300 { background-color: rgb(209 213 219); }
+        .bg-gray-400 { background-color: rgb(156 163 175); }
+        .bg-gray-500 { background-color: rgb(107 114 128); }
+        .bg-gray-600 { background-color: rgb(75 85 99); }
+        .bg-gray-700 { background-color: rgb(55 65 81); }
+        .bg-gray-800 { background-color: rgb(31 41 55); }
+        .bg-gray-900 { background-color: rgb(17 24 39); }
+        .bg-red-50 { background-color: rgb(254 242 242); }
+        .bg-red-400 { background-color: rgb(248 113 113); }
+        .bg-red-600 { background-color: rgb(220 38 38); }
+        .bg-green-50 { background-color: rgb(240 253 244); }
+        .bg-green-400 { background-color: rgb(74 222 128); }
+        .bg-green-500 { background-color: rgb(34 197 94); }
+        .bg-blue-50 { background-color: rgb(239 246 255); }
+        .bg-blue-400 { background-color: rgb(96 165 250); }
+        .bg-blue-500 { background-color: rgb(59 130 246); }
+        .bg-blue-600 { background-color: rgb(37 99 235); }
+        .bg-indigo-500 { background-color: rgb(99 102 241); }
+        .bg-purple-500 { background-color: rgb(168 85 247); }
+        .bg-yellow-400 { background-color: rgb(250 204 21); }
+        .bg-orange-500 { background-color: rgb(249 115 22); }
+        
+        /* Background transparency */
+        .bg-white\/10 { background-color: rgb(255 255 255 / 0.1); }
+        .bg-gray-800\/30 { background-color: rgb(31 41 55 / 0.3); }
+        .bg-gray-800\/50 { background-color: rgb(31 41 55 / 0.5); }
+        .bg-gray-700\/50 { background-color: rgb(55 65 81 / 0.5); }
+        .bg-black { background-color: rgb(0 0 0); }
+        .bg-opacity-25 { --tw-bg-opacity: 0.25; }
+        
+        /* Borders */
+        .border { border-width: 1px; }
+        .border-t { border-top-width: 1px; }
+        .border-b { border-bottom-width: 1px; }
+        .border-l-4 { border-left-width: 4px; }
+        .border-b-2 { border-bottom-width: 2px; }
+        .border-transparent { border-color: transparent; }
+        .border-gray-100 { border-color: rgb(243 244 246); }
+        .border-gray-200 { border-color: rgb(229 231 235); }
+        .border-gray-300 { border-color: rgb(209 213 219); }
+        .border-gray-600 { border-color: rgb(75 85 99); }
+        .border-gray-700 { border-color: rgb(55 65 81); }
+        .border-red-400 { border-color: rgb(248 113 113); }
+        .border-green-400 { border-color: rgb(74 222 128); }
+        
+        /* Border Radius */
+        .rounded { border-radius: 0.25rem; }
+        .rounded-md { border-radius: 0.375rem; }
+        .rounded-lg { border-radius: 0.5rem; }
+        .rounded-xl { border-radius: 0.75rem; }
+        .rounded-full { border-radius: 9999px; }
+        
+        /* Shadows */
+        .shadow { box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1); }
+        .shadow-sm { box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05); }
+        .shadow-md { box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1); }
+        .shadow-lg { box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1); }
+        .shadow-xl { box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1); }
+        .shadow-2xl { box-shadow: 0 25px 50px -12px rgb(0 0 0 / 0.25); }
+        
+        /* Ring */
+        .ring-1 { --tw-ring-offset-shadow: var(--tw-ring-inset) 0 0 0 var(--tw-ring-offset-width) var(--tw-ring-offset-color); --tw-ring-shadow: var(--tw-ring-inset) 0 0 0 calc(1px + var(--tw-ring-offset-width)) var(--tw-ring-color); box-shadow: var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow, 0 0 #0000); }
+        .ring-black { --tw-ring-color: rgb(0 0 0); }
+        .ring-opacity-5 { --tw-ring-opacity: 0.05; }
+        
+        /* Backdrop */
+        .backdrop-blur-md { backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
+        
+        /* Transitions */
+        .transition { transition-property: color, background-color, border-color, text-decoration-color, fill, stroke, opacity, box-shadow, transform, filter, backdrop-filter; transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1); transition-duration: 150ms; }
+        .transition-all { transition-property: all; transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1); transition-duration: 150ms; }
+        .transition-opacity { transition-property: opacity; transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1); transition-duration: 150ms; }
+        .transition-transform { transition-property: transform; transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1); transition-duration: 150ms; }
+        .duration-75 { transition-duration: 75ms; }
+        .duration-150 { transition-duration: 150ms; }
+        .duration-200 { transition-duration: 200ms; }
+        .duration-300 { transition-duration: 300ms; }
+        .duration-500 { transition-duration: 500ms; }
+        .duration-1000 { transition-duration: 1000ms; }
+        .ease-in { transition-timing-function: cubic-bezier(0.4, 0, 1, 1); }
+        .ease-out { transition-timing-function: cubic-bezier(0, 0, 0.2, 1); }
+        .ease-in-out { transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1); }
+        
+        /* Transforms */
+        .scale-95 { transform: scale(0.95); }
+        .scale-100 { transform: scale(1); }
+        .scale-105 { transform: scale(1.05); }
+        .transform { transform: translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y)); }
+        
+        /* Focus & Hover States */
+        .focus\:outline-none:focus { outline: 2px solid transparent; outline-offset: 2px; }
+        .focus\:ring-2:focus { --tw-ring-offset-shadow: var(--tw-ring-inset) 0 0 0 var(--tw-ring-offset-width) var(--tw-ring-offset-color); --tw-ring-shadow: var(--tw-ring-inset) 0 0 0 calc(2px + var(--tw-ring-offset-width)) var(--tw-ring-color); box-shadow: var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow, 0 0 #0000); }
+        .focus\:ring-4:focus { --tw-ring-offset-shadow: var(--tw-ring-inset) 0 0 0 var(--tw-ring-offset-width) var(--tw-ring-offset-color); --tw-ring-shadow: var(--tw-ring-inset) 0 0 0 calc(4px + var(--tw-ring-offset-width)) var(--tw-ring-color); box-shadow: var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow, 0 0 #0000); }
+        .focus\:ring-inset:focus { --tw-ring-inset: inset; }
+        .focus\:ring-offset-2:focus { --tw-ring-offset-width: 2px; }
+        
+        .hover\:bg-gray-100:hover { background-color: rgb(243 244 246); }
+        .hover\:bg-gray-200:hover { background-color: rgb(229 231 235); }
+        .hover\:bg-gray-700:hover { background-color: rgb(55 65 81); }
+        .hover\:text-gray-200:hover { color: rgb(229 231 235); }
+        .hover\:text-gray-500:hover { color: rgb(107 114 128); }
+        .hover\:text-gray-700:hover { color: rgb(55 65 81); }
+        .hover\:text-gray-900:hover { color: rgb(17 24 39); }
+        .hover\:text-white:hover { color: rgb(255 255 255); }
+        .hover\:text-red-600:hover { color: rgb(220 38 38); }
+        .hover\:text-green-600:hover { color: rgb(22 163 74); }
+        .hover\:shadow-lg:hover { box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1); }
+        .hover\:scale-105:hover { transform: scale(1.05); }
+        .hover\:border-gray-300:hover { border-color: rgb(209 213 219); }
+        
+        /* Dark mode styles */
+        .dark .dark\:bg-gray-50 { background-color: rgb(249 250 251); }
+        .dark .dark\:bg-gray-100 { background-color: rgb(243 244 246); }
+        .dark .dark\:bg-gray-200 { background-color: rgb(229 231 235); }
+        .dark .dark\:bg-gray-600 { background-color: rgb(75 85 99); }
+        .dark .dark\:bg-gray-700 { background-color: rgb(55 65 81); }
+        .dark .dark\:bg-gray-800 { background-color: rgb(31 41 55); }
+        .dark .dark\:bg-gray-900 { background-color: rgb(17 24 39); }
+        .dark .dark\:text-white { color: rgb(255 255 255); }
+        .dark .dark\:text-gray-100 { color: rgb(243 244 246); }
+        .dark .dark\:text-gray-200 { color: rgb(229 231 235); }
+        .dark .dark\:text-gray-300 { color: rgb(209 213 219); }
+        .dark .dark\:text-gray-400 { color: rgb(156 163 175); }
+        .dark .dark\:text-gray-500 { color: rgb(107 114 128); }
+        .dark .dark\:border-gray-600 { border-color: rgb(75 85 99); }
+        .dark .dark\:border-gray-700 { border-color: rgb(55 65 81); }
+        .dark .dark\:hover\:bg-gray-700:hover { background-color: rgb(55 65 81); }
+        .dark .dark\:hover\:text-gray-200:hover { color: rgb(229 231 235); }
+        .dark .dark\:hover\:text-white:hover { color: rgb(255 255 255); }
+        
+        /* Responsive utilities */
+        @media (min-width: 640px) {
+            .sm\:px-6 { padding-left: 1.5rem; padding-right: 1.5rem; }
+            .sm\:text-left { text-align: left; }
+            .sm\:block { display: block; }
         }
-    </script>
-    
-    {{-- Alpine.js --}}
-    <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+        
+        @media (min-width: 768px) {
+            .md\:block { display: block; }
+            .md\:grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+            .md\:grid-cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+        }
+        
+        @media (min-width: 1024px) {
+            .lg\:px-8 { padding-left: 2rem; padding-right: 2rem; }
+            .lg\:block { display: block; }
+            .lg\:grid-cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+        }
+        
+        @media (min-width: 1280px) {
+            .xl\:grid-cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+        }
+        
+        /* Custom utility classes */
+        .antialiased { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+        .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+        .overflow-hidden { overflow: hidden; }
+        .overflow-y-auto { overflow-y: auto; }
+        .cursor-pointer { cursor: pointer; }
+    </style>
     
     <!-- Custom admin styles -->
     <style>
@@ -133,7 +473,7 @@
     <!-- Additional head content -->
     @stack('head')
 </head>
-<body class="admin-bg bg-grid-pattern text-gray-100 antialiased">
+<body class="admin-bg bg-grid-pattern text-gray-100 antialiased bg-gray-900 dark:bg-gray-900">
     <!-- Admin Navigation -->
     <nav class="bg-gray-800/50 backdrop-blur-md shadow-lg border-b border-gray-700/30">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -195,7 +535,7 @@
                 </div>
                 
                 <!-- Right side - Search, Quick actions, User menu -->
-                <div class="flex items-center space-x-4" x-data="{ quick:false, q:'' }">
+                <div class="flex items-center space-x-4">
                     <!-- Global search -->
                     <div class="hidden lg:block">
                         <input type="search" x-model="q" placeholder="Szukaj..."
@@ -239,21 +579,21 @@
                     </button>
                     
                     <!-- User menu dropdown -->
-                    <div class="relative" x-data="{ open: false }">
-                        <button @click="open = !open" 
+                    <div class="relative">
+                        <button @click="userMenuOpen = !userMenuOpen" 
                                 class="flex items-center space-x-3 text-sm rounded-full focus:outline-none focus:ring-2 focus:ring-offset-2 p-2 hover:bg-gray-100 dark:hover:bg-gray-700"
                                 style="--tw-ring-color: #e0ac7e;"
                             <div class="h-8 w-8 rounded-full bg-gray-300 dark:bg-gray-600 flex items-center justify-center">
                                 <span class="text-sm font-medium text-gray-700 dark:text-gray-200">
-                                    {{ substr(auth()->user()->name, 0, 1) }}
+                                    {{ auth()->check() ? substr(auth()->user()->name, 0, 1) : 'A' }}
                                 </span>
                             </div>
                             <div class="hidden md:block text-left">
                                 <div class="text-sm font-medium text-gray-900 dark:text-white">
-                                    {{ auth()->user()->name }}
+                                    {{ auth()->check() ? auth()->user()->name : 'Admin' }}
                                 </div>
                                 <div class="text-xs text-gray-500 dark:text-gray-400">
-                                    {{ auth()->user()->getRoleNames()->first() }}
+                                    {{ auth()->check() ? auth()->user()->getRoleNames()->first() : 'Administrator' }}
                                 </div>
                             </div>
                             <svg class="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -262,15 +602,15 @@
                         </button>
                         
                         <!-- Dropdown menu -->
-                        <div x-show="open" 
+                        <div x-show="userMenuOpen" 
                              x-transition:enter="transition ease-out duration-200"
                              x-transition:enter-start="opacity-0 scale-95"
                              x-transition:enter-end="opacity-100 scale-100"
                              x-transition:leave="transition ease-in duration-75"
                              x-transition:leave-start="opacity-100 scale-100"
                              x-transition:leave-end="opacity-0 scale-95"
-                             @click.away="open = false"
-                             class="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-md shadow-lg py-1 ring-1 ring-black ring-opacity-5 focus:outline-none z-50">
+                             @click.away="userMenuOpen = false"
+                             class="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-md shadow-lg py-1 ring-1 ring-black ring-opacity-5 focus:outline-none" style="z-index: 99999 !important;">
                             
                             <a href="{{ route('profile.show') }}" 
                                class="block px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">
@@ -387,7 +727,7 @@
     @endif
     
     <!-- Main Content -->
-    <main class="flex-1">
+    <main class="flex-1 bg-gray-900 min-h-screen">
         {{ $slot }}
     </main>
     

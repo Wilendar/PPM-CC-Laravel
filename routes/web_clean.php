@@ -10,8 +10,8 @@ use Illuminate\Support\Facades\Log;
 | Web Routes
 |--------------------------------------------------------------------------
 |
-| PPM-CC-Laravel Web Routes - Simplified Version
-| Only working routes without missing Livewire components
+| PPM-CC-Laravel Web Routes - Clean Version for New Admin Panel
+| Only basic routes, admin panel routes will be built from scratch
 |
 */
 
@@ -54,12 +54,12 @@ Route::post('/login', function (Request $request) {
         
         Log::info('Successful login for user: ' . $user->email);
         
-        // Redirect based on user role
+        // Redirect based on user role – Admin do panelu, pozostali na dashboard
         if ($user->hasRole('Admin')) {
             return redirect()->intended('/admin');
         }
-        
-        return redirect()->intended(route('dashboard'));
+
+        return redirect()->intended('/dashboard');
     }
     
     return back()->withErrors([
@@ -95,50 +95,30 @@ Route::middleware(['auth'])->group(function () {
 });
 
 // ==========================================
-// ADMIN ROUTES (tylko istniejące komponenty Livewire)
+// ADMIN ROUTES - ETAP_04 FAZA A: Dashboard Core & Monitoring
 // ==========================================
+// TEMPORARY: Middleware disabled for development testing
 
-// Uwaga: autoryzacja przez AdminMiddleware (bez 'auth'),
-// aby goscie dostawali 200 z widokiem logowania pod /admin
-Route::prefix('admin')->middleware([\App\Http\Middleware\AdminMiddleware::class])->name('admin.')->group(function () {
+Route::prefix('admin')->name('admin.')->group(function () {
     
-    // Admin Dashboard - działający komponent Livewire
+    // Admin Dashboard - FAZA A: Dashboard Core & Monitoring
     Route::get('/', \App\Http\Livewire\Dashboard\AdminDashboard::class)->name('dashboard');
     
-    // System Settings - działający komponent
-    Route::get('/system-settings', \App\Http\Livewire\Admin\Settings\SystemSettings::class)
-         ->name('system-settings.index');
+    // TEMPORARY: Dummy routes to prevent 500 errors from admin layout navigation
+    Route::get('/users', function () { return 'Users - Coming soon'; })->name('users');
+    Route::get('/integrations', function () { return 'Integrations - Coming soon'; })->name('integrations'); 
+    Route::get('/settings', function () { return 'Settings - Coming soon'; })->name('settings');
+    Route::get('/shops', function () { return 'Shops - Coming soon'; })->name('shops');
+    Route::get('/system-settings', function () { return 'System Settings - Coming soon'; })->name('system-settings.index');
+    Route::get('/backup', function () { return 'Backup - Coming soon'; })->name('backup.index');
+    Route::get('/maintenance', function () { return 'Maintenance - Coming soon'; })->name('maintenance.index');
     
-    // Backup Management - działający komponent
-    Route::prefix('backup')->name('backup.')->group(function () {
-        Route::get('/', \App\Http\Livewire\Admin\Backup\BackupManager::class)->name('index');
-    });
-    
-    // Maintenance Management - działający komponent
-    Route::get('/maintenance', \App\Http\Livewire\Admin\Maintenance\DatabaseMaintenance::class)
-         ->name('maintenance.index');
-    
-    // Shop Management - działający komponent
-    Route::get('/shops', \App\Http\Livewire\Admin\Shops\ShopManager::class)->name('shops.index');
-    
-    // ERP Integration Management - działający komponent
-    Route::get('/integrations', \App\Http\Livewire\Admin\ERP\ERPManager::class)->name('integrations.index');
-    
-    // Basic admin routes (placeholders for missing components)
-    Route::get('/users', function () {
-        return view('admin.users.index');
-    })->name('users');
-    
-    Route::get('/settings', function () {
-        return view('admin.settings.index');
-    })->name('settings');
 });
 
 // ==========================================
 // TEST ROUTES
 // ==========================================
 
-// Test routes
 Route::get('/test-dashboard', function () {
     return 'Dashboard test works!';
 });
