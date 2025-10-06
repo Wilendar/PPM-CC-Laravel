@@ -144,7 +144,7 @@ class ProductPrice extends Model
     }
 
     /**
-     * Boot the model - Auto-calculations
+     * Boot the model - Auto-calculations + Audit trail
      */
     protected static function boot(): void
     {
@@ -157,10 +157,55 @@ class ProductPrice extends Model
             }
 
             // Auto-calculate margin if enabled and cost_price available
-            if ($price->auto_calculate_margin && $price->cost_price && 
+            if ($price->auto_calculate_margin && $price->cost_price &&
                 ($price->isDirty('price_net') || $price->isDirty('cost_price'))) {
                 $price->calculateMargin();
             }
+        });
+
+        // Create audit trail on creation
+        static::created(function ($productPrice) {
+            \App\Models\PriceHistory::createForModel(
+                $productPrice,
+                'created',
+                [],
+                $productPrice->toArray(),
+                [
+                    'reason' => 'Product price created',
+                    'source' => 'system'
+                ]
+            );
+        });
+
+        // Create audit trail on update
+        static::updated(function ($productPrice) {
+            $oldValues = $productPrice->getOriginal();
+            $newValues = $productPrice->toArray();
+
+            \App\Models\PriceHistory::createForModel(
+                $productPrice,
+                'updated',
+                $oldValues,
+                $newValues,
+                [
+                    'reason' => 'Product price updated',
+                    'source' => 'system'
+                ]
+            );
+        });
+
+        // Create audit trail on deletion
+        static::deleted(function ($productPrice) {
+            \App\Models\PriceHistory::createForModel(
+                $productPrice,
+                'deleted',
+                $productPrice->toArray(),
+                [],
+                [
+                    'reason' => 'Product price deleted',
+                    'source' => 'system'
+                ]
+            );
         });
     }
 

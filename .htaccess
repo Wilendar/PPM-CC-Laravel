@@ -1,3 +1,6 @@
+# Force PHP 8.3 for Laravel 12.x compatibility
+AddHandler application/x-httpd-php83 .php
+
 <IfModule mod_negotiation.c>
     Options -MultiViews -Indexes
 </IfModule>
@@ -12,6 +15,16 @@
     # Redirect Trailing Slashes If Not A Folder...
     RewriteCond %{REQUEST_FILENAME} !-d
     RewriteRule ^(.*)/$ /$1 [L,R=301]
+
+    # Allow direct access to public folder
+    RewriteCond %{REQUEST_URI} ^/public/
+    RewriteCond %{REQUEST_FILENAME} -f
+    RewriteRule ^ - [L]
+
+    # Allow direct access to css folder
+    RewriteCond %{REQUEST_URI} ^/css/
+    RewriteCond %{REQUEST_FILENAME} -f
+    RewriteRule ^ - [L]
 
     # Send Requests To Front Controller...
     RewriteCond %{REQUEST_FILENAME} !-d

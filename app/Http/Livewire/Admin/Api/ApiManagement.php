@@ -137,9 +137,9 @@ class ApiManagement extends Component
         $this->autoRefresh = !$this->autoRefresh;
         
         if ($this->autoRefresh) {
-            $this->emit('startAutoRefresh', $this->refreshInterval);
+            $this->dispatch('startAutoRefresh', $this->refreshInterval);
         } else {
-            $this->emit('stopAutoRefresh');
+            $this->dispatch('stopAutoRefresh');
         }
     }
 
@@ -224,7 +224,7 @@ class ApiManagement extends Component
         $apiService = app(ApiMonitoringService::class);
         $deletedCount = $apiService->cleanupOldLogs(90);
         
-        $this->emit('showToast', [
+        $this->dispatch('showToast', [
             'type' => 'success',
             'title' => 'Logi wyczyszczone',
             'message' => "Usunięto {$deletedCount} starych logów API.",
@@ -263,7 +263,7 @@ class ApiManagement extends Component
     public function updatedRefreshInterval()
     {
         if ($this->autoRefresh) {
-            $this->emit('updateRefreshInterval', $this->refreshInterval);
+            $this->dispatch('updateRefreshInterval', $this->refreshInterval);
         }
     }
 

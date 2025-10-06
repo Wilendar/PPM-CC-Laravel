@@ -1,5 +1,44 @@
 # ✅ ETAP_03: System Autoryzacji i Uprawnień
 
+## 🔍 INSTRUKCJE PRZED ROZPOCZĘCIEM ETAP
+
+**⚠️ OBOWIĄZKOWE KROKI:**
+1. **Przeanalizuj dokumentację struktury:** Przeczytaj `_DOCS/Struktura_Plikow_Projektu.md` i `_DOCS/Struktura_Bazy_Danych.md`
+2. **Sprawdź aktualny stan:** Porównaj obecną strukturę plików z planem w tym ETAP
+3. **Zidentyfikuj nowe komponenty:** Lista plików/tabel/modeli do utworzenia w tym ETAP
+4. **Zaktualizuj dokumentację:** Dodaj planowane komponenty z statusem ❌ do dokumentacji struktury
+
+**PLANOWANE KOMPONENTY W TYM ETAP:**
+```
+Komponenty Livewire do utworzenia:
+- app/Http/Livewire/Auth/Login.php
+- app/Http/Livewire/Auth/Register.php
+- app/Http/Livewire/Profile/UserProfile.php
+
+Views to utworzenia:
+- resources/views/livewire/auth/login.blade.php
+- resources/views/livewire/auth/register.blade.php
+- resources/views/layouts/auth.blade.php
+
+Middleware do utworzenia:
+- app/Http/Middleware/RoleMiddleware.php
+- app/Http/Middleware/PermissionMiddleware.php
+
+Tabele bazy danych (Spatie):
+- roles table
+- permissions table
+- model_has_permissions table
+- model_has_roles table
+- role_has_permissions table
+
+Extended User Model:
+- OAuth fields (google_id, microsoft_id)
+- Dashboard preferences
+- Two-factor authentication fields
+```
+
+---
+
 **Status ETAPU:** ✅ **COMPLETED - FINAL COMPLETION**  
 **Czas rzeczywisty:** 40 godzin (zgodnie z szacunkiem)  
 **Priorytet:** 🟢 UKOŃCZONY  
@@ -100,15 +139,19 @@ Trzeci etap budowy aplikacji PPM koncentruje się na implementacji zaawansowaneg
         - ❌ 1.2.2.1.5 Zarządzanie backupami i logami
       - ❌ **1.2.2.2 Manager permissions**
         - ❌ 1.2.2.2.1 Pełny CRUD produktów i kategorii
+        **🔗 POWIAZANIE Z ETAP_05 (sekcje 2.1-2.3):** Uprawnienia managera musza pokrywac formularze i listy produktowe z modulu Produktow.
         - ❌ 1.2.2.2.2 Import/export masowy
+        **🔗 POWIAZANIE Z ETAP_06 (sekcja 5.2):** Dostep do masowych operacji wymaga spojnosc z systemem importu/eksportu XLSX.
         - ❌ 1.2.2.2.3 Zarządzanie cenami (bez cost_prices)
         - ❌ 1.2.2.2.4 Synchronizacja z ERP
+        **🔗 POWIAZANIE Z ETAP_08 (sekcje 8.3-8.5):** Polityki musza uwzgledniac operacje konfiguracyjne dla integracji BaseLinker/Subiekt/Dynamics.
         - ❌ 1.2.2.2.5 Zarządzanie mediami
       - ❌ **1.2.2.3 Editor permissions**
         - ❌ 1.2.2.3.1 Update produktów (nazwy, opisy, kategorii)
         - ❌ 1.2.2.3.2 Zarządzanie mediami (bez delete)
         - ❌ 1.2.2.3.3 Read prices (bez cost_prices)
         - ❌ 1.2.2.3.4 Export produktów do CSV/PrestaShop
+        **🔗 POWIAZANIE Z ETAP_06 (sekcja 5.2.2.1) oraz ETAP_07 (sekcja 7.3.2):** Editor uruchamia eksporty zgodne z pipeline integracji PrestaShop.
         - ❌ 1.2.2.3.5 Zarządzanie atrybutami i cechami
       - ❌ **1.2.2.4 Pozostałe role permissions**
         - ❌ 1.2.2.4.1 Warehouseman: deliveries, stock_update, containers
@@ -349,6 +392,7 @@ Trzeci etap budowy aplikacji PPM koncentruje się na implementacji zaawansowaneg
         - ❌ 6.1.1.1.1 viewAny, view, create, update, delete methods
         - ❌ 6.1.1.1.2 export, import permissions
         - ❌ 6.1.1.1.3 sync (z ERP/PrestaShop) permissions
+        **🔗 POWIAZANIE Z ETAP_07 (sekcja 7.7) oraz ETAP_08 (sekcja 8.7):** Zestaw uprawnien musi obejmowac kolejki i joby synchronizacji integracji.
         - ❌ 6.1.1.1.4 viewCostPrices permission (Admin/Manager only)
         - ❌ 6.1.1.1.5 manageMedia permission
       - ❌ **6.1.1.2 Business logic w policies**

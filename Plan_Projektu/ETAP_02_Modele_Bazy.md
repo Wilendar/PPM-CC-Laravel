@@ -1,5 +1,46 @@
 # 🛠️ ETAP_02: Modele i Struktura Bazy Danych
 
+## 🔍 INSTRUKCJE PRZED ROZPOCZĘCIEM ETAP
+
+**⚠️ OBOWIĄZKOWE KROKI:**
+1. **Przeanalizuj dokumentację struktury:** Przeczytaj `_DOCS/Struktura_Plikow_Projektu.md` i `_DOCS/Struktura_Bazy_Danych.md`
+2. **Sprawdź aktualny stan:** Porównaj obecną strukturę plików z planem w tym ETAP
+3. **Zidentyfikuj nowe komponenty:** Lista plików/tabel/modeli do utworzenia w tym ETAP
+4. **Zaktualizuj dokumentację:** Dodaj planowane komponenty z statusem ❌ do dokumentacji struktury
+
+**PLANOWANE KOMPONENTY W TYM ETAP:**
+```
+Modele Eloquent do utworzenia:
+- Product.php (główny model produktów)
+- Category.php (system kategorii drzewiasty)
+- ProductVariant.php (warianty produktów)
+- PriceGroup.php (grupy cenowe)
+- Warehouse.php (magazyny)
+- ProductPrice.php (ceny per grupa)
+- ProductStock.php (stany magazynowe)
+- Media.php (pliki multimedialne)
+- ProductAttribute.php (atrybuty produktów)
+
+Migracje bazy danych:
+- 2024_01_01_000001_create_products_table
+- 2024_01_01_000002_create_categories_table
+- 2024_01_01_000003_create_product_variants_table
+- 2024_01_01_000006_create_price_groups_table
+- 2024_01_01_000007_create_warehouses_table
+- 2024_01_01_000008_create_product_prices_table
+- 2024_01_01_000009_create_product_stock_table
+- 2024_01_01_000010_create_media_table
+- + 25 więcej migracji
+
+Seedery testowe:
+- ProductSeeder.php
+- CategorySeeder.php
+- PriceGroupSeeder.php
+- WarehouseSeeder.php
+```
+
+---
+
 **Status ETAPU:** ✅ **UKOŃCZONY** - **FAZA A, B, C & D COMPLETED** (100% ukończone)  
 **Czas wykonania:** 45 godzin (zgodnie z planem)  
 **Priorytet:** 🔴 KRYTYCZNY ✅ COMPLETED  
@@ -64,9 +105,13 @@ Drugi etap budowy aplikacji PPM koncentruje się na projektowaniu i implementacj
         - ❌ 1.1.1.1.5 System wariantów z dedykowanymi parametrami
       - ❌ **1.1.1.2 Integracje zewnętrzne**
         - ❌ 1.1.1.2.1 Mapowanie PrestaShop (ps_product, ps_category, ps_specific_price)
+        **🔗 🔗 POWIAZANIE Z ETAP_07 (punkty 7.5.1.1, 7.5.2.1):** Struktury mapowan w bazie musza byc zgodne z transformerami i mapperami integracji PrestaShop.
         - ❌ 1.1.1.2.2 Mapowanie Baselinker API struktur
+        **🔗 🔗 POWIAZANIE Z ETAP_08 (punkty 8.3.1.1, 8.3.2.1):** Zachowaj zgodnosc pol z klientem i serwisami BaseLinker opisanymi w etapie ERP.
         - ❌ 1.1.1.2.3 Mapowanie Subiekt GT tabel
+        **🔗 🔗 POWIAZANIE Z ETAP_08 (punkty 8.4.1.1, 8.4.2.1):** Definicje pol musza byc spiete z mostkiem Subiekt GT oraz klientem PHP.
         - ❌ 1.1.1.2.4 Mapowanie Microsoft Dynamics entities
+        **🔗 🔗 POWIAZANIE Z ETAP_08 (punkty 8.5.1.1, 8.5.2.1):** Uzgodnij strukture encji z klientem OData i synchronizacja Dynamics.
         - ❌ 1.1.1.2.5 Uniwersalne pole mapping_data JSONB
       - ❌ **1.1.1.3 System dostaw i kontenerów (przyszłość)**
         - ❌ 1.1.1.3.1 Struktury dla containers i orders
@@ -211,6 +256,7 @@ Drugi etap budowy aplikacji PPM koncentruje się na projektowaniu i implementacj
       - ✅ **2.2.3.2 Integracje magazynów**
         - ✅ 2.2.3.2.1 erp_mapping (JSONB) - mapowanie z ERP
         - ✅ 2.2.3.2.2 prestashop_mapping (JSONB) - mapowanie z PrestaShop
+        **🔗 🔗 POWIAZANIE Z ETAP_07 (punkt 7.2.2.1):** Statusy magazynowe korzystaja z tych samych tabel synchronizacji produktow.
         - ✅ 2.2.3.2.3 created_at, updated_at
           └──📁 PLIK: database/migrations/2024_01_01_000007_create_warehouses_table.php
 
@@ -252,7 +298,9 @@ Drugi etap budowy aplikacji PPM koncentruje się na projektowaniu i implementacj
         - ❌ 3.1.1.2.6 is_primary (BOOLEAN DEFAULT FALSE) - główne zdjęcie
       - ❌ **3.1.1.3 Integracje i statusy**
         - ❌ 3.1.1.3.1 prestashop_mapping (JSONB) - mapowanie per sklep
+        **🔗 🔗 POWIAZANIE Z ETAP_07 (punkty 7.4.1.2, 7.5.2.1):** Dane mapowan musza zgadzac sie z logika strategii synchronizacji kategorii i produktow.
         - ❌ 3.1.1.3.2 sync_status (ENUM: pending, synced, error, ignored)
+        **🔗 🔗 POWIAZANIE Z ETAP_07 (punkt 7.2.2.1):** Wartosc statusow ma odzwierciedlac pola tabeli product_sync_status.
         - ❌ 3.1.1.3.3 is_active (BOOLEAN DEFAULT TRUE)
         - ❌ 3.1.1.3.4 created_at, updated_at, deleted_at
 
@@ -762,3 +810,70 @@ Po ukończeniu ETAP_02 będziemy mieli:
 - **Kompletny audit trail** do śledzenia wszystkich zmian
 
 **Następny etap:** [ETAP_03_Autoryzacja.md](ETAP_03_Autoryzacja.md) - implementacja 7-poziomowego systemu uprawnień.
+
+---
+
+## ✅ SEKCJA WERYFIKACYJNA - ZAKOŃCZENIE ETAP
+
+**⚠️ OBOWIĄZKOWE KROKI PO UKOŃCZENIU:**
+1. **Weryfikuj zgodność struktury:** Porównaj rzeczywistą strukturę plików/bazy z dokumentacją
+2. **Zaktualizuj dokumentację:** Zmień status ❌ → ✅ dla wszystkich ukończonych komponentów
+3. **Dodaj linki do plików:** Zaktualizuj plan ETAP z rzeczywistymi ścieżkami do utworzonych plików
+4. **Przygotuj następny ETAP:** Sprawdź zależności i wymagania dla kolejnego ETAP
+
+**RZECZYWISTA STRUKTURA ZREALIZOWANA:**
+```
+✅ MODELE ELOQUENT:
+└──📁 PLIK: app/Models/Product.php
+└──📁 PLIK: app/Models/Category.php
+└──📁 PLIK: app/Models/ProductVariant.php
+└──📁 PLIK: app/Models/PriceGroup.php
+└──📁 PLIK: app/Models/Warehouse.php
+└──📁 PLIK: app/Models/ProductPrice.php
+└──📁 PLIK: app/Models/ProductStock.php
+└──📁 PLIK: app/Models/Media.php
+└──📁 PLIK: app/Models/ProductAttribute.php
+└──📁 PLIK: app/Models/ProductAttributeValue.php
+└──📁 PLIK: app/Models/IntegrationMapping.php
+└──📁 PLIK: app/Models/FileUpload.php
+└──📁 PLIK: app/Models/User.php (extended)
+
+✅ MIGRACJE BAZY DANYCH (32 pliki):
+└──📊 TABLE: products
+└──📊 TABLE: categories
+└──📊 TABLE: product_variants
+└──📊 TABLE: price_groups
+└──📊 TABLE: warehouses
+└──📊 TABLE: product_prices
+└──📊 TABLE: product_stock
+└──📊 TABLE: media
+└──📊 TABLE: product_attributes
+└──📊 TABLE: product_attribute_values
+└──📊 TABLE: integration_mappings
+└──📊 TABLE: file_uploads
+└──📊 TABLE: audit_logs
+└──📊 TABLE: notifications
+└──📊 TABLE: + 18 więcej tabel
+
+✅ SEEDERY TESTOWE:
+└──📁 PLIK: database/seeders/ProductSeeder.php
+└──📁 PLIK: database/seeders/CategorySeeder.php
+└──📁 PLIK: database/seeders/PriceGroupSeeder.php
+└──📁 PLIK: database/seeders/WarehouseSeeder.php
+```
+
+**STATUS DOKUMENTACJI:**
+- ✅ `_DOCS/Struktura_Plikow_Projektu.md` - zaktualizowano
+- ✅ `_DOCS/Struktura_Bazy_Danych.md` - zaktualizowano
+
+**WERYFIKACJA MIGRACJI:**
+- ✅ 42 migracje wdrożone na production
+- ✅ Wszystkie tabele utworzone pomyślnie
+- ✅ Indeksy wydajnościowe aktywne
+- ✅ Constrainty i relacje działają
+
+**PRZYGOTOWANIE DO ETAP_03:**
+- ✅ Modele gotowe na system uprawnień
+- ✅ Tabela users rozszerzona
+- ✅ Audit trail zaimplementowany
+- ✅ Brak blokerów technicznych

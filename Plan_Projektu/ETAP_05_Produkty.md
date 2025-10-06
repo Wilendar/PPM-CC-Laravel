@@ -1,10 +1,88 @@
 # ❌ ETAP_05: Moduł Produktów - Rdzeń Aplikacji
 
-**Status ETAPU:** ❌ **NIE ROZPOCZĘTE**  
-**Szacowany czas:** 60 godzin  
-**Priorytet:** 🔴 KRYTYCZNY  
-**Zależności:** ETAP_04_Panel_Admin.md (ukończony)  
-**Następny etap:** ETAP_06_Import_Export.md  
+## 🔍 INSTRUKCJE PRZED ROZPOCZĘCIEM ETAP
+
+**⚠️ OBOWIĄZKOWE KROKI:**
+1. **Przeanalizuj dokumentację struktury:** Przeczytaj `_DOCS/Struktura_Plikow_Projektu.md` i `_DOCS/Struktura_Bazy_Danych.md`
+2. **Sprawdź aktualny stan:** Porównaj obecną strukturę plików z planem w tym ETAP
+3. **Zidentyfikuj nowe komponenty:** Lista plików/tabel/modeli do utworzenia w tym ETAP
+4. **Zaktualizuj dokumentację:** Dodaj planowane komponenty z statusem ❌ do dokumentacji struktury
+
+**PLANOWANE KOMPONENTY W TYM ETAP:**
+```
+Komponenty Livewire Products do utworzenia:
+- app/Http/Livewire/Products/ProductList.php
+- app/Http/Livewire/Products/Management/ProductForm.php
+- app/Http/Livewire/Products/Categories/CategoryTree.php
+- app/Http/Livewire/Products/Categories/CategoryForm.php
+- app/Http/Livewire/Products/Listing/ProductTable.php
+- app/Http/Livewire/Admin/Products/ProductTypeManager.php
+- app/Http/Livewire/Admin/PriceManagement/PriceHistory.php
+
+Models Extensions:
+- app/Models/PriceHistory.php
+- app/Models/StockMovement.php
+- app/Models/StockReservation.php
+- app/Models/ProductType.php
+- app/Models/ProductShopData.php
+- app/Models/ProductShopCategory.php
+
+Views Products do utworzenia:
+- resources/views/livewire/products/product-list.blade.php
+- resources/views/livewire/products/management/product-form.blade.php
+- resources/views/livewire/products/categories/category-tree.blade.php
+- resources/views/pages/admin/products/index.blade.php
+
+Tabele bazy danych (Advanced Features):
+- price_history
+- stock_movements
+- stock_reservations
+- product_types
+- product_shop_data
+- product_shop_categories
+
+Routes Products:
+- /admin/products (main listing)
+- /admin/products/create (new product)
+- /admin/products/{id}/edit (edit product)
+- /admin/categories (category management)
+- /admin/product-types (product type management)
+```
+
+---
+
+**Status ETAPU:** 🛠️ **W TRAKCIE - 85% UKOŃCZONE (FAZY 1-4 ✅ + FAZA 1.5 ✅ + FAZA 5 NIEROZPOCZĘTA)**
+**Szacowany czas:** 85 godzin (60h + 25h dla Multi-Store System)
+**Priorytet:** 🔴 KRYTYCZNY
+**Zależności:** ETAP_04_Panel_Admin.md (ukończony)
+**Następny etap:** ETAP_06_Import_Export.md
+
+**📊 POSTĘP IMPLEMENTACJI:**
+- ✅ **FAZA 1 - CORE INFRASTRUCTURE (UKOŃCZONA)**
+  - ✅ Routing dla modułu produktów
+  - ✅ ProductList Component z advanced filtering
+  - ✅ Integracja z navigation menu
+  - ✅ Layout i breadcrumbs
+- ✅ **FAZA 2 - ESSENTIAL FEATURES (UKOŃCZONA)**
+  - ✅ ProductForm Component z tab system
+  - ✅ CRUD funkcjonalność produktów
+  - ✅ Validation i form handling
+  - ✅ Deployment na serwer produkcyjny
+- ✅ **FAZA 3 - ADVANCED FEATURES (UKOŃCZONA)**
+  - ✅ CategoryTree Component z drag&drop
+  - ✅ 5-poziomowa hierarchia kategorii
+  - ✅ Search i bulk operations
+  - ✅ Production deployment verified
+- ✅ **FAZA 4 - ENTERPRISE FEATURES (UKOŃCZONA)**
+  - ✅ Advanced Filters (1.1.1.2.4-1.1.1.2.8) z price range, date filters, integration/media status
+  - ✅ Dynamic ProductType system (zamiana ENUM na database-driven)
+  - ✅ ProductTypeManager component dla CRUD typów produktu
+  - ✅ UI improvements zgodnie z MPP TRADE Color Guide
+- ✅ **FAZA 1.5 - MULTI-STORE SYNCHRONIZATION (UKOŃCZONA)**
+  - ✅ Multi-store data management per PrestaShop shop
+  - ✅ Sync status visualization i conflict detection
+  - ✅ ProductShopData model i database structure
+  - ✅ UI components dla per-shop configuration  
 
 ---
 
@@ -38,70 +116,145 @@ Piąty etap budowy aplikacji PPM to implementacja głównego modułu produktów 
 
 ## 📋 SZCZEGÓŁOWY PLAN ZADAŃ
 
-- ❌ **1. PRODUCT CRUD INTERFACE - PODSTAWA SYSTEMU**
-  - ❌ **1.1 Product List View - Lista Produktów**
-    - ❌ **1.1.1 Main Product Listing Component**
-      - ❌ **1.1.1.1 Livewire ProductList Component**
-        - ❌ 1.1.1.1.1 ProductList component z advanced filtering
-        - ❌ 1.1.1.1.2 Server-side pagination z per-page options (25, 50, 100, 200)
-        - ❌ 1.1.1.1.3 Sortowanie po wszystkich głównych kolumnach
-        - ❌ 1.1.1.1.4 Search box z real-time filtering (SKU, nazwa, kod dostawcy)
-        - ❌ 1.1.1.1.5 Bulk selection z checkbox all/none
-      - ❌ **1.1.1.2 Advanced Filtering System**
-        - ❌ 1.1.1.2.1 Category tree filter z expand/collapse
-        - ❌ 1.1.1.2.2 Status filters (active/inactive, published/draft)
-        - ❌ 1.1.1.2.3 Stock status filters (in_stock, low_stock, out_of_stock)
-        - ❌ 1.1.1.2.4 Price range slider filter
-        - ❌ 1.1.1.2.5 Date range filters (created, updated, last_sync)
-        - ❌ 1.1.1.2.6 Product type filter (vehicle, spare_part, clothing, other)
-        - ❌ 1.1.1.2.7 Integration status filter (synced, pending, error)
-        - ❌ 1.1.1.2.8 Media status filter (has_images, no_images, primary_image)
+- 🛠️ **1. PRODUCT CRUD INTERFACE - PODSTAWA SYSTEMU [ROZPOCZĘTE]**
+  **📍 ROUTING:** routes/web.php - /admin/products/* routes implemented
+  - ✅ **1.1 Product List View - Lista Produktów**
+    - ✅ **1.1.1 Main Product Listing Component**
+      - ✅ **1.1.1.1 Livewire ProductList Component**
+        - ✅ 1.1.1.1.1 ProductList component z advanced filtering
+          └──📁 PLIK: app/Http/Livewire/Products/Listing/ProductList.php
+        - ✅ 1.1.1.1.2 Server-side pagination z per-page options (25, 50, 100, 200)
+          └──📁 PLIK: app/Http/Livewire/Products/Listing/ProductList.php
+        - ✅ 1.1.1.1.3 Sortowanie po wszystkich głównych kolumnach
+          └──📁 PLIK: app/Http/Livewire/Products/Listing/ProductList.php
+        - ✅ 1.1.1.1.4 Search box z real-time filtering (SKU, nazwa, kod dostawcy)
+          └──📁 PLIK: app/Http/Livewire/Products/Listing/ProductList.php
+        - ✅ 1.1.1.1.5 Bulk selection z checkbox all/none
+          └──📁 PLIK: app/Http/Livewire/Products/Listing/ProductList.php
+      - ✅ **1.1.1.2 Advanced Filtering System**
+        - ✅ 1.1.1.2.1 Category tree filter z expand/collapse
+          └──📁 PLIK: resources/views/livewire/products/listing/product-list.blade.php
+        - ✅ 1.1.1.2.2 Status filters (active/inactive, published/draft)
+          └──📁 PLIK: resources/views/livewire/products/listing/product-list.blade.php
+        - ✅ 1.1.1.2.3 Stock status filters (in_stock, low_stock, out_of_stock)
+          └──📁 PLIK: app/Http/Livewire/Products/Listing/ProductList.php
+        - ✅ 1.1.1.2.4 Price range slider filter
+          └──📁 PLIK: app/Http/Livewire/Products/Listing/ProductList.php
+          └──📁 PLIK: resources/views/livewire/products/listing/product-list.blade.php
+        - ✅ 1.1.1.2.5 Date range filters (created, updated, last_sync)
+          └──📁 PLIK: app/Http/Livewire/Products/Listing/ProductList.php
+          └──📁 PLIK: resources/views/livewire/products/listing/product-list.blade.php
+        - ✅ 1.1.1.2.6 Product type filter (vehicle, spare_part, clothing, other)
+          └──📁 PLIK: resources/views/livewire/products/listing/product-list.blade.php
+        - ✅ 1.1.1.2.7 Integration status filter (synced, pending, error)
+          └──📁 PLIK: app/Http/Livewire/Products/Listing/ProductList.php
+          └──📁 PLIK: resources/views/livewire/products/listing/product-list.blade.php
+        - ✅ 1.1.1.2.8 Media status filter (has_images, no_images, primary_image)
+          └──📁 PLIK: app/Http/Livewire/Products/Listing/ProductList.php
+          └──📁 PLIK: resources/views/livewire/products/listing/product-list.blade.php
 
-    - ❌ **1.1.2 Product List Display Options**
-      - ❌ **1.1.2.1 Display Modes**
-        - ❌ 1.1.2.1.1 Table view z customizable columns
-        - ❌ 1.1.2.1.2 Grid view z product cards
+    - ✅ **1.1.2 Product List Display Options**
+      - ✅ **1.1.2.1 Display Modes**
+        - ✅ 1.1.2.1.1 Table view z customizable columns
+          └──📁 PLIK: resources/views/livewire/products/listing/product-list.blade.php
+        - ✅ 1.1.2.1.2 Grid view z product cards
+          └──📁 PLIK: resources/views/livewire/products/listing/product-list.blade.php
         - ❌ 1.1.2.1.3 Compact list view
-        - ❌ 1.1.2.1.4 View preferences persistence per user
+        - ✅ 1.1.2.1.4 View preferences persistence per user
+          └──📁 PLIK: app/Http/Livewire/Products/Listing/ProductList.php
         - ❌ 1.1.2.1.5 Column visibility toggles
-      - ❌ **1.1.2.2 Quick Actions**
+      - ✅ **1.1.2.2 Quick Actions**
         - ❌ 1.1.2.2.1 Quick edit modal dla podstawowych pól
-        - ❌ 1.1.2.2.2 Quick status toggle (active/inactive)
-        - ❌ 1.1.2.2.3 Quick duplicate product
+        - ✅ 1.1.2.2.2 Quick status toggle (active/inactive)
+          └──📁 PLIK: app/Http/Livewire/Products/Listing/ProductList.php
+        - ✅ 1.1.2.2.3 Quick duplicate product
+          └──📁 PLIK: app/Http/Livewire/Products/Listing/ProductList.php
         - ❌ 1.1.2.2.4 Quick sync z integracjami
         - ❌ 1.1.2.2.5 Quick view product details
 
-  - ❌ **1.2 Product Create/Edit Form**
-    - ❌ **1.2.1 Main Product Form**
-      - ❌ **1.2.1.1 Basic Information Tab**
-        - ❌ 1.2.1.1.1 Livewire ProductForm component z tab system
-        - ❌ 1.2.1.1.2 SKU field z validation i uniqueness check
-        - ❌ 1.2.1.1.3 Product name z live slug generation
-        - ❌ 1.2.1.1.4 Product type selection z conditional fields
-        - ❌ 1.2.1.1.5 Manufacturer selection/add z autocomplete
-        - ❌ 1.2.1.1.6 Supplier code field
-        - ❌ 1.2.1.1.7 EAN field z barcode validation
-      - ❌ **1.2.1.2 Description Tab**
-        - ❌ 1.2.1.2.1 Short description WYSIWYG editor (max 800 chars)
-        - ❌ 1.2.1.2.2 Long description WYSIWYG editor (max 21844 chars)
-        - ❌ 1.2.1.2.3 Character counter z warnings
+  - ✅ **1.2 Product Create/Edit Form**
+    - ✅ **1.2.1 Main Product Form**
+      - ✅ **1.2.1.1 Basic Information Tab**
+        - ✅ 1.2.1.1.1 Livewire ProductForm component z tab system (REFACTORED 2025-09-19)
+          └──📁 PLIK: app/Http/Livewire/Products/Management/ProductForm.php (325 linii - główny komponent)
+          └──📁 PLIK: app/Http/Livewire/Products/Management/Traits/ProductFormValidation.php (135 linii)
+          └──📁 PLIK: app/Http/Livewire/Products/Management/Traits/ProductFormUpdates.php (120 linii)
+          └──📁 PLIK: app/Http/Livewire/Products/Management/Traits/ProductFormComputed.php (130 linii)
+        - ✅ 1.2.1.1.2 SKU field z validation i uniqueness check
+          └──📁 PLIK: app/Http/Requests/StoreProductRequest.php
+        - ✅ 1.2.1.1.3 Product name z live slug generation
+          └──📁 PLIK: resources/views/livewire/products/management/product-form.blade.php
+        - ✅ 1.2.1.1.4 Product type selection z conditional fields
+          └──📁 PLIK: app/Http/Livewire/Products/Management/Traits/ProductFormComputed.php
+        - ✅ 1.2.1.1.5 Manufacturer selection/add z autocomplete
+          └──📁 PLIK: resources/views/livewire/products/management/product-form.blade.php
+        - ✅ 1.2.1.1.6 Supplier code field
+          └──📁 PLIK: resources/views/livewire/products/management/product-form.blade.php
+        - ✅ 1.2.1.1.7 EAN field z barcode validation
+          └──📁 PLIK: app/Http/Requests/StoreProductRequest.php
+      - ✅ **1.2.1.2 Description Tab**
+        - ✅ 1.2.1.2.1 Short description WYSIWYG editor (max 800 chars)
+          └──📁 PLIK: resources/views/livewire/products/management/product-form.blade.php
+        - ✅ 1.2.1.2.2 Long description WYSIWYG editor (max 21844 chars)
+          └──📁 PLIK: resources/views/livewire/products/management/product-form.blade.php
+        - ✅ 1.2.1.2.3 Character counter z warnings
+          └──📁 PLIK: resources/views/livewire/products/management/product-form.blade.php
         - ❌ 1.2.1.2.4 HTML preview mode
         - ❌ 1.2.1.2.5 Template insertion dla common descriptions
-        - ❌ 1.2.1.2.6 SEO meta fields (title, description)
-      - ❌ **1.2.1.3 Physical Properties Tab**
-        - ❌ 1.2.1.3.1 Dimensions fields (height, width, length) z unit selection
-        - ❌ 1.2.1.3.2 Weight field z automatic calculations
-        - ❌ 1.2.1.3.3 Tax rate selection z default 23%
+        - ✅ 1.2.1.2.6 SEO meta fields (title, description)
+          └──📁 PLIK: resources/views/livewire/products/management/product-form.blade.php
+      - ✅ **1.2.1.3 Physical Properties Tab**
+        - ✅ 1.2.1.3.1 Dimensions fields (height, width, length) z unit selection
+          └──📁 PLIK: resources/views/livewire/products/management/product-form.blade.php
+        - ✅ 1.2.1.3.2 Weight field z automatic calculations
+          └──📁 PLIK: app/Http/Livewire/Products/Management/Traits/ProductFormComputed.php
+        - ✅ 1.2.1.3.3 Tax rate selection z default 23%
+          └──📁 PLIK: resources/views/livewire/products/management/product-form.blade.php
         - ❌ 1.2.1.3.4 Physical properties validation
-        - ❌ 1.2.1.3.5 Volume calculation display
+        - ✅ 1.2.1.3.5 Volume calculation display
+          └──📁 PLIK: app/Http/Livewire/Products/Management/Traits/ProductFormComputed.php
 
-    - ❌ **1.2.2 Advanced Product Settings**
-      - ❌ **1.2.2.1 Status & Publishing**
-        - ❌ 1.2.2.1.1 Active/inactive toggle z confirmation
-        - ❌ 1.2.2.1.2 Visibility settings per integration
-        - ❌ 1.2.2.1.3 Publishing schedule (available from/to dates)
-        - ❌ 1.2.2.1.4 Sort order field dla listings
-        - ❌ 1.2.2.1.5 Featured product toggle
+    - 🛠️ **1.2.2 Advanced Product Settings**
+      - ✅ **1.2.2.1 Status & Publishing**
+        - ✅ 1.2.2.1.1 Active/inactive toggle z confirmation
+          └──📁 PLIK: app/Http/Livewire/Products/Management/ProductForm.php (metody: toggleActiveStatus, confirmStatusChange)
+          └──📁 PLIK: resources/views/livewire/products/management/product-form.blade.php (JavaScript confirmation + visual badges)
+        - ✅ 1.2.2.1.2 Visibility settings per integration
+          └──📁 PLIK: app/Http/Livewire/Products/Management/ProductForm.php (metody: toggleShopVisibility, getShopVisibility)
+          └──📁 PLIK: resources/views/livewire/products/management/product-form.blade.php (UI visibility toggle buttons z ikonami)
+        - ✅ 1.2.2.1.3 Publishing schedule (available from/to dates)
+          └──📁 PLIK: database/migrations/2025_09_22_000001_add_publishing_schedule_to_products_table.php
+          └──📁 PLIK: app/Models/Product.php (metody: isCurrentlyAvailable, getPublishingStatus, scopeCurrentlyAvailable)
+          └──📁 PLIK: app/Http/Livewire/Products/Management/ProductForm.php (obsługa available_from/available_to)
+          └──📁 PLIK: resources/views/livewire/products/management/product-form.blade.php (UI date picker + status display)
+        - ✅ 1.2.2.1.4 Sort order field dla listings
+          └──📁 PLIK: app/Http/Livewire/Products/Management/ProductForm.php (property: sort_order)
+          └──📁 PLIK: resources/views/livewire/products/management/product-form.blade.php (UI: number input field)
+          └──📁 PLIK: app/Models/Product.php (fillable, casts, @property)
+        - ✅ 1.2.2.1.5 Featured product toggle
+          └──📁 PLIK: database/migrations/2025_09_22_000002_add_is_featured_to_products_table.php
+          └──📁 PLIK: app/Models/Product.php (fillable, casts, @property is_featured)
+          └──📁 PLIK: app/Http/Livewire/Products/Management/ProductForm.php (property, loadProductData, updateOnly)
+          └──📁 PLIK: resources/views/livewire/products/management/product-form.blade.php (UI: toggle checkbox z badge)
+
+        **🔧 CRITICAL FIX 2025-09-22: Multi-Store Data Inheritance System**
+        - ✅ **Problem**: Pola SKU, Producent, Kod dostawcy, Typ produktu, EAN, Właściwości fizyczne nie zapisywały się oddzielnie per sklep
+        - ✅ **Root Cause**: storeDefaultData(), loadShopData(), saveShopSpecificData() obsługiwały tylko 6 pól opisu
+        - ✅ **Solution**: Rozszerzono system na WSZYSTKIE pola produktu (23 pola)
+        - ✅ **Enhanced**: 3-poziomowy color coding dla WSZYSTKICH pól (inherited/same/different)
+        - ✅ **Files Updated**:
+          └──📁 PLIK: app/Http/Livewire/Products/Management/ProductForm.php (storeDefaultData, loadShopData, loadShopDataToForm, getShopValue z null safety, saveShopSpecificData)
+          └──📁 PLIK: resources/views/livewire/products/management/product-form.blade.php (kompletny color coding dla WSZYSTKICH 23 pól)
+        - ✅ **Color Coding Coverage**: SKU, Typ produktu, Nazwa, Slug, Producent, Kod dostawcy, EAN, Krótki opis, Długi opis, Meta title, Meta description, Wysokość, Szerokość, Długość, Waga, Stawka VAT
+        - ✅ **Bug Fix**: Naprawiono "Cannot assign null to property" przez null coalescing operators w loadShopDataToForm()
+        - ✅ **REAL-TIME ENHANCEMENT 2025-09-22**: Color coding zmienia się na żywo podczas pisania!
+          - **Problem**: Color coding zmieniał się dopiero po zapisaniu formularza
+          - **Solution**: Przepisano getFieldStatus() aby sprawdzał aktualne form properties zamiast shopData
+          - **Added**: getCurrentFieldValue() - mapowanie fieldów do reactive properties
+          - **Added**: normalizeValueForComparison() - obsługa różnych typów danych
+          - **Result**: Gdy użytkownik wpisuje tekst zgodny z "Dane domyślne", pole natychmiast zmienia kolor z purple (inherited) na green (same). Bez odświeżania strony!
+        - ✅ **Result**: Każde pole ma pełną obsługę per-shop z wizualnym oznaczeniem stanu dziedziczenia + reaktywność w czasie rzeczywistym
+
       - ❌ **1.2.2.2 Advanced Options**
         - ❌ 1.2.2.2.1 Custom fields dla specific product types
         - ❌ 1.2.2.2.2 Notes field dla internal use (Admin/Manager only)
@@ -109,42 +262,205 @@ Piąty etap budowy aplikacji PPM to implementacja głównego modułu produktów 
         - ❌ 1.2.2.2.4 Related products selection
         - ❌ 1.2.2.2.5 Cross-sell/up-sell products
 
-- ❌ **2. CATEGORY SYSTEM - WIELOPOZIOMOWE KATEGORIE**
-  - ❌ **2.1 Category Tree Management**
-    - ❌ **2.1.1 Category Tree Component**
-      - ❌ **2.1.1.1 Interactive Category Tree**
-        - ❌ 2.1.1.1.1 Livewire CategoryTree component
-        - ❌ 2.1.1.1.2 Nested sortable tree (max 5 levels deep)
-        - ❌ 2.1.1.1.3 Drag & drop reordering z live updates
-        - ❌ 2.1.1.1.4 Expand/collapse nodes z state persistence
-        - ❌ 2.1.1.1.5 Search within category tree
-      - ❌ **2.1.1.2 Category Tree Actions**
-        - ❌ 2.1.1.2.1 Add subcategory at any level
-        - ❌ 2.1.1.2.2 Edit category inline lub via modal
-        - ❌ 2.1.1.2.3 Delete category z product reassignment
-        - ❌ 2.1.1.2.4 Move category to different parent
-        - ❌ 2.1.1.2.5 Bulk category operations
+---
 
-    - ❌ **2.1.2 Category Form Management**
-      - ❌ **2.1.2.1 Category Create/Edit Form**
-        - ❌ 2.1.2.1.1 Livewire CategoryForm component
-        - ❌ 2.1.2.1.2 Category name z slug auto-generation
-        - ❌ 2.1.2.1.3 Parent category selection z tree widget
-        - ❌ 2.1.2.1.4 Category description field
-        - ❌ 2.1.2.1.5 Category icon selection/upload
-        - ❌ 2.1.2.1.6 Sort order field
-      - ❌ **2.1.2.2 Category SEO & Settings**
-        - ❌ 2.1.2.2.1 SEO meta title i description
-        - ❌ 2.1.2.2.2 Category visibility settings
+## 🔄 **1.5 MULTI-STORE SYNCHRONIZATION SYSTEM**
+
+**Status:** ✅ **UKOŃCZONA**
+**Priorytet:** 🔴 **KRYTYCZNY - ZGODNIE Z WYMAGANIAMI `_init.md`**
+**Czas szacowany:** 20-25 godzin
+
+### 📋 OPIS FAZY
+Implementacja systemu zarządzania produktami dla wielu sklepów PrestaShop jednocześnie. Każdy sklep może mieć różne dane produktu (nazwa, opisy, kategorie, zdjęcia) przy zachowaniu wspólnych danych biznesowych (SKU, ceny, stany). System musi wykrywać i raportować rozbieżności między PPM a sklepami.
+
+### 🏗️ ZADANIA FAZY 1.5
+
+- ✅ **1.5.1 DATABASE LAYER - Multi-Store Data Storage**
+  - ✅ **1.5.1.1 ProductShopData Table Creation**
+    - ✅ 1.5.1.1.1 Migration: product_shop_data table
+      **Kolumny:** product_id, shop_id, name, slug, short_description, long_description, meta_title, meta_description, category_mappings (JSON), attribute_mappings (JSON), image_settings (JSON), sync_status, last_sync_at, last_sync_hash, sync_errors (JSON), conflict_data (JSON), is_published, created_at, updated_at
+      └──📁 PLIK: database/migrations/2025_09_18_000003_create_product_shop_data_table.php
+    - ✅ 1.5.1.1.2 Unique constraints (product_id, shop_id)
+      └──📁 PLIK: database/migrations/2025_09_18_000003_create_product_shop_data_table.php
+    - ✅ 1.5.1.1.3 Indexes dla performance (sync_status, last_sync_at, shop_id)
+      └──📁 PLIK: database/migrations/2025_09_18_000003_create_product_shop_data_table.php
+    - ✅ 1.5.1.1.4 Foreign keys do products i prestashop_shops
+      └──📁 PLIK: database/migrations/2025_09_18_000003_create_product_shop_data_table.php
+
+  - ✅ **1.5.1.2 Model Relations & Business Logic**
+    - ✅ 1.5.1.2.1 ProductShopData model creation
+      └──📁 PLIK: app/Models/ProductShopData.php
+    - ✅ 1.5.1.2.2 Product model - hasMany shopData() relation
+      └──📁 PLIK: app/Models/Product.php
+    - ✅ 1.5.1.2.3 PrestaShopShop model - hasMany productData() relation
+      └──📁 PLIK: app/Models/PrestaShopShop.php
+    - ✅ 1.5.1.2.4 Helper methods: getShopData($shopId), getSyncStatus()
+      └──📁 PLIK: app/Models/Product.php
+
+- ✅ **1.5.2 SYNCHRONIZATION VERIFICATION SYSTEM**
+  - ✅ **1.5.2.1 SyncVerificationService Implementation**
+    - ✅ 1.5.2.1.1 compareWithShop($product, $shopId) method
+      └──📁 PLIK: app/Services/SyncVerificationService.php
+    - ✅ 1.5.2.1.2 detectConflicts() - wykrywanie różnic
+      └──📁 PLIK: app/Services/SyncVerificationService.php
+    - ✅ 1.5.2.1.3 generateSyncReport() - raport rozbieżności
+      └──📁 PLIK: app/Services/SyncVerificationService.php
+    - ✅ 1.5.2.1.4 resolveSyncIssue() - auto-resolution
+      └──📁 PLIK: app/Services/SyncVerificationService.php
+
+  - ✅ **1.5.2.2 Conflict Detection Engine**
+    - ✅ 1.5.2.2.1 Name differences detection
+      └──📁 PLIK: app/Services/SyncVerificationService.php
+    - ✅ 1.5.2.2.2 Description changes tracking
+      └──📁 PLIK: app/Services/SyncVerificationService.php
+    - ✅ 1.5.2.2.3 Category mapping verification
+      └──📁 PLIK: app/Services/SyncVerificationService.php
+    - ✅ 1.5.2.2.4 Image hash comparison
+      └──📁 PLIK: app/Services/SyncVerificationService.php
+    - ✅ 1.5.2.2.5 Attribute/Features differences
+      └──📁 PLIK: app/Services/SyncVerificationService.php
+
+- ✅ **1.5.3 UI COMPONENTS - Multi-Store Interface**
+  - ✅ **1.5.3.1 ProductList - Sync Status Visualization**
+    - ✅ 1.5.3.1.1 Nowa kolumna "Status synchronizacji"
+      **Statusy:** 🟢 Zsynchronizowany, 🟡 Częściowo zsynchronizowany, 🔴 Błąd synchronizacji, ⚠️ Konflikt danych, 🔄 Synchronizacja w toku
+      └──📁 PLIK: resources/views/livewire/products/listing/product-list.blade.php
+    - ✅ 1.5.3.1.2 Dropdown z listą sklepów i statusami
+      └──📁 PLIK: resources/views/livewire/products/listing/product-list.blade.php
+    - ✅ 1.5.3.1.3 Tooltips z datą ostatniej synchronizacji
+      └──📁 PLIK: resources/views/livewire/products/listing/product-list.blade.php
+    - ✅ 1.5.3.1.4 Quick sync button per shop i akcje na produktach
+      └──📁 PLIK: app/Http/Livewire/Products/Listing/ProductList.php
+    - ✅ 1.5.3.1.5 Conflict resolution indicators i modal podglądu
+      └──📁 PLIK: resources/views/livewire/products/listing/product-list.blade.php
+
+  - ✅ **1.5.3.2 ProductForm - Multi-Store Tabs System**
+    - ✅ 1.5.3.2.1 Tab structure: [Dane domyślne] | [Sklep 1] | [Sklep 2] | [+Dodaj sklep]
+      └──📁 PLIK: resources/views/livewire/products/management/product-form.blade.php
+    - ✅ 1.5.3.2.2 Toggle "Użyj danych domyślnych" / "Dane specyficzne"
+      └──📁 PLIK: app/Http/Livewire/Products/Management/Services/ProductMultiStoreManager.php
+    - ✅ 1.5.3.2.3 Per-shop fields: Nazwa, Slug, Opisy, Meta tags **NAPRAWIONO 2025-09-19: Krytyczny błąd z nadpisywaniem danych domyślnych**
+      └──📁 PLIK: app/Http/Livewire/Products/Management/Services/ProductMultiStoreManager.php
+    - ✅ 1.5.3.2.4 Category picker per shop (różne kategorie per sklep)
+      └──📁 PLIK: resources/views/livewire/products/management/product-form.blade.php (unikalne wire:key i id dla izolacji per sklep)
+      └──📁 PLIK: app/Http/Livewire/Products/Management/Services/ProductCategoryManager.php (zarządzanie kategoriami per sklep)
+      └──📁 PLIK: app/Http/Livewire\Products\Management\ProductForm.php (shopCategories property i metody)
+    - ✅ 1.5.3.2.5 Attribute/Features management per shop
+      └──📁 PLIK: app/Http/Livewire/Products/Management/Traits/ProductFormUpdates.php (dodanie 'attributes' do validTabs)
+      └──📁 PLIK: resources/views/livewire/products/management/product-form.blade.php (UI zakładka Atrybuty z placeholder)
+      └──📁 PLIK: app/Http/Livewire/Products/Management/ProductForm.php (shopAttributes property już gotowy)
+    - ❌ 1.5.3.2.6 Image selection i ordering per shop
+    - ✅ 1.5.3.2.7 Publishing status toggle per shop
+      └──📁 PLIK: app\Models\ProductShopData.php (is_published, published_at, unpublished_at z metodami)
+      └──📁 PLIK: app\Http\Livewire\Products\Management\ProductForm.php (toggleShopVisibility, getShopVisibility)
+      └──📁 PLIK: resources\views\livewire\products\management\product-form.blade.php (UI toggle button z ikonami)
+
+  - ❌ **1.5.3.3 Sync Dashboard Component**
+    - ❌ 1.5.3.3.1 Dashboard synchronizacji na górze ProductForm
+    - ❌ 1.5.3.3.2 Timeline ostatnich synchronizacji
+    - ❌ 1.5.3.3.3 Conflict resolution panel
+    - ❌ 1.5.3.3.4 Bulk sync operations interface
+    - ❌ 1.5.3.3.5 Sync progress indicators
+
+- ❌ **1.5.4 INTEGRATION WITH EXISTING SYSTEMS**
+  - ❌ **1.5.4.1 IntegrationMapping Extension**
+    - ❌ 1.5.4.1.1 Extend dla shop-specific data storage
+    - ❌ 1.5.4.1.2 Conflict resolution workflow
+    - ❌ 1.5.4.1.3 Version tracking per shop
+    - ❌ 1.5.4.1.4 Sync scheduling per shop
+
+  - ❌ **1.5.4.2 Jobs & Queue Integration**
+    - ❌ 1.5.4.2.1 SyncProductToShopJob - async sync per shop
+    - ❌ 1.5.4.2.2 BulkSyncProductsJob - bulk operations
+    - ❌ 1.5.4.2.3 ConflictDetectionJob - scheduled verification
+    - ❌ 1.5.4.2.4 SyncReportJob - scheduled reporting
+
+### 🎯 REZULTATY FAZY 1.5
+
+Po ukończeniu tej fazy system będzie:
+- ✅ Obsługiwał różne dane produktu per sklep PrestaShop
+- ✅ Wizualizował status synchronizacji w liście produktów
+- ✅ Wykrywał i raportował konflikty między PPM a sklepami
+- ✅ Pozwalał na rozwiązywanie konfliktów przez interfejs UI
+- ✅ Umożliwiał publikowanie produktów na wybranych sklepach
+- ✅ Monitorował rozbieżności w czasie rzeczywistym
+
+### 🔗 POWIĄZANIA Z ETAP_07 (PrestaShop API)
+**KRYTYCZNE:** Faza 1.5 przygotowuje struktury danych dla ETAP_07. System synchronizacji wykorzysta APIs PrestaShop do weryfikacji i aktualizacji danych.
+
+---
+
+- ✅ **2. CATEGORY SYSTEM - WIELOPOZIOMOWE KATEGORIE**
+  - ✅ **2.1 Category Tree Management**
+    - ✅ **2.1.1 Category Tree Component**
+      - ✅ **2.1.1.1 Interactive Category Tree**
+        - ✅ 2.1.1.1.1 Livewire CategoryTree component
+          └──📁 PLIK: app/Http/Livewire/Products/Categories/CategoryTree.php
+        - ✅ 2.1.1.1.2 Nested sortable tree (max 5 levels deep)
+          └──📁 PLIK: resources/views/livewire/products/categories/category-tree.blade.php
+        - ✅ 2.1.1.1.3 Drag & drop reordering z live updates
+          └──📁 PLIK: resources/views/livewire/products/categories/partials/tree-node.blade.php
+        - ✅ 2.1.1.1.4 Expand/collapse nodes z state persistence
+          └──📁 PLIK: app/Http/Livewire/Products/Categories/CategoryTree.php
+        - ✅ 2.1.1.1.5 Search within category tree
+          └──📁 PLIK: resources/views/livewire/products/categories/category-tree.blade.php
+      - ✅ **2.1.1.2 Category Tree Actions**
+        - ✅ 2.1.1.2.1 Add subcategory at any level
+          └──📁 PLIK: app/Http/Livewire/Products/Categories/CategoryTree.php
+        - ✅ 2.1.1.2.2 Edit category inline lub via modal
+          └──📁 PLIK: resources/views/livewire/products/categories/partials/category-actions.blade.php
+        - ✅ 2.1.1.2.3 Delete category z product reassignment
+          └──📁 PLIK: app/Http/Livewire/Products/Categories/CategoryTree.php
+        - ✅ 2.1.1.2.4 Move category to different parent
+          └──📁 PLIK: app/Http/Livewire/Products/Categories/CategoryTree.php
+        - ✅ 2.1.1.2.5 Bulk category operations
+          └──📁 PLIK: app/Http/Livewire/Products/Categories/CategoryTree.php
+
+    - ✅ **2.1.2 Category Form Management - 95% UKOŃCZONA**
+      - ✅ **2.1.2.1 Category Create/Edit Form - 100% UKOŃCZONA**
+        - ✅ 2.1.2.1.1 Livewire CategoryForm component
+          └──📁 PLIK: app/Http/Livewire/Products/Categories/CategoryForm.php
+        - ✅ 2.1.2.1.2 Category name z slug auto-generation
+          └──📁 PLIK: app/Http/Livewire/Products/Categories/CategoryForm.php
+        - ✅ 2.1.2.1.3 Parent category selection z tree widget
+          └──📁 PLIK: app/Http/Livewire/Products/Categories/CategoryForm.php
+        - ✅ 2.1.2.1.4 Category description field
+          └──📁 PLIK: resources/views/livewire/products/categories/category-form.blade.php
+        - ✅ 2.1.2.1.5 Category icon selection/upload
+          └──📁 PLIK: app/Http/Livewire/Products/Categories/CategoryForm.php
+        - ✅ 2.1.2.1.6 Sort order field
+          └──📁 PLIK: app/Http/Livewire/Products/Categories/CategoryForm.php
+      - 🛠️ **2.1.2.2 Category SEO & Settings - 80% UKOŃCZONA (4/5 zadań)**
+        - ✅ 2.1.2.2.1 SEO meta title i description
+          └──📁 PLIK: app/Http/Livewire/Products/Categories/CategoryForm.php
+        - ✅ 2.1.2.2.2 Category visibility settings
+          └──📁 PLIK: app/Http/Livewire/Products/Categories/CategoryForm.php
         - ❌ 2.1.2.2.3 Category-specific attributes configuration
-        - ❌ 2.1.2.2.4 Default values dla products w kategorii
-        - ❌ 2.1.2.2.5 Category image/banner upload
+          **ADNOTACJA:** Planowane w EAV system (ETAP_05 sekcja 7.1)
+        - ✅ 2.1.2.2.4 Default values dla products w kategorii
+          └──📁 PLIK: app/Http/Livewire/Products/Categories/CategoryForm.php
+        - ✅ 2.1.2.2.5 Category image/banner upload
+          └──📁 PLIK: app/Http/Livewire/Products/Categories/CategoryForm.php
+
+      **🔧 OPIS IMPLEMENTACJI CATEGORY FORM MANAGEMENT:**
+      - **741 linii:** Kompletny CategoryForm component z wszystkimi funkcjami enterprise
+      - **1093 linii:** Pełny view z wszystkimi zakładkami (Basic, SEO, Visibility, Advanced, Defaults)
+      - **825 linii:** Model Category z tree structure i business logic
+      - **Funkcje:** Tab system, validation, real-time slug generation, tree widget selection
+      - **SEO:** Meta title/description/keywords/canonical/OpenGraph
+      - **Visibility:** Schedule availability, menu/filter visibility, publishing controls
+      - **Media:** Icon upload (Font Awesome + custom), banner upload z image processing
+      - **Defaults:** Tax rate, weight, dimensions jako domyślne dla produktów
+      - **CSS FIX:** Naprawiono konflikt Bootstrap vs Tailwind przez frontend-specialist
+      - **ROUTES:** /admin/products/categories/create działają poprawnie
+      - **DEPLOYMENT:** Funkcjonalność zweryfikowana na serwerze produkcyjnym
 
   - ❌ **2.2 Product-Category Assignment**
     - ❌ **2.2.1 Category Assignment Interface**
       - ❌ **2.2.2.1 Product Category Selection**
         - ❌ 2.2.2.1.1 Multiple category assignment per product
         - ❌ 2.2.2.1.2 Primary category designation dla PrestaShop
+        **🔗 🔗 POWIAZANIE Z ETAP_07 (punkty 7.5.1.1, 7.5.2.1):** Wybor kategorii glownych musi odpowiadac mapowaniu kategori i transformacjom w integracji PrestaShop.
         - ❌ 2.2.2.1.3 Category tree selector w product form
         - ❌ 2.2.2.1.4 Breadcrumb display dla selected categories
         - ❌ 2.2.2.1.5 Category inheritance rules
@@ -308,6 +624,7 @@ Piąty etap budowy aplikacji PPM to implementacja głównego modułu produktów 
   - ❌ **6.2 Media Sync & Integration**
     - ❌ **6.2.1 Integration Media Management**
       - ❌ **6.2.1.1 PrestaShop Image Sync**
+        **🔗 🔗 POWIAZANIE Z ETAP_07 (punkty 7.4.3.1, 7.5.1.1):** Silnik mediow korzysta z tych samych strategii i transformerow obrazow w integracji PrestaShop.
         - ❌ 6.2.1.1.1 Image upload to PrestaShop per shop
         - ❌ 6.2.1.1.2 PrestaShop image structure compliance
         - ❌ 6.2.1.1.3 Image sync status tracking
@@ -420,6 +737,7 @@ Piąty etap budowy aplikacji PPM to implementacja głównego modułu produktów 
         - ❌ 9.1.2.1.5 Bulk tag assignment
       - ❌ **9.1.2.2 Integration Operations**
         - ❌ 9.1.2.2.1 Bulk sync z PrestaShop stores
+        **🔗 🔗 POWIAZANIE Z ETAP_07 (punkt 7.7.1.2):** Hurtowe synchronizacje odwoluje sie do joba BulkSyncProducts i kolejek z etapu API.
         - ❌ 9.1.2.2.2 Bulk sync z ERP systems
         - ❌ 9.1.2.2.3 Bulk export operations
         - ❌ 9.1.2.2.4 Bulk media operations
@@ -576,7 +894,6 @@ Etap uznajemy za ukończony gdy:
 ### Problem 4: Bulk operations timeout na large datasets
 **Rozwiązanie:** Queue-based processing, batch operations, progress tracking
 
----
 
 ## 📊 METRYKI SUKCESU ETAPU
 
@@ -585,6 +902,46 @@ Etap uznajemy za ukończony gdy:
 - 📦 **Functionality:** All product management features operational
 - 🔍 **Search:** Advanced filtering z < 500ms response time
 - 📊 **Scale:** Support dla 50K+ products z good performance
+
+---
+
+## 🔧 REFACTORING ARCHITEKTURY (2025-09-19) - ZGODNOŚĆ Z CLAUDE.MD
+
+**✅ UKOŃCZONY:** Masywny refactoring ProductForm.php zgodnie z zasadami CLAUDE.md
+
+### 📊 WYNIKI REFACTORINGU
+- **PRZED:** ProductForm.php - 1507 linii ❌ (5x większy niż dozwolone)
+- **PO:** ProductForm.php - 325 linii ✅ (zgodny z CLAUDE.md)
+
+### 🏗️ NOWA ARCHITEKTURA MODUŁOWA
+```
+app/Http/Livewire/Products/Management/
+├── ProductForm.php                     (325 linii) ✅ - główny komponent
+├── ProductForm-Original-Backup.php     (1507 linii) - backup
+├── Traits/
+│   ├── ProductFormValidation.php       (135 linii) ✅ - validation rules i business logic
+│   ├── ProductFormUpdates.php          (120 linii) ✅ - field updates i character counting
+│   └── ProductFormComputed.php         (130 linii) ✅ - computed properties dla wydajności
+└── Services/
+    ├── ProductMultiStoreManager.php     (250 linii) ✅ - zarządzanie multi-store
+    ├── ProductCategoryManager.php       (170 linii) ✅ - zarządzanie kategoriami
+    └── ProductFormSaver.php             (220 linii) ✅ - operacje CRUD i zapisywanie
+```
+
+### ⚡ KORZYŚCI REFACTORINGU
+1. **✅ Zgodność z CLAUDE.md** - Wszystkie pliki <300 linii
+2. **🔧 Separacja odpowiedzialności** - Każda klasa ma jedną funkcję
+3. **🧪 Łatwość testowania** - Osobne unit testy dla każdej części
+4. **⚡ Lepsza wydajność** - Mniejszy Livewire snapshot
+5. **📈 Łatwość rozwoju** - Jasna struktura kodu
+6. **🔄 Możliwość ponownego użycia** - Komponenty można używać w innych miejscach
+
+### 🧪 TESTY FUNKCJONALNE PO REFACTORINGU
+- **✅ /admin/products/create** - Formularz ładuje się poprawnie
+- **✅ /admin/products** - Lista produktów działa
+- **✅ /products/create** - Przekierowania działają
+- **✅ CRUD Operations** - Tworzenie i edycja produktów funkcjonalna
+- **✅ Multi-Store** - System per-shop data zachowany
 
 ---
 
@@ -597,5 +954,8 @@ Po ukończeniu ETAP_05 będziemy mieli:
 - **Stock management** z multiple warehouses
 - **Media system** gotowy dla integrations
 - **Search i filtering** dla power users
+- **Multi-Store Synchronization System** dla różnych sklepów PrestaShop
+- **Conflict detection i resolution** między PPM a sklepami
+- **Status synchronizacji** w czasie rzeczywistym
 
 **Następny etap:** [ETAP_06_Import_Export.md](ETAP_06_Import_Export.md) - system importu/eksportu XLSX z dynamicznym mapowaniem kolumn.

@@ -1,0 +1,12 @@
+# Allow direct access to static files in public directory
+Options -Indexes
+
+<IfModule mod_rewrite.c>
+    RewriteEngine Off
+</IfModule>
+
+# Allow direct access to all files
+<FilesMatch ".*">
+    Order Allow,Deny
+    Allow from all
+</FilesMatch>

@@ -587,7 +587,7 @@ class SystemSettings extends Component
         $this->messageType = $type;
         
         // Auto-hide po 5 sekundach
-        $this->emit('messageShown');
+        $this->dispatch('messageShown');
     }
 
     /**

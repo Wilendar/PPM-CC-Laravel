@@ -487,7 +487,7 @@ class DatabaseMaintenance extends Component
     {
         $this->message = $message;
         $this->messageType = $type;
-        $this->emit('messageShown');
+        $this->dispatch('messageShown');
     }
 
     /**

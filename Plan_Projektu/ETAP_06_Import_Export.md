@@ -1,5 +1,56 @@
 # ❌ ETAP_06: System Import/Export XLSX
 
+## 🔍 INSTRUKCJE PRZED ROZPOCZĘCIEM ETAP
+
+**⚠️ OBOWIĄZKOWE KROKI:**
+1. **Przeanalizuj dokumentację struktury:** Przeczytaj `_DOCS/Struktura_Plikow_Projektu.md` i `_DOCS/Struktura_Bazy_Danych.md`
+2. **Sprawdź aktualny stan:** Porównaj obecną strukturę plików z planem w tym ETAP
+3. **Zidentyfikuj nowe komponenty:** Lista plików/tabel/modeli do utworzenia w tym ETAP
+4. **Zaktualizuj dokumentację:** Dodaj planowane komponenty z statusem ❌ do dokumentacji struktury
+
+**PLANOWANE KOMPONENTY W TYM ETAP:**
+```
+Services Import/Export do utworzenia:
+- app/Services/Import/XlsxImportService.php
+- app/Services/Export/XlsxExportService.php
+- app/Services/Import/ColumnMappingService.php
+- app/Services/Import/ValidationService.php
+
+Komponenty Livewire do utworzenia:
+- app/Http/Livewire/Admin/Import/ImportWizard.php
+- app/Http/Livewire/Admin/Export/ExportManager.php
+- app/Http/Livewire/Admin/Import/MappingConfiguration.php
+- app/Http/Livewire/Admin/Import/ImportHistory.php
+
+Models do utworzenia:
+- app/Models/ImportJob.php
+- app/Models/ExportJob.php
+- app/Models/ImportMapping.php
+- app/Models/ExportTemplate.php
+- app/Models/ContainerShipment.php
+
+Views do utworzenia:
+- resources/views/livewire/admin/import/import-wizard.blade.php
+- resources/views/livewire/admin/export/export-manager.blade.php
+- resources/views/livewire/admin/import/mapping-configuration.blade.php
+
+Tabele bazy danych:
+- import_jobs
+- export_jobs
+- import_mappings
+- export_templates
+- container_shipments
+- import_logs
+
+Routes Import/Export:
+- /admin/import (import wizard)
+- /admin/export (export manager)
+- /admin/import-history (import history)
+- /admin/container-tracking (container management)
+```
+
+---
+
 **Status ETAPU:** ❌ **NIE ROZPOCZĘTE**  
 **Szacowany czas:** 40 godzin  
 **Priorytet:** 🟡 WYSOKI  
@@ -322,14 +373,18 @@ Szósty etap budowy aplikacji PPM koncentruje się na implementacji zaawansowane
     - ❌ **5.2.2 Integration-Ready Exports**
       - ❌ **5.2.2.1 PrestaShop Compatible Exports**
         - ❌ 5.2.2.1.1 PrestaShop CSV format compliance
+        **🔗 🔗 POWIAZANIE Z ETAP_07 (punkt 7.5.1.1):** Format kolumn musi odpowiadac transformacjom produktow wykorzystywanych przez PrestaShop API.
         - ❌ 5.2.2.1.2 Category path formatting
         - ❌ 5.2.2.1.3 Image URL generation
         - ❌ 5.2.2.1.4 Multi-language field exports
         - ❌ 5.2.2.1.5 SEO field formatting
       - ❌ **5.2.2.2 ERP Compatible Exports**
         - ❌ 5.2.2.2.1 Baselinker format exports
+        **🔗 🔗 POWIAZANIE Z ETAP_08 (punkt 8.3.1.1):** Struktura eksportu ma byc zgodna z klientem BaseLinkerApiClient i wymaganymi polami synchronizacji.
         - ❌ 5.2.2.2.2 Subiekt GT compatible formats
+        **🔗 🔗 POWIAZANIE Z ETAP_08 (punkt 8.4.2.1):** Format wymiany danych musi pasowac do SubiektGTClient oraz bridge .NET.
         - ❌ 5.2.2.2.3 Microsoft Dynamics formats
+        **🔗 🔗 POWIAZANIE Z ETAP_08 (punkt 8.5.1.1):** Pliki eksportu wymagaja zgodnosci z klientem DynamicsODataClient i mapowaniami OData.
         - ❌ 5.2.2.2.4 Generic ERP formatting
         - ❌ 5.2.2.2.5 Custom integration formats
 

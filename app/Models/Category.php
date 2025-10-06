@@ -12,6 +12,9 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Support\Str;
 use Illuminate\Support\Collection;
+use App\Models\ShopMapping;
+use App\Models\PrestaShopShop;
+use App\Services\PrestaShop\PrestaShopImportService;
 
 /**
  * Category Model - Self-Referencing Tree Structure dla PPM-CC-Laravel
@@ -31,13 +34,25 @@ use Illuminate\Support\Collection;
  * @property string $name Nazwa kategorii
  * @property string|null $slug URL-friendly slug
  * @property string|null $description Opis kategorii
+ * @property string|null $short_description Krótki opis
  * @property int $level Poziom zagnieżdżenia (0-4)
  * @property string|null $path Materialized path '/1/2/5'
  * @property int $sort_order Kolejność w kategorii
  * @property bool $is_active Status aktywności
+ * @property bool $is_featured Kategoria polecana
  * @property string|null $icon Font-awesome lub custom icon
+ * @property string|null $icon_path Ścieżka do pliku ikony
+ * @property string|null $banner_path Ścieżka do bannera
  * @property string|null $meta_title SEO tytuł
  * @property string|null $meta_description SEO opis
+ * @property string|null $meta_keywords SEO słowa kluczowe
+ * @property string|null $canonical_url Kanoniczny URL
+ * @property string|null $og_title OpenGraph tytuł
+ * @property string|null $og_description OpenGraph opis
+ * @property string|null $og_image OpenGraph obraz
+ * @property array|null $visual_settings Ustawienia wizualne
+ * @property array|null $visibility_settings Ustawienia widoczności
+ * @property array|null $default_values Domyślne wartości produktów
  * @property \Carbon\Carbon $created_at
  * @property \Carbon\Carbon $updated_at
  * @property \Carbon\Carbon|null $deleted_at
@@ -89,11 +104,23 @@ class Category extends Model
         'name',
         'slug',
         'description',
+        'short_description',
         'sort_order',
         'is_active',
+        'is_featured',
         'icon',
-        'meta_title', 
+        'icon_path',
+        'banner_path',
+        'meta_title',
         'meta_description',
+        'meta_keywords',
+        'canonical_url',
+        'og_title',
+        'og_description',
+        'og_image',
+        'visual_settings',
+        'visibility_settings',
+        'default_values',
     ];
 
     /**
@@ -119,6 +146,10 @@ class Category extends Model
             'level' => 'integer',
             'sort_order' => 'integer',
             'is_active' => 'boolean',
+            'is_featured' => 'boolean',
+            'visual_settings' => 'array',
+            'visibility_settings' => 'array',
+            'default_values' => 'array',
             'created_at' => 'datetime',
             'updated_at' => 'datetime',
             'deleted_at' => 'datetime',
@@ -430,7 +461,7 @@ class Category extends Model
 
     /**
      * Scope: Active categories only
-     * 
+     *
      * Performance: Most common filter dla public interfaces
      *
      * @param \Illuminate\Database\Eloquent\Builder $query
@@ -439,6 +470,19 @@ class Category extends Model
     public function scopeActive(Builder $query): Builder
     {
         return $query->where('is_active', true);
+    }
+
+    /**
+     * Scope: Featured categories only
+     *
+     * Performance: Index na is_featured dla featured category queries
+     *
+     * @param \Illuminate\Database\Eloquent\Builder $query
+     * @return \Illuminate\Database\Eloquent\Builder
+     */
+    public function scopeFeatured(Builder $query): Builder
+    {
+        return $query->where('is_featured', true);
     }
 
     /**
@@ -769,7 +813,7 @@ class Category extends Model
 
     /**
      * Retrieve the model for a bound value.
-     * 
+     *
      * Performance: Fallback to ID jeśli slug nie istnieje
      *
      * @param mixed $value
@@ -778,7 +822,117 @@ class Category extends Model
      */
     public function resolveRouteBinding($value, $field = null)
     {
-        return $this->where('slug', $value)->first() 
+        return $this->where('slug', $value)->first()
             ?? $this->where('id', $value)->first();
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | ETAP_07 FAZA 2A.4: PRESTASHOP IMPORT/EXPORT MODEL EXTENSIONS
+    |--------------------------------------------------------------------------
+    */
+
+    /**
+     * Get PrestaShop mappings for this category
+     *
+     * ETAP_07 Integration: Track category mappings per PrestaShop shop
+     * Performance: Eager loading ready with mapping_type filter
+     * Business Logic: Category ID mapping between PPM and PrestaShop
+     *
+     * @return \Illuminate\Database\Eloquent\Relations\HasMany
+     */
+    public function prestashopMappings(): HasMany
+    {
+        return $this->hasMany(ShopMapping::class, 'ppm_value')
+            ->where('mapping_type', 'category');
+    }
+
+    /**
+     * Get PrestaShop category ID for specific shop
+     *
+     * Usage: $psCategoryId = $category->getPrestashopCategoryId($shop);
+     * Returns: PrestaShop category ID or null if not mapped
+     * Performance: Single query with shop_id and mapping_type filter
+     *
+     * @param \App\Models\PrestaShopShop $shop
+     * @return int|null
+     */
+    public function getPrestashopCategoryId(PrestaShopShop $shop): ?int
+    {
+        $mapping = $this->prestashopMappings()
+            ->where('shop_id', $shop->id)
+            ->first();
+
+        return $mapping?->prestashop_id;
+    }
+
+    /**
+     * Import entire category tree from PrestaShop shop
+     *
+     * Usage: $categories = Category::importTreeFromPrestaShop($shop);
+     * Business Logic: Static factory method for bulk category imports
+     * Performance: Delegates to PrestaShopImportService
+     * Integration: ETAP_07 FAZA 2A.1 reverse transformation
+     *
+     * @param \App\Models\PrestaShopShop $shop
+     * @param int|null $rootCategoryId Optional root category to start from
+     * @return \Illuminate\Support\Collection
+     */
+    public static function importTreeFromPrestaShop(
+        PrestaShopShop $shop,
+        ?int $rootCategoryId = null
+    ): Collection
+    {
+        $importService = app(PrestaShopImportService::class);
+        $categories = $importService->importCategoryTreeFromPrestaShop($shop, $rootCategoryId);
+
+        return collect($categories);
+    }
+
+    /**
+     * Sync this category to PrestaShop shop (create or update mapping)
+     *
+     * Usage: $mapping = $category->syncWithPrestaShop($shop, 5);
+     * Business Logic: Create/update ShopMapping for category
+     * Performance: UpdateOrCreate pattern for atomic operation
+     * Integration: Ready for export workflow
+     *
+     * @param \App\Models\PrestaShopShop $shop
+     * @param int $prestashopCategoryId
+     * @return \App\Models\ShopMapping
+     */
+    public function syncWithPrestaShop(PrestaShopShop $shop, int $prestashopCategoryId): ShopMapping
+    {
+        return ShopMapping::updateOrCreate(
+            [
+                'shop_id' => $shop->id,
+                'mapping_type' => 'category',
+                'ppm_value' => $this->id
+            ],
+            [
+                'prestashop_id' => $prestashopCategoryId,
+                'prestashop_value' => $this->name,
+                'is_active' => true
+            ]
+        );
+    }
+
+    /**
+     * Scope: Categories mapped to specific PrestaShop shop
+     *
+     * Usage: $categories = Category::mappedToPrestaShop($shop->id)->get();
+     * Business Logic: Filter categories by mapping existence
+     * Performance: Optimized subquery with mapping_type and is_active filter
+     *
+     * @param \Illuminate\Database\Eloquent\Builder $query
+     * @param int $shopId
+     * @return \Illuminate\Database\Eloquent\Builder
+     */
+    public function scopeMappedToPrestaShop(Builder $query, int $shopId): Builder
+    {
+        return $query->whereHas('prestashopMappings', function($q) use ($shopId) {
+            $q->where('shop_id', $shopId)
+              ->where('is_active', true);
+        });
     }
 }

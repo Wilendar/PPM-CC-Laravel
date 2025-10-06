@@ -132,7 +132,7 @@ class NotificationCenter extends Component
         
         if ($notificationService->markAsRead($notificationId)) {
             $this->loadNotifications();
-            $this->emit('notificationRead', $notificationId);
+            $this->dispatch('notificationRead', $notificationId);
         }
     }
 
@@ -148,7 +148,7 @@ class NotificationCenter extends Component
             ]);
 
         $this->loadNotifications();
-        $this->emit('allNotificationsRead');
+        $this->dispatch('allNotificationsRead');
     }
 
     /**
@@ -185,7 +185,7 @@ class NotificationCenter extends Component
         
         if ($notificationService->acknowledge($notificationId, auth()->user())) {
             $this->loadNotifications();
-            $this->emit('notificationAcknowledged', $notificationId);
+            $this->dispatch('notificationAcknowledged', $notificationId);
         }
     }
 
@@ -198,7 +198,7 @@ class NotificationCenter extends Component
         
         // Show browser notification for critical alerts
         if ($data['priority'] === AdminNotification::PRIORITY_CRITICAL) {
-            $this->emit('showBrowserNotification', [
+            $this->dispatch('showBrowserNotification', [
                 'title' => $data['title'],
                 'body' => $data['message'],
                 'icon' => '/favicon.ico',
@@ -206,7 +206,7 @@ class NotificationCenter extends Component
         }
         
         // Show toast notification
-        $this->emit('showToast', [
+        $this->dispatch('showToast', [
             'type' => $this->getPriorityToastType($data['priority']),
             'title' => $data['title'],
             'message' => $data['message'],

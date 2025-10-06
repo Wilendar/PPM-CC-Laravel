@@ -142,15 +142,15 @@ Route::prefix('v1')->middleware(['api_access'])->group(function () {
     // ==========================================
     // PRESTASHOP SYNC API (Manager+)
     // ==========================================
-    
+
     Route::prefix('sync')->middleware(['role:Admin,Manager'])->group(function () {
-        
+
         Route::get('/shops', function () {
             return response()->json([
                 'shops' => []
             ]);
         })->name('api.sync.shops.index');
-        
+
         Route::post('/shops/{shop_id}/products/{sku}', function ($shop_id, $sku) {
             return response()->json([
                 'message' => 'Product sync initiated',
@@ -158,7 +158,7 @@ Route::prefix('v1')->middleware(['api_access'])->group(function () {
                 'status' => 'queued'
             ]);
         })->name('api.sync.product');
-        
+
         Route::post('/shops/{shop_id}/categories', function ($shop_id) {
             return response()->json([
                 'message' => 'Category sync initiated',
@@ -166,7 +166,7 @@ Route::prefix('v1')->middleware(['api_access'])->group(function () {
                 'status' => 'queued'
             ]);
         })->name('api.sync.categories');
-        
+
         Route::get('/jobs/{job_id}', function ($job_id) {
             return response()->json([
                 'job_id' => $job_id,
@@ -176,6 +176,12 @@ Route::prefix('v1')->middleware(['api_access'])->group(function () {
             ]);
         })->name('api.sync.job.status');
     });
+
+    // ==========================================
+    // PRESTASHOP CATEGORY API (ETAP_07 FAZA 2B.1) - moved outside v1 group
+    // ==========================================
+    // Dynamic Category Loading dla ProductForm shop tabs
+    // Using web middleware + auth for Livewire component access
     
     // ==========================================
     // IMPORT/EXPORT API
@@ -330,6 +336,27 @@ Route::prefix('v1')->middleware(['api_access', 'throttle:10,1'])->group(function
             'job_id' => uniqid()
         ]);
     })->middleware(['role:Admin,Manager'])->name('api.sync.bulk');
+});
+
+// ==========================================
+// PRESTASHOP CATEGORY API (ETAP_07 FAZA 2B.1)
+// ==========================================
+// Routes outside api_access middleware - using web auth for Livewire components
+// These routes are called from ProductForm Livewire component (authenticated web context)
+
+Route::prefix('v1/prestashop')->middleware(['web', 'auth'])->group(function () {
+
+    // GET /api/v1/prestashop/categories/{shopId}
+    // Fetch category tree dla PrestaShop shop (cached)
+    Route::get('categories/{shopId}',
+        [\App\Http\Controllers\API\PrestaShopCategoryController::class, 'getCategoryTree']
+    )->name('api.prestashop.categories');
+
+    // POST /api/v1/prestashop/categories/{shopId}/refresh
+    // Clear cache and re-fetch fresh data from PrestaShop
+    Route::post('categories/{shopId}/refresh',
+        [\App\Http\Controllers\API\PrestaShopCategoryController::class, 'refreshCache']
+    )->name('api.prestashop.categories.refresh');
 });
 
 // ==========================================

@@ -12,6 +12,7 @@ param(
     [switch]$CreateBackup,
     [switch]$RestoreBackup,
     [switch]$DryRun,
+    [switch]$NoDelete,
     [switch]$Force,
     [switch]$HealthCheck,
     [string]$BackupName = "",
@@ -100,12 +101,12 @@ function Setup-HostidoDirectories {
     Write-ColorText "📁 Tworzenie struktury katalogów na Hostido..." "Info"
     
     $directories = @(
-        "/domains/ppm.mpptrade.pl/public_html/storage/logs",
-        "/domains/ppm.mpptrade.pl/public_html/storage/framework/cache",
-        "/domains/ppm.mpptrade.pl/public_html/storage/framework/sessions",
-        "/domains/ppm.mpptrade.pl/public_html/storage/framework/views",
-        "/domains/ppm.mpptrade.pl/public_html/bootstrap/cache",
-        "/domains/ppm.mpptrade.pl/backups"
+        "domains/ppm.mpptrade.pl/public_html/storage/logs",
+        "domains/ppm.mpptrade.pl/public_html/storage/framework/cache",
+        "domains/ppm.mpptrade.pl/public_html/storage/framework/sessions",
+        "domains/ppm.mpptrade.pl/public_html/storage/framework/views",
+        "domains/ppm.mpptrade.pl/public_html/bootstrap/cache",
+        "domains/ppm.mpptrade.pl/backups"
     )
     
     foreach ($dir in $directories) {
@@ -263,14 +264,21 @@ function Deploy-ToHostido {
     Write-ColorText "🚀 Rozpoczynanie deployment na Hostido..." "Info"
     Write-ColorText "Source: $Source" "Info"
     Write-ColorText "Target: $Target" "Info"
-    
+
+    # Dry-run: skip file sync
+    if ($DryRun) {
+        Write-ColorText "DRY-RUN: Skipping file synchronization" "Warning"
+        return $true
+    }
+
     # Wykluczenia dla upload
     $ExcludePatterns = @(
         "node_modules\*",
         ".git\*",
         "tests\*",
-        "storage\logs\*",
-        "storage\app\public\*",
+        "storage\*",
+        "bootstrap\cache\*",
+        "vendor\*",
         ".env*",
         "*.log",
         "_TOOLS\*",
@@ -282,11 +290,12 @@ function Deploy-ToHostido {
         # Tworzenie skryptu WinSCP
         $ScriptPath = "$env:TEMP\hostido_deploy_script.txt"
         $RemoteTargetPath = ($Target -replace '^/','')
+        $DeleteFlag = if ($NoDelete) { "" } else { " -delete" }
         $ScriptContent = @"
 open sftp://${HostidoUser}@${HostidoHost}:${HostidoPort} -privatekey="${HostidoKeyPath}" -hostkey="ssh-ed25519 255 s5jsBvAUexZAUyZgYF3ONT2RvrcsHjhso6DCiTBICiM"
 cd ${RemoteTargetPath}
 lcd ${Source}
-synchronize remote -delete -filemask="|$($ExcludePatterns -join ';')"
+synchronize remote$DeleteFlag -criteria=time -transfer=binary -preservetime -filemask="|$($ExcludePatterns -join ';')"
 close
 exit
 "@
@@ -319,6 +328,11 @@ exit
 
 function Invoke-PostDeployCommands {
     Write-ColorText "⚙️  Wykonywanie komend post-deployment..." "Info"
+    
+    if ($DryRun) {
+        Write-ColorText "DRY-RUN: Skipping post-deployment commands" "Warning"
+        return $true
+    }
     
     $remoteTarget = ($TargetPath -replace '^/','')
     $commands = @(
@@ -476,7 +490,10 @@ try {
         & $AutomationScript -Command $Command
         $Results["Custom Command"] = $LASTEXITCODE -eq 0
     }
-    
+
+    # 4b. Ponowne komendy post-deployment po custom
+    $Results["Post Deploy Commands"] = Invoke-PostDeployCommands
+
     # 5. Health check
     $Results["Health Check"] = Test-ApplicationHealth
     if (!$Results["Health Check"]) {

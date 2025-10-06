@@ -212,6 +212,44 @@ class PrestaShopShop extends Model
     }
 
     /**
+     * Get product shop data for this shop - FAZA 1.5: Multi-Store Synchronization System ✅ IMPLEMENTED
+     *
+     * Business Logic: All products with shop-specific data for this PrestaShop store
+     * Performance: Indexed relationship dla multi-store operations
+     * Sync Status: Access to per-product sync status and settings
+     *
+     * @return \Illuminate\Database\Eloquent\Relations\HasMany
+     */
+    public function productShopData(): HasMany
+    {
+        return $this->hasMany(ProductShopData::class, 'shop_id', 'id')
+                    ->orderBy('product_id', 'asc');
+    }
+
+    /**
+     * Get published products for this shop
+     *
+     * @return \Illuminate\Database\Eloquent\Relations\HasMany
+     */
+    public function publishedProducts(): HasMany
+    {
+        return $this->productShopData()
+                    ->where('is_published', true)
+                    ->where('sync_status', '!=', 'disabled');
+    }
+
+    /**
+     * Get products needing sync for this shop
+     *
+     * @return \Illuminate\Database\Eloquent\Relations\HasMany
+     */
+    public function productsNeedingSync(): HasMany
+    {
+        return $this->productShopData()
+                    ->whereIn('sync_status', ['pending', 'error', 'conflict']);
+    }
+
+    /**
      * Get the decrypted API key.
      */
     protected function apiKey(): Attribute
@@ -220,6 +258,42 @@ class PrestaShopShop extends Model
             get: fn (string $value) => decrypt($value),
             set: fn (string $value) => encrypt($value),
         );
+    }
+
+    /**
+     * Accessor: Get simplified version field (maps prestashop_version to version)
+     *
+     * CRITICAL FIX: PrestaShopClientFactory expects $shop->version but DB column is prestashop_version
+     * This accessor provides compatibility layer without requiring DB changes
+     *
+     * @return string Version number ('8' or '9')
+     */
+    public function getVersionAttribute(): string
+    {
+        // Extract major version from prestashop_version (e.g., "1.7.8.11" -> "8", "9.0.0" -> "9")
+        $version = $this->attributes['prestashop_version'] ?? '';
+
+        if (empty($version)) {
+            return '8'; // Default to version 8 if empty
+        }
+
+        // If version is already simplified ('8' or '9'), return as-is
+        if (in_array($version, ['8', '9'])) {
+            return $version;
+        }
+
+        // Extract first digit from version string (e.g., "1.7.8" -> "8")
+        // PrestaShop 1.7.x = version 8, PrestaShop 9.x = version 9
+        if (str_starts_with($version, '1.7') || str_starts_with($version, '1.8') || str_starts_with($version, '8')) {
+            return '8';
+        }
+
+        if (str_starts_with($version, '9')) {
+            return '9';
+        }
+
+        // Default fallback
+        return '8';
     }
 
     /**

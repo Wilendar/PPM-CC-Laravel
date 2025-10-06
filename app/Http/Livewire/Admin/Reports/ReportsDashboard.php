@@ -147,7 +147,7 @@ class ReportsDashboard extends Component
                 'integration_performance' => $reportsService->generateIntegrationPerformanceReport($this->generatePeriod, $date),
             };
 
-            $this->emit('showToast', [
+            $this->dispatch('showToast', [
                 'type' => 'success',
                 'title' => 'Raport w kolejce',
                 'message' => 'Raport został dodany do kolejki generowania.',
@@ -157,7 +157,7 @@ class ReportsDashboard extends Component
             $this->refreshReports();
 
         } catch (\Exception $e) {
-            $this->emit('showToast', [
+            $this->dispatch('showToast', [
                 'type' => 'error',
                 'title' => 'Błąd generowania',
                 'message' => 'Nie udało się wygenerować raportu: ' . $e->getMessage(),
@@ -175,7 +175,7 @@ class ReportsDashboard extends Component
         if ($report) {
             $report->delete();
             
-            $this->emit('showToast', [
+            $this->dispatch('showToast', [
                 'type' => 'success',
                 'title' => 'Raport usunięty',
                 'message' => 'Raport został pomyślnie usunięty.',
@@ -191,7 +191,7 @@ class ReportsDashboard extends Component
         $report = SystemReport::find($reportId);
         
         if (!$report || $report->status !== SystemReport::STATUS_COMPLETED) {
-            $this->emit('showToast', [
+            $this->dispatch('showToast', [
                 'type' => 'error',
                 'title' => 'Błąd pobierania',
                 'message' => 'Raport nie jest dostępny do pobrania.',
@@ -232,14 +232,14 @@ class ReportsDashboard extends Component
                 'integration_performance' => $reportsService->generateIntegrationPerformanceReport($existingReport->period, $date),
             };
 
-            $this->emit('showToast', [
+            $this->dispatch('showToast', [
                 'type' => 'success',
                 'title' => 'Raport regenerowany',
                 'message' => 'Nowa wersja raportu została dodana do kolejki.',
             ]);
 
         } catch (\Exception $e) {
-            $this->emit('showToast', [
+            $this->dispatch('showToast', [
                 'type' => 'error',
                 'title' => 'Błąd regeneracji',
                 'message' => 'Nie udało się wygenerować raportu: ' . $e->getMessage(),

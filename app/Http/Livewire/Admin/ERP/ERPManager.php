@@ -489,7 +489,7 @@ class ERPManager extends Component
             session()->flash('success', 'Połączenie ERP zostało dodane pomyślnie!');
             
             $this->closeWizard();
-            $this->emit('connectionCreated', $connection->id);
+            $this->dispatch('connectionCreated', $connection->id);
 
         } catch (\Exception $e) {
             session()->flash('error', 'Błąd podczas dodawania połączenia ERP: ' . $e->getMessage());
@@ -610,8 +610,8 @@ class ERPManager extends Component
             $jobClass::dispatch($syncJob);
 
             session()->flash('success', "Synchronizacja ERP '{$connection->instance_name}' została uruchomiona!");
-            
-            $this->emit('syncStarted', $syncJob->job_id);
+
+            $this->dispatch('syncStarted', $syncJob->job_id);
 
         } catch (\Exception $e) {
             session()->flash('error', 'Błąd podczas uruchamiania synchronizacji: ' . $e->getMessage());
@@ -757,6 +757,6 @@ class ERPManager extends Component
     public function handleSyncCompleted($jobId)
     {
         session()->flash('success', 'Synchronizacja ERP została ukończona!');
-        $this->emit('refreshConnections');
+        $this->dispatch('refreshConnections');
     }
 }

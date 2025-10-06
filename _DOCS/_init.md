@@ -331,7 +331,7 @@
 
   * System musi poprawnie eksportować dopasowania do Prestashop zgodnie z zasadami i strukturą bazy danych prestashop
 
-* **KRYTYCZNE** musisz stosować się do zasad bazy danych prestashop, korzystając ze wszystkich zależności i id między kolumnami i tabelami presty cech. Prze każdym tworzeniem czy edycją kodu związanym z eksportem produktów do prestashop musisz koniecznie zweryfikować rzeczywistą strukturę bazy danych w Prestashop https://github.com/PrestaShop/PrestaShop/blob/8.2.x/install-dev/data/db_structure.sql oraz https://github.com/PrestaShop/PrestaShop/blob/9.0.x/install-dev/data/db_structure.sql
+* **KRYTYCZNE** musisz stosować się do zasad bazy danych prestashop, korzystając ze wszystkich zależności i id między kolumnami i tabelami presty cech. Prze każdym tworzeniem czy edycją kodu związanym z eksportem produktów do prestashop musisz koniecznie zweryfikować rzeczywistą strukturę bazy danych w Prestashop https://github.com/PrestaShop/PrestaShop/blob/8.3.x/install-dev/data/db_structure.sql oraz https://github.com/PrestaShop/PrestaShop/blob/9.0.x/install-dev/data/db_structure.sql
 
 * Aplikacja musi inteligentnie odfiltrowywać Cechy dopasowań pojazdów w zależności od tego na jaki sklep prestashop ma być eksportowana. Np. Admin powinien mieć możliwość zdefiniowania Wszystkich modeli globalnie, manualnie lub przez import csv, a następnie "zbanować" (domyślnie w karcie produktu w aplikacji wpisuje się globalne dane na każdy sklep, chyba, że zostały zdefiniowane dane do wybrany sklep) wybrane modele na wybrany sklep prestashop, dzięki czemu podczas eksportu produktu na ten sklep Cechy (dopasowania) będą się automatycznie dostosowywać podczas eksportu a dany sklep prestashop.
 

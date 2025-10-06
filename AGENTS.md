@@ -5,8 +5,10 @@
 - Po każdej zmianie w repo wykonuj natychmiastowy deploy na Hostido (prod) – bez czekania na osobne potwierdzenie.
 - Procedura minimalna (domyślna):
   - Upload: `_TOOLS/hostido_deploy.ps1 -SourcePath "." -TargetPath "/domains/ppm.mpptrade.pl/public_html/"`
-  - Komendy: `_TOOLS/hostido_deploy.ps1 -Command "cd domains/ppm.mpptrade.pl/public_html && php artisan migrate --force && php artisan view:clear && php artisan config:clear && php artisan cache:clear"`
+  - Komendy: `_TOOLS/hostido_deploy.ps1 -Command "cd domains/ppm.mpptrade.pl/public_html && composer install --no-dev && php artisan migrate --force && php artisan view:clear && php artisan config:clear && php artisan cache:clear"`
   - Health-check: odwiedź `/up`, smoke-test `/admin` (403/200 oraz widżety dashboardu)
+  - DryRun:  `_TOOLS/hostido_deploy.ps1 -DryRun -Verbose` (bez uploadu i bez komend) 
+  - Uwaga: skrypt deploy wyklucza  `vendor/*` z synchronizacji (remote vendor nie jest usuwany) 
 - Backup (zalecany przy migracjach/ryzyku):
   - `_TOOLS/hostido_deploy.ps1 -CreateBackup -BackupName "auto_YYYYMMDD_HHMM"`
 - Awaria/Brak dostępu:
@@ -117,6 +119,31 @@ plink -ssh host379076@host379076.hostido.net.pl -P 64321 -i $HostidoKey -batch "
 plink -ssh host379076@host379076.hostido.net.pl -P 64321 -i $HostidoKey -batch "cd domains/ppm.mpptrade.pl/public_html && php artisan migrate --force && php artisan config:cache"
 ```
 
+### Szybki upload pojedynczych plików (Quick Push)
+
+- Narzędzie: `_TOOLS/hostido_quick_push.ps1`
+- Zastosowanie: gdy zmieniasz tylko kilka plików (np. Blade/JS/CSS/PHP) i nie potrzebujesz pełnej synchronizacji ani composera.
+- Przykłady:
+  - Pojedynczy widok + odświeżenie cache widoków:
+    `_TOOLS/hostido_quick_push.ps1 -Files @('resources/views/layouts/admin.blade.php') -PostCommand "cd domains/ppm.mpptrade.pl/public_html && php artisan view:clear"`
+  - Kilka plików:
+    `_TOOLS/hostido_quick_push.ps1 -Files @('resources/views/livewire/dashboard/admin-dashboard.blade.php','resources/views/layouts/admin.blade.php') -PostCommand "cd domains/ppm.mpptrade.pl/public_html && php artisan view:clear"`
+  - Klasa PHP (bez komend po stronie serwera):
+    `_TOOLS/hostido_quick_push.ps1 -Files @('app/Http/Controllers/Admin/DashboardController.php')`
+
+Uwaga: pełny skrypt deploy (`_TOOLS/hostido_deploy.ps1`) używa przyrostowego `synchronize remote` (wysyła tylko zmienione pliki) i wyklucza `vendor/*`. Opcjonalny `-Command` (np. `composer install`) uruchamiany jest przed końcowym cache, a następnie post-deploy wykonuje się ponownie, aby domknąć cache po instalacji paczek.
+
+### Kiedy używać którego trybu (When to use)
+
+- Quick Push: pojedyncze/kilka plików (Blade/JS/CSS/PHP) bez zmian zależności i migracji.
+  - Przykład: `_TOOLS/hostido_quick_push.ps1 -Files @('resources/views/layouts/admin.blade.php') -PostCommand "cd domains/ppm.mpptrade.pl/public_html && php artisan view:clear"`
+- UploadOnly + NoDelete: wiele plików w różnych folderach, bez composer/migracji, bezpieczny (nic nie usuwa po stronie serwera).
+  - Przykład: `_TOOLS/hostido_deploy.ps1 -UploadOnly -NoDelete -Verbose`
+- Pełny deploy + -Command: tylko gdy zmienia się `composer.lock`, są migracje lub istotne zmiany konfiguracji/cache.
+  - Przykład: `_TOOLS/hostido_deploy.ps1 -Verbose -Command "cd domains/ppm.mpptrade.pl/public_html && composer install --no-dev && php artisan migrate --force && php artisan optimize:clear && php artisan config:cache && php artisan route:cache && php artisan view:cache"`
+- Dokumentacja/markdown: Quick Push bez `-PostCommand`.
+- ZAWSZE: unikać pełnego build/deploy jeśli nie jest konieczny; preferować Quick Push lub UploadOnly+NoDelete.
+
 ### Ręczne połączenie SSH
 ```bash
 # Wymaga klucza SSH (HostidoSSHNoPass.ppk)
@@ -174,7 +201,7 @@ PPM-CC-Laravel/
 - Multi-store support
 - Zachowanie struktur katalogów dla zdjęć
 - Weryfikacja zgodności z bazą danych Prestashop 8.x/9.x
-- **KRYTYCZNE**: Sprawdzanie struktury DB: https://github.com/PrestaShop/PrestaShop/blob/8.2.x/install-dev/data/db_structure.sql
+- **KRYTYCZNE**: Sprawdzanie struktury DB: https://github.com/PrestaShop/PrestaShop/blob/8.3.x/install-dev/data/db_structure.sql
 
 ### ERP Systems
 - **Baselinker**: Priorytet #1 dla integracji
@@ -366,3 +393,7 @@ Korzystaj z następujących oznaczeń statusu planu:
 
 - **Autor**: Kamil Wiliński (nie Claude AI)
 - **Środowisko**: Windows + PowerShell 7 (nie WSL/Linux)
+
+
+
+

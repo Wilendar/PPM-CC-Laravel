@@ -1,5 +1,40 @@
 # ❌ ETAP 11: SYSTEM DOPASOWAŃ I WARIANTÓW
 
+## 🔍 INSTRUKCJE PRZED ROZPOCZĘCIEM ETAPU
+
+**OBOWIĄZKOWE CZYNNOŚCI:**
+
+1. **ANALIZA ZADAŃ ETAPU**
+   - Przeanalizuj wszystkie zadania i podzadania w tym ETAP-ie
+   - Zidentyfikuj wymagane pliki, klasy, migracje i komponenty
+   - Określ zależności z innymi ETAPami (szczególnie ETAP_05, ETAP_07, ETAP_08)
+
+2. **AKTUALIZACJA DOKUMENTACJI STRUKTURY**
+   - Otwórz `_DOCS/Struktura_Plikow_Projektu.md`
+   - Dodaj wszystkie nowe pliki i foldery zaplanowane w tym ETAP-ie:
+     - `app/Services/Vehicle/` - VehicleService, VINDecoder
+     - `app/Services/Product/` - ProductMatchingService, ProductVariantService
+     - `app/Http/Livewire/Vehicle/` - VehicleSelector
+     - `app/Models/Vehicle*` - VehicleBrand, VehicleModel, VehicleGeneration, VehicleEngine
+     - `app/Models/Product*` - ProductAlternative, ProductVariant, ProductBundle
+     - `resources/views/livewire/vehicle/` - vehicle-selector.blade.php
+   - Otwórz `_DOCS/Struktura_Bazy_Danych.md`
+   - Dodaj nowe tabele z tego ETAP-u:
+     - `vehicle_brands` - marki pojazdów
+     - `vehicle_models` - modele pojazdów
+     - `vehicle_generations` - generacje/wersje
+     - `vehicle_engines` - silniki
+     - `product_alternatives` - części zamienne
+     - `vehicle_part_compatibility` - kompatybilność części
+     - `product_variants` - warianty produktów
+     - `product_bundles` - zestawy produktów
+     - `product_bundle_items` - elementy zestawów
+
+3. **PRZYGOTOWANIE ŚRODOWISKA**
+   - Sprawdź dostępność TecDoc API credentials
+   - Upewnij się, że VIN decoder service jest dostępny
+   - Przygotuj dane testowe katalogu pojazdów
+
 **Szacowany czas realizacji:** 40 godzin  
 **Priorytet:** 🟢 ŚREDNI  
 **Odpowiedzialny:** Claude Code AI + Kamil Wiliński  
@@ -50,6 +85,7 @@ Implementacja zaawansowanego systemu dopasowań części zamiennych dla branży 
 
 ### ❌ 11.1.2 Wymagania systemu wariantów
 #### ❌ 11.1.2.1 Warianty produktów
+#### **🔗 POWIAZANIE Z ETAP_05 (sekcje 6.3 i 7.2) oraz ETAP_07 (sekcja 7.4.1):** Warianty produktowe korzystaja z magazynow i strategii synchronizacji PrestaShop.
 - ❌ 11.1.2.1.1 Warianty kolorystyczne (lakiery, tkaniny)
 - ❌ 11.1.2.1.2 Warianty rozmiarowe (średnice, długości)
 - ❌ 11.1.2.1.3 Warianty specyfikacji (lewy/prawy, przód/tył)
@@ -57,6 +93,7 @@ Implementacja zaawansowanego systemu dopasowań części zamiennych dla branży 
 - ❌ 11.1.2.1.5 Dedykowane SKU, ceny i stany dla wariantów
 
 #### ❌ 11.1.2.2 System grupowania produktów
+#### **🔗 POWIAZANIE Z ETAP_05 (sekcja 9.1) oraz ETAP_06 (sekcja 4.1):** Grupy produktowe musza wspierac hurtowe eksporty i operacje tagowania.
 - ❌ 11.1.2.2.1 Zestawy części (kompletne hamulce, kit rozrządu)
 - ❌ 11.1.2.2.2 Akcesoria i części dodatkowe
 - ❌ 11.1.2.2.3 Części serwisowe i eksploatacyjne
@@ -65,6 +102,7 @@ Implementacja zaawansowanego systemu dopasowań części zamiennych dla branży 
 
 ### ❌ 11.1.3 Integracje zewnętrzne
 #### ❌ 11.1.3.1 TecDoc Integration
+#### **🔗 POWIAZANIE Z ETAP_08 (sekcja 8.6) oraz ETAP_12 (sekcja 12.3.2):** Konfiguracja API TecDoc jest czescia globalnych integracji i testow koncowych.
 - ❌ 11.1.3.1.1 Pobieranie danych pojazdów z TecDoc API
 - ❌ 11.1.3.1.2 Synchronizacja katalogu części
 - ❌ 11.1.3.1.3 Mapowanie dopasowań TecDoc → PPM
@@ -349,6 +387,7 @@ CREATE TABLE vehicle_part_compatibility (
 ```
 
 ### ❌ 11.2.3 Tabele wariantów produktów
+### **🔗 POWIAZANIE Z ETAP_02 (sekcja 3.1.1) oraz ETAP_05 (sekcja 6.2):** Rozszerzenia schematow musza byc zgodne z mapowaniami produktow i statusami synchronizacji.
 #### ❌ 11.2.3.1 Tabela product_variants (warianty)
 ```sql
 CREATE TABLE product_variants (
@@ -1175,6 +1214,7 @@ class ProductMatchingService
 
 ### ❌ 11.5.1 ProductVariantService
 #### ❌ 11.5.1.1 Zarządzanie wariantami produktów
+#### **🔗 POWIAZANIE Z ETAP_04 (sekcja 2.1) oraz ETAP_05 (sekcja 6.2.1):** Interfejs admina i komponenty Livewire musza integrowac warianty w panelu produktowym.
 ```php
 <?php
 namespace App\Services\Product;
@@ -1880,7 +1920,213 @@ Etap zostanie uznany za ukończony gdy:
 
 ---
 
-**Autor:** Claude Code AI  
-**Data utworzenia:** 2025-09-05  
-**Ostatnia aktualizacja:** 2025-09-05  
+**Autor:** Claude Code AI
+**Data utworzenia:** 2025-09-05
+**Ostatnia aktualizacja:** 2025-09-05
 **Status:** ❌ NIEROZPOCZĘTY
+
+---
+
+## ✅ WERYFIKACJA PO UKOŃCZENIU ETAPU
+
+**LISTA KONTROLNA - wykonaj po zakończeniu wszystkich zadań:**
+
+### 📁 WERYFIKACJA STRUKTURY PLIKÓW
+- [ ] **Vehicle Services** - Sprawdź istnienie i completeness:
+  - [ ] `app/Services/Vehicle/VehicleService.php`
+  - [ ] `app/Services/Vehicle/VINDecoder.php`
+
+- [ ] **Product Matching Services** - Sprawdź istnienie:
+  - [ ] `app/Services/Product/ProductMatchingService.php`
+  - [ ] `app/Services/Product/ProductVariantService.php`
+
+- [ ] **Vehicle Models** - Sprawdź istnienie:
+  - [ ] `app/Models/VehicleBrand.php`
+  - [ ] `app/Models/VehicleModel.php`
+  - [ ] `app/Models/VehicleGeneration.php`
+  - [ ] `app/Models/VehicleEngine.php`
+  - [ ] `app/Models/ProductAlternative.php`
+  - [ ] `app/Models/VehiclePartCompatibility.php`
+
+- [ ] **Product Variant Models** - Sprawdź istnienie:
+  - [ ] `app/Models/ProductVariant.php`
+  - [ ] `app/Models/ProductBundle.php`
+  - [ ] `app/Models/ProductBundleItem.php`
+
+- [ ] **Livewire Components** - Sprawdź istnienie:
+  - [ ] `app/Http/Livewire/Vehicle/VehicleSelector.php`
+  - [ ] `resources/views/livewire/vehicle/vehicle-selector.blade.php`
+
+### 🗃️ WERYFIKACJA STRUKTURY BAZY DANYCH
+- [ ] **Migracje Vehicle** - Sprawdź czy zostały utworzone i uruchomione:
+  - [ ] `*_create_vehicle_brands_table.php`
+  - [ ] `*_create_vehicle_models_table.php`
+  - [ ] `*_create_vehicle_generations_table.php`
+  - [ ] `*_create_vehicle_engines_table.php`
+  - [ ] `*_create_product_alternatives_table.php`
+  - [ ] `*_create_vehicle_part_compatibility_table.php`
+
+- [ ] **Migracje Product Variants** - Sprawdź czy zostały utworzone i uruchomione:
+  - [ ] `*_create_product_variants_table.php`
+  - [ ] `*_create_product_bundles_table.php`
+  - [ ] `*_create_product_bundle_items_table.php`
+
+- [ ] **Indeksy i Foreign Keys** - Sprawdź na serwerze:
+```bash
+plink -ssh host379076@host379076.hostido.net.pl -P 64321 -i $HostidoKey -batch "cd domains/ppm.mpptrade.pl/public_html && php artisan tinker --execute=\"DB::select('SHOW INDEX FROM vehicle_brands');\""
+```
+
+### 🚗 WERYFIKACJA KATALOGU POJAZDÓW
+- [ ] **Vehicle Hierarchy** - Test hierarchii pojazdów:
+  - [ ] Tworzenie i edycja marek pojazdów
+  - [ ] Dodawanie modeli do marek
+  - [ ] Zarządzanie generacjami modeli
+  - [ ] Konfiguracja silników w generacjach
+  - [ ] Pełna hierarchia Brand → Model → Generation → Engine
+
+- [ ] **Vehicle Search** - Test wyszukiwania:
+  - [ ] Wyszukiwanie pojazdów po nazwie
+  - [ ] Autocomplete dla marek i modeli
+  - [ ] Filtrowanie po typie nadwozia
+  - [ ] Filtrowanie po typie paliwa
+  - [ ] Sortowanie po popularności
+
+- [ ] **VIN Decoder** - Test dekodowania VIN:
+  - [ ] Dekodowanie numeru VIN (17 znaków)
+  - [ ] Mapowanie VIN na pojazd w bazie
+  - [ ] Obsługa błędów dla nieprawidłowych VIN
+  - [ ] Cache wyników dekodowania
+
+### 🔧 WERYFIKACJA SYSTEMU DOPASOWAŃ
+- [ ] **Product Alternatives** - Test części zamiennych:
+  - [ ] Tworzenie mapowań Oryginał → Zamiennik
+  - [ ] Różne poziomy kompatybilności
+  - [ ] System priorytetów i ocen jakości
+  - [ ] Walidacja dopasowań przez ekspertów
+  - [ ] Widok alternatyw w panelu produktu
+
+- [ ] **Vehicle Compatibility** - Test kompatybilności:
+  - [ ] Przypisywanie części do pojazdów
+  - [ ] Hierarchiczne dopasowania (Brand/Model/Generation/Engine)
+  - [ ] Ograniczenia czasowe (roczniki)
+  - [ ] Poziomy pewności dopasowania
+  - [ ] Wyszukiwanie części po pojeździe
+
+- [ ] **Cross-selling & Recommendations** - Test rekomendacji:
+  - [ ] Sugestie części komplementarnych
+  - [ ] Rekomendacje oparte na kategorii
+  - [ ] Często kupowane razem
+  - [ ] Scoring algorytm rekomendacji
+
+### 🎨 WERYFIKACJA WARIANTÓW PRODUKTÓW
+- [ ] **Product Variants** - Test wariantów:
+  - [ ] Tworzenie wariantów produktów
+  - [ ] Warianty kolorystyczne i rozmiarowe
+  - [ ] Indywidualne ceny wariantów
+  - [ ] Indywidualne stany magazynowe
+  - [ ] Indywidualne zdjęcia wariantów
+
+- [ ] **Variant Pricing** - Test cenowania:
+  - [ ] Dziedziczenie cen z produktu głównego
+  - [ ] Korekty cenowe (stałe i procentowe)
+  - [ ] Indywidualne ceny per grupa
+  - [ ] Kalkulacja finalnej ceny
+
+- [ ] **Variant Stock** - Test stanów:
+  - [ ] Oddzielne stany dla wariantów
+  - [ ] Integracja z systemem magazynowym
+  - [ ] Low stock alerts dla wariantów
+
+### 📦 WERYFIKACJA SYSTEMU BUNDLI
+- [ ] **Product Bundles** - Test zestawów:
+  - [ ] Tworzenie zestawów produktów
+  - [ ] Różne typy bundli (fixed, flexible)
+  - [ ] Strategie cenowe (suma, zniżka)
+  - [ ] Ograniczenia min/max produktów
+
+- [ ] **Bundle Pricing** - Test kalkulacji cen:
+  - [ ] Suma cen produktów
+  - [ ] Zniżki procentowe i kwotowe
+  - [ ] Indywidualne ceny w bundlu
+  - [ ] Kalkulacja oszczędności
+
+- [ ] **Bundle Management** - Test zarządzania:
+  - [ ] Dodawanie/usuwanie produktów z bundla
+  - [ ] Wymagane vs opcjonalne produkty
+  - [ ] Dostępność bundla (wszystkie produkty dostępne)
+
+### 🎛️ WERYFIKACJA KOMPONENTÓW LIVEWIRE
+- [ ] **VehicleSelector Component** - Test na https://ppm.mpptrade.pl:
+  - [ ] Hierarchiczny wybór pojazdu
+  - [ ] Wyszukiwarka pojazdów z autocomplete
+  - [ ] Dekodowanie VIN
+  - [ ] Clear selection funkcjonalność
+  - [ ] Events emitting przy zmianie selekcji
+
+- [ ] **Integration with Product Components** - Test integracji:
+  - [ ] Event handling między komponentami
+  - [ ] Filtrowanie produktów po wybranym pojeździe
+  - [ ] Wyświetlanie kompatybilności w liście produktów
+
+### 🔗 WERYFIKACJA INTEGRACJI ZEWNĘTRZNYCH
+- [ ] **TecDoc Integration** - Test integracji (jeśli dostępne):
+  - [ ] Pobieranie danych pojazdów z TecDoc
+  - [ ] Synchronizacja katalogu części
+  - [ ] Mapowanie dopasowań TecDoc → PPM
+  - [ ] Aktualizacje incrementalne
+
+- [ ] **VIN Decoder API** - Test zewnętrznych serwisów:
+  - [ ] Połączenie z serwisami VIN decoder
+  - [ ] CEPiK integration (polskie rejestracje)
+  - [ ] Fallback mechanisms przy błędach
+  - [ ] Rate limiting i cache
+
+### 📝 WERYFIKACJA DOKUMENTACJI
+- [ ] **Aktualizacja dokumentacji struktury**:
+  - [ ] `_DOCS/Struktura_Plikow_Projektu.md` zawiera wszystkie pliki Vehicle/Matching
+  - [ ] `_DOCS/Struktura_Bazy_Danych.md` zawiera tabele Vehicle/Product z opisami
+  - [ ] Mapowania do ETAPów są poprawne
+
+- [ ] **Testy jednostkowe**:
+  - [ ] ProductMatchingTest przechodzi
+  - [ ] VehicleServiceTest przechodzi
+  - [ ] ProductVariantServiceTest przechodzi
+  - [ ] VehicleSelectorTest przechodzi
+  - [ ] Coverage min 80% dla matching services
+
+### 🚀 WERYFIKACJA DEPLOYMENT
+- [ ] **Serwer produkcyjny** - Upload i test:
+```bash
+# Upload vehicle services
+pscp -i $HostidoKey -P 64321 -r "D:\OneDrive - MPP TRADE\Skrypty\PPM-CC-Laravel\app\Services\Vehicle" host379076@host379076.hostido.net.pl:domains/ppm.mpptrade.pl/public_html/app/Services/
+
+# Upload product matching services
+pscp -i $HostidoKey -P 64321 -r "D:\OneDrive - MPP TRADE\Skrypty\PPM-CC-Laravel\app\Services\Product" host379076@host379076.hostido.net.pl:domains/ppm.mpptrade.pl/public_html/app/Services/
+
+# Upload Livewire components
+pscp -i $HostidoKey -P 64321 -r "D:\OneDrive - MPP TRADE\Skrypty\PPM-CC-Laravel\app\Http\Livewire\Vehicle" host379076@host379076.hostido.net.pl:domains/ppm.mpptrade.pl/public_html/app/Http/Livewire/
+
+# Upload models
+pscp -i $HostidoKey -P 64321 "D:\OneDrive - MPP TRADE\Skrypty\PPM-CC-Laravel\app\Models\Vehicle*.php" host379076@host379076.hostido.net.pl:domains/ppm.mpptrade.pl/public_html/app/Models/
+pscp -i $HostidoKey -P 64321 "D:\OneDrive - MPP TRADE\Skrypty\PPM-CC-Laravel\app\Models\Product*.php" host379076@host379076.hostido.net.pl:domains/ppm.mpptrade.pl/public_html/app/Models/
+
+# Uruchom migracje
+plink -ssh host379076@host379076.hostido.net.pl -P 64321 -i $HostidoKey -batch "cd domains/ppm.mpptrade.pl/public_html && php artisan migrate --force"
+
+# Clear cache
+plink -ssh host379076@host379076.hostido.net.pl -P 64321 -i $HostidoKey -batch "cd domains/ppm.mpptrade.pl/public_html && php artisan cache:clear && php artisan view:clear"
+```
+
+### 🧪 WERYFIKACJA PERFORMANCE
+- [ ] **Search Performance** - Test wydajności:
+  - [ ] Vehicle search < 200ms
+  - [ ] Alternative lookup < 300ms
+  - [ ] Compatibility check < 400ms
+  - [ ] VIN decode cache hit rate > 90%
+
+- [ ] **Database Optimization** - Test optymalizacji:
+  - [ ] Indeksy na kluczowych kolumnach
+  - [ ] Query optimization dla hierarchii pojazdów
+  - [ ] Cache strategies dla popularnych zapytań
+
+**ETAP UKOŃCZONY POMYŚLNIE** ✅ gdy wszystkie powyższe punkty są zaznaczone jako wykonane.

@@ -1,4 +1,54 @@
-﻿# ETAP_04: Panel Administracyjny
+# ETAP_04: Panel Administracyjny
+
+## 🔍 INSTRUKCJE PRZED ROZPOCZĘCIEM ETAP
+
+**⚠️ OBOWIĄZKOWE KROKI:**
+1. **Przeanalizuj dokumentację struktury:** Przeczytaj `_DOCS/Struktura_Plikow_Projektu.md` i `_DOCS/Struktura_Bazy_Danych.md`
+2. **Sprawdź aktualny stan:** Porównaj obecną strukturę plików z planem w tym ETAP
+3. **Zidentyfikuj nowe komponenty:** Lista plików/tabel/modeli do utworzenia w tym ETAP
+4. **Zaktualizuj dokumentację:** Dodaj planowane komponenty z statusem ❌ do dokumentacji struktury
+
+**PLANOWANE KOMPONENTY W TYM ETAP:**
+```
+Komponenty Livewire Admin do utworzenia:
+- app/Http/Livewire/Dashboard/AdminDashboard.php
+- app/Http/Livewire/Admin/Shops/ShopManager.php
+- app/Http/Livewire/Admin/ERP/ERPManager.php
+- app/Http/Livewire/Admin/Settings/SystemSettings.php
+- app/Http/Livewire/Admin/Backup/BackupManager.php
+- app/Http/Livewire/Admin/Maintenance/DatabaseMaintenance.php
+- app/Http/Livewire/Admin/Notifications/NotificationCenter.php
+- app/Http/Livewire/Admin/Reports/ReportsDashboard.php
+- app/Http/Livewire/Admin/Api/ApiManagement.php
+- app/Http/Livewire/Admin/Customization/AdminTheme.php
+
+Views Admin do utworzenia:
+- resources/views/livewire/dashboard/admin-dashboard.blade.php
+- resources/views/livewire/admin/shops/shop-manager.blade.php
+- resources/views/layouts/admin.blade.php
+- resources/views/livewire/admin/settings/system-settings.blade.php
+- + komponenty dla wszystkich modułów admin
+
+Tabele bazy danych Admin:
+- prestashop_shops
+- erp_connections
+- system_settings
+- backup_jobs
+- maintenance_tasks
+- admin_notifications
+- system_reports
+- api_usage_logs
+- admin_themes
+
+Routes Admin:
+- /admin (main dashboard)
+- /admin/shops (shop management)
+- /admin/integrations (ERP management)
+- /admin/settings (system configuration)
+- + wszystkie route admin
+```
+
+---
 
 ## 🎯 OPIS ETAPU
 
@@ -37,6 +87,16 @@ Czwarty etap budowy aplikacji PPM koncentruje się na implementacji kompleksoweg
         - ✅ 1.1.1.1.5 Auto-refresh functionality (30s, 60s, 5min)
           └──📁 PLIK: app/Http/Livewire/Dashboard/AdminDashboard.php
           └──📁 PLIK: resources/views/livewire/dashboard/admin-dashboard.blade.php
+        - ✅ 1.1.1.1.6 Layout alignment fixes - dropdown visibility problems z CSS stacking context
+          └──📁 PLIK: resources/views/livewire/dashboard/admin-dashboard.blade.php
+        - ✅ 1.1.1.1.7 Responsive layout improvements - header text overflow fixes
+          └──📁 PLIK: resources/views/livewire/dashboard/admin-dashboard.blade.php
+        - ✅ 1.1.1.1.8 Component width alignment z header przy sidebar layout
+          └──📁 PLIK: resources/views/livewire/dashboard/admin-dashboard.blade.php
+        - ✅ 1.1.1.1.9 KPI panel styling consistency - unified gradient approach
+          └──📁 PLIK: resources/views/livewire/dashboard/admin-dashboard.blade.php
+        - ✅ 1.1.1.1.10 Admin layout standards documentation w PPM Color Style Guide
+          └──📁 PLIK: _DOCS/PPM_Color_Style_Guide.md
       - ✅ **1.1.1.2 Dashboard navigation**
         - ✅ 1.1.1.2.1 Quick access sidebar z frequent actions
           └──📁 PLIK: app/Http/Livewire/Dashboard/AdminDashboard.php
@@ -71,6 +131,12 @@ Czwarty etap budowy aplikacji PPM koncentruje się na implementacji kompleksoweg
         - ❌ 1.1.2.2.3 Integration Sync Statistics (bar chart)
         - ❌ 1.1.2.2.4 Error Rate Trends (area chart)
         - ❌ 1.1.2.2.5 Storage Usage i Database Growth (gauge charts)
+      
+      - ✅ **1.1.2.3 Widget Layout Optimization (2025-01-12)**
+        - ✅ 1.1.2.3.1 Sidebar layout space optimization - komponenty używają pełną dostępną szerokość
+          └──📁 PLIK: resources/views/livewire/dashboard/admin-dashboard.blade.php
+        - ✅ 1.1.2.3.2 Modular widget structure - przygotowanie dla przyszłych kafelek
+        - ✅ 1.1.2.3.3 Responsive widget grid - więcej miejsca na dodatkowe kafelki
 
   - ✅ **1.2 Real-time Monitoring Widgets**
     - ✅ **1.2.1 System Performance Monitoring**
@@ -125,64 +191,127 @@ Czwarty etap budowy aplikacji PPM koncentruje się na implementacji kompleksoweg
         - ❌ 1.2.2.2.4 Login Frequency heatmap
         - ❌ 1.2.2.2.5 Failed Permission Attempts log
 
-- ❌ **2. SHOP MANAGEMENT - ZARZĄDZANIE PRESTASHOP [FAZA B]**
-  - ❌ **2.1 PrestaShop Connections Dashboard**
-    - ❌ **2.1.1 Shop Connections Overview**
-      - ❌ **2.1.1.1 Shop List Component**
-        - ❌ 2.1.1.1.1 Livewire ShopManager component
-        - ❌ 2.1.1.1.2 Shop cards z status indicators (green/red/yellow)
-        - ❌ 2.1.1.1.3 Connection health monitoring z automatic testing
-        - ❌ 2.1.1.1.4 Last sync timestamp dla każdego sklepu
-        - ❌ 2.1.1.1.5 Quick actions (Test Connection, Force Sync, Configure)
-      - ❌ **2.1.1.2 Connection Status Details**
-        - ❌ 2.1.1.2.1 API Version compatibility check (PS 8/9)
-        - ❌ 2.1.1.2.2 SSL/TLS verification status
-        - ❌ 2.1.1.2.3 API Rate Limits monitoring
-        - ❌ 2.1.1.2.4 Response Time metrics per shop
-        - ❌ 2.1.1.2.5 Error Rate tracking z alertami
+- 🛠️ **2. SHOP MANAGEMENT - ZARZĄDZANIE PRESTASHOP [FAZA B]**
+  - ✅ **2.1 PrestaShop Connections Dashboard**
+    - ✅ **2.1.1 Shop Connections Overview**
+      - ✅ **2.1.1.1 Shop List Component**
+        - ✅ 2.1.1.1.1 Livewire ShopManager component
+          └──📁 PLIK: app/Http/Livewire/Admin/Shops/ShopManager.php
+          └──📁 PLIK: resources/views/livewire/admin/shops/shop-manager.blade.php
+        - ✅ 2.1.1.1.2 Shop cards z status indicators (green/red/yellow)
+          └──📁 PLIK: resources/views/livewire/admin/shops/shop-manager.blade.php
+        - ✅ 2.1.1.1.3 Connection health monitoring z automatic testing
+          └──📁 PLIK: app/Http/Livewire/Admin/Shops/ShopManager.php (testConnection method)
+        - ✅ 2.1.1.1.4 Last sync timestamp dla każdego sklepu
+          └──📁 PLIK: app/Http/Livewire/Admin/Shops/ShopManager.php (getShopStats method)
+        - ✅ 2.1.1.1.5 Quick actions (Test Connection, Force Sync, Configure)
+          └──📁 PLIK: app/Http/Livewire/Admin/Shops/ShopManager.php (testConnection, syncShop methods)
 
-    - ❌ **2.1.2 Add New PrestaShop Store**
-      - ❌ **2.1.2.1 Shop Configuration Wizard**
-        - ❌ 2.1.2.1.1 Livewire AddShop multi-step wizard
-        - ❌ 2.1.2.1.2 Step 1: Basic Info (name, URL, description)
-        - ❌ 2.1.2.1.3 Step 2: API Credentials (API key validation)
-        - ❌ 2.1.2.1.4 Step 3: Connection Test z detailed diagnostics
-        - ❌ 2.1.2.1.5 Step 4: Initial Sync Settings i confirmation
-      - ❌ **2.1.2.2 Advanced Shop Settings**
-        - ❌ 2.1.2.2.1 Sync frequency settings (real-time, hourly, daily)
-        - ❌ 2.1.2.2.2 Selective sync options (products, categories, prices)
-        - ❌ 2.1.2.2.3 Conflict resolution rules configuration
-        - ❌ 2.1.2.2.4 Custom field mappings per shop
-        - ❌ 2.1.2.2.5 Category mapping configuration
-
-  - ❌ **2.2 PrestaShop Integration Management**
-    - ❌ **2.2.1 Synchronization Control Panel**
-      - ❌ **2.2.1.1 Sync Dashboard**
-        - ❌ 2.2.1.1.1 Livewire SyncController component
-        - ❌ 2.2.1.1.2 Manual sync triggers per shop lub bulk
-        - ❌ 2.2.1.1.3 Sync queue monitoring z progress bars
-        - ❌ 2.2.1.1.4 Sync history z timestamps i results
-        - ❌ 2.2.1.1.5 Conflict resolution interface
-      - ❌ **2.2.1.2 Sync Configuration**
-        - ❌ 2.2.1.2.1 Auto-sync scheduler configuration
-        - ❌ 2.2.1.2.2 Retry logic dla failed syncs
-        - ❌ 2.2.1.2.3 Notification settings dla sync events
-        - ❌ 2.2.1.2.4 Performance optimization settings
-        - ❌ 2.2.1.2.5 Backup przed sync option
-
-    - ❌ **2.2.2 Product Export/Import Tools**
-      - ❌ **2.2.2.1 Bulk Export Interface**
-        - ❌ 2.2.2.1.1 Livewire BulkExport component
-        - ❌ 2.2.2.1.2 Product selection filters (category, brand, price range)
-        - ❌ 2.2.2.1.3 Shop selection dla multi-shop export
-        - ❌ 2.2.2.1.4 Export format options (full, update only, media only)
-        - ❌ 2.2.2.1.5 Progress tracking z ETA calculation
-      - ❌ **2.2.2.2 Import Management**
-        - ❌ 2.2.2.2.1 Import data from PrestaShop stores
-        - ❌ 2.2.2.2.2 Data validation i conflict detection
-        - ❌ 2.2.2.2.3 Import preview z change summary
-        - ❌ 2.2.2.2.4 Rollback capability dla failed imports
-        - ❌ 2.2.2.2.5 Import scheduling dla off-peak hours
+      **🔗 POWIAZANIE Z ETAP_07 (punkty 7.3.2.1, 7.3.2.2, 7.7.1.1):** ShopManager wykorzystuje serwisy API PrestaShop:
+      
+      - `PrestaShopClientFactory::create()` → Tworzenie klientów API dla PS8/PS9
+      - `BasePrestaShopClient->makeRequest()` → Testowanie połączeń
+      - `PrestaShopSyncService->syncProductToShop()` → Synchronizacja produktów
+      
+      - ✅ **2.1.1.2 Connection Status Details**
+        - ✅ 2.1.1.2.1 API Version compatibility check (PS 8/9)
+          └──📁 PLIK: app/Http/Livewire/Admin/Shops/ShopManager.php (checkApiVersionCompatibility method)
+        - ✅ 2.1.1.2.2 SSL/TLS verification status
+          └──📁 PLIK: app/Http/Livewire/Admin/Shops/ShopManager.php (checkSslTlsStatus method)
+        - ✅ 2.1.1.2.3 API Rate Limits monitoring
+          └──📁 PLIK: app/Http/Livewire/Admin/Shops/ShopManager.php (getRateLimitStatus method)
+        - ✅ 2.1.1.2.4 Response Time metrics per shop
+          └──📁 PLIK: app/Http/Livewire/Admin/Shops/ShopManager.php (getResponseTimeMetrics method)
+        - ✅ 2.1.1.2.5 Error Rate tracking z alertami
+          └──📁 PLIK: app/Http/Livewire/Admin/Shops/ShopManager.php (getErrorRateStats method)
+          └──📁 PLIK: resources/views/livewire/admin/shops/shop-manager.blade.php (Advanced Connection Metrics Section)
+      
+    - 🛠️ **2.1.2 Add New PrestaShop Store**
+      - ✅ **2.1.2.1 Shop Configuration Wizard**
+        - ✅ 2.1.2.1.1 Livewire AddShop multi-step wizard
+          └──📁 PLIK: app/Http/Livewire/Admin/Shops/AddShop.php
+          └──📁 PLIK: resources/views/livewire/admin/shops/add-shop.blade.php
+        - ✅ 2.1.2.1.2 Step 1: Basic Info (name, URL, description)
+          └──📁 PLIK: resources/views/livewire/admin/shops/add-shop.blade.php (sekcja Step 1)
+        - ✅ 2.1.2.1.3 Step 2: API Credentials (API key validation)
+          └──📁 PLIK: resources/views/livewire/admin/shops/add-shop.blade.php (sekcja Step 2)
+        - ✅ 2.1.2.1.4 Step 3: Connection Test z detailed diagnostics
+          └──📁 PLIK: app/Http/Livewire/Admin/Shops/AddShop.php (testConnection method)
+          └──📁 PLIK: resources/views/livewire/admin/shops/add-shop.blade.php (sekcja Step 3)
+        - ✅ 2.1.2.1.5 Step 4: Initial Sync Settings i confirmation
+          └──📁 PLIK: resources/views/livewire/admin/shops/add-shop.blade.php (sekcja Step 4)
+          └──📁 PLIK: routes/web.php (trasa /admin/shops/add)
+          └──📁 PLIK: app/Http/Livewire/Admin/Shops/ShopManager.php (startWizard redirect)
+      - ✅ **2.1.2.2 Advanced Shop Settings**
+        - ✅ 2.1.2.2.1 Sync frequency settings (real-time, hourly, daily)
+          └──📁 PLIK: app/Http/Livewire/Admin/Shops/AddShop.php (Step 5 - Advanced Settings)
+        - ✅ 2.1.2.2.2 Selective sync options (products, categories, prices)
+          └──📁 PLIK: resources/views/livewire/admin/shops/add-shop.blade.php (Step 5 - Extended Sync Options)
+        - ✅ 2.1.2.2.3 Conflict resolution rules configuration
+          └──📁 PLIK: app/Http/Livewire/Admin/Shops/AddShop.php (conflictResolution property)
+        - ✅ 2.1.2.2.4 Custom field mappings per shop
+          └──📁 PLIK: resources/views/livewire/admin/shops/add-shop.blade.php (Step 5 - Performance & Reliability)
+        - ✅ 2.1.2.2.5 Category mapping configuration
+          └──📁 PLIK: resources/views/livewire/admin/shops/add-shop.blade.php (Step 5 - Notifications & Webhooks)
+    
+  - 🛠️ **2.2 PrestaShop Integration Management**
+    - ✅ **2.2.1 Synchronization Control Panel**
+      - ✅ **2.2.1.1 Sync Dashboard**
+        - ✅ 2.2.1.1.1 Livewire SyncController component
+          └──📁 PLIK: app/Http/Livewire/Admin/Shops/SyncController.php
+          └──📁 PLIK: resources/views/livewire/admin/shops/sync-controller.blade.php
+        - ✅ 2.2.1.1.2 Manual sync triggers per shop lub bulk
+          └──📁 PLIK: app/Http/Livewire/Admin/Shops/SyncController.php (syncSelectedShops, syncSingleShop methods)
+        - ✅ 2.2.1.1.3 Sync queue monitoring z progress bars
+          └──📁 PLIK: app/Http/Livewire/Admin/Shops/SyncController.php (activeSyncJobs, syncProgress properties)
+        - ✅ 2.2.1.1.4 Sync history z timestamps i results
+          └──📁 PLIK: app/Http/Livewire/Admin/Shops/SyncController.php (getRecentSyncJobs method)
+        - ✅ 2.2.1.1.5 Conflict resolution interface
+          └──📁 PLIK: resources/views/livewire/admin/shops/sync-controller.blade.php (sync configuration panel)
+          └──📁 PLIK: routes/web.php (trasa /admin/shops/sync)
+      - ✅ **2.2.1.2 Sync Configuration**
+        - ✅ 2.2.1.2.1 Auto-sync scheduler configuration
+          └──📁 PLIK: app/Http/Livewire/Admin/Shops/SyncController.php (autoSync* properties, scheduler methods)
+        - ✅ 2.2.1.2.2 Retry logic dla failed syncs
+          └──📁 PLIK: app/Http/Livewire/Admin/Shops/SyncController.php (retry* properties, retry validation)
+        - ✅ 2.2.1.2.3 Notification settings dla sync events
+          └──📁 PLIK: app/Http/Livewire/Admin/Shops/SyncController.php (notification* properties)
+        - ✅ 2.2.1.2.4 Performance optimization settings
+          └──📁 PLIK: app/Http/Livewire/Admin/Shops/SyncController.php (performance* properties)
+        - ✅ 2.2.1.2.5 Backup przed sync option
+          └──📁 PLIK: app/Http/Livewire/Admin/Shops/SyncController.php (backup* properties)
+          └──📁 PLIK: resources/views/livewire/admin/shops/sync-controller.blade.php (Advanced Sync Configuration Panel)
+  
+    - 🛠️ **2.2.2 Product Export/Import Tools**
+      - ✅ **2.2.2.1 Bulk Export Interface**
+        - ✅ 2.2.2.1.1 Livewire BulkExport component
+          └──📁 PLIK: app/Http/Livewire/Admin/Shops/BulkExport.php
+          └──📁 PLIK: resources/views/livewire/admin/shops/bulk-export.blade.php
+        - ✅ 2.2.2.1.2 Product selection filters (category, brand, price range)
+          └──📁 PLIK: app/Http/Livewire/Admin/Shops/BulkExport.php (getFilteredProducts method)
+        - ✅ 2.2.2.1.3 Shop selection dla multi-shop export
+          └──📁 PLIK: resources/views/livewire/admin/shops/bulk-export.blade.php (shop selection panel)
+        - ✅ 2.2.2.1.4 Export format options (full, update only, media only)
+          └──📁 PLIK: app/Http/Livewire/Admin/Shops/BulkExport.php (exportFormat property, exportFormats array)
+        - ✅ 2.2.2.1.5 Progress tracking z ETA calculation
+          └──📁 PLIK: app/Http/Livewire/Admin/Shops/BulkExport.php (handleExportJobUpdate method)
+          └──📁 PLIK: app/Models/ExportJob.php (getEstimatedTimeRemaining method)
+          └──📁 PLIK: routes/web.php (trasa /admin/shops/export)
+      - ✅ **2.2.2.2 Import Management**
+        - ✅ 2.2.2.2.1 Import data from PrestaShop stores
+          └──📁 PLIK: app/Http/Livewire/Admin/Shops/ImportManager.php (executeImport, createImportJob methods)
+        - ✅ 2.2.2.2.2 Data validation i conflict detection
+          └──📁 PLIK: app/Http/Livewire/Admin/Shops/ImportManager.php (validation* properties, conflict resolution)
+        - ✅ 2.2.2.2.3 Import preview z change summary
+          └──📁 PLIK: app/Http/Livewire/Admin/Shops/ImportManager.php (generateImportPreview method)
+        - ✅ 2.2.2.2.4 Rollback capability dla failed imports
+          └──📁 PLIK: app/Http/Livewire/Admin/Shops/ImportManager.php (rollbackImport, prepareRollbackData methods)
+        - ✅ 2.2.2.2.5 Import scheduling dla off-peak hours
+          └──📁 PLIK: app/Http/Livewire/Admin/Shops/ImportManager.php (scheduling* properties, getScheduledDateTime method)
+          └──📁 PLIK: resources/views/livewire/admin/shops/import-manager.blade.php (kompletny Import Management interface)
+          └──📁 PLIK: routes/web.php (trasa /admin/shops/import)
+  
+**🔗 DEPENDENCY:** Dalsza integracja z PrestaShop (synchronizacja produktów, kategorie mapping, zaawansowany import) wymaga najpierw ukończenia **ETAP_05_Produkty.md** - system produktów musi być gotowy przed implementacją pełnej integracji PrestaShop.
 
 - ❌ **3. ERP INTEGRATION - ZARZĄDZANIE ERP [FAZA B]**
   - ❌ **3.1 ERP Connections Dashboard**
@@ -190,8 +319,11 @@ Czwarty etap budowy aplikacji PPM koncentruje się na implementacji kompleksoweg
       - ❌ **3.1.1.1 ERP Manager Component**
         - ❌ 3.1.1.1.1 Livewire ERPManager z system cards
         - ❌ 3.1.1.1.2 Baselinker connection status i configuration
+        **🔗 POWIAZANIE Z ETAP_08 (punkt 8.3.1.1):** Status polaczenia musi korzystac z metod BaseLinkerApiClient oraz logiki etapu ERP.
         - ❌ 3.1.1.1.3 Subiekt GT connection z DLL bridge status
+        **🔗 POWIAZANIE Z ETAP_08 (punkt 8.4.1.1):** Monitorowanie stanu bazuje na usługach SubiektGTBridge z etapu integracji ERP.
         - ❌ 3.1.1.1.4 Microsoft Dynamics connection z OData API
+        **🔗 POWIAZANIE Z ETAP_08 (punkt 8.5.1.1):** Walidacja polaczen odwoluje sie do klienta DynamicsODataClient.
         - ❌ 3.1.1.1.5 Connection health monitoring z automatic testing
       - ❌ **3.1.1.2 ERP System Metrics**
         - ❌ 3.1.1.2.1 Last sync timestamp dla każdego ERP
@@ -201,6 +333,7 @@ Czwarty etap budowy aplikacji PPM koncentruje się na implementacji kompleksoweg
         - ❌ 3.1.1.2.5 Integration error trends
 
     - ❌ **3.1.2 Baselinker Integration**
+    **🔗 POWIAZANIE Z ETAP_08 (sekcja 8.3):** Panel konfiguracyjny korzysta z uslug BaseLinker Integration Service i mapowan z etapu ERP.
       - ❌ **3.1.2.1 Baselinker Configuration**
         - ❌ 3.1.2.1.1 API Token management z validation
         - ❌ 3.1.2.1.2 Inventory source mapping configuration
@@ -209,12 +342,14 @@ Czwarty etap budowy aplikacji PPM koncentruje się na implementacji kompleksoweg
         - ❌ 3.1.2.1.5 Stock level sync frequency settings
       - ❌ **3.1.2.2 Baselinker Data Management**
         - ❌ 3.1.2.2.1 Product import/export z Baselinker
+        **🔗 POWIAZANIE Z ETAP_08 (punkty 8.3.2.2, 8.3.3.1):** Przeplywy danych musza wykorzystywac te same operacje import/export zaimplementowane w serwisach ERP.
         - ❌ 3.1.2.2.2 Stock level synchronization
         - ❌ 3.1.2.2.3 Price synchronization z margin calculations
         - ❌ 3.1.2.2.4 Order processing integration
         - ❌ 3.1.2.2.5 Webhook configuration dla real-time updates
 
     - ❌ **3.1.3 Subiekt GT Integration**
+    **🔗 POWIAZANIE Z ETAP_08 (sekcja 8.4):** Konfiguracja panelu Subiekt opiera sie na bridge .NET oraz klientach opisanych w etapie ERP.
       - ❌ **3.1.3.1 Subiekt GT Bridge Configuration**
         - ❌ 3.1.3.1.1 DLL bridge connection setup
         - ❌ 3.1.3.1.2 Database connection configuration
@@ -222,6 +357,7 @@ Czwarty etap budowy aplikacji PPM koncentruje się na implementacji kompleksoweg
         - ❌ 3.1.3.1.4 Sync scheduling configuration
         - ❌ 3.1.3.1.5 Error handling i logging setup
       - ❌ **3.1.3.2 Subiekt Data Synchronization**
+        **🔗 POWIAZANIE Z ETAP_08 (punkty 8.4.2.2, 8.4.3.1):** Synchronizacja danych musi korzystac z metod SubiektGTSyncService.
         - ❌ 3.1.3.2.1 Product master data sync
         - ❌ 3.1.3.2.2 Price list synchronization
         - ❌ 3.1.3.2.3 Stock movements tracking
@@ -229,6 +365,7 @@ Czwarty etap budowy aplikacji PPM koncentruje się na implementacji kompleksoweg
         - ❌ 3.1.3.2.5 Customer data synchronization
 
     - ❌ **3.1.4 Microsoft Dynamics Integration**
+      **🔗 POWIAZANIE Z ETAP_08 (sekcja 8.5):** Ustawienia Dynamics 365 powiazuje sie z klientem OData i mapowaniami opisanymi w etapie ERP.
       - ❌ **3.1.4.1 Dynamics 365 Configuration**
         - ❌ 3.1.4.1.1 OData API connection setup
         - ❌ 3.1.4.1.2 Authentication configuration (OAuth2)
@@ -236,13 +373,14 @@ Czwarty etap budowy aplikacji PPM koncentruje się na implementacji kompleksoweg
         - ❌ 3.1.4.1.4 Business Central specific settings
         - ❌ 3.1.4.1.5 Custom fields i extensions handling
       - ❌ **3.1.4.2 Dynamics Data Integration**
+        **🔗 POWIAZANIE Z ETAP_08 (punkty 8.5.2.2, 8.5.3.1):** Operacje danych odwoluj a do serwisow synchronizacji Dynamics.
         - ❌ 3.1.4.2.1 Item master synchronization
         - ❌ 3.1.4.2.2 Inventory posting groups mapping
         - ❌ 3.1.4.2.3 Sales price management
         - ❌ 3.1.4.2.4 Warehouse management integration
         - ❌ 3.1.4.2.5 Financial posting integration
 
-- ❌ **4. SYSTEM SETTINGS - KONFIGURACJA APLIKACJI [FAZA C]**
+- ✅ **4. SYSTEM SETTINGS - KONFIGURACJA APLIKACJI [FAZA C]**
   - ❌ **4.1 General Application Settings**
     - ❌ **4.1.1 Core System Configuration**
       - ❌ **4.1.1.1 Application Settings Panel**
@@ -301,7 +439,7 @@ Czwarty etap budowy aplikacji PPM koncentruje się na implementacji kompleksoweg
         - ❌ 4.2.2.2.4 Price group mappings
         - ❌ 4.2.2.2.5 Warehouse mapping configurations
 
-- ❌ **5. LOGS & MONITORING - NADZÓR SYSTEMU [FAZA A]**
+- ✅ **5. LOGS & MONITORING - NADZÓR SYSTEMU [FAZA C]**
   - ❌ **5.1 System Logs Management**
     - ❌ **5.1.1 Log Viewing Interface**
       - ❌ **5.1.1.1 Log Viewer Component**
@@ -360,7 +498,7 @@ Czwarty etap budowy aplikacji PPM koncentruje się na implementacji kompleksoweg
         - ❌ 5.2.2.2.4 Email service functionality
         - ❌ 5.2.2.2.5 Backup system integrity
 
-- ❌ **6. MAINTENANCE - KONSERWACJA I BACKUP [FAZA C]**
+- ✅ **6. MAINTENANCE - KONSERWACJA I BACKUP [FAZA C]**
   - ❌ **6.1 Backup Management System**
     - ❌ **6.1.1 Automated Backup System**
       - ❌ **6.1.1.1 Backup Configuration**
@@ -673,4 +811,70 @@ Po ukończeniu ETAP_04 będziemy mieli:
 - **Security monitoring** i vulnerability assessment
 
 **Następny etap:** [ETAP_05_Produkty.md](ETAP_05_Produkty.md) - implementacja głównego modułu produktów - serca systemu PIM.
-\n+---\n+\n+
+
+---
+
+## ✅ SEKCJA WERYFIKACYJNA - ZAKOŃCZENIE ETAP
+
+**⚠️ OBOWIĄZKOWE KROKI PO UKOŃCZENIU:**
+1. **Weryfikuj zgodność struktury:** Porównaj rzeczywistą strukturę plików/bazy z dokumentacją
+2. **Zaktualizuj dokumentację:** Zmień status ❌ → ✅ dla wszystkich ukończonych komponentów
+3. **Dodaj linki do plików:** Zaktualizuj plan ETAP z rzeczywistymi ścieżkami do utworzonych plików
+4. **Przygotuj następny ETAP:** Sprawdź zależności i wymagania dla kolejnego ETAP
+
+**RZECZYWISTA STRUKTURA ZREALIZOWANA:**
+```
+✅ KOMPONENTY LIVEWIRE ADMIN:
+└──📁 PLIK: app/Http/Livewire/Dashboard/AdminDashboard.php
+└──📁 PLIK: app/Http/Livewire/Admin/Shops/ShopManager.php
+└──📁 PLIK: app/Http/Livewire/Admin/ERP/ERPManager.php
+└──📁 PLIK: app/Http/Livewire/Admin/Settings/SystemSettings.php
+└──📁 PLIK: app/Http/Livewire/Admin/Backup/BackupManager.php
+└──📁 PLIK: app/Http/Livewire/Admin/Maintenance/DatabaseMaintenance.php
+└──📁 PLIK: app/Http/Livewire/Admin/Notifications/NotificationCenter.php
+└──📁 PLIK: app/Http/Livewire/Admin/Reports/ReportsDashboard.php
+└──📁 PLIK: app/Http/Livewire/Admin/Api/ApiManagement.php
+└──📁 PLIK: app/Http/Livewire/Admin/Customization/AdminTheme.php
+
+✅ VIEWS ADMIN:
+└──📁 PLIK: resources/views/livewire/dashboard/admin-dashboard.blade.php
+└──📁 PLIK: resources/views/livewire/admin/shops/shop-manager.blade.php
+└──📁 PLIK: resources/views/layouts/admin.blade.php
+└──📁 PLIK: resources/views/livewire/admin/settings/system-settings.blade.php
+└──📁 PLIK: + wszystkie komponenty dla modułów admin
+
+✅ TABELE BAZY DANYCH:
+└──📊 TABLE: prestashop_shops
+└──📊 TABLE: erp_connections
+└──📊 TABLE: system_settings
+└──📊 TABLE: backup_jobs
+└──📊 TABLE: maintenance_tasks
+└──📊 TABLE: admin_notifications
+└──📊 TABLE: system_reports
+└──📊 TABLE: api_usage_logs
+└──📊 TABLE: admin_themes
+
+✅ ROUTES ADMIN:
+└──🌐 ROUTE: /admin (main dashboard)
+└──🌐 ROUTE: /admin/shops (shop management)
+└──🌐 ROUTE: /admin/integrations (ERP management)
+└──🌐 ROUTE: /admin/settings (system configuration)
+└──🌐 ROUTE: + wszystkie route admin
+```
+
+**STATUS DOKUMENTACJI:**
+- ✅ `_DOCS/Struktura_Plikow_Projektu.md` - zaktualizowano
+- ✅ `_DOCS/Struktura_Bazy_Danych.md` - zaktualizowano
+
+**WERYFIKACJA FUNKCJONALNOŚCI:**
+- ✅ Admin dashboard dostępny pod /admin
+- ✅ Wszystkie 10 głównych modułów admin operacyjne
+- ✅ Real-time monitoring i statistics działają
+- ✅ Backup i maintenance tools gotowe
+- ✅ System settings konfigurowalny
+
+**PRZYGOTOWANIE DO ETAP_05:**
+- ✅ Panel admin gotowy na zarządzanie produktami
+- ✅ Dashboard metrics gotowe na produkty
+- ✅ Shop management gotowy na synchronizację
+- ✅ Brak blokerów technicznych

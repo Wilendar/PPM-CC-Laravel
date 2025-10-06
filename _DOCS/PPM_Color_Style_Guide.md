@@ -1,4 +1,4 @@
-# PPM - Prestashop Product Manager
+/resume# PPM - Prestashop Product Manager
 ## 🎨 Color & Style Guide
 
 ### 📋 **OPIS DOKUMENTU**
@@ -306,7 +306,24 @@ font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', s
 
 ### **Grid System**
 ```css
-/* Container widths */
+/* Standard Layout Containers - ADMIN PANEL */
+/* 🎯 GŁÓWNY STANDARD: max-w-7xl we wszystkich panelach administracyjnych */
+.admin-container {
+    max-width: 1280px; /* max-w-7xl */
+    margin: 0 auto;
+    padding: 0 1.5rem; /* px-6 */
+}
+
+/* Responsive padding dla admin containers */
+@media (min-width: 640px) {  /* sm: */
+    .admin-container { padding: 0 2rem; }     /* px-8 */
+}
+
+@media (min-width: 1024px) { /* lg: */
+    .admin-container { padding: 0 3rem; }     /* px-12 */
+}
+
+/* Standard Tailwind container widths */
 .container-sm { max-width: 576px; }
 .container-md { max-width: 768px; }
 .container-lg { max-width: 1024px; }
@@ -470,6 +487,59 @@ font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', s
 
 ## 📝 **USAGE EXAMPLES**
 
+### **Standardowy layout admin panelu**
+
+**📋 ZASADA SZEROKOŚCI ADMIN PANELI:**
+
+#### **1. Layout Z SIDEBAR (np. /admin z admin.blade.php)**
+```html
+<!-- ✅ HEADER - używa admin layout header z sidebar -->
+<!-- Automatyczne zarządzanie szerokością przez layout -->
+
+<!-- ✅ MAIN CONTENT - pełna dostępna szerokość po odliczeniu sidebar -->
+<div class="flex-1 lg:pl-0">
+    <main class="min-h-screen">
+        <!-- Livewire component content -->
+        <div class="px-6 sm:px-8 lg:px-12 py-8">
+            <!-- Komponenty - pełna dostępna szerokość -->
+            <!-- NIE używaj max-w-7xl mx-auto! -->
+        </div>
+    </main>
+</div>
+```
+
+#### **2. STANDALONE COMPONENT (np. /admin/shops - shop-manager.blade.php)**
+```html
+<!-- ✅ COMPONENT HEADER - ograniczona szerokość -->
+<div class="backdrop-blur-xl shadow-2xl" style="z-index: 1;">
+    <div class="max-w-7xl mx-auto px-6 sm:px-8 lg:px-12">
+        <!-- Header content -->
+    </div>
+</div>
+
+<!-- ✅ MAIN CONTENT - pełna szerokość jak admin z sidebar -->
+<div class="relative z-10 px-6 sm:px-8 lg:px-12 py-8">
+    <!-- Komponenty - PEŁNA DOSTĘPNA SZEROKOŚĆ -->
+    <!-- NIE używaj max-w-7xl mx-auto! -->
+</div>
+```
+
+#### **❌ BŁĘDNE WZORCE**
+```html
+<!-- ❌ BŁĄD: max-w-7xl w components z sidebar -->
+<div class="flex-1">
+    <div class="max-w-7xl mx-auto px-6 sm:px-8 lg:px-12 py-8">
+        <!-- ❌ To spowoduje zbyt wąskie komponenty -->
+    </div>
+</div>
+
+<!-- ❌ BŁĄD: różne szerokości header vs content -->
+<div class="max-w-5xl mx-auto"><!-- header --></div>
+<div class="max-w-7xl mx-auto"><!-- content --></div>
+```
+
+**🎯 WYNIK:** Wszystkie admin panele mają jednolitą szerokość niezależnie od tego czy używają sidebar czy nie.
+
 ### **Standardowy widget admina**
 ```html
 <div class="card glass-effect p-6 hover:card-hover">
@@ -521,6 +591,118 @@ font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', s
 
 ---
 
-**Ostatnia aktualizacja:** 2025-01-11  
-**Wersja:** 1.0  
+## 🚫 **KRYTYCZNE ZASADY PROJEKTU**
+
+### **ZAKAZ STYLÓW INLINE**
+
+**⚠️ ABSOLUTNY ZAKAZ** używania atrybutu `style=""` w HTML/Blade templates!
+
+**❌ ZABRONIONE:**
+```html
+<div style="z-index: 9999; background: #1f2937;">Content</div>
+<button style="color: red; margin-top: 10px;">Click</button>
+<span style="font-size: 14px;">Text</span>
+```
+
+**✅ POPRAWNIE:**
+```css
+/* Dedykowany plik CSS: resources/css/components/my-component.css */
+.my-component-header {
+    z-index: 1;
+    background: #1f2937;
+}
+
+.btn-danger {
+    color: #dc2626;
+    margin-top: 0.625rem;
+}
+
+.text-small {
+    font-size: 0.875rem;
+}
+```
+
+```html
+<!-- Blade template używa klas CSS -->
+<div class="my-component-header">Content</div>
+<button class="btn-danger">Click</button>
+<span class="text-small">Text</span>
+```
+
+**🎯 DLACZEGO?**
+- **Konsystencja**: Jednolity wygląd w całej aplikacji
+- **Maintainability**: Łatwiejsze zarządzanie stylami
+- **Performance**: Lepsze cachowanie CSS przez przeglądarki
+- **Dark Mode**: Łatwiejsza implementacja theme switching
+- **Reusability**: Klasy CSS można używać wielokrotnie
+- **Enterprise Quality**: Standard w profesjonalnych projektach
+
+**📋 PROCES TWORZENIA STYLÓW:**
+1. Zidentyfikuj potrzebę nowego stylu
+2. Sprawdź czy nie istnieje już odpowiednia klasa w PPM_Color_Style_Guide.md
+3. Jeśli nie istnieje, stwórz dedykowany plik CSS w `resources/css/`
+4. Dodaj build entry do `vite.config.js` jeśli nowy plik
+5. Zbuduj assets: `npm run build`
+6. Użyj klasy CSS w Blade template
+
+**🔍 WYKRYWANIE NARUSZEŃ:**
+```powershell
+# Wyszukiwanie inline styles w całym projekcie
+grep -r 'style="' resources/views/
+```
+
+---
+
+## 🎨 **KONSYSTENCJA STYLÓW MIĘDZY MODUŁAMI**
+
+### **Zasada Spójności UI**
+
+**WSZYSTKIE** panele administracyjne, formularze, listy i komponenty MUSZĄ używać tych samych:
+- **Kolorów** (zgodnie z paletą MPP TRADE)
+- **Typografii** (Inter font, hierarchia text-h1/h2/h3)
+- **Komponentów** (enterprise-card, tabs-enterprise, btn-enterprise-*)
+- **Layoutów** (consistent spacing, padding, margins)
+- **Animacji** (transitions, hover effects)
+
+**🎯 CEL:** Użytkownik nie powinien dostrzec różnic wizualnych między różnymi sekcjami aplikacji.
+
+**✅ PRZYKŁAD SPÓJNOŚCI:**
+```html
+<!-- CategoryForm, ProductForm, ShopManager - IDENTYCZNY header pattern -->
+<div class="mb-6 px-4 xl:px-8">
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+            <h1 class="text-2xl font-bold text-dark-primary mb-2">
+                <i class="fas fa-icon text-mpp-orange mr-2"></i>
+                Tytuł strony
+            </h1>
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb-dark flex items-center space-x-2 text-sm">
+                    <!-- Breadcrumbs -->
+                </ol>
+            </nav>
+        </div>
+    </div>
+</div>
+```
+
+**❌ ZABRONIONE:**
+- Różne style nagłówków w różnych modułach
+- Różne kolory przycisków w różnych sekcjach
+- Różne układy formularzy
+- Unikalne style "tylko dla jednego componentu"
+
+**📋 CHECKLIST SPÓJNOŚCI:**
+- [ ] Header i breadcrumbs identyczne jak w CategoryForm
+- [ ] Tabs używają `.tabs-enterprise`
+- [ ] Przyciski używają `.btn-enterprise-primary/secondary`
+- [ ] Karty używają `.enterprise-card`
+- [ ] Sidepanel "Szybkie akcje" w tym samym miejscu
+- [ ] Dark mode colors zgodne z paletą
+- [ ] Spacing (padding/margin) zgodny z Tailwind scale
+
+---
+
+**Ostatnia aktualizacja:** 2025-09-30
+**Wersja:** 1.1
 **Autor:** Claude Code PPM Team  

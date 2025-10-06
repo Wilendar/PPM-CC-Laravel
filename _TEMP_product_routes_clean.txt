@@ -1,0 +1,18 @@
+    // ==========================================
+    // ETAP_05: PRODUCTS MODULE - CORE ROUTES
+    // ==========================================
+
+    // Product Management Routes
+    Route::prefix('products')->name('products.')->group(function () {
+        // Main product listing
+        Route::get('/', \App\Http\Livewire\Products\Listing\ProductList::class)->name('index');
+
+        // Product creation
+        Route::get('/create', \App\Http\Livewire\Products\Management\ProductForm::class)->name('create');
+
+        // Product editing
+        Route::get('/{product}/edit', \App\Http\Livewire\Products\Management\ProductForm::class)->name('edit');
+
+        // Product view (public preview)
+        Route::get('/{product}', \App\Http\Livewire\Products\Management\ProductView::class)->name('show');
+    });

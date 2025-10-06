@@ -7,11 +7,15 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Storage;
+use App\Models\ProductSyncStatus;
+use App\Models\PrestaShopShop;
+use App\Services\PrestaShop\PrestaShopImportService;
 
 /**
  * Product Model - Core entity systemu PIM PPM-CC-Laravel
@@ -33,7 +37,8 @@ use Illuminate\Support\Facades\Storage;
  * @property string $name Nazwa produktu
  * @property string|null $short_description Max 800 znaków
  * @property string|null $long_description Max 21844 znaków
- * @property string $product_type vehicle|spare_part|clothing|other
+ * @property int $product_type_id ID typu produktu
+ * @property \App\Models\ProductType $productType Typ produktu (relation)
  * @property string|null $manufacturer Producent
  * @property string|null $supplier_code Kod dostawcy
  * @property float|null $weight Waga w kg
@@ -44,6 +49,7 @@ use Illuminate\Support\Facades\Storage;
  * @property float $tax_rate Stawka VAT %
  * @property bool $is_active Status aktywności
  * @property bool $is_variant_master Czy posiada warianty
+ * @property bool $is_featured Czy produkt jest wyróżniony
  * @property int $sort_order Kolejność sortowania
  * @property string|null $meta_title SEO tytuł
  * @property string|null $meta_description SEO opis
@@ -88,9 +94,10 @@ class Product extends Model
     protected $fillable = [
         'sku',
         'name',
+        'slug',
         'short_description',
         'long_description',
-        'product_type',
+        'product_type_id',
         'manufacturer',
         'supplier_code',
         'weight',
@@ -101,9 +108,29 @@ class Product extends Model
         'tax_rate',
         'is_active',
         'is_variant_master',
+        'is_featured',
+        'available_from',
+        'available_to',
         'sort_order',
         'meta_title',
         'meta_description',
+    ];
+
+    /**
+     * The attributes that should be cast.
+     *
+     * @var array<string, string>
+     */
+    protected $casts = [
+        'available_from' => 'datetime',
+        'available_to' => 'datetime',
+        'is_active' => 'boolean',
+        'is_variant_master' => 'boolean',
+        'weight' => 'decimal:3',
+        'height' => 'decimal:2',
+        'width' => 'decimal:2',
+        'length' => 'decimal:2',
+        'tax_rate' => 'decimal:2',
     ];
 
     /**
@@ -135,6 +162,7 @@ class Product extends Model
             'tax_rate' => 'decimal:2',
             'is_active' => 'boolean',
             'is_variant_master' => 'boolean',
+            'is_featured' => 'boolean',
             'sort_order' => 'integer',
             'created_at' => 'datetime',
             'updated_at' => 'datetime',
@@ -172,6 +200,19 @@ class Product extends Model
     */
 
     /**
+     * Product type relationship (many:1)
+     *
+     * Business Logic: Każdy produkt ma przypisany typ (edytowalny)
+     * Performance: Eager loading ready z proper indexing
+     *
+     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
+     */
+    public function productType(): BelongsTo
+    {
+        return $this->belongsTo(ProductType::class);
+    }
+
+    /**
      * Product variants relationship (1:many)
      * 
      * Business Logic: Jeden produkt może mieć wiele wariantów
@@ -199,7 +240,7 @@ class Product extends Model
         return $this->belongsToMany(Category::class, 'product_categories')
                     ->withPivot(['is_primary', 'sort_order'])
                     ->withTimestamps()
-                    ->orderBy('pivot_sort_order', 'asc');
+                    ->orderBy('product_categories.sort_order', 'asc');
     }
 
     /**
@@ -219,8 +260,24 @@ class Product extends Model
     }
 
     /**
+     * Shop-specific categories relationship (1:many) - ETAP_05 ✅ IMPLEMENTED
+     *
+     * Business Logic: Kategorie per sklep PrestaShop z dziedziczeniem
+     * Performance: Eager loading ready z proper indexing
+     * Integration: ps_category_product per sklep mapping ready
+     *
+     * @return \Illuminate\Database\Eloquent\Relations\HasMany
+     */
+    public function shopCategories(): HasMany
+    {
+        return $this->hasMany(ProductShopCategory::class, 'product_id', 'id')
+                    ->orderBy('shop_id', 'asc')
+                    ->orderBy('sort_order', 'asc');
+    }
+
+    /**
      * Product prices relationship (1:many) - FAZA B ✅ IMPLEMENTED
-     * 
+     *
      * Business Logic: 8 grup cenowych PPM z support dla variants
      * Performance: Eager loading ready z proper indexing
      * Integration: PrestaShop specific_price mapping ready
@@ -320,7 +377,7 @@ class Product extends Model
 
     /**
      * Product integration mappings polymorphic relationship (1:many) - FAZA C ✅ IMPLEMENTED
-     * 
+     *
      * Universal mapping: PrestaShop, Baselinker, Subiekt GT, etc.
      * Performance: Optimized dla sync operations
      * Multi-store: Support dla różnych sklepów PrestaShop
@@ -332,6 +389,118 @@ class Product extends Model
         return $this->morphMany(IntegrationMapping::class, 'mappable')
                     ->orderBy('integration_type', 'asc')
                     ->orderBy('integration_identifier', 'asc');
+    }
+
+    /**
+     * Product shop data relationship (1:many) - FAZA 1.5: Multi-Store Synchronization System ✅ IMPLEMENTED
+     *
+     * Business Logic: Każdy produkt może mieć różne dane per sklep PrestaShop
+     * Performance: Eager loading ready z proper indexing
+     * Multi-store: Shop-specific names, descriptions, categories, images
+     * Sync Status: Tracking synchronization status per shop
+     *
+     * @return \Illuminate\Database\Eloquent\Relations\HasMany
+     */
+    public function shopData(): HasMany
+    {
+        return $this->hasMany(ProductShopData::class, 'product_id', 'id')
+                    ->orderBy('shop_id', 'asc');
+    }
+
+    /**
+     * Active shop data only (published and sync enabled)
+     *
+     * @return \Illuminate\Database\Eloquent\Relations\HasMany
+     */
+    public function activeShopData(): HasMany
+    {
+        return $this->shopData()
+                    ->where('is_published', true)
+                    ->where('sync_status', '!=', 'disabled');
+    }
+
+    /**
+     * Shop data for specific shop
+     *
+     * @param int $shopId
+     * @return \Illuminate\Database\Eloquent\Relations\HasMany
+     */
+    public function dataForShop(int $shopId): HasMany
+    {
+        return $this->shopData()
+                    ->where('shop_id', $shopId);
+    }
+
+    /**
+     * Stock movements history dla all warehouses - STOCK MANAGEMENT SYSTEM ✅ IMPLEMENTED
+     *
+     * Complete audit trail wszystkich ruchów magazynowych
+     * Business Logic: IN/OUT/TRANSFER operations z cost tracking
+     * Performance: Indexed dla history queries i reporting
+     * Integration: ERP sync ready z external reference tracking
+     *
+     * @return \Illuminate\Database\Eloquent\Relations\HasMany
+     */
+    public function stockMovements(): HasMany
+    {
+        return $this->hasMany(StockMovement::class, 'product_id', 'id')
+                    ->with(['warehouse', 'creator'])
+                    ->orderBy('movement_date', 'desc');
+    }
+
+    /**
+     * Recent stock movements (last 30 days) dla performance optimization
+     *
+     * @return \Illuminate\Database\Eloquent\Relations\HasMany
+     */
+    public function recentStockMovements(): HasMany
+    {
+        return $this->stockMovements()
+                    ->recent(30)
+                    ->limit(50);
+    }
+
+    /**
+     * Stock reservations dla all warehouses - STOCK MANAGEMENT SYSTEM ✅ IMPLEMENTED
+     *
+     * Advanced reservation system dla orders/quotes/transfers
+     * Business Logic: Priority-based queue z expiry management
+     * Performance: Optimized dla reservation queries
+     * Integration: Order management system ready
+     *
+     * @return \Illuminate\Database\Eloquent\Relations\HasMany
+     */
+    public function stockReservations(): HasMany
+    {
+        return $this->hasMany(StockReservation::class, 'product_id', 'id')
+                    ->with(['warehouse', 'reserver'])
+                    ->orderBy('priority', 'asc')
+                    ->orderBy('reserved_at', 'asc');
+    }
+
+    /**
+     * Active stock reservations only (pending/confirmed/partial)
+     *
+     * @return \Illuminate\Database\Eloquent\Relations\HasMany
+     */
+    public function activeReservations(): HasMany
+    {
+        return $this->stockReservations()
+                    ->active()
+                    ->orderBy('priority', 'asc');
+    }
+
+    /**
+     * High priority reservations requiring attention
+     *
+     * @return \Illuminate\Database\Eloquent\Relations\HasMany
+     */
+    public function urgentReservations(): HasMany
+    {
+        return $this->stockReservations()
+                    ->highPriority()
+                    ->active()
+                    ->orderBy('reserved_at', 'asc');
     }
 
     /*
@@ -654,9 +823,16 @@ class Product extends Model
      * @param string $type
      * @return \Illuminate\Database\Eloquent\Builder
      */
-    public function scopeByType(Builder $query, string $type): Builder
+    public function scopeByType(Builder $query, string $typeSlugOrId): Builder
     {
-        return $query->where('product_type', $type);
+        // Support both slug and ID
+        if (is_numeric($typeSlugOrId)) {
+            return $query->where('product_type_id', $typeSlugOrId);
+        }
+
+        return $query->whereHas('productType', function (Builder $subquery) use ($typeSlugOrId) {
+            $subquery->where('slug', $typeSlugOrId);
+        });
     }
 
     /**
@@ -768,13 +944,14 @@ class Product extends Model
     {
         // Different placeholders based on product type
         $placeholders = [
-            'vehicle' => '/images/placeholders/vehicle-placeholder.jpg',
-            'spare_part' => '/images/placeholders/spare-part-placeholder.jpg', 
-            'clothing' => '/images/placeholders/clothing-placeholder.jpg',
-            'other' => '/images/placeholders/default-placeholder.jpg',
+            'pojazd' => '/images/placeholders/vehicle-placeholder.jpg',
+            'czesc-zamiennicza' => '/images/placeholders/spare-part-placeholder.jpg',
+            'odziez' => '/images/placeholders/clothing-placeholder.jpg',
+            'inne' => '/images/placeholders/default-placeholder.jpg',
         ];
 
-        return $placeholders[$this->product_type] ?? $placeholders['other'];
+        $typeSlug = $this->productType?->slug ?? 'inne';
+        return $placeholders[$typeSlug] ?? $placeholders['inne'];
     }
 
     /**
@@ -1045,6 +1222,388 @@ class Product extends Model
 
     /*
     |--------------------------------------------------------------------------
+    | STOCK MANAGEMENT SYSTEM: BUSINESS METHODS
+    |--------------------------------------------------------------------------
+    */
+
+    /**
+     * Get total available stock across all warehouses
+     *
+     * @return int
+     */
+    public function getTotalAvailableStock(): int
+    {
+        return $this->activeStock()->sum('available_quantity');
+    }
+
+    /**
+     * Get stock level for specific warehouse
+     *
+     * @param int $warehouseId
+     * @return int
+     */
+    public function getWarehouseStock(int $warehouseId): int
+    {
+        $stock = $this->activeStock()
+                     ->where('warehouse_id', $warehouseId)
+                     ->first();
+
+        return $stock ? $stock->available_quantity : 0;
+    }
+
+    /**
+     * Check if product has sufficient stock in any warehouse
+     *
+     * @param int $requiredQuantity
+     * @param int|null $warehouseId
+     * @return bool
+     */
+    public function hasStock(int $requiredQuantity, ?int $warehouseId = null): bool
+    {
+        if ($warehouseId) {
+            return $this->getWarehouseStock($warehouseId) >= $requiredQuantity;
+        }
+
+        return $this->getTotalAvailableStock() >= $requiredQuantity;
+    }
+
+    /**
+     * Get warehouses with available stock
+     *
+     * @param int|null $minQuantity
+     * @return \Illuminate\Support\Collection
+     */
+    public function getWarehousesWithStock(?int $minQuantity = 1)
+    {
+        return $this->activeStock()
+                   ->with('warehouse')
+                   ->where('available_quantity', '>=', $minQuantity)
+                   ->get()
+                   ->map(function ($stock) {
+                       return [
+                           'warehouse_id' => $stock->warehouse_id,
+                           'warehouse_name' => $stock->warehouse->name,
+                           'warehouse_code' => $stock->warehouse->code,
+                           'available_quantity' => $stock->available_quantity,
+                           'is_low_stock' => $stock->is_low_stock,
+                           'delivery_status' => $stock->delivery_status,
+                       ];
+                   });
+    }
+
+    /**
+     * Get recent stock movements (last 7 days)
+     *
+     * @param int $days
+     * @return \Illuminate\Support\Collection
+     */
+    public function getRecentMovements(int $days = 7)
+    {
+        return $this->stockMovements()
+                   ->with(['warehouse', 'creator', 'fromWarehouse', 'toWarehouse'])
+                   ->recent($days)
+                   ->limit(20)
+                   ->get()
+                   ->map(function ($movement) {
+                       return $movement->getSummary();
+                   });
+    }
+
+    /**
+     * Get pending reservations summary
+     *
+     * @return array
+     */
+    public function getReservationsSummary(): array
+    {
+        $activeReservations = $this->activeReservations;
+
+        $summary = [
+            'total_reservations' => $activeReservations->count(),
+            'total_reserved_quantity' => $activeReservations->sum('quantity_remaining'),
+            'high_priority_count' => $activeReservations->where('priority', '<=', 3)->count(),
+            'expiring_soon' => $activeReservations->filter(function ($reservation) {
+                return $reservation->expires_at &&
+                       $reservation->expires_at->diffInHours(now()) <= 24;
+            })->count(),
+        ];
+
+        return $summary;
+    }
+
+    /**
+     * Calculate stock turnover rate
+     *
+     * @param int $days
+     * @return float
+     */
+    public function getStockTurnoverRate(int $days = 30): float
+    {
+        $outboundMovements = $this->stockMovements()
+                                 ->outbound()
+                                 ->where('movement_date', '>=', now()->subDays($days))
+                                 ->sum(\DB::raw('ABS(quantity_change)'));
+
+        $averageStock = $this->activeStock()->avg('quantity') ?? 0;
+
+        if ($averageStock <= 0) {
+            return 0.0;
+        }
+
+        return round($outboundMovements / $averageStock, 2);
+    }
+
+    /**
+     * Get low stock alerts dla this product
+     *
+     * @return \Illuminate\Support\Collection
+     */
+    public function getLowStockAlerts()
+    {
+        return $this->activeStock()
+                   ->with('warehouse')
+                   ->where('low_stock_alert', true)
+                   ->whereRaw('available_quantity <= minimum_stock')
+                   ->get()
+                   ->map(function ($stock) {
+                       return [
+                           'warehouse_name' => $stock->warehouse->name,
+                           'current_stock' => $stock->available_quantity,
+                           'minimum_stock' => $stock->minimum_stock,
+                           'deficit' => $stock->minimum_stock - $stock->available_quantity,
+                           'last_movement' => $stock->last_movement_at?->format('Y-m-d H:i'),
+                       ];
+                   });
+    }
+
+    /**
+     * Get stock movement statistics
+     *
+     * @param int $days
+     * @return array
+     */
+    public function getStockStatistics(int $days = 30): array
+    {
+        $movements = $this->stockMovements()
+                         ->where('movement_date', '>=', now()->subDays($days));
+
+        $inbound = $movements->inbound()->sum(\DB::raw('ABS(quantity_change)'));
+        $outbound = $movements->outbound()->sum(\DB::raw('ABS(quantity_change)'));
+        $transfers = $movements->transfers()->count();
+
+        return [
+            'period_days' => $days,
+            'total_movements' => $movements->count(),
+            'inbound_quantity' => $inbound,
+            'outbound_quantity' => $outbound,
+            'net_change' => $inbound - $outbound,
+            'transfers_count' => $transfers,
+            'current_total_stock' => $this->getTotalAvailableStock(),
+            'turnover_rate' => $this->getStockTurnoverRate($days),
+        ];
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | FAZA 1.5: MULTI-STORE SYNCHRONIZATION BUSINESS METHODS
+    |--------------------------------------------------------------------------
+    */
+
+    /**
+     * Get or create shop data for specific shop
+     *
+     * @param int $shopId
+     * @return \App\Models\ProductShopData
+     */
+    public function getOrCreateShopData(int $shopId): ProductShopData
+    {
+        return $this->shopData()
+                    ->where('shop_id', $shopId)
+                    ->firstOrCreate([
+                        'product_id' => $this->id,
+                        'shop_id' => $shopId,
+                    ]);
+    }
+
+    /**
+     * Check if product is published on specific shop
+     *
+     * @param int $shopId
+     * @return bool
+     */
+    public function isPublishedOnShop(int $shopId): bool
+    {
+        $shopData = $this->dataForShop($shopId)->first();
+        return $shopData ? $shopData->is_published : false;
+    }
+
+    /**
+     * Get sync status for specific shop
+     *
+     * @param int $shopId
+     * @return string|null
+     */
+    public function getSyncStatusForShop(int $shopId): ?string
+    {
+        $shopData = $this->dataForShop($shopId)->first();
+        return $shopData ? $shopData->sync_status : null;
+    }
+
+    /**
+     * Get all shops where product is published
+     *
+     * @return \Illuminate\Support\Collection
+     */
+    public function getPublishedShops()
+    {
+        return $this->activeShopData()
+                    ->with('shop')
+                    ->get()
+                    ->pluck('shop');
+    }
+
+    /**
+     * Get sync status summary across all shops
+     *
+     * @return array
+     */
+    public function getMultiStoreSyncSummary(): array
+    {
+        $shopData = $this->shopData()->with('shop')->get();
+
+        $summary = [
+            'total_shops' => $shopData->count(),
+            'published_shops' => $shopData->where('is_published', true)->count(),
+            'synced_shops' => $shopData->where('sync_status', 'synced')->count(),
+            'error_shops' => $shopData->where('sync_status', 'error')->count(),
+            'conflict_shops' => $shopData->where('sync_status', 'conflict')->count(),
+            'disabled_shops' => $shopData->where('sync_status', 'disabled')->count(),
+            'shops_needing_sync' => $shopData->filter(function ($data) {
+                return $data->needsSync();
+            })->count(),
+        ];
+
+        $summary['sync_health_percentage'] = $summary['total_shops'] > 0
+            ? round(($summary['synced_shops'] / $summary['total_shops']) * 100, 1)
+            : 0;
+
+        return $summary;
+    }
+
+    /**
+     * Publish product to specific shop
+     *
+     * @param int $shopId
+     * @param array $shopSpecificData
+     * @return \App\Models\ProductShopData
+     */
+    public function publishToShop(int $shopId, array $shopSpecificData = []): ProductShopData
+    {
+        $shopData = $this->getOrCreateShopData($shopId);
+
+        // Update shop-specific data if provided
+        if (!empty($shopSpecificData)) {
+            $shopData->fill($shopSpecificData);
+        }
+
+        $shopData->publish();
+
+        return $shopData;
+    }
+
+    /**
+     * Unpublish product from specific shop
+     *
+     * @param int $shopId
+     * @return bool
+     */
+    public function unpublishFromShop(int $shopId): bool
+    {
+        $shopData = $this->dataForShop($shopId)->first();
+
+        if ($shopData) {
+            $shopData->unpublish();
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * Mark all shop data as needing sync
+     *
+     * @return int Count of updated records
+     */
+    public function markAllShopsForSync(): int
+    {
+        return $this->activeShopData()
+                    ->update([
+                        'sync_status' => 'pending',
+                        'sync_errors' => null,
+                        'conflict_data' => null,
+                        'conflict_detected_at' => null,
+                    ]);
+    }
+
+    /**
+     * Get shops with sync conflicts
+     *
+     * @return \Illuminate\Support\Collection
+     */
+    public function getShopsWithConflicts()
+    {
+        return $this->shopData()
+                    ->with('shop')
+                    ->where('sync_status', 'conflict')
+                    ->whereNotNull('conflict_detected_at')
+                    ->get()
+                    ->map(function ($shopData) {
+                        return [
+                            'shop_id' => $shopData->shop_id,
+                            'shop_name' => $shopData->shop->name ?? 'Unknown Shop',
+                            'conflict_detected_at' => $shopData->conflict_detected_at,
+                            'conflict_data' => $shopData->conflict_data,
+                            'time_since_conflict' => $shopData->conflict_detected_at?->diffForHumans(),
+                        ];
+                    });
+    }
+
+    /**
+     * Get effective name for specific shop (shop-specific or fallback to product name)
+     *
+     * @param int $shopId
+     * @return string
+     */
+    public function getEffectiveNameForShop(int $shopId): string
+    {
+        $shopData = $this->dataForShop($shopId)->first();
+        return $shopData && $shopData->name ? $shopData->name : $this->name;
+    }
+
+    /**
+     * Get effective description for specific shop
+     *
+     * @param int $shopId
+     * @param string $type 'short' or 'long'
+     * @return string|null
+     */
+    public function getEffectiveDescriptionForShop(int $shopId, string $type = 'short'): ?string
+    {
+        $shopData = $this->dataForShop($shopId)->first();
+
+        if ($type === 'short') {
+            return $shopData && $shopData->short_description
+                ? $shopData->short_description
+                : $this->short_description;
+        }
+
+        return $shopData && $shopData->long_description
+            ? $shopData->long_description
+            : $this->long_description;
+    }
+
+    /*
+    |--------------------------------------------------------------------------
     | FAZA C: MEDIA & ATTRIBUTES BUSINESS METHODS
     |--------------------------------------------------------------------------
     */
@@ -1076,13 +1635,13 @@ class Product extends Model
     }
 
     /**
-     * Set attribute value using EAV system
+     * Set attribute value using EAV system (renamed to avoid Laravel Model conflict)
      *
      * @param string|int $attributeCode
      * @param mixed $value
      * @return \App\Models\ProductAttributeValue
      */
-    public function setAttribute(string|int $attributeCode, mixed $value): ProductAttributeValue
+    public function setProductAttributeValue(string|int $attributeCode, mixed $value): ProductAttributeValue
     {
         // Find attribute by code or ID
         $attribute = is_numeric($attributeCode) 
@@ -1111,12 +1670,12 @@ class Product extends Model
     }
 
     /**
-     * Get attribute value using EAV system
+     * Get attribute value using EAV system (renamed to avoid Laravel Model conflict)
      *
      * @param string|int $attributeCode
      * @return mixed
      */
-    public function getAttribute(string|int $attributeCode): mixed
+    public function getProductAttributeValue(string|int $attributeCode): mixed
     {
         // Find attribute by code or ID
         $attribute = is_numeric($attributeCode) 
@@ -1171,14 +1730,14 @@ class Product extends Model
     }
 
     /**
-     * Check if product has specific attribute
+     * Check if product has specific product attribute (renamed to avoid Laravel Model conflict)
      *
      * @param string|int $attributeCode
      * @return bool
      */
-    public function hasAttribute(string|int $attributeCode): bool
+    public function hasProductAttribute(string|int $attributeCode): bool
     {
-        return $this->getAttribute($attributeCode) !== null;
+        return $this->getProductAttributeValue($attributeCode) !== null;
     }
 
     /**
@@ -1191,19 +1750,19 @@ class Product extends Model
         $automotive = [];
         
         // Vehicle Model compatibility
-        $models = $this->getAttribute('model');
+        $models = $this->getProductAttributeValue('model');
         if ($models) {
             $automotive['models'] = is_array($models) ? $models : [$models];
         }
         
         // OEM part numbers
-        $original = $this->getAttribute('original');
+        $original = $this->getProductAttributeValue('original');
         if ($original) {
             $automotive['original'] = $original;
         }
         
         // Replacement part numbers
-        $replacement = $this->getAttribute('replacement');
+        $replacement = $this->getProductAttributeValue('replacement');
         if ($replacement) {
             $automotive['replacement'] = $replacement;
         }
@@ -1219,9 +1778,9 @@ class Product extends Model
     public function getSyncStatus(): array
     {
         $status = [];
-        
+
         $mappings = $this->integrationMappings()->get();
-        
+
         foreach ($mappings as $mapping) {
             $status[$mapping->integration_type][$mapping->integration_identifier] = [
                 'status' => $mapping->sync_status,
@@ -1231,8 +1790,221 @@ class Product extends Model
                 'error_count' => $mapping->error_count,
             ];
         }
-        
+
         return $status;
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | ETAP_07 FAZA 2A.4: PRESTASHOP IMPORT/EXPORT MODEL EXTENSIONS
+    |--------------------------------------------------------------------------
+    */
+
+    /**
+     * Get ProductSyncStatus records for this product
+     *
+     * ETAP_07 Integration: Track sync status per PrestaShop shop
+     * Performance: Eager loading ready with shop relationship
+     *
+     * @return \Illuminate\Database\Eloquent\Relations\HasMany
+     */
+    public function syncStatuses(): HasMany
+    {
+        return $this->hasMany(ProductSyncStatus::class);
+    }
+
+    /**
+     * Get sync status for specific PrestaShop shop
+     *
+     * Usage: $syncStatus = $product->getSyncStatus($shop);
+     * Returns: ProductSyncStatus instance or null
+     * Performance: Single query with shop_id filter
+     *
+     * @param \App\Models\PrestaShopShop $shop
+     * @return \App\Models\ProductSyncStatus|null
+     */
+    public function getShopSyncStatus(PrestaShopShop $shop): ?ProductSyncStatus
+    {
+        return $this->syncStatuses()
+            ->where('shop_id', $shop->id)
+            ->first();
+    }
+
+    /**
+     * Get sync status for specific shop by ID
+     *
+     * ETAP_07 FAZA 3: Helper method for ProductForm integration
+     * Usage: $syncStatus = $product->syncStatusForShop($shopId);
+     * Returns: ProductSyncStatus instance or null
+     * Performance: Single query with shop_id filter
+     *
+     * @param int $shopId
+     * @return \App\Models\ProductSyncStatus|null
+     */
+    public function syncStatusForShop(int $shopId): ?ProductSyncStatus
+    {
+        return $this->syncStatuses()
+            ->where('shop_id', $shopId)
+            ->first();
+    }
+
+    /**
+     * Get PrestaShop product ID for specific shop (if synced)
+     *
+     * Usage: $psProductId = $product->getPrestashopProductId($shop);
+     * Returns: PrestaShop product ID or null if not synced
+     * Business Logic: Convenience method for sync operations
+     *
+     * @param \App\Models\PrestaShopShop $shop
+     * @return int|null
+     */
+    public function getPrestashopProductId(PrestaShopShop $shop): ?int
+    {
+        $syncStatus = $this->getShopSyncStatus($shop);
+        return $syncStatus?->prestashop_product_id;
+    }
+
+    /**
+     * Import this product's data from PrestaShop shop
+     *
+     * Usage: $product = Product::importFromPrestaShop(123, $shop);
+     * Business Logic: Static factory method for PrestaShop imports
+     * Performance: Delegates to PrestaShopImportService
+     * Integration: ETAP_07 FAZA 2A.1 reverse transformation
+     *
+     * @param int $prestashopProductId PrestaShop product ID
+     * @param \App\Models\PrestaShopShop $shop Shop to import from
+     * @return self Imported Product instance
+     */
+    public static function importFromPrestaShop(
+        int $prestashopProductId,
+        PrestaShopShop $shop
+    ): self
+    {
+        $importService = app(PrestaShopImportService::class);
+        return $importService->importProductFromPrestaShop($prestashopProductId, $shop);
+    }
+
+    /**
+     * Scope: Products imported from specific PrestaShop shop
+     *
+     * Usage: $products = Product::importedFrom($shop->id)->get();
+     * Business Logic: Filter products by import source
+     * Performance: Optimized subquery with sync_direction filter
+     *
+     * @param \Illuminate\Database\Eloquent\Builder $query
+     * @param int $shopId
+     * @return \Illuminate\Database\Eloquent\Builder
+     */
+    public function scopeImportedFrom(Builder $query, int $shopId): Builder
+    {
+        return $query->whereHas('syncStatuses', function($q) use ($shopId) {
+            $q->where('shop_id', $shopId)
+              ->where('sync_direction', 'ps_to_ppm');
+        });
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | PUBLISHING SCHEDULE BUSINESS LOGIC
+    |--------------------------------------------------------------------------
+    */
+
+    /**
+     * Check if product is currently available based on publishing schedule
+     *
+     * @return bool
+     */
+    public function isCurrentlyAvailable(): bool
+    {
+        $now = now();
+
+        // If both dates are null, product is always available (no schedule set)
+        if (!$this->available_from && !$this->available_to) {
+            return true;
+        }
+
+        // If only available_from is set, check if we're past that date
+        if ($this->available_from && !$this->available_to) {
+            return $now->gte($this->available_from);
+        }
+
+        // If only available_to is set, check if we're before that date
+        if (!$this->available_from && $this->available_to) {
+            return $now->lte($this->available_to);
+        }
+
+        // If both dates are set, check if we're within the range
+        return $now->gte($this->available_from) && $now->lte($this->available_to);
+    }
+
+    /**
+     * Get publishing status with details
+     *
+     * @return array
+     */
+    public function getPublishingStatus(): array
+    {
+        $now = now();
+        $status = [
+            'is_available' => $this->isCurrentlyAvailable(),
+            'status_text' => '',
+            'available_from' => $this->available_from,
+            'available_to' => $this->available_to,
+        ];
+
+        if (!$this->available_from && !$this->available_to) {
+            $status['status_text'] = 'Zawsze dostępny';
+        } elseif ($this->available_from && $now->lt($this->available_from)) {
+            $status['status_text'] = 'Będzie dostępny od ' . $this->available_from->format('d.m.Y H:i');
+        } elseif ($this->available_to && $now->gt($this->available_to)) {
+            $status['status_text'] = 'Już niedostępny (do ' . $this->available_to->format('d.m.Y H:i') . ')';
+        } elseif ($this->isCurrentlyAvailable()) {
+            if ($this->available_to) {
+                $status['status_text'] = 'Dostępny do ' . $this->available_to->format('d.m.Y H:i');
+            } else {
+                $status['status_text'] = 'Dostępny od ' . $this->available_from->format('d.m.Y H:i');
+            }
+        } else {
+            $status['status_text'] = 'Niedostępny';
+        }
+
+        return $status;
+    }
+
+    /**
+     * Scope to filter products that are currently available
+     *
+     * @param \Illuminate\Database\Eloquent\Builder $query
+     * @return \Illuminate\Database\Eloquent\Builder
+     */
+    public function scopeCurrentlyAvailable(Builder $query): Builder
+    {
+        $now = now();
+
+        return $query->where(function ($query) use ($now) {
+            $query->where(function ($q) use ($now) {
+                // No schedule set - always available
+                $q->whereNull('available_from')
+                  ->whereNull('available_to');
+            })->orWhere(function ($q) use ($now) {
+                // Only available_from set - past that date
+                $q->whereNotNull('available_from')
+                  ->whereNull('available_to')
+                  ->where('available_from', '<=', $now);
+            })->orWhere(function ($q) use ($now) {
+                // Only available_to set - before that date
+                $q->whereNull('available_from')
+                  ->whereNotNull('available_to')
+                  ->where('available_to', '>=', $now);
+            })->orWhere(function ($q) use ($now) {
+                // Both dates set - within range
+                $q->whereNotNull('available_from')
+                  ->whereNotNull('available_to')
+                  ->where('available_from', '<=', $now)
+                  ->where('available_to', '>=', $now);
+            });
+        });
     }
 
     /*
@@ -1243,14 +2015,26 @@ class Product extends Model
 
     /**
      * Get the route key for the model.
-     * 
-     * Performance: Route model binding na slug dla SEO URLs
+     *
+     * Performance: Route model binding na slug dla SEO URLs, fallback to ID
      *
      * @return string
      */
     public function getRouteKeyName(): string
     {
         return 'slug';
+    }
+
+    /**
+     * Get the value of the model's route key.
+     *
+     * Fallback: Return ID if slug is null/empty
+     *
+     * @return mixed
+     */
+    public function getRouteKey()
+    {
+        return $this->slug ?: $this->id;
     }
 
     /**

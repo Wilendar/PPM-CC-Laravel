@@ -1,5 +1,30 @@
 # ✅ ETAP_01: Fundament i Architektura Projektu
 
+## 🔍 INSTRUKCJE PRZED ROZPOCZĘCIEM ETAP
+
+**⚠️ OBOWIĄZKOWE KROKI:**
+1. **Przeanalizuj dokumentację struktury:** Przeczytaj `_DOCS/Struktura_Plikow_Projektu.md` i `_DOCS/Struktura_Bazy_Danych.md`
+2. **Sprawdź aktualny stan:** Porównaj obecną strukturę plików z planem w tym ETAP
+3. **Zidentyfikuj nowe komponenty:** Lista plików/tabel/modeli do utworzenia w tym ETAP
+4. **Zaktualizuj dokumentację:** Dodaj planowane komponenty z statusem ❌ do dokumentacji struktury
+
+**PLANOWANE KOMPONENTY W TYM ETAP:**
+```
+Pliki do utworzenia/modyfikacji:
+- composer.json (konfiguracja pakietów)
+- .env (konfiguracja środowiska)
+- config/ (pliki konfiguracyjne Laravel)
+- routes/web.php (podstawowe route)
+- _TOOLS/ (skrypty deployment)
+
+Tabele bazy danych:
+- migrations table (Laravel standard)
+- failed_jobs table (Laravel standard)
+- personal_access_tokens table (Laravel standard)
+```
+
+---
+
 **Status ETAPU:** ✅ **UKOŃCZONY** - wszystkie kluczowe komponenty zaimplementowane (100% complete)  
 **Szacowany czas:** 35 godzin  
 **Priorytet:** 🔴 KRYTYCZNY  
@@ -252,10 +277,12 @@ Pierwszy i najważniejszy etap budowy aplikacji PPM-CC-Laravel. Obejmuje inicjal
     - ✅ **5.1.1 Moduły biznesowe na serwerze**
       - ✅ **5.1.1.1 Utworzenie struktury modułów**
         - ✅ 5.1.1.1.1 Utworzenie app/Modules/ (produkty, kategorie, integracje)
+          **🔗 POWIAZANIE Z ETAP_05 (sekcje 1.1 oraz 2.2):** Moduly produktowe, kategorii i integracji beda rozszerzane w etapie glownego panelu produktow.
             └── PLIK: Struktura Laravel gotowa
         - ✅ 5.1.1.1.2 Placeholder controllers i models w modułach
             └── PLIK: app/Http/Controllers/, app/Models/
         - ✅ 5.1.1.1.3 Struktura app/Services/ (PrestaShop, ERP, FileManager)
+          **🔗 POWIAZANIE Z ETAP_07 (sekcje 7.3-7.5) oraz ETAP_08 (sekcje 8.3-8.5):** Serwisy integracyjne wymagaja fundamentu dla klientow PrestaShop i ERP.
             └── PLIK: app/ folder przygotowana
         - ✅ 5.1.1.1.4 Struktura app/Livewire/ (Product, Admin, Dashboard)
             └── PLIK: Livewire zainstalowane i gotowe
@@ -519,8 +546,11 @@ Po ukończeniu ETAP_01 będziemy mieli:
 ✅ **Środowisko gotowe na rozwój** - Zero config dla ETAP_02  
 ✅ **Deployment zero-friction** - 1-click deploy przez PowerShell  
 ✅ **Skalowalność enterprise** - Architektura dla 100K+ produktów  
+**🔗 POWIAZANIE Z ETAP_09 (sekcja 9.1) oraz ETAP_11 (sekcja 11.2):** Indexy wyszukiwarki i warianty produktowe wymagaja przygotowanej infrastruktury wydajnosciowej.
 ✅ **Multi-store ready** - Fundament dla wielu sklepów PrestaShop  
+**🔗 POWIAZANIE Z ETAP_07 (sekcja 7.2) oraz ETAP_04 (sekcja 2.1):** Utrzymuj zgodnosc struktur sklepow z integracja PrestaShop i panelem zarzadzania sklepami.
 ✅ **ERP integration ready** - Baza pod Baselinker/Subiekt GT/Dynamics  
+**🔗 POWIAZANIE Z ETAP_08 (sekcje 8.1-8.5) oraz ETAP_10 (sekcja 10.1.3):** Przygotowane schematy beda wykorzystywane przez integracje ERP i modul dostaw.
 
 ### 🔄 PRZYGOTOWANIE DO ETAP_02:
 
@@ -532,6 +562,41 @@ Po ukończeniu ETAP_01 będziemy mieli:
 - ✅ Eloquent ORM gotowy na 50+ tabel PIM
 
 **ZERO BLOCKERÓW** - Można rozpocząć ETAP_02 natychmiast! 🚀
+
+---
+
+## ✅ SEKCJA WERYFIKACYJNA - ZAKOŃCZENIE ETAP
+
+**⚠️ OBOWIĄZKOWE KROKI PO UKOŃCZENIU:**
+1. **Weryfikuj zgodność struktury:** Porównaj rzeczywistą strukturę plików/bazy z dokumentacją
+2. **Zaktualizuj dokumentację:** Zmień status ❌ → ✅ dla wszystkich ukończonych komponentów
+3. **Dodaj linki do plików:** Zaktualizuj plan ETAP z rzeczywistymi ścieżkami do utworzonych plików
+4. **Przygotuj następny ETAP:** Sprawdź zależności i wymagania dla kolejnego ETAP
+
+**RZECZYWISTA STRUKTURA ZREALIZOWANA:**
+```
+✅ PLIKI UTWORZONE/ZMODYFIKOWANE:
+└──📁 PLIK: composer.json
+└──📁 PLIK: .env.example
+└──📁 PLIK: config/app.php
+└──📁 PLIK: routes/web.php
+└──📁 PLIK: _TOOLS/hostido_deploy.ps1
+└──📁 PLIK: _TOOLS/hostido_quick_push.ps1
+
+✅ TABELE BAZY DANYCH:
+└──📊 TABLE: migrations
+└──📊 TABLE: failed_jobs
+└──📊 TABLE: personal_access_tokens
+```
+
+**STATUS DOKUMENTACJI:**
+- ✅ `_DOCS/Struktura_Plikow_Projektu.md` - zaktualizowano
+- ✅ `_DOCS/Struktura_Bazy_Danych.md` - zaktualizowano
+
+**PRZYGOTOWANIE DO ETAP_02:**
+- ✅ Środowisko gotowe na migracje bazy danych
+- ✅ Modele Eloquent gotowe do implementacji
+- ✅ Brak blokerów technicznych
 
 ---
 

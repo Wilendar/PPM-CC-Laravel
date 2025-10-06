@@ -1,5 +1,39 @@
 # ❌ ETAP 09: SYSTEM WYSZUKIWANIA
 
+## 🔍 INSTRUKCJE PRZED ROZPOCZĘCIEM ETAPU
+
+**OBOWIĄZKOWE CZYNNOŚCI:**
+
+1. **ANALIZA ZADAŃ ETAPU**
+   - Przeanalizuj wszystkie zadania i podzadania w tym ETAP-ie
+   - Zidentyfikuj wymagane pliki, klasy, migracje i komponenty
+   - Określ zależności z innymi ETAPami (szczególnie ETAP_05, ETAP_07, ETAP_11)
+
+2. **AKTUALIZACJA DOKUMENTACJI STRUKTURY**
+   - Otwórz `_DOCS/Struktura_Plikow_Projektu.md`
+   - Dodaj wszystkie nowe pliki i foldery zaplanowane w tym ETAP-ie:
+     - `app/Services/Search/` - ProductSearchService, AutocompleteService
+     - `app/Services/Search/Strategies/` - ExactSearchStrategy, FuzzySearchStrategy
+     - `app/Services/Search/QueryParser/` - SearchQueryParser
+     - `app/Http/Livewire/Search/` - SearchComponent
+     - `app/Jobs/Search/` - UpdateSearchIndex
+     - `app/Console/Commands/` - RebuildSearchIndex
+     - `resources/views/livewire/search/` - search-component.blade.php
+   - Otwórz `_DOCS/Struktura_Bazy_Danych.md`
+   - Dodaj nowe tabele z tego ETAP-u:
+     - `search_indexes` - indeksy wyszukiwania z full-text
+     - `search_queries` - historia zapytań
+     - `search_suggestions` - autosugestie
+     - `search_filters` - konfiguracja filtrów
+     - `search_filter_options` - opcje filtrów
+
+3. **PRZYGOTOWANIE ŚRODOWISKA**
+   - Sprawdź konfigurację MySQL full-text search
+   - Upewnij się, że Redis jest dostępny dla cache
+   - Przygotuj dane testowe produktów do wyszukiwania
+
+**UWAGA** WYŁĄCZ autoryzację AdminMiddleware na czas developmentu!
+
 **Szacowany czas realizacji:** 35 godzin  
 **Priorytet:** 🟢 ŚREDNI  
 **Odpowiedzialny:** Claude Code AI + Kamil Wiliński  
@@ -29,10 +63,15 @@ Implementacja zaawansowanego, inteligentnego systemu wyszukiwania produktów z f
 ### ❌ 9.1.1 Wymagania funkcjonalne wyszukiwarki
 #### ❌ 9.1.1.1 Analiza przypadków użycia
 - ❌ 9.1.1.1.1 Szybkie wyszukiwanie po SKU (dokładne dopasowanie)
+    **🔗 POWIAZANIE Z ETAP_05 (sekcja 1.1.1) oraz ETAP_07 (sekcja 7.2.2):** Dane SKU i mapowania sklepowe musza byc aktualizowane w indeksie wyszukiwania.
 - ❌ 9.1.1.1.2 Wyszukiwanie po nazwie produktu (rozmyte dopasowanie)
+    **🔗 POWIAZANIE Z ETAP_05 (sekcja 3.1) oraz ETAP_11 (sekcja 11.1.2):** Tlumaczenia nazw oraz warianty produktowe musza byc widoczne dla logiki wyszukiwania.
 - ❌ 9.1.1.1.3 Wyszukiwanie po kategorii i podkategorii
+    **🔗 POWIAZANIE Z ETAP_05 (sekcja 2.2) oraz ETAP_07 (sekcja 7.5.2):** Indeks kategorii wykorzystuje mapowania miedzy PPM a PrestaShop.
 - ❌ 9.1.1.1.4 Wyszukiwanie po cechach i parametrach technicznych
+    **🔗 POWIAZANIE Z ETAP_05 (sekcja 4.1) oraz ETAP_11 (sekcja 11.2.3):** Atrybuty i warianty musza dostarczac danych do filtracji.
 - ❌ 9.1.1.1.5 Wyszukiwanie po opisie i słowach kluczowych
+    **🔗 POWIAZANIE Z ETAP_05 (sekcja 3.2) oraz ETAP_06 (sekcja 4.2):** Opisy i slowa kluczowe byly przygotowywane w module produktow oraz importach.
 
 #### ❌ 9.1.1.2 Wymagania wydajnościowe
 - ❌ 9.1.1.2.1 Czas odpowiedzi < 200ms dla prostych zapytań
@@ -40,6 +79,7 @@ Implementacja zaawansowanego, inteligentnego systemu wyszukiwania produktów z f
 - ❌ 9.1.1.2.3 Obsługa 100+ jednoczesnych wyszukiwań
 - ❌ 9.1.1.2.4 Autocomplete < 100ms
 - ❌ 9.1.1.2.5 Indeksowanie w czasie rzeczywistym
+    **🔗 POWIAZANIE Z ETAP_07 (sekcja 7.6) oraz ETAP_12 (sekcja 12.3):** Aktualizacje musza reagowac na webhooki PrestaShop i strategie cache produkcyjnego.
 
 #### ❌ 9.1.1.3 Wymagania bezpieczeństwa i uprawnień
 - ❌ 9.1.1.3.1 Filtrowanie wyników według uprawnień użytkownika
@@ -1805,6 +1845,7 @@ class SearchIndexManager
 
 ### ❌ 9.8.1 SearchController API
 #### ❌ 9.8.1.1 API endpoints dla wyszukiwania
+    **🔗 POWIAZANIE Z ETAP_12 (sekcja 12.2.1.3) oraz ETAP_03 (sekcja 6.1):** Testy API i polityki autoryzacji musza uwzgledniac endpointy wyszukiwarki.
 ```php
 <?php
 namespace App\Http\Controllers\API;
@@ -2062,7 +2103,167 @@ Etap zostanie uznany za ukończony gdy:
 
 ---
 
-**Autor:** Claude Code AI  
-**Data utworzenia:** 2025-09-05  
-**Ostatnia aktualizacja:** 2025-09-05  
+**Autor:** Claude Code AI
+**Data utworzenia:** 2025-09-05
+**Ostatnia aktualizacja:** 2025-09-05
 **Status:** ❌ NIEROZPOCZĘTY
+
+---
+
+## ✅ WERYFIKACJA PO UKOŃCZENIU ETAPU
+
+**LISTA KONTROLNA - wykonaj po zakończeniu wszystkich zadań:**
+
+### 📁 WERYFIKACJA STRUKTURY PLIKÓW
+- [ ] **Search Services** - Sprawdź istnienie i completeness:
+  - [ ] `app/Services/Search/ProductSearchService.php`
+  - [ ] `app/Services/Search/AutocompleteService.php`
+  - [ ] `app/Services/Search/SearchIndexManager.php`
+  - [ ] `app/Services/Search/QueryParser/SearchQueryParser.php`
+
+- [ ] **Search Strategies** - Sprawdź istnienie:
+  - [ ] `app/Services/Search/Strategies/SearchStrategyInterface.php`
+  - [ ] `app/Services/Search/Strategies/ExactSearchStrategy.php`
+  - [ ] `app/Services/Search/Strategies/FuzzySearchStrategy.php`
+  - [ ] `app/Services/Search/Strategies/FullTextSearchStrategy.php`
+
+- [ ] **Search Models** - Sprawdź istnienie:
+  - [ ] `app/Models/SearchIndex.php`
+  - [ ] `app/Models/SearchQuery.php`
+  - [ ] `app/Models/SearchSuggestion.php`
+  - [ ] `app/Models/SearchFilter.php`
+
+- [ ] **Livewire Components** - Sprawdź istnienie:
+  - [ ] `app/Http/Livewire/Search/SearchComponent.php`
+  - [ ] `resources/views/livewire/search/search-component.blade.php`
+
+- [ ] **Jobs i Commands** - Sprawdź istnienie:
+  - [ ] `app/Jobs/Search/UpdateSearchIndex.php`
+  - [ ] `app/Console/Commands/RebuildSearchIndex.php`
+
+### 🗃️ WERYFIKACJA STRUKTURY BAZY DANYCH
+- [ ] **Migracje Search** - Sprawdź czy zostały utworzone i uruchomione:
+  - [ ] `*_create_search_indexes_table.php`
+  - [ ] `*_create_search_queries_table.php`
+  - [ ] `*_create_search_suggestions_table.php`
+  - [ ] `*_create_search_filters_table.php`
+  - [ ] `*_create_search_filter_options_table.php`
+
+- [ ] **Full-Text Indexes** - Sprawdź indeksy na serwerze:
+```bash
+plink -ssh host379076@host379076.hostido.net.pl -P 64321 -i $HostidoKey -batch "cd domains/ppm.mpptrade.pl/public_html && php artisan tinker --execute=\"DB::select('SHOW INDEX FROM search_indexes WHERE Index_type = \'FULLTEXT\'');\""
+```
+
+### 🔍 WERYFIKACJA FUNKCJONALNOŚCI WYSZUKIWANIA
+- [ ] **Basic Search** - Test podstawowych funkcji:
+  - [ ] Wyszukiwanie po SKU (exact match)
+  - [ ] Wyszukiwanie po nazwie produktu
+  - [ ] Wyszukiwanie po opisie produktu
+  - [ ] Wyszukiwanie po kategorii
+
+- [ ] **Advanced Search** - Test zaawansowanych funkcji:
+  - [ ] Fuzzy search z tolerancją błędów
+  - [ ] Full-text search z operatorami
+  - [ ] Multi-word search
+  - [ ] Polish character normalization (ą→a, ć→c)
+
+- [ ] **Autocomplete** - Test autosugestii:
+  - [ ] Sugestie produktów
+  - [ ] Sugestie kategorii
+  - [ ] Sugestie marek
+  - [ ] Popularność sugestii
+
+### 🎯 WERYFIKACJA STRATEGII WYSZUKIWANIA
+- [ ] **ExactSearchStrategy** - Test dokładnego wyszukiwania:
+  - [ ] Wyszukiwanie po SKU
+  - [ ] Wyszukiwanie po kodach produktów
+  - [ ] Wyszukiwanie po EAN
+
+- [ ] **FuzzySearchStrategy** - Test rozmytego wyszukiwania:
+  - [ ] Tolerancja błędów ortograficznych
+  - [ ] Obsługa literówek
+  - [ ] Wielopoziomowe dopasowanie
+  - [ ] Relevance scoring
+
+- [ ] **Query Parser** - Test parsera zapytań:
+  - [ ] Normalizacja zapytań
+  - [ ] Wykrywanie SKU patterns
+  - [ ] Wykrywanie search operators
+  - [ ] Inline filters (category:name, price:100-500)
+
+### 🚀 WERYFIKACJA WYDAJNOŚCI
+- [ ] **Performance Tests** - Test czasów odpowiedzi:
+  - [ ] Prosty search < 200ms
+  - [ ] Złożony search < 500ms
+  - [ ] Autocomplete < 100ms
+  - [ ] Cache effectiveness
+
+- [ ] **Search Index** - Test indeksowania:
+  - [ ] Automatyczne indexowanie nowych produktów
+  - [ ] UpdateSearchIndex job działa poprawnie
+  - [ ] RebuildSearchIndex command działa
+  - [ ] Search suggestions są aktualizowane
+
+### 🎛️ WERYFIKACJA KOMPONENTÓW LIVEWIRE
+- [ ] **SearchComponent** - Test funkcjonalności na https://ppm.mpptrade.pl:
+  - [ ] Real-time autosugestie podczas pisania
+  - [ ] Zmiana strategii wyszukiwania
+  - [ ] Filtrowanie wyników
+  - [ ] Sortowanie wyników
+  - [ ] Paginacja wyników
+
+- [ ] **Security & Permissions** - Test uprawnień:
+  - [ ] Filtrowanie wyników według uprawnień użytkownika
+  - [ ] Ukrywanie cen dla nieuprawnionych
+  - [ ] Rate limiting dla wyszukiwań
+  - [ ] Input sanitization
+
+### 📡 WERYFIKACJA API ENDPOINTS
+- [ ] **Search API** - Test `/api/search`:
+  - [ ] POST search z różnymi strategiami
+  - [ ] Filtry i sortowanie
+  - [ ] Paginacja
+  - [ ] Error handling
+
+- [ ] **Autocomplete API** - Test `/api/autocomplete`:
+  - [ ] GET suggestions z query param
+  - [ ] Limit suggestions
+  - [ ] Response format
+
+- [ ] **Filters API** - Test `/api/search/filters`:
+  - [ ] Dostępne kategorie
+  - [ ] Zakresy cenowe
+  - [ ] Dostępne marki
+
+### 📝 WERYFIKACJA DOKUMENTACJI
+- [ ] **Aktualizacja dokumentacji struktury**:
+  - [ ] `_DOCS/Struktura_Plikow_Projektu.md` zawiera wszystkie pliki Search
+  - [ ] `_DOCS/Struktura_Bazy_Danych.md` zawiera tabele Search z opisami
+  - [ ] Mapowania do ETAPów są poprawne
+
+- [ ] **Testy jednostkowe**:
+  - [ ] ProductSearchTest przechodzi
+  - [ ] AutocompleteServiceTest przechodzi
+  - [ ] Search strategies tests przechodzą
+  - [ ] Coverage min 80% dla search services
+
+### 🚀 WERYFIKACJA DEPLOYMENT
+- [ ] **Serwer produkcyjny** - Upload i test:
+```bash
+# Upload search services
+pscp -i $HostidoKey -P 64321 -r "D:\OneDrive - MPP TRADE\Skrypty\PPM-CC-Laravel\app\Services\Search" host379076@host379076.hostido.net.pl:domains/ppm.mpptrade.pl/public_html/app/Services/
+
+# Upload Livewire components
+pscp -i $HostidoKey -P 64321 -r "D:\OneDrive - MPP TRADE\Skrypty\PPM-CC-Laravel\app\Http\Livewire\Search" host379076@host379076.hostido.net.pl:domains/ppm.mpptrade.pl/public_html/app/Http/Livewire/
+
+# Uruchom migracje
+plink -ssh host379076@host379076.hostido.net.pl -P 64321 -i $HostidoKey -batch "cd domains/ppm.mpptrade.pl/public_html && php artisan migrate --force"
+
+# Rebuild search index
+plink -ssh host379076@host379076.hostido.net.pl -P 64321 -i $HostidoKey -batch "cd domains/ppm.mpptrade.pl/public_html && php artisan search:rebuild-index"
+
+# Clear cache
+plink -ssh host379076@host379076.hostido.net.pl -P 64321 -i $HostidoKey -batch "cd domains/ppm.mpptrade.pl/public_html && php artisan cache:clear && php artisan view:clear"
+```
+
+**ETAP UKOŃCZONY POMYŚLNIE** ✅ gdy wszystkie powyższe punkty są zaznaczone jako wykonane.

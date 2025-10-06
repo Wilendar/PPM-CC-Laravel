@@ -216,7 +216,7 @@ class BackupManager extends Component
 
             // W prawdziwej implementacji byłby to redirect do route
             $url = $this->backupService->getDownloadUrl($backup);
-            $this->emit('downloadFile', $url);
+            $this->dispatch('downloadFile', $url);
 
         } catch (\Exception $e) {
             $this->showMessage('Błąd podczas pobierania: ' . $e->getMessage(), 'error');
@@ -431,7 +431,7 @@ class BackupManager extends Component
     {
         $this->message = $message;
         $this->messageType = $type;
-        $this->emit('messageShown');
+        $this->dispatch('messageShown');
     }
 
     /**

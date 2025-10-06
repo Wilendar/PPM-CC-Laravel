@@ -201,50 +201,7 @@
     </div>
 </div>
 
-@push('styles')
-<style>
-    .admin-theme-customization {
-        min-height: calc(100vh - 200px);
-    }
-    
-    .color-picker {
-        -webkit-appearance: none;
-        -moz-appearance: none;
-        appearance: none;
-        width: 50px;
-        height: 50px;
-        border: none;
-        cursor: pointer;
-        border-radius: 50%;
-        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-    }
-    
-    .color-picker::-webkit-color-swatch-wrapper {
-        padding: 0;
-    }
-    
-    .color-picker::-webkit-color-swatch {
-        border: none;
-        border-radius: 50%;
-    }
-    
-    .theme-preview-container {
-        transform: scale(0.8);
-        transform-origin: top left;
-        width: 125%;
-        height: 125%;
-        overflow: hidden;
-    }
-    
-    @media (max-width: 1024px) {
-        .theme-preview-container {
-            transform: scale(0.6);
-            width: 166%;
-            height: 166%;
-        }
-    }
-</style>
-@endpush
+{{-- Styles moved to resources/css/admin/components.css --}}
 
 @push('scripts')
 <script>

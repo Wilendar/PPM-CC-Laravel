@@ -245,6 +245,15 @@ class SyncJob extends Model
     }
 
     /**
+     * Get PrestaShop shop (target) for this sync job.
+     * ETAP_07 FAZA 1H - Support for SyncController eager loading
+     */
+    public function prestashopShop(): BelongsTo
+    {
+        return $this->belongsTo(PrestaShopShop::class, 'target_id', 'id');
+    }
+
+    /**
      * Get status badge class for UI.
      */
     public function getStatusBadgeAttribute(): string

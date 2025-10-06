@@ -1,5 +1,39 @@
 # ❌ ETAP 10: SYSTEM DOSTAW I KONTENERÓW
 
+## 🔍 INSTRUKCJE PRZED ROZPOCZĘCIEM ETAPU
+
+**OBOWIĄZKOWE CZYNNOŚCI:**
+
+1. **ANALIZA ZADAŃ ETAPU**
+   - Przeanalizuj wszystkie zadania i podzadania w tym ETAP-ie
+   - Zidentyfikuj wymagane pliki, klasy, migracje i komponenty
+   - Określ zależności z innymi ETAPami (szczególnie ETAP_08, ETAP_05, ETAP_03)
+
+2. **AKTUALIZACJA DOKUMENTACJI STRUKTURY**
+   - Otwórz `_DOCS/Struktura_Plikow_Projektu.md`
+   - Dodaj wszystkie nowe pliki i foldery zaplanowane w tym ETAP-ie:
+     - `app/Services/Delivery/` - ShipmentService, LocationOptimizationService
+     - `app/Services/Delivery/Tracking/` - TrackingService, CourierInterface
+     - `app/Http/Controllers/API/Mobile/` - MobileWarehouseController
+     - `app/Http/Livewire/Delivery/` - ShipmentManager
+     - `app/Jobs/Delivery/` - UpdateTrackingInfo, ExportShipmentsJob
+     - `resources/views/livewire/delivery/` - shipment-manager.blade.php
+   - Otwórz `_DOCS/Struktura_Bazy_Danych.md`
+   - Dodaj nowe tabele z tego ETAP-u:
+     - `shipments` - główna tabela dostaw
+     - `containers` - kontenery w dostawach
+     - `warehouse_locations` - lokalizacje magazynowe
+     - `shipment_items` - pozycje w dostawach
+     - `shipment_status_history` - historia statusów
+     - `location_movements` - przemieszczenia magazynowe
+
+3. **PRZYGOTOWANIE ŚRODOWISKA**
+   - Sprawdź API keys dla kurierów (DPD, InPost, UPS)
+   - Upewnij się, że Redis jest dostępny dla queue
+   - Przygotuj dane testowe magazynów i lokalizacji
+
+**UWAGA** WYŁĄCZ autoryzację AdminMiddleware na czas developmentu!
+
 **Szacowany czas realizacji:** 50 godzin  
 **Priorytet:** 🟡 WYSOKI  
 **Odpowiedzialny:** Claude Code AI + Kamil Wiliński  
@@ -29,10 +63,12 @@ Implementacja kompletnego systemu zarządzania dostawami, kontenerami i logistyk
 ### ❌ 10.1.1 Wymagania funkcjonalne dostaw
 #### ❌ 10.1.1.1 Przepływ procesu dostawy
 - ❌ 10.1.1.1.1 Zamówienie dostawy (ręczne lub z ERP)
+    **🔗 POWIAZANIE Z ETAP_08 (sekcja 8.3.4) oraz ETAP_05 (sekcja 9.1):** Automaty importujace dostawy bazuja na integracjach ERP i hurtowych operacjach produktowych.
 - ❌ 10.1.1.1.2 Śledzenie statusu przesyłki
 - ❌ 10.1.1.1.3 Przygotowanie dokumentów odprawy
 - ❌ 10.1.1.1.4 Przyjęcie dostawy w magazynie
 - ❌ 10.1.1.1.5 Lokalizacja produktów w magazynie
+    **🔗 POWIAZANIE Z ETAP_05 (sekcja 7.1) oraz ETAP_11 (sekcja 11.2.3):** Dane magazynowe i wariantowe musza aktualizowac mapowania lokalizacji.
 
 #### ❌ 10.1.1.2 Zarządzanie kontenerami
 - ❌ 10.1.1.2.1 Rejestracja nowych kontenerów
@@ -51,6 +87,7 @@ Implementacja kompletnego systemu zarządzania dostawami, kontenerami i logistyk
 ### ❌ 10.1.2 Wymagania aplikacji magazynowej Android
 #### ❌ 10.1.2.1 Funkcjonalności mobilne
 - ❌ 10.1.2.1.1 Skanowanie kodów kreskowych produktów i lokalizacji
+        **🔗 POWIAZANIE Z ETAP_05 (sekcja 6.1) oraz ETAP_07 (sekcja 7.7.1):** Skanowanie uruchamia synchronizacje produktow i joby kolejek PrestaShop.
 - ❌ 10.1.2.1.2 Przyjmowanie dostaw z walidacją
 - ❌ 10.1.2.1.3 Przemieszczanie produktów między lokalizacjami  
 - ❌ 10.1.2.1.4 Inwentaryzacja i korekty stanów
@@ -58,6 +95,7 @@ Implementacja kompletnego systemu zarządzania dostawami, kontenerami i logistyk
 
 #### ❌ 10.1.2.2 API Requirements
 - ❌ 10.1.2.2.1 RESTful API z autentykacją JWT
+        **🔗 POWIAZANIE Z ETAP_03 (sekcja 4.2) oraz ETAP_12 (sekcja 12.2.1.3):** Bezpieczenstwo API korzysta z polityk auth i zestawu testow koncowych.
 - ❌ 10.1.2.2.2 Endpoints dla wszystkich operacji magazynowych
 - ❌ 10.1.2.2.3 Batch operations dla synchronizacji offline
 - ❌ 10.1.2.2.4 Real-time notifications via WebSocket
@@ -73,6 +111,7 @@ Implementacja kompletnego systemu zarządzania dostawami, kontenerami i logistyk
 
 #### ❌ 10.1.3.2 Integracja z ERP
 - ❌ 10.1.3.2.1 Automatyczny import zamówień z BaseLinker
+        **🔗 POWIAZANIE Z ETAP_08 (sekcja 8.3.3) oraz ETAP_06 (sekcja 5.2.2.2):** Dane importowane musza trzymac formaty ERP oraz eksporty XLSX.
 - ❌ 10.1.3.2.2 Sync dostawni z Subiekt GT
 - ❌ 10.1.3.2.3 Purchase Orders z Microsoft Dynamics
 - ❌ 10.1.3.2.4 Automatyczne aktualizacje stanów po przyjęciu
@@ -132,6 +171,7 @@ CREATE TABLE shipments (
     
     -- ERP integration
     erp_source ENUM('manual', 'baselinker', 'subiekt_gt', 'dynamics') DEFAULT 'manual',
+    -- **🔗 POWIAZANIE Z ETAP_08 (sekcja 8.3.1.1):** Enumeracja musi pokrywac typy polaczen zdefiniowane w integracjach ERP.
     erp_reference_id VARCHAR(255) NULL,
     erp_data JSON NULL,
     
@@ -1292,6 +1332,7 @@ class DPDCourier implements CourierInterface
 ---
 
 ## ❌ 10.6 WAREHOUSE MOBILE API
+## **🔗 POWIAZANIE Z ETAP_03 (sekcja 1.2.2.4) oraz ETAP_12 (sekcja 12.2.2.2):** Role magazyniera i scenariusze E2E musza obejmowac mobilne przeplywy dostaw.
 
 ### ❌ 10.6.1 MobileWarehouseController
 #### ❌ 10.6.1.1 API dla aplikacji Android
@@ -2069,7 +2110,205 @@ Etap zostanie uznany za ukończony gdy:
 
 ---
 
-**Autor:** Claude Code AI  
-**Data utworzenia:** 2025-09-05  
-**Ostatnia aktualizacja:** 2025-09-05  
+**Autor:** Claude Code AI
+**Data utworzenia:** 2025-09-05
+**Ostatnia aktualizacja:** 2025-09-05
 **Status:** ❌ NIEROZPOCZĘTY
+
+---
+
+## ✅ WERYFIKACJA PO UKOŃCZENIU ETAPU
+
+**LISTA KONTROLNA - wykonaj po zakończeniu wszystkich zadań:**
+
+### 📁 WERYFIKACJA STRUKTURY PLIKÓW
+- [ ] **Delivery Services** - Sprawdź istnienie i completeness:
+  - [ ] `app/Services/Delivery/ShipmentService.php`
+  - [ ] `app/Services/Delivery/LocationOptimizationService.php`
+  - [ ] `app/Services/Delivery/Tracking/TrackingService.php`
+  - [ ] `app/Services/Delivery/Tracking/Couriers/CourierInterface.php`
+  - [ ] `app/Services/Delivery/Tracking/Couriers/DPDCourier.php`
+
+- [ ] **Delivery Models** - Sprawdź istnienie:
+  - [ ] `app/Models/Shipment.php`
+  - [ ] `app/Models/Container.php`
+  - [ ] `app/Models/ShipmentItem.php`
+  - [ ] `app/Models/WarehouseLocation.php`
+  - [ ] `app/Models/LocationMovement.php`
+  - [ ] `app/Models/ShipmentStatusHistory.php`
+
+- [ ] **Mobile API Controllers** - Sprawdź istnienie:
+  - [ ] `app/Http/Controllers/API/Mobile/MobileWarehouseController.php`
+  - [ ] JWT authentication middleware dla mobile
+
+- [ ] **Livewire Components** - Sprawdź istnienie:
+  - [ ] `app/Http/Livewire/Delivery/ShipmentManager.php`
+  - [ ] `resources/views/livewire/delivery/shipment-manager.blade.php`
+
+- [ ] **Jobs i Commands** - Sprawdź istnienie:
+  - [ ] `app/Jobs/Delivery/UpdateTrackingInfo.php`
+  - [ ] `app/Jobs/Delivery/ExportShipmentsJob.php`
+
+### 🗃️ WERYFIKACJA STRUKTURY BAZY DANYCH
+- [ ] **Migracje Delivery** - Sprawdź czy zostały utworzone i uruchomione:
+  - [ ] `*_create_shipments_table.php`
+  - [ ] `*_create_containers_table.php`
+  - [ ] `*_create_warehouse_locations_table.php`
+  - [ ] `*_create_shipment_items_table.php`
+  - [ ] `*_create_shipment_status_history_table.php`
+  - [ ] `*_create_location_movements_table.php`
+
+- [ ] **Foreign Keys i Indeksy** - Sprawdź na serwerze:
+```bash
+plink -ssh host379076@host379076.hostido.net.pl -P 64321 -i $HostidoKey -batch "cd domains/ppm.mpptrade.pl/public_html && php artisan tinker --execute=\"DB::select('SHOW INDEX FROM shipments WHERE Key_name != \'PRIMARY\');\""
+```
+
+### 🚚 WERYFIKACJA FUNKCJONALNOŚCI DOSTAW
+- [ ] **Shipment Management** - Test podstawowych funkcji:
+  - [ ] Tworzenie nowej dostawy
+  - [ ] Aktualizacja statusu dostawy
+  - [ ] Przypisywanie kontenerów
+  - [ ] Generowanie numerów dostaw
+  - [ ] Śledzenie historii statusów
+
+- [ ] **Container Management** - Test zarządzania kontenerami:
+  - [ ] Tworzenie kontenerów
+  - [ ] Przypisywanie produktów do kontenerów
+  - [ ] Śledzenie lokalizacji kontenerów
+  - [ ] Status unpacking
+
+- [ ] **Location Optimization** - Test optymalizacji lokalizacji:
+  - [ ] Automatyczne przypisywanie optymalnych lokalizacji
+  - [ ] Sprawdzanie dostępnej przestrzeni
+  - [ ] Generowanie tras picking
+  - [ ] Sugestie reorganizacji
+
+### 📦 WERYFIKACJA PRZYJMOWANIA DOSTAW
+- [ ] **Item Reception** - Test przyjmowania pozycji:
+  - [ ] Skanowanie kodów kreskowych produktów
+  - [ ] Walidacja ilości otrzymanych
+  - [ ] Automatyczne przypisywanie lokalizacji
+  - [ ] Aktualizacja stanów magazynowych
+  - [ ] Quality check workflow
+
+- [ ] **Stock Integration** - Test integracji ze stanami:
+  - [ ] Aktualizacja tabeli stock po przyjęciu
+  - [ ] Korekty lokalizacji produktów
+  - [ ] Historia przemieszczęń
+  - [ ] Synchronizacja z ERP
+
+### 📱 WERYFIKACJA MOBILE API
+- [ ] **Authentication** - Test uwierzytelniania:
+  - [ ] JWT token generation/validation
+  - [ ] Mobile middleware
+  - [ ] Role-based access control
+
+- [ ] **Mobile Endpoints** - Test wszystkich endpointów:
+  - [ ] GET `/api/mobile/shipments/pending` - Lista dostaw do przyjęcia
+  - [ ] GET `/api/mobile/shipments/{id}` - Szczegóły dostawy
+  - [ ] POST `/api/mobile/items/receive` - Przyjęcie pozycji
+  - [ ] POST `/api/mobile/barcode/scan` - Skanowanie kodów
+  - [ ] GET `/api/mobile/locations` - Lista lokalizacji
+  - [ ] POST `/api/mobile/items/move` - Przemieszczenie produktu
+
+- [ ] **Offline Support** - Test trybu offline:
+  - [ ] Batch operations dla synchronizacji
+  - [ ] Error handling i retry mechanism
+  - [ ] Device info tracking
+
+### 🚛 WERYFIKACJA TRACKING SYSTEM
+- [ ] **Courier Integration** - Test integracji z kurierami:
+  - [ ] DPD tracking API
+  - [ ] InPost tracking API
+  - [ ] UPS tracking API
+  - [ ] Universal courier adapter
+
+- [ ] **Automatic Updates** - Test automatycznych aktualizacji:
+  - [ ] UpdateTrackingInfo job queue
+  - [ ] Webhook handlers dla kurierów
+  - [ ] Status mapping (courier → shipment)
+  - [ ] Notification system
+
+- [ ] **Tracking Data** - Test danych śledzenia:
+  - [ ] Real-time tracking URLs
+  - [ ] Location info extraction
+  - [ ] Estimated delivery updates
+  - [ ] Exception handling
+
+### 🎛️ WERYFIKACJA KOMPONENTÓW LIVEWIRE
+- [ ] **ShipmentManager Panel** - Test funkcjonalności na https://ppm.mpptrade.pl:
+  - [ ] Lista dostaw z filtrowaniem
+  - [ ] Tworzenie nowych dostaw
+  - [ ] Aktualizacja statusów
+  - [ ] Przypisywanie do użytkowników
+  - [ ] Eksport raportów
+
+- [ ] **Real-time Updates** - Test aktualizacji:
+  - [ ] Live status changes
+  - [ ] Counter updates
+  - [ ] Pagination i filtering
+  - [ ] Search functionality
+
+### 🔗 WERYFIKACJA INTEGRACJI ERP
+- [ ] **ERP Sync** - Test synchronizacji z ETAPem 08:
+  - [ ] Import dostaw z BaseLinker
+  - [ ] Sync z Subiekt GT
+  - [ ] Purchase Orders z Dynamics
+  - [ ] Automatyczne aktualizacje stanów
+
+- [ ] **Data Consistency** - Test spójności danych:
+  - [ ] ERP reference tracking
+  - [ ] Status synchronization
+  - [ ] Stock level updates
+  - [ ] Error logging
+
+### 📝 WERYFIKACJA DOKUMENTACJI
+- [ ] **Aktualizacja dokumentacji struktury**:
+  - [ ] `_DOCS/Struktura_Plikow_Projektu.md` zawiera wszystkie pliki Delivery
+  - [ ] `_DOCS/Struktura_Bazy_Danych.md` zawiera tabele Delivery z opisami
+  - [ ] Mapowania do ETAPów są poprawne
+
+- [ ] **Mobile API Documentation**:
+  - [ ] Endpoint documentation
+  - [ ] Authentication flow
+  - [ ] Error codes i responses
+  - [ ] Offline sync procedures
+
+- [ ] **Testy jednostkowe**:
+  - [ ] ShipmentServiceTest przechodzi
+  - [ ] LocationOptimizationTest przechodzi
+  - [ ] TrackingServiceTest przechodzi
+  - [ ] Mobile API tests przechodzą
+  - [ ] Coverage min 80% dla delivery services
+
+### 🚀 WERYFIKACJA DEPLOYMENT
+- [ ] **Serwer produkcyjny** - Upload i test:
+```bash
+# Upload delivery services
+pscp -i $HostidoKey -P 64321 -r "D:\OneDrive - MPP TRADE\Skrypty\PPM-CC-Laravel\app\Services\Delivery" host379076@host379076.hostido.net.pl:domains/ppm.mpptrade.pl/public_html/app/Services/
+
+# Upload mobile API
+pscp -i $HostidoKey -P 64321 -r "D:\OneDrive - MPP TRADE\Skrypty\PPM-CC-Laravel\app\Http\Controllers\API\Mobile" host379076@host379076.hostido.net.pl:domains/ppm.mpptrade.pl/public_html/app/Http/Controllers/API/
+
+# Upload Livewire components
+pscp -i $HostidoKey -P 64321 -r "D:\OneDrive - MPP TRADE\Skrypty\PPM-CC-Laravel\app\Http\Livewire\Delivery" host379076@host379076.hostido.net.pl:domains/ppm.mpptrade.pl/public_html/app/Http/Livewire/
+
+# Uruchom migracje
+plink -ssh host379076@host379076.hostido.net.pl -P 64321 -i $HostidoKey -batch "cd domains/ppm.mpptrade.pl/public_html && php artisan migrate --force"
+
+# Configure queues dla tracking
+plink -ssh host379076@host379076.hostido.net.pl -P 64321 -i $HostidoKey -batch "cd domains/ppm.mpptrade.pl/public_html && php artisan queue:restart"
+
+# Clear cache
+plink -ssh host379076@host379076.hostido.net.pl -P 64321 -i $HostidoKey -batch "cd domains/ppm.mpptrade.pl/public_html && php artisan cache:clear && php artisan view:clear"
+```
+
+### 📱 WERYFIKACJA ANDROID APP INTEGRATION
+- [ ] **API Testing** - Test z Android app:
+  - [ ] Authentication flow działa
+  - [ ] Wszystkie endpoints odpowiadają poprawnie
+  - [ ] Barcode scanning integration
+  - [ ] Offline mode synchronization
+  - [ ] Push notifications (jeśli zaimplementowane)
+
+**ETAP UKOŃCZONY POMYŚLNIE** ✅ gdy wszystkie powyższe punkty są zaznaczone jako wykonane.

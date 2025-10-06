@@ -297,51 +297,7 @@
     </div>
 </div>
 
-@push('styles')
-<style>
-    .widget-grid-container {
-        display: grid;
-        grid-template-columns: repeat(var(--grid-columns, 12), 1fr);
-        grid-gap: 16px;
-        position: relative;
-    }
-
-    .widget-item {
-        position: relative;
-        min-height: 120px;
-        z-index: 10;
-    }
-
-    .widget-item.dragging {
-        opacity: 0.8;
-        transform: scale(1.02);
-        z-index: 1000;
-    }
-
-    .grid-lines {
-        display: none;
-    }
-
-    .show-grid .grid-lines {
-        display: block;
-        background-image: 
-            linear-gradient(to right, rgba(59, 130, 246, 0.1) 1px, transparent 1px),
-            linear-gradient(to bottom, rgba(59, 130, 246, 0.1) 1px, transparent 1px);
-        background-size: calc(100% / 12) 20px;
-    }
-
-    .resize-handle {
-        width: 12px;
-        height: 12px;
-        background: transparent;
-    }
-
-    .widget-item:hover .resize-handle {
-        background: rgba(59, 130, 246, 0.2);
-        border-radius: 2px;
-    }
-</style>
-@endpush
+{{-- Styles moved to resources/css/admin/components.css --}}
 
 @push('scripts')
 <script>

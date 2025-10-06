@@ -92,6 +92,59 @@ class PriceGroup extends Model
         ];
     }
 
+    /**
+     * Boot model - Add audit trail hooks
+     */
+    protected static function boot(): void
+    {
+        parent::boot();
+
+        // Create audit trail on creation
+        static::created(function ($priceGroup) {
+            \App\Models\PriceHistory::createForModel(
+                $priceGroup,
+                'created',
+                [],
+                $priceGroup->toArray(),
+                [
+                    'reason' => 'Price group created',
+                    'source' => 'system'
+                ]
+            );
+        });
+
+        // Create audit trail on update
+        static::updated(function ($priceGroup) {
+            $oldValues = $priceGroup->getOriginal();
+            $newValues = $priceGroup->toArray();
+
+            \App\Models\PriceHistory::createForModel(
+                $priceGroup,
+                'updated',
+                $oldValues,
+                $newValues,
+                [
+                    'reason' => 'Price group updated',
+                    'source' => 'system'
+                ]
+            );
+        });
+
+        // Create audit trail on deletion
+        static::deleted(function ($priceGroup) {
+            \App\Models\PriceHistory::createForModel(
+                $priceGroup,
+                'deleted',
+                $priceGroup->toArray(),
+                [],
+                [
+                    'reason' => 'Price group deleted',
+                    'source' => 'system'
+                ]
+            );
+        });
+    }
+
     /*
     |--------------------------------------------------------------------------
     | RELATIONSHIPS

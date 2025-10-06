@@ -10,9 +10,9 @@
     </div>
      
     <!-- Dashboard Header with Enhanced Navigation -->
-    <div class="relative backdrop-blur-xl shadow-2xl" style="background: linear-gradient(135deg, rgba(31, 41, 55, 0.95), rgba(17, 24, 39, 0.95)); border-bottom: 1px solid rgba(224, 172, 126, 0.3); overflow: visible !important;">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="flex items-center justify-between h-20">
+    <div class="relative backdrop-blur-xl shadow-2xl" style="background: linear-gradient(135deg, rgba(31, 41, 55, 0.95), rgba(17, 24, 39, 0.95)); border-bottom: 1px solid rgba(224, 172, 126, 0.3); overflow: visible !important; z-index: 10000;">
+        <div class="max-w-7xl mx-auto px-6 sm:px-8 lg:px-12">
+            <div class="flex items-center justify-between h-24">
                 <div class="flex items-center">
                     <!-- Enhanced Logo with MPP Colors -->
                     <div class="flex-shrink-0">
@@ -25,27 +25,24 @@
                             <div class="absolute inset-0 rounded-xl opacity-75 blur animate-pulse" style="background: linear-gradient(45deg, #e0ac7e, #d1975a);"></div>
                         </div>
                     </div>
-                    <div class="ml-6">
-                        <div class="flex items-center space-x-3">
-                            <div>
-                                <h1 class="text-3xl font-black tracking-tight" style="color: #e0ac7e !important;">
-                                    ADMIN PANEL
-                                </h1>
-                                <p class="text-sm font-medium text-gray-300 tracking-wide">
-                                    PPM Enterprise • Prestashop Product Manager
-                                </p>
-                            </div>
-                            <!-- MPP TRADE Brand Badge -->
-                            <div class="hidden md:flex items-center px-3 py-1.5 rounded-full border" style="background: linear-gradient(45deg, rgba(224, 172, 126, 0.2), rgba(209, 151, 90, 0.2)); border-color: rgba(224, 172, 126, 0.3);">
-                                <div class="w-2 h-2 rounded-full mr-2 animate-pulse" style="background-color: #e0ac7e;"></div>
-                                <span class="text-xs font-bold tracking-wider" style="color: #e0ac7e;">MPP TRADE</span>
-                            </div>
-                        </div>
+                    <div class="ml-4 flex-1 min-w-0">
+                        <h1 class="text-xl font-bold tracking-tight" style="color: #e0ac7e !important;">
+                            ADMIN PANEL
+                        </h1>
+                        <p class="text-xs font-medium text-gray-400 tracking-wide truncate">
+                            PPM Enterprise
+                        </p>
+                    </div>
+                    
+                    <!-- MPP TRADE Brand Badge - kompaktowy -->
+                    <div class="hidden lg:flex items-center px-2 py-1 rounded-full border ml-2 flex-shrink-0" style="background: linear-gradient(45deg, rgba(224, 172, 126, 0.2), rgba(209, 151, 90, 0.2)); border-color: rgba(224, 172, 126, 0.3);">
+                        <div class="w-1.5 h-1.5 rounded-full mr-1.5 animate-pulse" style="background-color: #e0ac7e;"></div>
+                        <span class="text-xs font-bold" style="color: #e0ac7e;">MPP</span>
                     </div>
                 </div>
                 
                 <!-- Enhanced Dashboard Controls with Navigation -->
-                <div class="flex items-center space-x-6">
+                <div class="flex items-center space-x-2 lg:space-x-4 flex-shrink-0">
                     <!-- Global Search Box -->
                     <div class="relative">
                         <div class="relative">
@@ -338,7 +335,7 @@
     
         <!-- Dashboard Content -->
         <div class="flex-1">
-            <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div class="px-6 sm:px-8 lg:px-12 py-8">
         
         <!-- System Health Status Bar with MPP Colors -->
         <div class="mb-8 relative">
@@ -585,11 +582,10 @@
                 <div class="relative z-10 mb-8">
                     <div class="flex items-center justify-between">
                         <h2 class="text-2xl font-black text-white flex items-center">
-                            <div class="w-12 h-12 rounded-lg flex items-center justify-center mr-4 shadow-xl" style="background: linear-gradient(45deg, #f59e0b, #e0ac7e, #d1975a);">
+                            <div class="w-12 h-12 bg-gradient-to-br from-orange-400 to-orange-600 rounded-lg flex items-center justify-center mr-4 shadow-xl">
                                 <svg class="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
                                 </svg>
-                                <div class="absolute inset-0 rounded-lg opacity-50 blur-lg animate-pulse" style="background: #e0ac7e;"></div>
                             </div>
                             <span style="color: #e0ac7e !important; font-weight: bold;">
                                 KPI BIZNESOWE

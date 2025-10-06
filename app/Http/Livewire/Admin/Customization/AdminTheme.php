@@ -133,7 +133,7 @@ class AdminTheme extends Component
                 'accent_color' => $this->accentColor,
             ]);
             
-            $this->emit('themeColorsUpdated');
+            $this->dispatch('themeColorsUpdated');
             session()->flash('message', 'Kolory motywu zostały zaktualizowane.');
             
         } catch (\Exception $e) {
@@ -161,7 +161,7 @@ class AdminTheme extends Component
                 'header_style' => $this->headerStyle,
             ]);
             
-            $this->emit('themeLayoutUpdated');
+            $this->dispatch('themeLayoutUpdated');
             session()->flash('message', 'Ustawienia layoutu zostały zaktualizowane.');
             
         } catch (\Exception $e) {
@@ -193,7 +193,7 @@ class AdminTheme extends Component
             
             $this->currentTheme = $themeService->updateTheme(auth()->user(), $data);
             
-            $this->emit('themeBrandingUpdated');
+            $this->dispatch('themeBrandingUpdated');
             session()->flash('message', 'Ustawienia brandingu zostały zaktualizowane.');
             
             // Reset file upload
@@ -216,7 +216,7 @@ class AdminTheme extends Component
                 'custom_css' => $this->customCss,
             ]);
             
-            $this->emit('themeCustomCssUpdated');
+            $this->dispatch('themeCustomCssUpdated');
             session()->flash('message', 'Custom CSS został zaktualizowany.');
             
         } catch (\Exception $e) {
@@ -275,7 +275,7 @@ class AdminTheme extends Component
             $this->currentTheme = $themeService->switchTheme(auth()->user(), $theme);
             $this->loadCurrentTheme($themeService);
             
-            $this->emit('themeChanged');
+            $this->dispatch('themeChanged');
             session()->flash('message', 'Motyw został przełączony.');
             
         } catch (\Exception $e) {
@@ -392,7 +392,7 @@ class AdminTheme extends Component
     public function togglePreview()
     {
         $this->previewMode = !$this->previewMode;
-        $this->emit('previewModeToggled', $this->previewMode);
+        $this->dispatch('previewModeToggled', $this->previewMode);
     }
 
     /**
@@ -407,7 +407,7 @@ class AdminTheme extends Component
             $this->loadCurrentTheme($themeService);
             $this->loadAvailableThemes($themeService);
             
-            $this->emit('themeReset');
+            $this->dispatch('themeReset');
             session()->flash('message', 'Motyw został zresetowany do domyślnego.');
             
         } catch (\Exception $e) {
@@ -459,7 +459,7 @@ class AdminTheme extends Component
     {
         $themeService = app(ThemeService::class);
         $this->loadCurrentTheme($themeService);
-        $this->emit('themeRefreshed');
+        $this->dispatch('themeRefreshed');
     }
 
     /**

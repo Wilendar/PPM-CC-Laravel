@@ -30,3 +30,7 @@ Nazwa hosta "z zewnątrz": host379076.hostido.net.pl
 Baza danych: host379076_ppm
 Nazwa użytkownika: host379076_ppm
 Hasło: qkS4FuXMMDDN4DJhatg6
+
+**PRESTASHOP API**
+https://dev.mpptrade.pl/api
+RPV43WNRX8Y7ZJWAPXU3ZA1Z9ZEE9Y22

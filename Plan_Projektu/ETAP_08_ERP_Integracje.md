@@ -1,5 +1,37 @@
 # ❌ ETAP 08: INTEGRACJE Z SYSTEMAMI ERP
 
+## 🔍 INSTRUKCJE PRZED ROZPOCZĘCIEM ETAPU
+
+**OBOWIĄZKOWE CZYNNOŚCI:**
+
+1. **ANALIZA ZADAŃ ETAPU**
+   - Przeanalizuj wszystkie zadania i podzadania w tym ETAP-ie
+   - Zidentyfikuj wymagane pliki, klasy, migracje i komponenty
+   - Określ zależności z innymi ETAPami (szczególnie ETAP_04, ETAP_06)
+
+2. **AKTUALIZACJA DOKUMENTACJI STRUKTURY**
+   - Otwórz `_DOCS/Struktura_Plikow_Projektu.md`
+   - Dodaj wszystkie nowe pliki i foldery zaplanowane w tym ETAP-ie:
+     - `app/Services/ERP/` - BaseLinker, SubiektGT, Dynamics services
+     - `app/Models/ErpConnection.php`, `ErpFieldMapping.php`, `ErpSyncJob.php`
+     - `app/Jobs/ERP/` - SyncProductToERP jobs
+     - Livewire components dla panelu ERP
+     - Migracje dla tabel ERP (`database/migrations/`)
+   - Otwórz `_DOCS/Struktura_Bazy_Danych.md`
+   - Dodaj nowe tabele z tego ETAP-u:
+     - `erp_connections` - konfiguracje połączeń ERP
+     - `erp_field_mappings` - mapowania pól między systemami
+     - `erp_sync_jobs` - zadania synchronizacji
+     - `erp_entity_sync_status` - statusy synchronizacji encji
+     - `erp_sync_logs` - logi operacji ERP
+
+3. **PRZYGOTOWANIE ŚRODOWISKA**
+   - Upewnij się, że BaseLinker API key jest dostępny
+   - Sprawdź dostępność Subiekt GT (DLL/COM)
+   - Przygotuj dane testowe Microsoft Dynamics 365
+
+**UWAGA** WYŁĄCZ autoryzację AdminMiddleware na czas developmentu!
+
 **Szacowany czas realizacji:** 45 godzin  
 **Priorytet:** 🟡 WYSOKI  
 **Odpowiedzialny:** Claude Code AI + Kamil Wiliński  
@@ -284,8 +316,10 @@ CREATE TABLE erp_sync_logs (
 ---
 
 ## ❌ 8.3 BASELINKER INTEGRATION SERVICE
+**🔗 🔗 POWIAZANIE Z ETAP_04 (sekcja 3.1.2) oraz ETAP_06 (punkt 5.2.2.2.1):** Serwis BaseLinker jest wykorzystywany przez panel ERP i eksporty CSV, wymagajac spójnych pol i konfiguracji.
 
 ### ❌ 8.3.1 BaseLinkerClient
+**🔗 🔗 POWIAZANIE Z ETAP_04 (punkt 3.1.1.1.2):** Statusy polaczen w panelu admin opieraja sie na tej klasie klienta.
 #### ❌ 8.3.1.1 Klasa BaseLinkerApiClient
 ```php
 <?php
@@ -638,9 +672,11 @@ class BaseLinkerSyncService
 ---
 
 ## ❌ 8.4 SUBIEKT GT INTEGRATION SERVICE
+**🔗 🔗 POWIAZANIE Z ETAP_04 (sekcja 3.1.3) oraz ETAP_06 (punkt 5.2.2.2.2):** Moduly panelu i eksporty do Subiekt korzystaja z tego samego bridge i mapowan.
 
 ### ❌ 8.4.1 .NET Bridge Service
 #### ❌ 8.4.1.1 SubiektGTBridge.cs - Windows Service
+**🔗 🔗 POWIAZANIE Z ETAP_04 (punkt 3.1.3.1):** Konfiguracja bridge w panelu admin musi uzywac tych samych ustawien polaczenia.
 ```csharp
 using System;
 using System.Collections.Generic;
@@ -941,8 +977,10 @@ class SubiektGTClient
 ---
 
 ## ❌ 8.5 MICROSOFT DYNAMICS INTEGRATION
+**🔗 🔗 POWIAZANIE Z ETAP_04 (sekcja 3.1.4) oraz ETAP_06 (punkt 5.2.2.2.3):** Integracja Dynamics jest kontrolowana z panelu ERP i wymaga zgodnych formatow eksportu.
 
 ### ❌ 8.5.1 Dynamics OData Client
+**🔗 🔗 POWIAZANIE Z ETAP_04 (punkt 3.1.4.1):** Testy polaczen w panelu admin bazuja na metodach tego klienta.
 #### ❌ 8.5.1.1 DynamicsODataClient.php
 ```php
 <?php
@@ -1770,7 +1808,121 @@ Etap zostanie uznany za ukończony gdy:
 
 ---
 
-**Autor:** Claude Code AI  
-**Data utworzenia:** 2025-09-05  
-**Ostatnia aktualizacja:** 2025-09-05  
+**Autor:** Claude Code AI
+**Data utworzenia:** 2025-09-05
+**Ostatnia aktualizacja:** 2025-09-05
 **Status:** ❌ NIEROZPOCZĘTY
+
+---
+
+## ✅ WERYFIKACJA PO UKOŃCZENIU ETAPU
+
+**LISTA KONTROLNA - wykonaj po zakończeniu wszystkich zadań:**
+
+### 📁 WERYFIKACJA STRUKTURY PLIKÓW
+- [ ] **Services ERP** - Sprawdź istnienie i completeness:
+  - [ ] `app/Services/ERP/BaseLinker/BaseLinkerApiClient.php`
+  - [ ] `app/Services/ERP/BaseLinker/BaseLinkerSyncService.php`
+  - [ ] `app/Services/ERP/SubiektGT/SubiektGTClient.php`
+  - [ ] `app/Services/ERP/Dynamics/DynamicsODataClient.php`
+  - [ ] `app/Services/ERP/ERPServiceManager.php`
+  - [ ] `app/Services/ERP/ERPSyncServiceInterface.php`
+
+- [ ] **Modele ERP** - Sprawdź istnienie:
+  - [ ] `app/Models/ErpConnection.php` (z relationships i validation)
+  - [ ] `app/Models/ErpFieldMapping.php`
+  - [ ] `app/Models/ErpSyncJob.php`
+  - [ ] `app/Models/ErpEntitySyncStatus.php`
+  - [ ] `app/Models/ErpSyncLog.php`
+
+- [ ] **Jobs i Queue** - Sprawdź istnienie:
+  - [ ] `app/Jobs/ERP/SyncProductToERP.php`
+  - [ ] Konfiguracja queue'ów dla ERP w `config/queue.php`
+
+- [ ] **Livewire Components** - Sprawdź istnienie:
+  - [ ] `app/Http/Livewire/Admin/ERP/ERPConnectionManager.php`
+  - [ ] `app/Http/Livewire/Admin/ERP/ERPDashboard.php`
+  - [ ] Odpowiednie views w `resources/views/livewire/admin/erp/`
+
+### 🗃️ WERYFIKACJA STRUKTURY BAZY DANYCH
+- [ ] **Migracje ERP** - Sprawdź czy zostały utworzone i uruchomione:
+  - [ ] `*_create_erp_connections_table.php`
+  - [ ] `*_create_erp_field_mappings_table.php`
+  - [ ] `*_create_erp_sync_jobs_table.php`
+  - [ ] `*_create_erp_entity_sync_status_table.php`
+  - [ ] `*_create_erp_sync_logs_table.php`
+
+- [ ] **Tabele w bazie** - Sprawdź istnienie tabel na serwerze:
+```bash
+plink -ssh host379076@host379076.hostido.net.pl -P 64321 -i $HostidoKey -batch "cd domains/ppm.mpptrade.pl/public_html && php artisan db:table erp_connections"
+```
+
+### 🔌 WERYFIKACJA INTEGRACJI ERP
+- [ ] **BaseLinker** - Test połączenia i operacji:
+  - [ ] Poprawne połączenie z BaseLinker API
+  - [ ] Test pobierania listy produktów
+  - [ ] Test dodawania produktu
+  - [ ] Test aktualizacji stanów magazynowych
+
+- [ ] **Subiekt GT** - Test .NET Bridge:
+  - [ ] Windows Service dla SubiektGTBridge działa
+  - [ ] Test połączenia HTTP na porcie 8080
+  - [ ] Test pobierania produktów z Subiekt GT
+  - [ ] Test operacji CRUD na produktach
+
+- [ ] **Microsoft Dynamics** - Test OData API:
+  - [ ] Poprawne uzyskanie access token OAuth2
+  - [ ] Test pobierania Items z Dynamics
+  - [ ] Test operacji na kategoriach i stanach
+
+### 🎛️ WERYFIKACJA PANELU ADMINISTRACYJNEGO
+- [ ] **ERP Manager Panel** - Sprawdź funkcjonalność na https://ppm.mpptrade.pl:
+  - [ ] Dodawanie nowych połączeń ERP
+  - [ ] Test Connection dla każdego typu ERP
+  - [ ] Konfiguracja mapowań pól
+  - [ ] Uruchomienie synchronizacji ręcznej
+  - [ ] Wyświetlanie statusów synchronizacji
+
+- [ ] **ERP Dashboard** - Sprawdź metryki i raporty:
+  - [ ] Statystyki synchronizacji (success rate, błędy)
+  - [ ] Lista ostatnich job'ów synchronizacji
+  - [ ] Monitoring statusów połączeń ERP
+
+### 🔄 WERYFIKACJA SYNCHRONIZACJI
+- [ ] **Sync Jobs Queue** - Sprawdź działanie:
+  - [ ] Job SyncProductToERP jest dodawany do queue
+  - [ ] Worker queue przetwarza ERP jobs
+  - [ ] Error handling i retry mechanism działa
+
+- [ ] **Bidirectional Sync** - Test pełnej synchronizacji:
+  - [ ] Push: PPM → ERP (BaseLinker, Subiekt, Dynamics)
+  - [ ] Pull: ERP → PPM (aktualizacja danych w PPM)
+  - [ ] Conflict resolution przy rozbieżnościach
+
+### 📝 WERYFIKACJA DOKUMENTACJI
+- [ ] **Aktualizacja dokumentacji struktury**:
+  - [ ] `_DOCS/Struktura_Plikow_Projektu.md` zawiera wszystkie nowe pliki ERP
+  - [ ] `_DOCS/Struktura_Bazy_Danych.md` zawiera tabele ERP z opisami
+  - [ ] Mapowania do ETAPów są poprawne
+
+- [ ] **Testy jednostkowe**:
+  - [ ] Testy dla BaseLinkerSyncService działają
+  - [ ] Testy dla SubiektGT działają
+  - [ ] Testy dla Dynamics działają
+  - [ ] Coverage testów min 80% dla services ERP
+
+### 🚀 WERYFIKACJA DEPLOYMENT
+- [ ] **Serwer produkcyjny** - Upload i test:
+```bash
+# Upload wszystkich plików ERP
+pscp -i $HostidoKey -P 64321 -r "D:\OneDrive - MPP TRADE\Skrypty\PPM-CC-Laravel\app\Services\ERP" host379076@host379076.hostido.net.pl:domains/ppm.mpptrade.pl/public_html/app/Services/
+
+# Uruchom migracje
+plink -ssh host379076@host379076.hostido.net.pl -P 64321 -i $HostidoKey -batch "cd domains/ppm.mpptrade.pl/public_html && php artisan migrate --force"
+
+# Clear cache
+plink -ssh host379076@host379076.hostido.net.pl -P 64321 -i $HostidoKey -batch "cd domains/ppm.mpptrade.pl/public_html && php artisan cache:clear && php artisan view:clear"
+```
+
+**ETAP UKOŃCZONY POMYŚLNIE** ✅ gdy wszystkie powyższe punkty są zaznaczone jako wykonane.
+
