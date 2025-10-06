@@ -29,7 +29,7 @@
 ehthumbs.db
 Thumbs.db
 
-# PPM-CC-Laravel Specific
+# PPM-CC-Laravel Specific - Application Data
 /storage/app/containers/
 /storage/app/products/images/
 /storage/app/imports/
@@ -47,11 +47,53 @@ Thumbs.db
 /tests/coverage/
 /.phpunit.cache
 
-# Tools
-/_TOOLS/logs/
-/_AGENT_REPORTS/*.log
+# ============================================
+# PPM-CC-Laravel - Project Documentation & Tools
+# These folders are for local development only
+# and should NOT be tracked in git repository
+# ============================================
 
+# Agent Reports (Claude Code agent work reports)
+/_AGENT_REPORTS/
+
+# Project Reports (daily summaries, status reports)
+/_REPORTS/
+
+# Development Tools (PowerShell scripts, diagnostics)
+/_TOOLS/
+
+# Diagnostics Files (debugging sessions)
+/_DIAGNOSTICS/
+
+# Issues & Fixes Documentation (problem solving docs)
+/_ISSUES_FIXES/
+
+# Project Documentation (all docs - not part of application code)
+/_DOCS/
+
+# Claude Code Configuration & Project Management
+/.claude/
+/Plan_Projektu/
+CLAUDE.md
+AGENTS.md
+
+# Temporary & Backup Files
+/_TEMP_*
+/_BACKUP_*
+/_WORKING_*
+_TEMP_*.php
+_TEMP_*.blade.php
+_BACKUP_*.php
+_WORKING_*.php
+category-form-server.blade.php
+*-server.css
+
+# Duplicate/Old Folders
+/Plan_Projektu copy/
+
+# ============================================
 # Temporary files from development/testing
+# ============================================
 cookies*.txt
 temp_*.txt
 temp_*.php
@@ -62,7 +104,7 @@ response*.txt
 headers.txt
 final_*.txt
 dashboard_*.txt
-*.backup*
+*.backup
 *_from_server.*
 test_results/
 absolute_test.php
@@ -80,23 +122,7 @@ test-*.blade.php
 test-*.html
 test_*.php
 upload_*.sh
-
-# Personal configuration files
-dane_hostingu-*.md
-dane_hostingu_backup_*.md
-CLAUDE-*.md
-CLAUDE_*.md
-AI_AGENTS_GUIDE_*.md
-/_DOCS
-/_DIAGNOSTICS
-/_AGENT_REPORTS
-/_REPORTS
-/_ISSUES_FIXES
-/_DOCS
-/claude
-/Plan_Projektu
-/Plan_Projektu
-/.claude
-/.claude
-/_DOCS
-/_DOCS
+force-debug.blade.php
+debug-category.blade.php
+simple-test.blade.php
+route-test.blade.php
