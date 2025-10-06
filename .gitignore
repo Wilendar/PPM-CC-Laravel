@@ -131,3 +131,4 @@ force-debug.blade.php
 debug-category.blade.php
 simple-test.blade.php
 route-test.blade.php
+/claude
