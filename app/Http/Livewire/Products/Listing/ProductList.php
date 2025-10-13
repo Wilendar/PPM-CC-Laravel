@@ -4,6 +4,8 @@ namespace App\Http\Livewire\Products\Listing;
 
 use Livewire\Component;
 use Livewire\WithPagination;
+use Livewire\Attributes\Computed;
+use Livewire\Attributes\On;
 use App\Models\Product;
 use App\Models\Category;
 use App\Models\PrestaShopShop;
@@ -14,6 +16,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use App\Services\PrestaShop\PrestaShopClientFactory;
 use App\Jobs\PrestaShop\BulkImportProducts;
+use App\Services\JobProgressService;
 
 /**
  * ProductList Component - Main product listing interface
@@ -76,6 +79,7 @@ class ProductList extends Component
     // Bulk Operations
     public array $selectedProducts = [];
     public bool $selectAll = false;
+    public bool $selectingAllPages = false; // True when user selects ALL products across pagination
 
     // UI State
     public bool $showFilters = false;
@@ -91,6 +95,9 @@ class ProductList extends Component
     public bool $showQuickSendModal = false;
     public array $selectedShopsForBulk = [];
 
+    // Bulk Delete Modal
+    public bool $showBulkDeleteModal = false;
+
     // ETAP_07 FAZA 3: Import Modal State
     public bool $showImportModal = false;
     public ?int $importShopId = null;
@@ -104,6 +111,14 @@ class ProductList extends Component
     public array $cachedProductSearches = []; // Cache: search_term => products array
     public string $importSearch = ''; // CRITICAL: For name/SKU search
     public bool $importIncludeSubcategories = true;
+
+    // ETAP_07 FAZA 3D: Category Preview Loading State
+    public bool $isAnalyzingCategories = false; // True when AnalyzeMissingCategories job is running
+    public ?string $analyzingShopName = null; // Shop name being analyzed (for display)
+
+    // ETAP_07 FAZA 3D: Track shown previews to prevent polling from showing same modal multiple times
+    // CRITICAL: MUST be public for Livewire to track across poll cycles!
+    public array $shownPreviewIds = []; // Preview IDs that have been shown (prevents duplicate modal opens)
 
     // Computed
     public bool $hasFilters = false;
@@ -181,9 +196,23 @@ class ProductList extends Component
      *
      * @return int
      */
-    public function getSelectedCountProperty(): int
+    #[Computed]
+    public function selectedCount(): int
     {
         return count($this->selectedProducts);
+    }
+
+    /**
+     * Get total count of products matching current filters (across all pages)
+     *
+     * Used for "Select all X products" banner
+     *
+     * @return int
+     */
+    #[Computed]
+    public function totalFilteredCount(): int
+    {
+        return $this->buildProductQuery()->count();
     }
 
     /**
@@ -373,6 +402,9 @@ class ProductList extends Component
             $this->resetSelection();
         }
 
+        // Reset "selecting all pages" when user manually toggles selectAll
+        $this->selectingAllPages = false;
+
         $this->updateBulkActionsVisibility();
     }
 
@@ -402,11 +434,48 @@ class ProductList extends Component
     }
 
     /**
+     * Select ALL products across all pages (matching current filters)
+     *
+     * This method selects ALL product IDs that match the current filters,
+     * not just the products visible on the current page.
+     */
+    public function selectAllPages(): void
+    {
+        // Get ALL product IDs matching current filters (across all pages)
+        $this->selectedProducts = $this->buildProductQuery()
+            ->pluck('id')
+            ->toArray();
+
+        $this->selectAll = true;
+        $this->selectingAllPages = true;
+
+        $this->updateBulkActionsVisibility();
+
+        $this->dispatch('success', message: sprintf(
+            'Zaznaczono wszystkie %d produktów pasujących do filtrów',
+            count($this->selectedProducts)
+        ));
+    }
+
+    /**
+     * Deselect all pages (return to current page selection only)
+     */
+    public function deselectAllPages(): void
+    {
+        // Return to "current page only" selection
+        $this->selectedProducts = $this->products->pluck('id')->toArray();
+        $this->selectAll = true;
+        $this->selectingAllPages = false;
+
+        $this->updateBulkActionsVisibility();
+    }
+
+    /**
      * Reset selection
      */
     public function resetSelection(): void
     {
-        $this->reset(['selectedProducts', 'selectAll']);
+        $this->reset(['selectedProducts', 'selectAll', 'selectingAllPages']);
         $this->updateBulkActionsVisibility();
     }
 
@@ -551,6 +620,13 @@ class ProductList extends Component
      *
      * @param int $productId
      */
+    /**
+     * Confirm single product deletion - ALWAYS show modal (permanent delete)
+     *
+     * CRITICAL FIX 2025-10-07: Removed canDelete() check
+     * Quick Action delete should ALWAYS show confirmation modal,
+     * just like bulk delete, and allow FORCE DELETE with all associations
+     */
     public function confirmDelete(int $productId): void
     {
         $product = Product::find($productId);
@@ -559,18 +635,18 @@ class ProductList extends Component
             return;
         }
 
-        // Check if product can be deleted
-        if (!$product->canDelete()) {
-            $this->dispatch('error', message: 'Nie można usunąć produktu - ma aktywne powiązania (warianty, ceny, stan magazynowy)');
-            return;
-        }
-
+        // ALWAYS show modal (removed canDelete() check)
+        // User will see warning about permanent deletion with all associations
         $this->productToDelete = $productId;
         $this->showDeleteModal = true;
     }
 
     /**
-     * Delete product after confirmation
+     * Delete product after confirmation - PERMANENT (force delete)
+     *
+     * CRITICAL FIX 2025-10-07: Changed to forceDelete()
+     * Quick Action delete performs PERMANENT deletion with all associations,
+     * just like bulk delete
      */
     public function deleteProduct(): void
     {
@@ -588,12 +664,28 @@ class ProductList extends Component
 
         try {
             $sku = $product->sku;
-            $product->delete();
 
-            $this->dispatch('success', message: "Produkt {$sku} został usunięty");
+            // FORCE DELETE - permanently remove product from database with all associations
+            // Note: Product model uses SoftDeletes, so we use forceDelete() for permanent removal
+            $product->forceDelete();
+
+            Log::info('Quick Action delete completed', [
+                'product_id' => $this->productToDelete,
+                'sku' => $sku,
+            ]);
+
+            $this->dispatch('success', message: "Produkt {$sku} został trwale usunięty");
             $this->cancelDelete();
 
+            // Refresh products list
+            unset($this->products);
+
         } catch (\Exception $e) {
+            Log::error('Quick Action delete failed', [
+                'product_id' => $this->productToDelete,
+                'error' => $e->getMessage(),
+            ]);
+
             $this->dispatch('error', message: 'Błąd podczas usuwania produktu: ' . $e->getMessage());
         }
     }
@@ -649,7 +741,9 @@ class ProductList extends Component
             ->with([
                 'productType:id,name,slug',
                 // FAZA 1.5: Multi-Store Sync Status - Eager load shop data for sync status display
-                'shopData:id,product_id,shop_id,sync_status,is_published,last_sync_at'
+                'shopData:id,product_id,shop_id,sync_status,is_published,last_sync_at',
+                // ETAP_07 FAZA 3: Sync Status - Eager load for ProductList UI display
+                'syncStatuses.shop:id,name'
             ])
             ->select([
                 'id', 'sku', 'name', 'product_type_id', 'manufacturer',
@@ -872,6 +966,118 @@ class ProductList extends Component
         ];
 
         session(['product_list_preferences' => $preferences]);
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | REAL-TIME PROGRESS TRACKING API (ETAP_07)
+    |--------------------------------------------------------------------------
+    */
+
+    /**
+     * Get active job progress for current user/shop
+     *
+     * USAGE: Computed property - access as $this->activeJobProgress in blade
+     * Returns JSON array of active jobs with progress data
+     *
+     * @return array
+     */
+    #[Computed]
+    public function activeJobProgress(): array
+    {
+        $progressService = app(JobProgressService::class);
+
+        // Get all active jobs (pending, running)
+        $activeJobs = $progressService->getActiveJobs();
+
+        // ALSO get recently completed/failed jobs (last 30 seconds)
+        // This ensures progress bars appear even for fast-completing jobs
+        $recentlyCompletedJobs = \App\Models\JobProgress::with('shop:id,name')
+            ->whereIn('status', ['completed', 'failed'])
+            ->where('completed_at', '>=', now()->subSeconds(30))
+            ->orderBy('completed_at', 'desc')
+            ->get();
+
+        // Merge active + recently completed
+        $allJobs = $activeJobs->merge($recentlyCompletedJobs);
+
+        // FILTER OUT category_delete jobs - those are shown only in CategoryTree
+        $filteredJobs = $allJobs->filter(function ($job) {
+            return $job->job_type !== 'category_delete';
+        });
+
+        return $filteredJobs->map(function ($job) {
+            return [
+                'id' => $job->id,
+                'job_id' => $job->job_id,
+                'job_type' => $job->job_type,
+                'shop_id' => $job->shop_id,
+                'shop_name' => $job->shop?->name,
+                'status' => $job->status,
+                'progress_percentage' => $job->progress_percentage,
+                'current_count' => $job->current_count,
+                'total_count' => $job->total_count,
+                'error_count' => $job->error_count,
+                'started_at' => $job->started_at?->diffForHumans(),
+            ];
+        })->toArray();
+    }
+
+    /**
+     * Get recent job history (last 24h)
+     *
+     * USAGE: For displaying completed/failed jobs in UI
+     *
+     * @return array
+     */
+    public function getRecentJobHistory(): array
+    {
+        $progressService = app(JobProgressService::class);
+
+        $recentJobs = $progressService->getRecentJobs();
+
+        return $recentJobs->map(function ($job) {
+            return [
+                'id' => $job->id,
+                'job_type' => $job->job_type,
+                'shop_id' => $job->shop_id,
+                'shop_name' => $job->shop?->name,
+                'status' => $job->status,
+                'progress_percentage' => $job->progress_percentage,
+                'current_count' => $job->current_count,
+                'total_count' => $job->total_count,
+                'error_count' => $job->error_count,
+                'duration_seconds' => $job->duration_seconds,
+                'started_at' => $job->started_at?->format('Y-m-d H:i:s'),
+                'completed_at' => $job->completed_at?->format('Y-m-d H:i:s'),
+            ];
+        })->toArray();
+    }
+
+    /**
+     * Get detailed job progress by ID
+     *
+     * USAGE: For modal/detail view of specific job
+     *
+     * @param int $progressId
+     * @return array|null
+     */
+    public function getJobProgressDetails(int $progressId): ?array
+    {
+        $progressService = app(JobProgressService::class);
+
+        $summary = $progressService->getProgressSummary($progressId);
+
+        if (!$summary) {
+            return null;
+        }
+
+        // Load full JobProgress model for error_details
+        $progress = \App\Models\JobProgress::find($progressId);
+
+        return array_merge($summary, [
+            'error_details' => $progress?->error_details ?? [],
+        ]);
     }
 
     /*
@@ -1122,9 +1328,24 @@ class ProductList extends Component
             return;
         }
 
-        BulkImportProducts::dispatch($shop, 'all');
+        // 🎯 FAZA 3D: Set loading state for Category Preview Modal
+        $this->isAnalyzingCategories = true;
+        $this->analyzingShopName = $shop->name;
 
-        $this->dispatch('success', message: 'Import wszystkich produktów rozpoczęty w tle. Otrzymasz powiadomienie po zakończeniu.');
+        // 🚀 CRITICAL: Create PENDING progress record BEFORE dispatch
+        $jobId = (string) \Illuminate\Support\Str::uuid();
+        $progressService = app(\App\Services\JobProgressService::class);
+
+        $progressService->createPendingJobProgress(
+            $jobId,
+            $shop,
+            'import',
+            0
+        );
+
+        BulkImportProducts::dispatch($shop, 'all', [], $jobId);
+
+        $this->dispatch('success', message: 'Analizuję kategorie z PrestaShop... To może potrwać kilka sekund.');
 
         $this->closeImportModal();
     }
@@ -1525,14 +1746,144 @@ class ProductList extends Component
             return;
         }
 
+        // 🎯 FAZA 3D: Set loading state for Category Preview Modal
+        $this->isAnalyzingCategories = true;
+        $this->analyzingShopName = $shop->name;
+
+        // 🚀 CRITICAL: Create PENDING progress record BEFORE dispatch
+        // This ensures progress bar appears IMMEDIATELY when user clicks "Import"
+        // Wire:poll will detect it within 3s without timing issues
+        $jobId = (string) \Illuminate\Support\Str::uuid();
+        $progressService = app(\App\Services\JobProgressService::class);
+
+        $progressService->createPendingJobProgress(
+            $jobId,
+            $shop,
+            'import',
+            0 // Will be updated to actual count when job starts
+        );
+
         BulkImportProducts::dispatch($shop, 'category', [
             'category_id' => $this->importCategoryId,
             'include_subcategories' => $this->importIncludeSubcategories,
-        ]);
+        ], $jobId); // Pass job_id to job
 
-        $this->dispatch('success', message: 'Import kategorii rozpoczęty w tle. Otrzymasz powiadomienie po zakończeniu.');
+        $this->dispatch('success', message: 'Analizuję kategorie z PrestaShop... To może potrwać kilka sekund.');
 
         $this->closeImportModal();
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | BULK ACTIONS METHODS
+    |--------------------------------------------------------------------------
+    */
+
+    /**
+     * Bulk activate selected products
+     */
+    public function bulkActivate(): void
+    {
+        if (empty($this->selectedProducts)) {
+            $this->dispatch('error', message: 'Nie zaznaczono żadnych produktów');
+            return;
+        }
+
+        $count = Product::whereIn('id', $this->selectedProducts)
+            ->update(['is_active' => true]);
+
+        $this->dispatch('success', message: "Aktywowano {$count} " . ($count == 1 ? 'produkt' : 'produkty'));
+        $this->resetSelection();
+    }
+
+    /**
+     * Bulk deactivate selected products
+     */
+    public function bulkDeactivate(): void
+    {
+        if (empty($this->selectedProducts)) {
+            $this->dispatch('error', message: 'Nie zaznaczono żadnych produktów');
+            return;
+        }
+
+        $count = Product::whereIn('id', $this->selectedProducts)
+            ->update(['is_active' => false]);
+
+        $this->dispatch('success', message: "Dezaktywowano {$count} " . ($count == 1 ? 'produkt' : 'produkty'));
+        $this->resetSelection();
+    }
+
+    /**
+     * Open bulk category assignment modal
+     */
+    public function openBulkCategoryModal(): void
+    {
+        if (empty($this->selectedProducts)) {
+            $this->dispatch('error', message: 'Nie zaznaczono żadnych produktów');
+            return;
+        }
+
+        // TODO: Implement category assignment modal
+        $this->dispatch('info', message: 'Funkcja przypisywania kategorii będzie dostępna wkrótce');
+    }
+
+    /**
+     * Open bulk delete confirmation modal
+     */
+    public function openBulkDeleteModal(): void
+    {
+        if (empty($this->selectedProducts)) {
+            $this->dispatch('error', message: 'Nie zaznaczono żadnych produktów');
+            return;
+        }
+
+        $this->showBulkDeleteModal = true;
+    }
+
+    /**
+     * Close bulk delete modal
+     */
+    public function closeBulkDeleteModal(): void
+    {
+        $this->showBulkDeleteModal = false;
+    }
+
+    /**
+     * Confirm and execute bulk delete
+     */
+    public function confirmBulkDelete(): void
+    {
+        if (empty($this->selectedProducts)) {
+            $this->dispatch('error', message: 'Nie zaznaczono żadnych produktów');
+            $this->closeBulkDeleteModal();
+            return;
+        }
+
+        try {
+            $count = Product::whereIn('id', $this->selectedProducts)->count();
+
+            // FORCE DELETE - permanently remove products from database
+            // Note: Product model uses SoftDeletes, so we need forceDelete() for permanent removal
+            Product::whereIn('id', $this->selectedProducts)->forceDelete();
+
+            Log::info('Bulk delete completed', [
+                'count' => $count,
+                'product_ids' => $this->selectedProducts,
+            ]);
+
+            $this->dispatch('success', message: "Trwale usunięto {$count} " . ($count == 1 ? 'produkt' : ($count < 5 ? 'produkty' : 'produktów')));
+
+            $this->resetSelection();
+            $this->closeBulkDeleteModal();
+
+        } catch (\Exception $e) {
+            Log::error('Bulk delete failed', [
+                'error' => $e->getMessage(),
+                'products' => $this->selectedProducts,
+            ]);
+
+            $this->dispatch('error', message: 'Błąd podczas usuwania produktów: ' . $e->getMessage());
+        }
     }
 
     /**
@@ -1734,11 +2085,26 @@ class ProductList extends Component
             return;
         }
 
+        // 🎯 FAZA 3D: Set loading state for Category Preview Modal
+        $this->isAnalyzingCategories = true;
+        $this->analyzingShopName = $shop->name;
+
+        // 🚀 CRITICAL: Create PENDING progress record BEFORE dispatch
+        $jobId = (string) \Illuminate\Support\Str::uuid();
+        $progressService = app(\App\Services\JobProgressService::class);
+
+        $progressService->createPendingJobProgress(
+            $jobId,
+            $shop,
+            'import',
+            count($this->selectedProductsToImport) // We know exact count for individual mode
+        );
+
         BulkImportProducts::dispatch($shop, 'individual', [
             'product_ids' => $this->selectedProductsToImport,
-        ]);
+        ], $jobId);
 
-        $this->dispatch('success', message: sprintf('Import %d produktów rozpoczęty w tle.', count($this->selectedProductsToImport)));
+        $this->dispatch('success', message: sprintf('Analizuję kategorie dla %d produktów... To może potrwać kilka sekund.', count($this->selectedProductsToImport)));
 
         $this->closeImportModal();
     }
@@ -1761,6 +2127,162 @@ class ProductList extends Component
     }
 
     /**
+     * Listen for shop changes from ProductForm and refresh list
+     *
+     * CRITICAL: Force full component refresh to reload shop associations
+     * Livewire 3.x uses $refresh magic action to re-render component with fresh data
+     */
+    #[On('shops-updated')]
+    public function refreshAfterShopUpdate($productId = null): void
+    {
+        // Clear computed property cache to force fresh query
+        unset($this->products);
+
+        // Reset to first page to ensure we see the updated product
+        $this->resetPage();
+
+        // Force component re-render by touching a tracked property
+        $this->perPage = $this->perPage;
+
+        Log::info('ProductList refreshed after shop update', [
+            'product_id' => $productId,
+            'current_page' => $this->getPage(),
+        ]);
+
+        // Dispatch client-side refresh event
+        $this->js('$wire.$refresh()');
+    }
+
+    /**
+     * Refresh product list after import job completes
+     *
+     * Listens to 'progress-completed' event dispatched by JobProgressBar
+     * when import job finishes (completed or failed)
+     */
+    #[On('progress-completed')]
+    public function refreshAfterImport(): void
+    {
+        // Clear computed property cache to force fresh query
+        unset($this->products);
+
+        // Reset to first page to show newly imported products
+        $this->resetPage();
+
+        // Force component re-render
+        $this->perPage = $this->perPage;
+
+        Log::info('ProductList refreshed after import completion');
+
+        // Dispatch client-side refresh event
+        $this->js('$wire.$refresh()');
+    }
+
+    /**
+     * Check for pending category previews (polling mechanism)
+     *
+     * ETAP_07 FAZA 3D: Category Import Preview System - Polling Method
+     *
+     * Called by wire:poll.3s to check if there are pending CategoryPreview records
+     * This is needed because Livewire::dispatch() in Queue Jobs doesn't work
+     *
+     * @return void
+     */
+    public function checkForPendingCategoryPreviews(): void
+    {
+        // Only check if we have active jobs
+        if (empty($this->activeJobProgress)) {
+            return;
+        }
+
+        // Get job IDs from active progress tracking
+        $activeJobIds = collect($this->activeJobProgress)->pluck('job_id')->filter()->toArray();
+
+        if (empty($activeJobIds)) {
+            return;
+        }
+
+        // Check for pending CategoryPreview records for these jobs
+        $pendingPreviews = \App\Models\CategoryPreview::whereIn('job_id', $activeJobIds)
+            ->where('status', \App\Models\CategoryPreview::STATUS_PENDING)
+            ->where('expires_at', '>', now())
+            ->get();
+
+        // Show modal for each pending preview (usually just one)
+        foreach ($pendingPreviews as $preview) {
+            // 🔥 CRITICAL: Skip if already shown (prevents duplicate modal opens from polling)
+            if (in_array($preview->id, $this->shownPreviewIds, true)) {
+                Log::debug('ProductList: Skipping already shown preview', [
+                    'preview_id' => $preview->id,
+                ]);
+                continue;
+            }
+
+            Log::info('ProductList: Pending CategoryPreview detected via polling', [
+                'preview_id' => $preview->id,
+                'job_id' => $preview->job_id,
+                'shop_id' => $preview->shop_id,
+                'total_categories' => $preview->total_categories,
+            ]);
+
+            // Dispatch event to CategoryPreviewModal component
+            $this->dispatch('show-category-preview', previewId: $preview->id);
+
+            // 🎯 FAZA 3D: Hide loading state when modal appears
+            $this->isAnalyzingCategories = false;
+            $this->analyzingShopName = null;
+
+            // Show info notification
+            $this->dispatch('info', message: "Analiza kategorii ukończona. Znaleziono {$preview->total_categories} brakujących kategorii.");
+
+            // 🔥 CRITICAL: Mark as shown to prevent polling from showing modal again
+            // Polling runs every 3s, tracking prevents duplicate opens
+            $this->shownPreviewIds[] = $preview->id;
+
+            Log::debug('CategoryPreview marked as shown', [
+                'preview_id' => $preview->id,
+                'shown_count' => count($this->shownPreviewIds),
+            ]);
+
+            break; // Show only one modal at a time
+        }
+    }
+
+    /**
+     * Handle category preview ready event
+     *
+     * ETAP_07 FAZA 3D: Category Import Preview System
+     *
+     * Listens to 'category-preview-ready' event dispatched by AnalyzeMissingCategories job
+     * Shows CategoryPreviewModal with preview data
+     *
+     * @param array $data Event data with preview_id, job_id, shop_id
+     */
+    #[On('category-preview-ready')]
+    public function handleCategoryPreviewReady(array $data): void
+    {
+        $previewId = $data['preview_id'] ?? null;
+
+        if (!$previewId) {
+            Log::warning('ProductList: category-preview-ready event without preview_id', [
+                'event_data' => $data,
+            ]);
+            return;
+        }
+
+        Log::info('ProductList: CategoryPreviewReady event received', [
+            'preview_id' => $previewId,
+            'job_id' => $data['job_id'] ?? null,
+            'shop_id' => $data['shop_id'] ?? null,
+        ]);
+
+        // Dispatch event to CategoryPreviewModal component
+        $this->dispatch('show-category-preview', previewId: $previewId);
+
+        // Show info notification
+        $this->dispatch('info', message: 'Analiza kategorii ukończona. Sprawdź podgląd przed importem.');
+    }
+
+    /**
      * Render the component
      *
      * @return \Illuminate\View\View
@@ -1771,11 +2293,8 @@ class ProductList extends Component
             'products' => $this->products,
             'categories' => $this->categories,
         ])->layout('layouts.admin', [
-            'title' => 'Zarządzanie produktami',
-            'breadcrumbs' => [
-                ['name' => 'Admin', 'url' => route('admin.dashboard')],
-                ['name' => 'Produkty', 'url' => null],
-            ]
+            'title' => 'Lista produktów - PPM',
+            'breadcrumb' => 'Lista produktów'
         ]);
     }
 }

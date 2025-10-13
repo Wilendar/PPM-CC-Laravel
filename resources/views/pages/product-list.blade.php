@@ -1,5 +1,5 @@
 {{-- Product List Page - Full Layout Wrapper --}}
-@extends('layouts.admin')
+@extends('layouts.admin', ['breadcrumb' => 'Lista produktów'])
 
 @section('title', 'Lista produktów - PPM')
 

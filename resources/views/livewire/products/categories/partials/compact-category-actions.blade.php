@@ -93,7 +93,6 @@
 
             {{-- Delete Category --}}
             <button wire:click="deleteCategory({{ $category->id }})"
-                    wire:confirm="Czy na pewno chcesz usunąć kategorię '{{ $category->name }}'? Ta operacja jest nieodwracalna!"
                     class="w-full text-left flex items-center px-4 py-2 text-sm text-red-600 dark:text-red-400
                            hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
                     role="menuitem">

@@ -77,7 +77,8 @@ class SyncCategoryToPrestaShop implements ShouldQueue, ShouldBeUnique
     {
         $this->category = $category;
         $this->shop = $shop;
-        $this->onQueue('prestashop_sync');
+        // Use default queue for CRON compatibility
+        // $this->onQueue('prestashop_sync');
     }
 
     /**

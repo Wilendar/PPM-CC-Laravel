@@ -189,7 +189,9 @@ class Category extends Model
 
         static::deleting(function ($category) {
             // Soft delete all descendants when parent is deleted
-            $category->descendants()->delete();
+            // descendants is an Attribute accessor returning Collection, not a query builder
+            // So we must iterate and delete each descendant individually
+            $category->descendants->each->delete();
         });
     }
 

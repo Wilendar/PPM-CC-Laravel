@@ -79,13 +79,14 @@ class SyncProductToPrestaShop implements ShouldQueue, ShouldBeUnique
         $this->product = $product;
         $this->shop = $shop;
 
+        // Use default queue for CRON compatibility
         // Set queue based on priority
-        $priority = $this->getSyncPriority();
-        if ($priority <= 3) {
-            $this->onQueue('prestashop_high');
-        } else {
-            $this->onQueue('prestashop_sync');
-        }
+        // $priority = $this->getSyncPriority();
+        // if ($priority <= 3) {
+        //     $this->onQueue('prestashop_high');
+        // } else {
+        //     $this->onQueue('prestashop_sync');
+        // }
     }
 
     /**

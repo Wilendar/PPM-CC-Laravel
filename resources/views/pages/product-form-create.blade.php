@@ -1,5 +1,5 @@
 {{-- Product Form Create Page - Blade Wrapper with Admin Layout --}}
-@extends('layouts.admin')
+@extends('layouts.admin', ['breadcrumb' => 'Dodaj produkt'])
 
 @section('title', 'Dodaj nowy produkt - PPM')
 

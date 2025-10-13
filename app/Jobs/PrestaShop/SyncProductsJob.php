@@ -62,7 +62,8 @@ class SyncProductsJob implements ShouldQueue
     public function __construct(SyncJob $syncJob)
     {
         $this->syncJob = $syncJob;
-        $this->onQueue('prestashop-sync');
+        // Use default queue for CRON compatibility
+        // $this->onQueue('prestashop-sync');
     }
 
     /**

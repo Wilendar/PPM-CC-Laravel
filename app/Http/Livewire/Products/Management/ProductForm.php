@@ -123,6 +123,10 @@ class ProductForm extends Component
     // === PRESTASHOP CATEGORIES (ETAP_07 FAZA 2B.2) ===
     public array $prestashopCategories = []; // Cached PrestaShop categories per shop [shopId => tree]
 
+    // === PRESTASHOP LAZY LOADING (ETAP_07 FIX) ===
+    public array $loadedShopData = []; // Cache loaded shop data from PrestaShop [shopId => {...data}]
+    public bool $isLoadingShopData = false; // Loading state indicator
+
     /*
     |--------------------------------------------------------------------------
     | COMPONENT LIFECYCLE
@@ -484,11 +488,18 @@ class ProductForm extends Component
 
     /**
      * Get categories for template (public method)
+     * Returns only root categories with their children loaded recursively
      */
     public function getAvailableCategories()
     {
         try {
-            return \App\Models\Category::orderBy('sort_order')->get();
+            // Return ONLY root categories (parent_id = null)
+            // Children will be rendered recursively via 'children' relationship in view
+            return \App\Models\Category::with('children')
+                ->whereNull('parent_id')
+                ->orderBy('sort_order')
+                ->orderBy('name')
+                ->get();
         } catch (\Exception $e) {
             Log::error('Failed to load categories in getAvailableCategories', ['error' => $e->getMessage()]);
             return collect();
@@ -1013,7 +1024,63 @@ class ProductForm extends Component
             'shopsToRemove_AFTER' => $this->shopsToRemove,
         ]);
 
+        // CRITICAL: Dispatch event IMMEDIATELY for UI refresh (not waiting for save)
+        // This ensures ProductList updates even if user doesn't click save
+        if ($this->product) {
+            $this->dispatch('shops-updated', ['productId' => $this->product->id]);
+            Log::info('Dispatched shops-updated event', [
+                'product_id' => $this->product->id,
+                'shop_id' => $shopId,
+            ]);
+        }
+
         $this->successMessage = "Sklep zostanie usunięty po zapisaniu zmian.";
+    }
+
+    /**
+     * Physically delete product from PrestaShop (not just remove association)
+     *
+     * ETAP_07 FAZA 3B: Physical product deletion in PrestaShop shop
+     */
+    public function deleteFromPrestaShop(int $shopId): void
+    {
+        if (!$this->product) {
+            $this->dispatch('error', message: 'Nie można usunąć - produkt nie istnieje');
+            return;
+        }
+
+        $shop = PrestaShopShop::find($shopId);
+        if (!$shop) {
+            $this->dispatch('error', message: 'Nie znaleziono sklepu');
+            return;
+        }
+
+        // Check if product is associated with this shop
+        $productShopData = \App\Models\ProductShopData::where('product_id', $this->product->id)
+            ->where('shop_id', $shopId)
+            ->first();
+
+        if (!$productShopData) {
+            $this->dispatch('warning', message: 'Produkt nie jest powiązany z tym sklepem');
+            return;
+        }
+
+        // Dispatch delete job to queue
+        \App\Jobs\PrestaShop\DeleteProductFromPrestaShop::dispatch($this->product, $shop);
+
+        Log::info('Delete job dispatched for product in shop', [
+            'product_id' => $this->product->id,
+            'shop_id' => $shopId,
+            'prestashop_product_id' => $productShopData->prestashop_product_id ?? 'not_synced',
+        ]);
+
+        $this->dispatch('success', message: "Zaplanowano usunięcie produktu ze sklepu: {$shop->name}");
+
+        // Remove from local state immediately (optimistic update)
+        $this->removeFromShop($shopId);
+
+        // Refresh to update UI
+        $this->loadProductFromDb();
     }
 
     /**
@@ -1063,6 +1130,16 @@ class ProductForm extends Component
             }
 
             $this->updateCharacterCounts();
+
+            // ETAP_07 FIX: Auto-load PrestaShop data when switching to shop (if not already loaded)
+            // This fixes the issue where updatedActiveShopId() hook doesn't trigger on PHP-side changes
+            if ($shopId !== null && !isset($this->loadedShopData[$shopId]) && $this->isEditMode) {
+                Log::info('Auto-loading PrestaShop data in switchToShop()', [
+                    'shop_id' => $shopId,
+                    'product_id' => $this->product?->id,
+                ]);
+                $this->loadProductDataFromPrestaShop($shopId);
+            }
 
             Log::info('Switched to shop tab with pending changes support', [
                 'product_id' => $this->product?->id,
@@ -2055,19 +2132,31 @@ class ProductForm extends Component
                 // FIXED: Delete shops marked for removal
                 if (!empty($this->shopsToRemove) && $this->product) {
                     foreach ($this->shopsToRemove as $shopId) {
-                        // Find and delete ProductShopData record
-                        $deleted = \App\Models\ProductShopData::where('product_id', $this->product->id)
+                        // CRITICAL FIX: Delete BOTH ProductShopData AND ProductSyncStatus
+                        // Otherwise ProductList will still show old sync status!
+
+                        // 1. Delete ProductShopData record
+                        $deletedShopData = \App\Models\ProductShopData::where('product_id', $this->product->id)
                             ->where('shop_id', $shopId)
                             ->delete();
 
-                        Log::info('Deleted shop from product (pending removal)', [
+                        // 2. Delete ProductSyncStatus record (sync tracking)
+                        $deletedSyncStatus = \App\Models\ProductSyncStatus::where('product_id', $this->product->id)
+                            ->where('shop_id', $shopId)
+                            ->delete();
+
+                        Log::info('Deleted shop association from product', [
                             'product_id' => $this->product->id,
                             'shop_id' => $shopId,
-                            'deleted_count' => $deleted,
+                            'deleted_shop_data' => $deletedShopData,
+                            'deleted_sync_status' => $deletedSyncStatus,
                         ]);
                     }
                     // Clear the pending removals list
                     $this->shopsToRemove = [];
+
+                    // Dispatch event to notify ProductList about shop changes
+                    $this->dispatch('shops-updated', ['productId' => $this->product->id]);
                 }
 
                 // CRITICAL FIX: Clear removed shops cache after save (no longer needed)
@@ -3064,6 +3153,136 @@ class ProductForm extends Component
     }
 
     /**
+     * Load product data from PrestaShop API (lazy loading on first shop tab click)
+     *
+     * ETAP_07 FIX - Lazy loading pattern to avoid unnecessary API calls
+     * NOTE: Different from private loadShopData() which loads from DB
+     *
+     * @param int $shopId Shop ID to load data from
+     * @param bool $forceReload Force reload even if cached
+     * @return void
+     */
+    public function loadProductDataFromPrestaShop(int $shopId, bool $forceReload = false): void
+    {
+        // If already loaded and not forcing reload, skip
+        if (isset($this->loadedShopData[$shopId]) && !$forceReload) {
+            Log::info('Shop data already loaded (cached)', ['shop_id' => $shopId]);
+            return;
+        }
+
+        $this->isLoadingShopData = true;
+
+        try {
+            // 1. Get shop from DB
+            $shop = PrestaShopShop::findOrFail($shopId);
+
+            // 2. Get ProductShopData (contains external_id = PrestaShop product ID)
+            $shopData = $this->product->shopData()
+                ->where('shop_id', $shopId)
+                ->first();
+
+            if (!$shopData || !$shopData->external_id) {
+                throw new \Exception('Produkt nie jest polaczony z PrestaShop (brak external_id)');
+            }
+
+            // 3. Fetch from PrestaShop API
+            $client = PrestaShopClientFactory::create($shop);
+            $prestashopData = $client->getProduct($shopData->external_id);
+
+            // Unwrap nested response (PrestaShop API wraps in 'product' key)
+            if (isset($prestashopData['product'])) {
+                $prestashopData = $prestashopData['product'];
+            }
+
+            // 4. Extract essential data for UI
+            $this->loadedShopData[$shopId] = [
+                'prestashop_id' => $shopData->external_id,
+                'link_rewrite' => data_get($prestashopData, 'link_rewrite.0.value') ?? data_get($prestashopData, 'link_rewrite'),
+                'name' => data_get($prestashopData, 'name.0.value') ?? data_get($prestashopData, 'name'),
+                'description_short' => data_get($prestashopData, 'description_short.0.value') ?? data_get($prestashopData, 'description_short'),
+                'description' => data_get($prestashopData, 'description.0.value') ?? data_get($prestashopData, 'description'),
+                'categories' => $prestashopData['associations']['categories'] ?? [],
+                'id_category_default' => $prestashopData['id_category_default'] ?? null,
+                'weight' => $prestashopData['weight'] ?? null,
+                'ean13' => $prestashopData['ean13'] ?? null,
+                'reference' => $prestashopData['reference'] ?? null,
+                'price' => $prestashopData['price'] ?? null,
+                'active' => $prestashopData['active'] ?? null,
+            ];
+
+            session()->flash('message', 'Dane produktu wczytane z PrestaShop');
+
+            Log::info('Shop data loaded from PrestaShop', [
+                'shop_id' => $shopId,
+                'product_id' => $this->product?->id,
+                'prestashop_id' => $shopData->external_id,
+                'link_rewrite' => $this->loadedShopData[$shopId]['link_rewrite'],
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Failed to load shop data from PrestaShop', [
+                'shop_id' => $shopId,
+                'product_id' => $this->product?->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            session()->flash('error', 'Blad wczytywania danych: ' . $e->getMessage());
+        } finally {
+            $this->isLoadingShopData = false;
+        }
+    }
+
+    /**
+     * Get PrestaShop product frontend URL
+     *
+     * ETAP_07 FIX - Generate correct frontend URL (not admin URL)
+     *
+     * @param int $shopId Shop ID
+     * @return string|null Frontend product URL or null if not available
+     */
+    public function getProductPrestaShopUrl(int $shopId): ?string
+    {
+        $shop = collect($this->availableShops)->firstWhere('id', $shopId);
+
+        if (!$shop) {
+            return null;
+        }
+
+        // Try to get data from cache first (loaded from PrestaShop API)
+        $shopData = $this->loadedShopData[$shopId] ?? null;
+
+        if ($shopData && isset($shopData['prestashop_id'])) {
+            $productId = $shopData['prestashop_id'];
+            $linkRewrite = $shopData['link_rewrite'] ?? null;
+
+            if ($linkRewrite) {
+                return rtrim($shop['url'], '/') . "/{$productId}-{$linkRewrite}.html";
+            }
+        }
+
+        // ETAP_07 REFACTOR: Fallback to ProductSyncStatus (not ProductShopData!)
+        // ProductSyncStatus now contains external_reference (link_rewrite) for URL generation
+        if ($this->product && $this->product->exists) {
+            $syncStatus = $this->product->syncStatuses()
+                ->where('shop_id', $shopId)
+                ->first();
+
+            if ($syncStatus && $syncStatus->prestashop_product_id) {
+                $productId = $syncStatus->prestashop_product_id;
+                $linkRewrite = $syncStatus->external_reference;
+
+                if ($linkRewrite) {
+                    return rtrim($shop['url'], '/') . "/{$productId}-{$linkRewrite}.html";
+                }
+
+                return rtrim($shop['url'], '/') . "/index.php?id_product={$productId}&controller=product";
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * Hook: when user switches to a shop, auto-load PrestaShop categories if not cached
      *
      * @param int|null $shopId
@@ -3082,6 +3301,14 @@ class ProductForm extends Component
                 'shop_id' => $shopId,
             ]);
             $this->loadPrestaShopCategories($shopId);
+        }
+
+        // ETAP_07 FIX: Auto-load shop data on first shop tab click (lazy loading)
+        if (!isset($this->loadedShopData[$shopId]) && $this->isEditMode) {
+            Log::info('Auto-loading shop data from PrestaShop on shop tab switch', [
+                'shop_id' => $shopId,
+            ]);
+            $this->loadProductDataFromPrestaShop($shopId);
         }
     }
 
@@ -3138,6 +3365,9 @@ class ProductForm extends Component
                 'availableAttributes' => [],
                 'fieldInheritance' => $fieldInheritance,
                 'isShopMode' => $this->activeShopId !== null,
+            ])->layout('layouts.admin', [
+                'title' => $pageTitle,
+                'breadcrumb' => $this->isEditMode ? 'Edytuj produkt' : 'Dodaj produkt'
             ]);
 
         } catch (\Exception $e) {

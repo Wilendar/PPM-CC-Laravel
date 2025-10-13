@@ -1,5 +1,5 @@
 {{-- Category Tree Page - Full Layout Wrapper --}}
-@extends('layouts.admin')
+@extends('layouts.admin', ['breadcrumb' => 'Kategorie'])
 
 @section('title', 'Lista kategorii - PPM')
 

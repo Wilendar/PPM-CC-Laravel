@@ -1,7 +1,7 @@
 {{-- Flash Messages Component --}}
 <div class="fixed top-4 right-4 z-50 space-y-2" x-data="flashMessages()" x-init="init()">
-    {{-- Success Messages --}}
-    @if(session('success'))
+    {{-- Success Messages (support both 'success' and 'message' keys) --}}
+    @if(session('success') || session('message'))
         <div x-data="{ show: true }" 
              x-show="show" 
              x-transition:enter="transition ease-out duration-300 transform"
@@ -24,7 +24,7 @@
                             Sukces!
                         </p>
                         <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                            {{ session('success') }}
+                            {{ session('success') ?? session('message') }}
                         </p>
                     </div>
                     <div class="ml-4 flex-shrink-0 flex">

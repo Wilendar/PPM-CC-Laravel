@@ -1,4 +1,7 @@
 <div>
+    {{-- Flash Messages Component --}}
+    <x-flash-messages />
+
     <div class="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 py-4">
         <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
             <div class="flex items-center space-x-4">
@@ -834,5 +837,88 @@ if (typeof Sortable === 'undefined') {
                 </div>
             </div>
         </div>
+    @endif
+
+    {{-- Force Delete Confirmation Modal --}}
+    @if($showForceDeleteModal)
+    <div class="fixed inset-0 z-[9999] overflow-y-auto"
+         x-data="{ show: @entangle('showForceDeleteModal') }"
+         x-show="show"
+         x-transition:enter="ease-out duration-300"
+         x-transition:enter-start="opacity-0"
+         x-transition:enter-end="opacity-100">
+
+        {{-- Backdrop --}}
+        <div class="fixed inset-0 bg-gray-900 bg-opacity-75 transition-opacity"></div>
+
+        {{-- Modal Content --}}
+        <div class="flex min-h-full items-center justify-center p-4">
+            <div class="relative bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-lg w-full p-6"
+                 x-transition:enter="ease-out duration-300"
+                 x-transition:enter-start="opacity-0 translate-y-4"
+                 x-transition:enter-end="opacity-100 translate-y-0">
+
+                {{-- Header --}}
+                <div class="flex items-start mb-4">
+                    <div class="flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-red-100 dark:bg-red-900/20">
+                        <i class="fas fa-exclamation-triangle text-red-600 dark:text-red-400 text-xl"></i>
+                    </div>
+                    <div class="ml-4 flex-1">
+                        <h3 class="text-lg font-semibold text-gray-900 dark:text-white">
+                            Wymuszenie usunięcia kategorii
+                        </h3>
+                        <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                            Ta kategoria zawiera dane. Potwierdź usunięcie.
+                        </p>
+                    </div>
+                    <button wire:click="cancelForceDelete"
+                            class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+
+                {{-- Warnings List --}}
+                @if(!empty($deleteWarnings))
+                <div class="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700 rounded-lg p-4 mb-4">
+                    <h4 class="text-sm font-medium text-yellow-800 dark:text-yellow-400 mb-2">
+                        <i class="fas fa-info-circle mr-1"></i> Ostrzeżenia:
+                    </h4>
+                    <ul class="list-disc list-inside space-y-1 text-sm text-yellow-700 dark:text-yellow-300">
+                        @foreach($deleteWarnings as $warning)
+                        <li>{{ $warning }}</li>
+                        @endforeach
+                    </ul>
+                </div>
+                @endif
+
+                {{-- Confirmation Text --}}
+                <div class="mb-6">
+                    <p class="text-sm text-gray-600 dark:text-gray-400">
+                        <strong>Operacja nieodwracalna!</strong> Wszystkie przypisania produktów do tej kategorii oraz podkategorie zostaną permanentnie usunięte.
+                    </p>
+                </div>
+
+                {{-- Actions --}}
+                <div class="flex justify-end space-x-3">
+                    <button wire:click="cancelForceDelete"
+                            class="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600">
+                        Anuluj
+                    </button>
+                    <button wire:click="confirmForceDelete"
+                            class="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg">
+                        <i class="fas fa-trash mr-2"></i>
+                        Potwierdź usunięcie
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    @endif
+
+    {{-- Job Progress Bar for Delete (if deleteProgressId exists) --}}
+    @if($deleteProgressId)
+    <div class="fixed bottom-4 right-4 z-50" wire:key="delete-progress-{{ $deleteProgressId }}">
+        @livewire('components.job-progress-bar', ['jobId' => $deleteProgressId], key('delete-progress-' . $deleteProgressId))
+    </div>
     @endif
 </div>

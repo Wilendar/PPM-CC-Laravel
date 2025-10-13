@@ -1,5 +1,5 @@
 {{-- Product Form Edit Page - Blade Wrapper with Admin Layout --}}
-@extends('layouts.admin')
+@extends('layouts.admin', ['breadcrumb' => 'Edytuj produkt'])
 
 @section('title', 'Edytuj produkt: ' . ($productModel->name ?? 'Produkt') . ' - PPM')
 

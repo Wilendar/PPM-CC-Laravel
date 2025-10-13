@@ -403,6 +403,12 @@ class ProductTransformer
                 // Category mapping
                 'category_id' => $categoryId,
 
+                // Product type (default to "spare_part" for imported products)
+                // PrestaShop types: Standard, virtual, Pack
+                // PPM types: 1=pojazd, 2=czesc-zamienna, 3=odziez, 4=inne
+                // User can change type manually in PPM if needed
+                'product_type_id' => 2, // Default: Część zamienna (spare_part)
+
                 // Status (PrestaShop uses '0'/'1' strings, convert to bool)
                 'is_active' => $this->convertPrestaShopBoolean($prestashopProduct['active'] ?? '0'),
 

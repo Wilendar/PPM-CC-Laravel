@@ -274,3 +274,23 @@
     0% { transform: rotate(0deg); }
     100% { transform: rotate(360deg); }
 }
+
+/* ========================================
+   SIDEBAR GRID LAYOUT SUPPORT
+   ======================================== */
+
+/* Ensure grid layout works properly on desktop */
+@media (min-width: 1024px) {
+    /* Main grid container should take full viewport */
+    .lg\:grid {
+        min-height: calc(100vh - 7rem); /* Full height minus header + dev banner */
+    }
+
+    /* Sidebar in grid should be sticky to viewport */
+    aside.lg\:static {
+        position: sticky !important;
+        top: 7rem; /* Stick below header */
+        max-height: calc(100vh - 7rem);
+        overflow-y: auto;
+    }
+}

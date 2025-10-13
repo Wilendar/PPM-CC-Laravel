@@ -452,74 +452,6 @@ class ProductVariant extends Model
     }
 
     /**
-     * Get effective attributes (own + inherited from master)
-     * 
-     * Business Logic: Attribute merging logic (own overrides inherited)
-     * Performance: Cached merged attributes
-     *
-     * @return \Illuminate\Database\Eloquent\Casts\Attribute
-     */
-    public function effectiveAttributes(): Attribute
-    {
-        return Attribute::make(
-            get: function (): array {
-                // TODO: Implement in FAZA B/C - Attribute Inheritance Logic
-                /*
-                $effective = [];
-                
-                if ($this->inherit_attributes) {
-                    $effective = $this->product->attributes->pluck('value', 'name')->toArray();
-                }
-                
-                // Own attributes override inherited ones
-                $ownAttributes = $this->attributes->pluck('value', 'name')->toArray();
-                
-                return array_merge($effective, $ownAttributes);
-                */
-                
-                // Placeholder implementation for FAZA A
-                return [
-                    'color' => null,
-                    'size' => null,
-                    'material' => null,
-                    'weight' => $this->product->weight,
-                    'dimensions' => $this->product->dimensions,
-                ];
-            }
-        );
-    }
-
-    /**
-     * Get effective media (own or inherited from master)
-     * 
-     * Business Logic: Media inheritance dla primary image
-     * Performance: Single query dla main image
-     *
-     * @return \Illuminate\Database\Eloquent\Casts\Attribute
-     */
-    public function effectiveMedia(): Attribute
-    {
-        return Attribute::make(
-            get: function (): ?string {
-                // TODO: Implement in FAZA C - Media Inheritance Logic
-                /*
-                $ownPrimaryMedia = $this->media()->where('is_primary', true)->first();
-                
-                if ($ownPrimaryMedia) {
-                    return Storage::url($ownPrimaryMedia->path);
-                }
-                
-                // Fallback to master product media
-                return $this->product->primaryImage;
-                */
-                
-                // Placeholder implementation for FAZA A
-                return $this->product->primaryImage;
-            }
-        );
-    }
-
-    /**
      * Get display name for UI
      * 
      * Business Logic: Combined master product name + variant name
@@ -930,72 +862,78 @@ class ProductVariant extends Model
     /**
      * Set attribute value for variant using EAV system
      *
+     * Note: This is different from Laravel's native setAttribute() which sets model properties.
+     * This method sets EAV system attributes (custom product attributes).
+     *
      * @param string|int $attributeCode
      * @param mixed $value
      * @return \App\Models\ProductAttributeValue
      */
-    public function setAttribute(string|int $attributeCode, mixed $value): ProductAttributeValue
+    public function setProductAttributeValue(string|int $attributeCode, mixed $value): ProductAttributeValue
     {
         // Find attribute by code or ID
-        $attribute = is_numeric($attributeCode) 
+        $attribute = is_numeric($attributeCode)
             ? ProductAttribute::find($attributeCode)
             : ProductAttribute::where('code', $attributeCode)->first();
-            
+
         if (!$attribute) {
             throw new \InvalidArgumentException("Attribute not found: {$attributeCode}");
         }
-        
+
         // Find or create variant attribute value
         $attributeValue = $this->attributeValues()
             ->where('attribute_id', $attribute->id)
             ->first();
-            
+
         if (!$attributeValue) {
             $attributeValue = new ProductAttributeValue();
             $attributeValue->product_id = $this->product_id; // Always reference master product
             $attributeValue->product_variant_id = $this->id;
             $attributeValue->attribute_id = $attribute->id;
         }
-        
+
         $attributeValue->value = $value;
         $attributeValue->is_inherited = false; // Explicitly set by variant
         $attributeValue->is_override = true;   // Override master value
         $attributeValue->save();
-        
+
         return $attributeValue;
     }
 
     /**
      * Get attribute value for variant using EAV system (with inheritance)
      *
+     * Note: This is different from Laravel's native getAttribute() which gets model properties.
+     * This method gets EAV system attributes (custom product attributes).
+     *
      * @param string|int $attributeCode
      * @return mixed
      */
-    public function getAttribute(string|int $attributeCode): mixed
+    public function getProductAttributeValue(string|int $attributeCode): mixed
     {
         // Find attribute by code or ID
-        $attribute = is_numeric($attributeCode) 
+        $attribute = is_numeric($attributeCode)
             ? ProductAttribute::find($attributeCode)
             : ProductAttribute::where('code', $attributeCode)->first();
-            
+
         if (!$attribute) {
             return null;
         }
-        
+
         // Try variant-specific value first
         $variantValue = $this->attributeValues()
             ->where('attribute_id', $attribute->id)
             ->first();
-            
+
         if ($variantValue) {
             return $variantValue->effective_value;
         }
-        
+
         // Fall back to master product value if inheriting attributes
         if ($this->inherit_attributes) {
-            return $this->product->getAttribute($attributeCode);
+            return $this->product->getProductAttributeValue($attributeCode);
         }
-        
+
         return null;
     }
 
@@ -1007,7 +945,7 @@ class ProductVariant extends Model
      */
     public function inheritAttributeFromMaster(string|int $attributeCode): bool
     {
-        $masterValue = $this->product->getAttribute($attributeCode);
+        $masterValue = $this->product->getProductAttributeValue($attributeCode);
         
         if ($masterValue === null) {
             return false;
@@ -1086,14 +1024,17 @@ class ProductVariant extends Model
     }
 
     /**
-     * Check if variant has specific attribute (including inherited)
+     * Check if variant has specific EAV product attribute (including inherited)
+     *
+     * Note: This is different from Laravel's native hasAttribute() which checks model properties.
+     * This method checks EAV system attributes (custom product attributes).
      *
      * @param string|int $attributeCode
      * @return bool
      */
-    public function hasAttribute(string|int $attributeCode): bool
+    public function hasProductAttribute(string|int $attributeCode): bool
     {
-        return $this->getAttribute($attributeCode) !== null;
+        return $this->getProductAttributeValue($attributeCode) !== null;
     }
 
     /**

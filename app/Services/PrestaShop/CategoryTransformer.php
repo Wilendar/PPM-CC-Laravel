@@ -253,6 +253,7 @@ class CategoryTransformer
                 // id_parent = 1: Root of all categories
                 // id_parent = 2: Home category (default parent for root categories)
                 if ($prestashopParentId > 2) {
+                    // Map parent category from PrestaShop ID to PPM ID
                     $parentId = $this->categoryMapper->mapFromPrestaShop($prestashopParentId, $shop);
 
                     if ($parentId === null) {
@@ -287,8 +288,10 @@ class CategoryTransformer
                 // Position in category tree
                 'sort_order' => isset($prestashopCategory['position']) ? (int) $prestashopCategory['position'] : 0,
 
-                // Level depth (PrestaShop level_depth → PPM level)
-                'level' => isset($prestashopCategory['level_depth']) ? (int) $prestashopCategory['level_depth'] : 1,
+                // 🔧 FIX: DON'T set level manually - Category model auto-calculates from parent_id!
+                // Category::boot() creating event calls setLevelAndPath() which sets level based on parent
+                // If we force-set level here, it will be overwritten anyway, causing confusion
+                // Let the model handle hierarchy automatically for correct parent->child relationships
 
                 // Auto-generate slug from Polish name
                 'slug' => $this->generateSlug($namePL ?? 'unnamed-category'),
@@ -308,7 +311,7 @@ class CategoryTransformer
                 'name' => $ppmCategory['name'],
                 'shop_id' => $shop->id,
                 'parent_mapped' => $parentId !== null,
-                'level' => $ppmCategory['level'],
+                'parent_id' => $parentId,
             ]);
 
             return $ppmCategory;

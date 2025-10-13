@@ -17,6 +17,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
  * @property int $product_id
  * @property int $shop_id
  * @property int|null $prestashop_product_id PrestaShop external product ID
+ * @property string|null $external_reference PrestaShop link_rewrite (product slug) for URL generation
  * @property string $sync_status pending|syncing|synced|error|conflict|disabled
  * @property \Carbon\Carbon|null $last_sync_at
  * @property \Carbon\Carbon|null $last_success_sync_at
@@ -53,6 +54,7 @@ class ProductSyncStatus extends Model
         'product_id',
         'shop_id',
         'prestashop_product_id',
+        'external_reference', // ETAP_07 REFACTOR: PrestaShop link_rewrite for URL generation
         'sync_status',
         'last_sync_at',
         'last_success_sync_at',

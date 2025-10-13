@@ -1,5 +1,5 @@
 {{-- Category Form Create Page - Full Layout Wrapper --}}
-@extends('layouts.admin')
+@extends('layouts.admin', ['breadcrumb' => 'Dodaj kategorię'])
 
 @section('title', 'Nowa kategoria - PPM')
 

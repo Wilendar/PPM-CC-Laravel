@@ -31,6 +31,26 @@ Artisan::command('inspire', function () {
 // SCHEDULED TASKS
 // ==========================================
 
+// ETAP_07 FAZA 3D: Category Preview & Job Progress Cleanup
+// Automatic cleanup dla expired category preview records
+Schedule::command('category-preview:cleanup')
+    ->hourly()
+    ->withoutOverlapping()
+    ->runInBackground();
+
+// Automatic cleanup dla stuck job progress (pending >30min)
+Schedule::command('jobs:cleanup-stuck --minutes=30')
+    ->hourly()
+    ->withoutOverlapping()
+    ->runInBackground();
+
+// Automatic log archival - move old logs to archive/ folder
+Schedule::command('logs:archive --keep-days=14')
+    ->daily()
+    ->at('00:15')
+    ->withoutOverlapping()
+    ->runInBackground();
+
 // Schedule będzie skonfigurowany w kolejnych fazach
 // na razie placeholder dla przyszłych zadań
 

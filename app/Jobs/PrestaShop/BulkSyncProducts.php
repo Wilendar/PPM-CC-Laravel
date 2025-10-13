@@ -13,6 +13,7 @@ use Illuminate\Support\Collection;
 use App\Models\Product;
 use App\Models\PrestaShopShop;
 use App\Models\ProductSyncStatus;
+use App\Services\JobProgressService;
 use Illuminate\Bus\Batch;
 use Throwable;
 
@@ -68,14 +69,17 @@ class BulkSyncProducts implements ShouldQueue
         $this->products = $products;
         $this->shop = $shop;
         $this->batchName = $batchName ?? "Bulk Sync to {$shop->name}";
-        $this->onQueue('prestashop_sync');
+        // Use default queue for CRON compatibility
+        // $this->onQueue('prestashop_sync');
     }
 
     /**
      * Execute the job
      */
-    public function handle(): void
+    public function handle(JobProgressService $progressService): void
     {
+        $progressId = null;
+
         Log::info('Bulk sync job started', [
             'shop_id' => $this->shop->id,
             'shop_name' => $this->shop->name,
@@ -83,95 +87,158 @@ class BulkSyncProducts implements ShouldQueue
             'batch_name' => $this->batchName,
         ]);
 
-        // Verify shop is active
-        if (!$this->shop->is_active) {
-            Log::error('Bulk sync aborted - shop not active', [
+        try {
+            // Verify shop is active
+            if (!$this->shop->is_active) {
+                Log::error('Bulk sync aborted - shop not active', [
+                    'shop_id' => $this->shop->id,
+                    'shop_name' => $this->shop->name,
+                ]);
+                return;
+            }
+
+            // 📊 CREATE PROGRESS TRACKING RECORD
+            $progressId = $progressService->createJobProgress(
+                $this->job->getJobId(),
+                $this->shop,
+                'sync',
+                $this->products->count()
+            );
+
+            // Group products by priority
+            $productsByPriority = $this->groupProductsByPriority();
+
+            // Create jobs array with priority order
+            $jobs = [];
+
+            // High priority first (priority <= 3)
+            if (isset($productsByPriority['high'])) {
+                foreach ($productsByPriority['high'] as $product) {
+                    $jobs[] = new SyncProductToPrestaShop($product, $this->shop);
+                }
+            }
+
+            // Normal priority (priority = 5)
+            if (isset($productsByPriority['normal'])) {
+                foreach ($productsByPriority['normal'] as $product) {
+                    $jobs[] = new SyncProductToPrestaShop($product, $this->shop);
+                }
+            }
+
+            // Low priority (priority >= 7)
+            if (isset($productsByPriority['low'])) {
+                foreach ($productsByPriority['low'] as $product) {
+                    $jobs[] = new SyncProductToPrestaShop($product, $this->shop);
+                }
+            }
+
+            if (empty($jobs)) {
+                Log::warning('No jobs to dispatch for bulk sync', [
+                    'shop_id' => $this->shop->id,
+                    'products_count' => $this->products->count(),
+                ]);
+
+                // 📊 MARK AS COMPLETED (no jobs to process)
+                if ($progressId) {
+                    $progressService->markCompleted($progressId, [
+                        'total_jobs' => 0,
+                        'message' => 'No products to sync',
+                    ]);
+                }
+
+                return;
+            }
+
+            // Capture progressId for batch callbacks
+            $capturedProgressId = $progressId;
+            $capturedShopId = $this->shop->id;
+
+            // Dispatch batch with callbacks
+            $batch = Bus::batch($jobs)
+                ->name($this->batchName)
+                ->allowFailures() // Don't cancel entire batch on single failure
+                ->then(function (Batch $batch) use ($progressService, $capturedProgressId) {
+                    // All jobs completed successfully
+                    Log::info('Bulk sync batch completed successfully', [
+                        'batch_id' => $batch->id,
+                        'batch_name' => $batch->name,
+                        'total_jobs' => $batch->totalJobs,
+                        'processed_jobs' => $batch->processedJobs(),
+                    ]);
+
+                    // 📊 MARK PROGRESS AS COMPLETED
+                    if ($capturedProgressId) {
+                        $progressService->markCompleted($capturedProgressId, [
+                            'batch_id' => $batch->id,
+                            'total_jobs' => $batch->totalJobs,
+                            'processed_jobs' => $batch->processedJobs(),
+                        ]);
+                    }
+                })
+                ->catch(function (Batch $batch, Throwable $e) use ($progressService, $capturedProgressId) {
+                    // First batch job failure
+                    Log::error('Bulk sync batch job failed', [
+                        'batch_id' => $batch->id,
+                        'batch_name' => $batch->name,
+                        'error' => $e->getMessage(),
+                        'failed_jobs' => $batch->failedJobs,
+                    ]);
+
+                    // 📊 ADD ERROR to progress (but don't mark as failed - batch allows failures)
+                    if ($capturedProgressId) {
+                        $progressService->addError($capturedProgressId, 'batch_job', $e->getMessage());
+                    }
+                })
+                ->finally(function (Batch $batch) use ($progressService, $capturedProgressId) {
+                    // Batch finished processing
+                    Log::info('Bulk sync batch finished', [
+                        'batch_id' => $batch->id,
+                        'batch_name' => $batch->name,
+                        'total_jobs' => $batch->totalJobs,
+                        'processed_jobs' => $batch->processedJobs(),
+                        'failed_jobs' => $batch->failedJobs,
+                        'progress_percentage' => $batch->progress(),
+                    ]);
+
+                    // 📊 UPDATE FINAL PROGRESS COUNT
+                    if ($capturedProgressId) {
+                        $progressService->updateProgress(
+                            $capturedProgressId,
+                            $batch->processedJobs(),
+                            []
+                        );
+                    }
+                })
+                ->onQueue('prestashop_sync')
+                ->dispatch();
+
+            Log::info('Bulk sync batch dispatched', [
+                'batch_id' => $batch->id,
+                'batch_name' => $batch->name,
                 'shop_id' => $this->shop->id,
-                'shop_name' => $this->shop->name,
+                'total_jobs' => count($jobs),
+                'high_priority' => count($productsByPriority['high'] ?? []),
+                'normal_priority' => count($productsByPriority['normal'] ?? []),
+                'low_priority' => count($productsByPriority['low'] ?? []),
+                'progress_id' => $progressId,
             ]);
-            return;
-        }
 
-        // Group products by priority
-        $productsByPriority = $this->groupProductsByPriority();
-
-        // Create jobs array with priority order
-        $jobs = [];
-
-        // High priority first (priority <= 3)
-        if (isset($productsByPriority['high'])) {
-            foreach ($productsByPriority['high'] as $product) {
-                $jobs[] = new SyncProductToPrestaShop($product, $this->shop);
+        } catch (\Exception $e) {
+            // 📊 MARK AS FAILED
+            if ($progressId) {
+                $progressService->markFailed($progressId, $e->getMessage(), [
+                    'trace' => $e->getTraceAsString(),
+                ]);
             }
-        }
 
-        // Normal priority (priority = 5)
-        if (isset($productsByPriority['normal'])) {
-            foreach ($productsByPriority['normal'] as $product) {
-                $jobs[] = new SyncProductToPrestaShop($product, $this->shop);
-            }
-        }
-
-        // Low priority (priority >= 7)
-        if (isset($productsByPriority['low'])) {
-            foreach ($productsByPriority['low'] as $product) {
-                $jobs[] = new SyncProductToPrestaShop($product, $this->shop);
-            }
-        }
-
-        if (empty($jobs)) {
-            Log::warning('No jobs to dispatch for bulk sync', [
+            Log::error('Bulk sync job failed during setup', [
                 'shop_id' => $this->shop->id,
-                'products_count' => $this->products->count(),
+                'error' => $e->getMessage(),
+                'progress_id' => $progressId,
             ]);
-            return;
+
+            throw $e;
         }
-
-        // Dispatch batch with callbacks
-        $batch = Bus::batch($jobs)
-            ->name($this->batchName)
-            ->allowFailures() // Don't cancel entire batch on single failure
-            ->then(function (Batch $batch) {
-                // All jobs completed successfully
-                Log::info('Bulk sync batch completed successfully', [
-                    'batch_id' => $batch->id,
-                    'batch_name' => $batch->name,
-                    'total_jobs' => $batch->totalJobs,
-                    'processed_jobs' => $batch->processedJobs(),
-                ]);
-            })
-            ->catch(function (Batch $batch, Throwable $e) {
-                // First batch job failure
-                Log::error('Bulk sync batch job failed', [
-                    'batch_id' => $batch->id,
-                    'batch_name' => $batch->name,
-                    'error' => $e->getMessage(),
-                    'failed_jobs' => $batch->failedJobs,
-                ]);
-            })
-            ->finally(function (Batch $batch) {
-                // Batch finished processing
-                Log::info('Bulk sync batch finished', [
-                    'batch_id' => $batch->id,
-                    'batch_name' => $batch->name,
-                    'total_jobs' => $batch->totalJobs,
-                    'processed_jobs' => $batch->processedJobs(),
-                    'failed_jobs' => $batch->failedJobs,
-                    'progress_percentage' => $batch->progress(),
-                ]);
-            })
-            ->onQueue('prestashop_sync')
-            ->dispatch();
-
-        Log::info('Bulk sync batch dispatched', [
-            'batch_id' => $batch->id,
-            'batch_name' => $batch->name,
-            'shop_id' => $this->shop->id,
-            'total_jobs' => count($jobs),
-            'high_priority' => count($productsByPriority['high'] ?? []),
-            'normal_priority' => count($productsByPriority['normal'] ?? []),
-            'low_priority' => count($productsByPriority['low'] ?? []),
-        ]);
     }
 
     /**

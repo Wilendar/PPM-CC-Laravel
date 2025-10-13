@@ -1,47 +1,49 @@
 <div class="min-h-screen bg-main-gradient">
     {{-- Header Section --}}
     <div class="sticky top-0 z-40 glass-effect border-b border-primary shadow-lg">
-        <div class="px-6 sm:px-8 lg:px-12 py-4">
+        <div class="px-4 sm:px-6 lg:px-8 py-4">
             {{-- Title & Action Bar --}}
-            <div class="flex items-center justify-between">
-                <div>
-                    <h1 class="text-2xl font-bold text-white">Produkty</h1>
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div class="min-w-0">
+                    <h1 class="text-xl sm:text-2xl font-bold text-white truncate">Produkty</h1>
                     <p class="mt-1 text-sm text-gray-400">
                         Zarządzaj wszystkimi produktami w systemie PIM
                     </p>
                 </div>
 
                 {{-- Primary Actions --}}
-                <div class="flex items-center space-x-3">
+                <div class="flex flex-wrap items-center gap-2 sm:gap-3">
                     {{-- Add Product Button --}}
                     <a href="{{ route('admin.products.create') }}"
-                       class="btn-primary inline-flex items-center px-4 py-2 text-white text-sm font-medium rounded-lg transition-all duration-300">
-                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                       class="btn-primary inline-flex items-center px-3 sm:px-4 py-2 text-white text-sm font-medium rounded-lg transition-all duration-300 whitespace-nowrap">
+                        <svg class="w-4 h-4 sm:w-5 sm:h-5 sm:mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
                         </svg>
-                        Dodaj produkt
+                        <span class="hidden sm:inline">Dodaj produkt</span>
+                        <span class="sm:hidden ml-1">Dodaj</span>
                     </a>
 
                     {{-- Import from PrestaShop Button --}}
                     <button wire:click="openImportModal('all')"
-                            class="btn-secondary inline-flex items-center px-4 py-2 text-sm font-medium rounded-lg transition-all duration-300">
-                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            class="btn-secondary inline-flex items-center px-3 sm:px-4 py-2 text-sm font-medium rounded-lg transition-all duration-300 whitespace-nowrap">
+                        <svg class="w-4 h-4 sm:w-5 sm:h-5 sm:mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                   d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10"/>
                         </svg>
-                        Importuj z PrestaShop
+                        <span class="hidden lg:inline">Importuj z PrestaShop</span>
+                        <span class="lg:hidden ml-1">Import</span>
                     </button>
 
                     {{-- View Mode Toggle --}}
                     <div class="flex bg-card rounded-lg p-1">
                         <button wire:click="changeViewMode('table')"
-                                class="px-3 py-1 text-sm rounded-md transition-all duration-300 {{ $viewMode === 'table' ? 'bg-orange-500 text-white shadow-soft' : 'text-muted hover:text-primary hover:bg-card-hover' }}">
+                                class="px-2 sm:px-3 py-1 text-sm rounded-md transition-all duration-300 {{ $viewMode === 'table' ? 'bg-orange-500 text-white shadow-soft' : 'text-muted hover:text-primary hover:bg-card-hover' }}">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16" />
                             </svg>
                         </button>
                         <button wire:click="changeViewMode('grid')"
-                                class="px-3 py-1 text-sm rounded-md transition-all duration-300 {{ $viewMode === 'grid' ? 'bg-orange-500 text-white shadow-soft' : 'text-muted hover:text-primary hover:bg-card-hover' }}">
+                                class="px-2 sm:px-3 py-1 text-sm rounded-md transition-all duration-300 {{ $viewMode === 'grid' ? 'bg-orange-500 text-white shadow-soft' : 'text-muted hover:text-primary hover:bg-card-hover' }}">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
                             </svg>
@@ -50,14 +52,15 @@
 
                     {{-- Filters Toggle --}}
                     <button wire:click="$toggle('showFilters')"
-                            class="btn-secondary inline-flex items-center px-3 py-2 border border-primary text-sm font-medium rounded-lg text-secondary hover:bg-card-hover transition-all duration-300 focus:ring-2 focus:ring-orange-500 focus:ring-opacity-50">
-                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            class="btn-secondary inline-flex items-center px-3 py-2 border border-primary text-sm font-medium rounded-lg text-secondary hover:bg-card-hover transition-all duration-300 focus:ring-2 focus:ring-orange-500 focus:ring-opacity-50 whitespace-nowrap">
+                        <svg class="w-4 h-4 mr-1 sm:mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.207A1 1 0 013 6.5V4z" />
                         </svg>
-                        Filtry
+                        <span class="hidden sm:inline">Filtry</span>
                         @if($hasFilters)
                             <span class="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-orange-500 text-white">
-                                Aktywne
+                                <span class="hidden sm:inline">Aktywne</span>
+                                <span class="sm:hidden">!</span>
                             </span>
                         @endif
                     </button>
@@ -67,7 +70,7 @@
             {{-- Filters Panel --}}
             @if($showFilters)
                 <div class="mt-4 p-4 card glass-effect rounded-lg border border-primary">
-                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
                         {{-- Search --}}
                         <div>
                             <label class="block text-sm font-medium text-gray-300 mb-2">Wyszukaj</label>
@@ -130,9 +133,9 @@
                         {{-- ETAP_05 - Advanced Filters (1.1.1.2.4-1.1.1.2.8) --}}
 
                         {{-- 1.1.1.2.4: Price Range Filter --}}
-                        <div class="md:col-span-2">
+                        <div class="sm:col-span-2">
                             <label class="block text-sm font-medium text-gray-300 mb-2">Zakres cen (PLN)</label>
-                            <div class="flex items-center space-x-2">
+                            <div class="flex items-center gap-2">
                                 <input wire:model.live="priceMin"
                                        type="number"
                                        min="0"
@@ -201,12 +204,12 @@
 
                     {{-- Filter Actions --}}
                     @if($hasFilters)
-                        <div class="mt-4 flex items-center justify-between">
+                        <div class="mt-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                             <p class="text-sm text-gray-400">
                                 {{ $products->total() }} produktów znalezionych
                             </p>
                             <button wire:click="clearFilters"
-                                    class="text-sm text-orange-500 hover:text-orange-400 transition-colors duration-300">
+                                    class="text-sm text-orange-500 hover:text-orange-400 transition-colors duration-300 text-left sm:text-right">
                                 Wyczyść filtry
                             </button>
                         </div>
@@ -214,23 +217,79 @@
                 </div>
             @endif
 
+            {{-- Select All Pages Banner --}}
+            @if($selectAll && !$selectingAllPages && $this->totalFilteredCount > $this->selectedCount)
+                <div class="mt-4 p-3 bg-blue-900/20 border border-blue-700 rounded-lg">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center space-x-3">
+                            <svg class="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                            </svg>
+                            <span class="text-sm text-blue-200">
+                                Zaznaczono <strong>{{ $this->selectedCount }}</strong> produktów na tej stronie.
+                            </span>
+                        </div>
+                        <button wire:click="selectAllPages"
+                                class="px-4 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-all duration-200">
+                            Zaznacz wszystkie {{ $this->totalFilteredCount }} produktów
+                        </button>
+                    </div>
+                </div>
+            @endif
+
+            {{-- Deselect All Pages Banner --}}
+            @if($selectingAllPages)
+                <div class="mt-4 p-3 bg-green-900/20 border border-green-700 rounded-lg">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center space-x-3">
+                            <svg class="w-5 h-5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                            </svg>
+                            <span class="text-sm text-green-200">
+                                Zaznaczono <strong>wszystkie {{ $this->selectedCount }}</strong> produktów pasujących do filtrów.
+                            </span>
+                        </div>
+                        <button wire:click="deselectAllPages"
+                                class="px-4 py-2 text-sm font-semibold text-white bg-gray-600 hover:bg-gray-700 rounded-lg transition-all duration-200">
+                            Odznacz (tylko bieżąca strona)
+                        </button>
+                    </div>
+                </div>
+            @endif
+
             {{-- Bulk Actions Bar --}}
             @if($showBulkActions)
                 <div class="mt-4 p-3 bg-orange-900/20 border border-orange-800 rounded-lg">
-                    <div class="flex items-center justify-between">
+                    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                         <div class="flex items-center">
                             <span class="text-sm font-medium text-orange-200">
-                                Zaznaczono {{ $selectedCount }} {{ $selectedCount == 1 ? 'produkt' : ($selectedCount < 5 ? 'produkty' : 'produktów') }}
+                                @if($selectingAllPages)
+                                    Zaznaczono <strong>wszystkie {{ $this->selectedCount }}</strong> produktów
+                                @else
+                                    Zaznaczono {{ $this->selectedCount }} {{ $this->selectedCount == 1 ? 'produkt' : ($this->selectedCount < 5 ? 'produkty' : 'produktów') }}
+                                @endif
                             </span>
                         </div>
-                        <div class="flex items-center space-x-2">
-                            <button class="px-3 py-1 text-sm btn-secondary rounded hover:bg-card-hover transition-all duration-300">
+                        <div class="flex flex-wrap items-center gap-2">
+                            <button wire:click="bulkActivate"
+                                    class="px-3 py-1 text-sm btn-secondary rounded hover:bg-card-hover transition-all duration-300">
+                                <svg class="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                </svg>
                                 Aktywuj
                             </button>
-                            <button class="px-3 py-1 text-sm btn-secondary rounded hover:bg-card-hover transition-all duration-300">
+                            <button wire:click="bulkDeactivate"
+                                    class="px-3 py-1 text-sm btn-secondary rounded hover:bg-card-hover transition-all duration-300">
+                                <svg class="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                </svg>
                                 Deaktywuj
                             </button>
-                            <button class="px-3 py-1 text-sm btn-secondary rounded hover:bg-card-hover transition-all duration-300">
+                            <button wire:click="openBulkCategoryModal"
+                                    class="px-3 py-1 text-sm btn-secondary rounded hover:bg-card-hover transition-all duration-300">
+                                <svg class="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/>
+                                </svg>
                                 Przypisz kategorię
                             </button>
                             <button wire:click="openQuickSendModal"
@@ -239,6 +298,13 @@
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
                                 </svg>
                                 Wyślij na sklepy
+                            </button>
+                            <button wire:click="openBulkDeleteModal"
+                                    class="px-3 py-1 text-sm bg-red-600 hover:bg-red-700 text-white rounded transition-all duration-300">
+                                <svg class="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                                </svg>
+                                Usuń
                             </button>
                             <button wire:click="resetSelection"
                                     class="px-3 py-1 text-sm text-muted hover:text-primary transition-colors duration-300">
@@ -251,13 +317,36 @@
         </div>
     </div>
 
+    {{-- Real-Time Progress Tracking - wire:poll MUST be outside @if to work! --}}
+    <div wire:poll.3s="checkForPendingCategoryPreviews">
+        @if(!empty($this->activeJobProgress))
+            <div class="px-6 sm:px-8 lg:px-12 pt-6">
+                <div class="mb-6 space-y-3">
+                    <h3 class="text-sm font-semibold text-gray-400 uppercase tracking-wide flex items-center">
+                        <svg class="w-4 h-4 mr-2 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                        </svg>
+                        Aktywne Operacje
+                    </h3>
+
+                    @foreach($this->activeJobProgress as $job)
+                        <livewire:components.job-progress-bar
+                            :key="'job-progress-' . $job['id']"
+                            :jobId="(int)$job['id']" />
+                    @endforeach
+                </div>
+            </div>
+        @endif
+    </div>
+
     {{-- Main Content --}}
-    <div class="px-6 sm:px-8 lg:px-12 py-6">
+    <div class="px-4 sm:px-6 lg:px-8 py-6">
         @if($viewMode === 'table')
             {{-- Table View --}}
             <div class="card glass-effect shadow-soft rounded-xl overflow-hidden">
-                <div class="overflow-x-auto">
-                    <table class="min-w-full divide-y divide-gray-700">
+                <div class="overflow-x-auto -mx-4 sm:mx-0">
+                    <div class="inline-block min-w-full align-middle">
+                        <table class="min-w-full divide-y divide-gray-700">
                         <thead class="bg-card">
                             <tr>
                                 {{-- Bulk Select --}}
@@ -304,13 +393,13 @@
                                     Status
                                 </th>
 
-                                {{-- FAZA 1.5: Multi-Store Sync Status Column --}}
+                                {{-- ETAP_07 FAZA 3: PrestaShop Sync Status Column --}}
                                 <th class="px-6 py-3 text-left text-xs font-medium text-muted uppercase tracking-wider">
                                     <div class="flex items-center">
                                         <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
                                         </svg>
-                                        Sync Status
+                                        PrestaShop Sync
                                     </div>
                                 </th>
 
@@ -406,72 +495,69 @@
                                         </button>
                                     </td>
 
-                                    {{-- FAZA 1.5: Multi-Store Sync Status --}}
-                                    <td class="px-6 py-4 whitespace-nowrap">
-                                        @php
-                                            $syncSummary = $product->getMultiStoreSyncSummary();
-                                            $totalShops = $syncSummary['total_shops'];
-                                            $syncedShops = $syncSummary['synced_shops'];
-                                            $conflictShops = $syncSummary['conflict_shops'];
-                                            $errorShops = $syncSummary['error_shops'];
-                                            $healthPercentage = $syncSummary['sync_health_percentage'];
-                                        @endphp
+                                    {{-- ETAP_07 FAZA 3: PrestaShop Sync Status --}}
+                                    {{-- CRITICAL FIX 2025-10-07: Changed from syncStatuses to shopData --}}
+                                    {{-- shopData = shop associations (current config), syncStatuses = sync operation history --}}
+                                    <td class="px-6 py-4">
+                                        @if($product->shopData->isNotEmpty())
+                                            @php
+                                                // Mapowanie emoji dla statusów
+                                                $statusEmojis = [
+                                                    'synced' => '🟢',
+                                                    'error' => '🔴',
+                                                    'syncing' => '🔄️',
+                                                    'pending' => '🕒',
+                                                    'conflict' => '🟡',
+                                                    'disabled' => '⚫',
+                                                ];
 
-                                        @if($totalShops === 0)
-                                            {{-- No shops configured --}}
-                                            <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-800 text-gray-300">
-                                                <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4"/>
-                                                </svg>
-                                                Brak sklepów
-                                            </span>
-                                        @elseif($healthPercentage >= 90)
-                                            {{-- Excellent sync health --}}
-                                            <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-800 text-green-200">
-                                                <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
-                                                </svg>
-                                                {{ $syncedShops }}/{{ $totalShops }} sklepów
-                                            </span>
-                                        @elseif($healthPercentage >= 70)
-                                            {{-- Good sync health --}}
-                                            <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-yellow-800 text-yellow-200">
-                                                <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"/>
-                                                </svg>
-                                                {{ $syncedShops }}/{{ $totalShops }} OK
-                                            </span>
-                                        @elseif($conflictShops > 0)
-                                            {{-- Has conflicts --}}
-                                            <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-orange-800 text-orange-200">
-                                                <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"/>
-                                                </svg>
-                                                {{ $conflictShops }} konfliktów
-                                            </span>
-                                        @elseif($errorShops > 0)
-                                            {{-- Has errors --}}
-                                            <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-800 text-red-200">
-                                                <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-                                                </svg>
-                                                {{ $errorShops }} błędów
-                                            </span>
-                                        @else
-                                            {{-- Pending sync --}}
-                                            <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-800 text-blue-200">
-                                                <svg class="w-3 h-3 mr-1 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
-                                                </svg>
-                                                Oczekuje sync
-                                            </span>
-                                        @endif
+                                                // Mapowanie labelek
+                                                $statusLabels = [
+                                                    'synced' => 'Sync OK',
+                                                    'error' => 'Błąd',
+                                                    'syncing' => 'Sync...',
+                                                    'pending' => 'Oczekuje',
+                                                    'conflict' => 'Konflikt',
+                                                    'disabled' => 'Wyłączone',
+                                                ];
 
-                                        {{-- Additional info on hover --}}
-                                        @if($totalShops > 0)
-                                            <div class="text-xs text-muted mt-1">
-                                                {{ round($healthPercentage, 0) }}% sync health
+                                                // Oblicz główny status na podstawie priorytetu (error > syncing > conflict > pending > synced > disabled)
+                                                $statuses = $product->shopData->pluck('sync_status')->toArray();
+
+                                                if (in_array('error', $statuses)) {
+                                                    $overallStatus = 'error';
+                                                } elseif (in_array('syncing', $statuses)) {
+                                                    $overallStatus = 'syncing';
+                                                } elseif (in_array('conflict', $statuses)) {
+                                                    $overallStatus = 'conflict';
+                                                } elseif (in_array('pending', $statuses)) {
+                                                    $overallStatus = 'pending';
+                                                } elseif (in_array('synced', $statuses) && count(array_unique($statuses)) === 1) {
+                                                    $overallStatus = 'synced';
+                                                } elseif (in_array('disabled', $statuses) && count(array_unique($statuses)) === 1) {
+                                                    $overallStatus = 'disabled';
+                                                } else {
+                                                    $overallStatus = 'pending'; // fallback
+                                                }
+                                            @endphp
+
+                                            <div class="flex flex-col gap-1">
+                                                {{-- Główny status (priorytetowy) --}}
+                                                <div class="sync-status-badge sync-status-{{ $overallStatus }}">
+                                                    {{ $statusEmojis[$overallStatus] ?? '⚪' }} {{ $statusLabels[$overallStatus] ?? 'Unknown' }}
+                                                </div>
+
+                                                {{-- Lista sklepów (FIXED: używa shopData zamiast syncStatuses) --}}
+                                                @foreach($product->shopData as $shopData)
+                                                    <div class="text-sm opacity-75">
+                                                        {{ $statusEmojis[$shopData->sync_status] ?? '⚪' }} {{ $shopData->shop->name ?? 'Unknown' }}
+                                                    </div>
+                                                @endforeach
                                             </div>
+                                        @else
+                                            <span class="text-xs text-gray-500 italic">
+                                                Brak powiązań ze sklepami
+                                            </span>
                                         @endif
                                     </td>
 
@@ -567,7 +653,8 @@
                                 </tr>
                             @endforelse
                         </tbody>
-                    </table>
+                        </table>
+                    </div>
                 </div>
             </div>
 
@@ -1052,6 +1139,117 @@ class="fixed top-4 right-4 z-50">
     </div>
 @endif
 
+{{-- QUICK ACTION DELETE CONFIRMATION MODAL --}}
+{{-- CRITICAL FIX 2025-10-07: Added permanent delete confirmation modal for single product --}}
+@if($showDeleteModal)
+<div class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50" wire:click.self="cancelDelete">
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-2xl w-full max-w-md p-6">
+        {{-- Header --}}
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="text-xl font-bold text-gray-900 dark:text-white flex items-center">
+                <svg class="w-6 h-6 text-red-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-1.964-1.333-2.732 0L3.732 16c-.77 1.333.192 3 1.732 3z"/>
+                </svg>
+                Potwierdzenie usunięcia
+            </h3>
+            <button wire:click="cancelDelete" class="text-gray-400 hover:text-gray-500 transition-colors">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                </svg>
+            </button>
+        </div>
+
+        {{-- Body --}}
+        <div class="mb-6">
+            <p class="text-gray-700 dark:text-gray-300 mb-3">
+                Czy na pewno chcesz <span class="font-bold text-red-600">TRWALE USUNĄĆ</span> produkt?
+            </p>
+            <div class="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3">
+                <p class="text-sm text-red-800 dark:text-red-300">
+                    <svg class="w-4 h-4 inline mr-1" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
+                    </svg>
+                    <strong>⚠️ UWAGA:</strong> Ta operacja jest <strong>nieodwracalna</strong>!<br>
+                    Produkt zostanie <strong>FIZYCZNIE USUNIĘTY</strong> z bazy danych (nie soft delete).<br>
+                    Wszystkie powiązane dane (kategorie, ceny, stany magazynowe) również zostaną usunięte.
+                </p>
+            </div>
+        </div>
+
+        {{-- Footer - Actions --}}
+        <div class="flex justify-end space-x-3">
+            <button wire:click="cancelDelete"
+                    class="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors">
+                Anuluj
+            </button>
+            <button wire:click="deleteProduct"
+                    class="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors flex items-center">
+                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                </svg>
+                Tak, usuń produkt
+            </button>
+        </div>
+    </div>
+</div>
+@endif
+
+{{-- BULK DELETE CONFIRMATION MODAL --}}
+@if($showBulkDeleteModal)
+<div class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50" wire:click.self="closeBulkDeleteModal">
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-2xl w-full max-w-md p-6">
+        {{-- Header --}}
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="text-xl font-bold text-gray-900 dark:text-white flex items-center">
+                <svg class="w-6 h-6 text-red-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-1.964-1.333-2.732 0L3.732 16c-.77 1.333.192 3 1.732 3z"/>
+                </svg>
+                Potwierdzenie usunięcia
+            </h3>
+            <button wire:click="closeBulkDeleteModal" class="text-gray-400 hover:text-gray-500 transition-colors">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                </svg>
+            </button>
+        </div>
+
+        {{-- Body --}}
+        <div class="mb-6">
+            <p class="text-gray-700 dark:text-gray-300 mb-3">
+                Czy na pewno chcesz <span class="font-bold text-red-600">TRWALE USUNĄĆ</span>
+                <span class="font-bold text-red-600">{{ $this->selectedCount }}</span>
+                {{ $this->selectedCount == 1 ? 'produkt' : ($this->selectedCount < 5 ? 'produkty' : 'produktów') }}?
+            </p>
+            <div class="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3">
+                <p class="text-sm text-red-800 dark:text-red-300">
+                    <svg class="w-4 h-4 inline mr-1" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
+                    </svg>
+                    <strong>⚠️ UWAGA:</strong> Ta operacja jest <strong>nieodwracalna</strong>!<br>
+                    Produkty zostaną <strong>FIZYCZNIE USUNIĘTE</strong> z bazy danych (nie soft delete).<br>
+                    Wszystkie powiązane dane (kategorie, ceny, stany magazynowe) również zostaną usunięte.
+                </p>
+            </div>
+        </div>
+
+        {{-- Footer - Actions --}}
+        <div class="flex justify-end space-x-3">
+            <button wire:click="closeBulkDeleteModal"
+                    class="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors">
+                Anuluj
+            </button>
+            <button wire:click="confirmBulkDelete"
+                    class="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors flex items-center">
+                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                </svg>
+                Tak, usuń produkty
+            </button>
+        </div>
+    </div>
+</div>
+@endif
+
 {{-- IMPORT FROM PRESTASHOP MODAL --}}
 @if($showImportModal)
 <div class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50">
@@ -1209,7 +1407,7 @@ class="fixed top-4 right-4 z-50">
                                 </div>
 
                                 {{-- ALPINE.JS OPTIMIZED: Client-side expand/collapse with skeleton loaders --}}
-                                <div class="border border-gray-300 dark:border-gray-600 rounded-lg max-h-96 overflow-y-auto p-4"
+                                <div class="border border-gray-300 dark:border-gray-600 rounded-lg max-h-64 overflow-y-auto p-4"
                                      x-data="{
                                          expanded: $wire.entangle('expandedCategories'),
                                          loading: null,
@@ -1450,7 +1648,7 @@ class="fixed top-4 right-4 z-50">
                                     @endif
                                 </div>
 
-                                <div class="border border-gray-300 dark:border-gray-600 rounded-lg max-h-96 overflow-y-auto">
+                                <div class="border border-gray-300 dark:border-gray-600 rounded-lg max-h-64 overflow-y-auto">
                                     @foreach($prestashopProducts as $product)
                                         @php
                                             $isSelected = in_array($product['id'], $selectedProductsToImport);
@@ -1504,6 +1702,71 @@ class="fixed top-4 right-4 z-50">
     </div>
 </div>
 @endif
+
+{{-- ETAP_07 FAZA 3D: Category Analysis Loading Overlay --}}
+@if($isAnalyzingCategories)
+<div class="fixed inset-0 z-[60] flex items-center justify-center bg-gray-900 bg-opacity-75 backdrop-blur-sm">
+    <div class="bg-gradient-to-br from-gray-800 via-gray-900 to-black rounded-2xl shadow-2xl p-8 max-w-md w-full mx-4 border border-gray-700">
+
+        {{-- Header --}}
+        <div class="text-center mb-6">
+            <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-orange-500/10 mb-4">
+                {{-- Animated Spinner SVG --}}
+                <svg class="animate-spin h-10 w-10 text-orange-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+            </div>
+
+            <h3 class="text-xl font-bold text-white mb-2">
+                Analizuję kategorie...
+            </h3>
+
+            @if($analyzingShopName)
+            <p class="text-sm text-gray-400">
+                Sklep: <span class="text-orange-400 font-medium">{{ $analyzingShopName }}</span>
+            </p>
+            @endif
+        </div>
+
+        {{-- Message --}}
+        <div class="space-y-3 mb-6">
+            <div class="flex items-start space-x-3">
+                <svg class="w-5 h-5 text-orange-500 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+                <p class="text-sm text-gray-300">
+                    Sprawdzam jakie kategorie muszą zostać utworzone w PPM przed importem produktów
+                </p>
+            </div>
+
+            <div class="flex items-start space-x-3">
+                <svg class="w-5 h-5 text-blue-500 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+                <p class="text-sm text-gray-400">
+                    To może potrwać <span class="text-blue-400 font-medium">3-5 sekund</span>
+                </p>
+            </div>
+        </div>
+
+        {{-- Progress Bar --}}
+        <div class="relative pt-1">
+            <div class="overflow-hidden h-2 text-xs flex rounded-full bg-gray-700">
+                <div class="animate-pulse bg-gradient-to-r from-orange-500 to-orange-600" style="width: 100%"></div>
+            </div>
+        </div>
+
+        {{-- Footer Note --}}
+        <p class="text-xs text-gray-500 text-center mt-4">
+            Za chwilę otrzymasz podgląd kategorii do utworzenia
+        </p>
+    </div>
+</div>
+@endif
+
+{{-- ETAP_07 FAZA 3D: Category Preview Modal --}}
+<livewire:components.category-preview-modal />
 
 {{-- MPP TRADE Custom Styles --}}
 <style>

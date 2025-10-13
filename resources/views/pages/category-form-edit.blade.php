@@ -1,5 +1,5 @@
 {{-- Category Form Edit Page - Full Layout Wrapper --}}
-@extends('layouts.admin')
+@extends('layouts.admin', ['breadcrumb' => 'Edytuj kategorię'])
 
 @section('title', 'Edytuj kategorię: ' . ($categoryModel->name ?? 'Kategoria') . ' - PPM')
 

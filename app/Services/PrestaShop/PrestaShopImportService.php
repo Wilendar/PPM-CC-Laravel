@@ -9,6 +9,7 @@ use App\Models\ProductSyncStatus;
 use App\Models\SyncLog;
 use App\Models\ShopMapping;
 use App\Models\ProductPrice;
+use App\Models\ProductShopData;
 use App\Services\PrestaShop\PrestaShopClientFactory;
 use App\Services\PrestaShop\ProductTransformer;
 use App\Services\PrestaShop\CategoryTransformer;
@@ -112,6 +113,13 @@ class PrestaShopImportService
             // 2. Fetch product from PrestaShop API
             $prestashopData = $client->getProduct($prestashopProductId);
 
+            // 2a. Unwrap nested 'product' key from PrestaShop API response
+            // PrestaShop API returns: {product: {id: 123, reference: "SKU", ...}}
+            // We need just the inner product object for transformers
+            if (isset($prestashopData['product']) && is_array($prestashopData['product'])) {
+                $prestashopData = $prestashopData['product'];
+            }
+
             Log::debug('Product fetched from PrestaShop API', [
                 'prestashop_product_id' => $prestashopProductId,
                 'reference' => data_get($prestashopData, 'reference'),
@@ -129,6 +137,7 @@ class PrestaShopImportService
                 $pricesData,
                 $stockData,
                 $prestashopProductId,
+                $prestashopData,  // 🔧 FIX: Add $prestashopData for syncProductCategories()
                 $shop
             ) {
                 // 5. Check if product exists (by SKU)
@@ -207,7 +216,9 @@ class PrestaShopImportService
                     }
                 }
 
-                // 8. Create/Update ProductSyncStatus
+                // 8. Create/Update ProductSyncStatus (with external_reference)
+                // ETAP_07 REFACTOR: external_reference (link_rewrite) moved from ProductShopData
+                // This allows URL generation without creating duplicate ProductShopData records
                 ProductSyncStatus::updateOrCreate(
                     [
                         'product_id' => $product->id,
@@ -215,6 +226,7 @@ class PrestaShopImportService
                     ],
                     [
                         'prestashop_product_id' => $prestashopProductId,
+                        'external_reference' => $prestashopData['link_rewrite'] ?? null,
                         'sync_status' => ProductSyncStatus::STATUS_SYNCED,
                         'sync_direction' => ProductSyncStatus::DIRECTION_PS_TO_PPM,
                         'last_sync_at' => now(),
@@ -222,6 +234,69 @@ class PrestaShopImportService
                         'error_message' => null,
                     ]
                 );
+
+                Log::info('Product import completed - ProductSyncStatus updated', [
+                    'product_id' => $product->id,
+                    'shop_id' => $shop->id,
+                    'prestashop_product_id' => $prestashopProductId,
+                    'external_reference' => $prestashopData['link_rewrite'] ?? null,
+                ]);
+
+                // 9. Create/Update ProductShopData (PrestaShop snapshot for conflict detection)
+                // ARCHITECTURE: ProductShopData serves as snapshot of PrestaShop data
+                // - Created during import to establish baseline
+                // - Updated periodically by SyncConflictDetection job
+                // - Compared with fresh API data to detect changes
+                // - NOT used for override (all data mirrors products table initially)
+                ProductShopData::updateOrCreate(
+                    [
+                        'product_id' => $product->id,
+                        'shop_id' => $shop->id,
+                    ],
+                    [
+                        // Copy ALL product data to establish snapshot baseline
+                        'sku' => $product->sku,
+                        'name' => $product->name,
+                        'slug' => $product->slug,
+                        'short_description' => $product->short_description,
+                        'long_description' => $product->long_description,
+                        'meta_title' => $product->meta_title,
+                        'meta_description' => $product->meta_description,
+
+                        // Product classification
+                        'product_type_id' => $product->product_type_id,
+                        'manufacturer' => $product->manufacturer,
+                        'supplier_code' => $product->supplier_code,
+                        'ean' => $product->ean,
+
+                        // Physical properties
+                        'weight' => $product->weight,
+                        'height' => $product->height,
+                        'width' => $product->width,
+                        'length' => $product->length,
+                        'tax_rate' => $product->tax_rate,
+
+                        // Status
+                        'is_active' => $product->is_active,
+                        'is_published' => true,
+                        'published_at' => now(),
+
+                        // Sync metadata
+                        'sync_status' => ProductShopData::STATUS_SYNCED,
+                        'last_sync_at' => now(),
+                        'external_id' => $prestashopProductId,
+                    ]
+                );
+
+                Log::info('ProductShopData snapshot created', [
+                    'product_id' => $product->id,
+                    'shop_id' => $shop->id,
+                    'purpose' => 'conflict_detection_baseline',
+                ]);
+
+                // 10. Sync categories from PrestaShop associations
+                // CRITICAL FIX: Products MUST have categories assigned!
+                $this->syncProductCategories($product, $prestashopData, $shop);
 
                 return $product;
             });
@@ -248,7 +323,7 @@ class PrestaShopImportService
             ]);
 
             // 11. Return Product z relationships
-            return $product->fresh(['prices', 'category']);
+            return $product->fresh(['prices', 'categories']);
 
         } catch (PrestaShopAPIException $e) {
             // Handle PrestaShop API errors
@@ -340,6 +415,11 @@ class PrestaShopImportService
 
             // 2. Fetch category from PrestaShop API
             $prestashopData = $client->getCategory($prestashopCategoryId);
+
+            // 2a. Unwrap nested 'category' key from PrestaShop API response
+            if (isset($prestashopData['category']) && is_array($prestashopData['category'])) {
+                $prestashopData = $prestashopData['category'];
+            }
 
             Log::debug('Category fetched from PrestaShop API', [
                 'prestashop_category_id' => $prestashopCategoryId,
@@ -721,5 +801,88 @@ class PrestaShopImportService
                 $e
             );
         }
+    }
+
+    /**
+     * Sync product categories from PrestaShop associations
+     *
+     * CRITICAL FIX: Products MUST have categories assigned!
+     *
+     * Workflow:
+     * 1. Extract PrestaShop category IDs from associations
+     * 2. Map each PrestaShop category to PPM category via ShopMapping
+     * 3. Sync categories using pivot table (product_categories)
+     * 4. Mark first category as primary if none selected
+     *
+     * @param Product $product Product instance
+     * @param array $prestashopData Raw PrestaShop product data
+     * @param PrestaShopShop $shop Shop instance
+     * @return void
+     */
+    protected function syncProductCategories(
+        Product $product,
+        array $prestashopData,
+        PrestaShopShop $shop
+    ): void
+    {
+        // Extract PrestaShop category IDs from associations
+        // Structure: associations.categories = [['id' => 2], ['id' => 51], ...]
+        $prestashopCategories = data_get($prestashopData, 'associations.categories', []);
+
+        if (empty($prestashopCategories)) {
+            Log::warning('Product has no categories in PrestaShop', [
+                'product_id' => $product->id,
+                'prestashop_product_id' => data_get($prestashopData, 'id'),
+            ]);
+            return;
+        }
+
+        // Map PrestaShop category IDs to PPM category IDs
+        $ppmCategoryIds = [];
+        $defaultCategoryId = (int) data_get($prestashopData, 'id_category_default', 0);
+
+        foreach ($prestashopCategories as $index => $psCategory) {
+            $prestashopCategoryId = (int) data_get($psCategory, 'id', 0);
+
+            if ($prestashopCategoryId <= 0) {
+                continue;
+            }
+
+            // Map PrestaShop category to PPM category via ShopMapping
+            $mapping = ShopMapping::where('shop_id', $shop->id)
+                ->where('mapping_type', ShopMapping::TYPE_CATEGORY)
+                ->where('prestashop_id', $prestashopCategoryId)
+                ->where('is_active', true)
+                ->first();
+
+            if ($mapping) {
+                $ppmCategoryIds[$mapping->ppm_value] = [
+                    'is_primary' => ($prestashopCategoryId === $defaultCategoryId),
+                    'sort_order' => $index,
+                ];
+            } else {
+                Log::warning('PrestaShop category not mapped to PPM', [
+                    'prestashop_category_id' => $prestashopCategoryId,
+                    'shop_id' => $shop->id,
+                ]);
+            }
+        }
+
+        if (empty($ppmCategoryIds)) {
+            Log::warning('No categories mapped - product will have NO categories!', [
+                'product_id' => $product->id,
+                'prestashop_categories' => array_column($prestashopCategories, 'id'),
+            ]);
+            return;
+        }
+
+        // Sync categories using pivot table
+        $product->categories()->sync($ppmCategoryIds);
+
+        Log::info('Product categories synced', [
+            'product_id' => $product->id,
+            'category_count' => count($ppmCategoryIds),
+            'category_ids' => array_keys($ppmCategoryIds),
+        ]);
     }
 }

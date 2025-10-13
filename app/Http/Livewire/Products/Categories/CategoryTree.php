@@ -4,6 +4,7 @@ namespace App\Http\Livewire\Products\Categories;
 
 use Livewire\Component;
 use Livewire\WithPagination;
+use Livewire\Attributes\On;
 use App\Models\Category;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
@@ -154,6 +155,41 @@ class CategoryTree extends Component
         'save' => false,
         'delete' => false,
     ];
+
+    /**
+     * Force Delete Modal state
+     *
+     * @var bool
+     */
+    public $showForceDeleteModal = false;
+
+    /**
+     * Category ID to delete (for force delete modal)
+     *
+     * @var int|null
+     */
+    public $categoryToDelete = null;
+
+    /**
+     * Delete warnings for force delete modal
+     *
+     * @var array
+     */
+    public $deleteWarnings = [];
+
+    /**
+     * Job ID for tracking delete progress (UUID string)
+     *
+     * @var string|null
+     */
+    public $deleteJobId = null;
+
+    /**
+     * Progress ID for JobProgressBar (database ID)
+     *
+     * @var int|null
+     */
+    public $deleteProgressId = null;
 
     // ==========================================
     // LIVEWIRE LIFECYCLE METHODS
@@ -598,22 +634,20 @@ class CategoryTree extends Component
         $this->loadingStates['delete'] = true;
 
         try {
-            $category = Category::find($categoryId);
+            $category = Category::with(['products', 'children'])->find($categoryId);
 
             if (!$category) {
                 throw new \Exception('Kategoria nie została znaleziona.');
             }
 
-            // Check if category has products
-            if ($category->products()->count() > 0) {
-                throw new \Exception('Nie można usunąć kategorii zawierającej produkty.');
+            // Check if category has products or children - show Force Delete Modal
+            if ($category->products()->count() > 0 || $category->children()->count() > 0) {
+                $this->showForceDeleteConfirmation($categoryId);
+                $this->loadingStates['delete'] = false;
+                return;
             }
 
-            // Check if category has children
-            if ($category->children()->count() > 0) {
-                throw new \Exception('Nie można usunąć kategorii zawierającej podkategorie.');
-            }
-
+            // Safe to delete without force
             DB::transaction(function () use ($category) {
                 $category->delete();
             });
@@ -634,6 +668,117 @@ class CategoryTree extends Component
         }
 
         $this->loadingStates['delete'] = false;
+    }
+
+    /**
+     * Show force delete confirmation modal with warnings
+     *
+     * @param int $categoryId
+     * @return void
+     */
+    public function showForceDeleteConfirmation(int $categoryId): void
+    {
+        $category = Category::with(['products', 'children'])->find($categoryId);
+
+        if (!$category) {
+            session()->flash('error', 'Kategoria nie została znaleziona.');
+            return;
+        }
+
+        $this->categoryToDelete = $category->id;
+        $this->deleteWarnings = [];
+
+        // Collect warnings
+        if ($category->products()->count() > 0) {
+            $this->deleteWarnings[] = 'Kategoria zawiera ' . $category->products()->count() . ' produktów. Przypisania do tej kategorii zostaną usunięte.';
+        }
+
+        if ($category->children()->count() > 0) {
+            $childrenCount = $category->children->count();
+            $descendantsCount = $category->descendants->count();
+
+            if ($descendantsCount > $childrenCount) {
+                $this->deleteWarnings[] = "Kategoria zawiera {$childrenCount} bezpośrednich podkategorii i łącznie {$descendantsCount} wszystkich potomków. Zostaną one również usunięte wraz z produktami.";
+            } else {
+                $this->deleteWarnings[] = "Kategoria zawiera {$childrenCount} podkategorii. Zostaną one również usunięte wraz z produktami.";
+            }
+        }
+
+        $this->showForceDeleteModal = true;
+    }
+
+    /**
+     * Force delete category with products/children
+     *
+     * @return void
+     */
+    public function confirmForceDelete(): void
+    {
+        if (!$this->categoryToDelete) {
+            return;
+        }
+
+        // Generate unique job ID for progress tracking
+        $this->deleteJobId = (string) \Illuminate\Support\Str::uuid();
+
+        // 🚀 CRITICAL: Create PENDING progress record BEFORE dispatch
+        // This ensures progress bar appears IMMEDIATELY when user clicks confirm
+        // Wire:poll will detect it within 3s without timing issues
+        $category = Category::find($this->categoryToDelete);
+        $totalCount = 0;
+
+        if ($category) {
+            // Calculate total: category + descendants
+            $totalCount = 1 + $category->descendants->count();
+        }
+
+        // Create PENDING progress (manually because no shop context for category deletion)
+        $progress = \App\Models\JobProgress::create([
+            'job_id' => $this->deleteJobId,
+            'job_type' => 'category_delete',
+            'shop_id' => null, // No shop context for category deletion
+            'status' => 'pending',
+            'current_count' => 0,
+            'total_count' => $totalCount,
+            'error_count' => 0,
+            'error_details' => [],
+            'started_at' => now(),
+        ]);
+
+        // CRITICAL: Save progress_id for JobProgressBar
+        $this->deleteProgressId = $progress->id;
+
+        Log::info('CategoryTree: Created PENDING progress for category deletion', [
+            'job_id' => $this->deleteJobId,
+            'progress_id' => $this->deleteProgressId,
+            'category_id' => $this->categoryToDelete,
+            'total_count' => $totalCount,
+        ]);
+
+        // Dispatch BulkDeleteCategoriesJob with force=true
+        \App\Jobs\Categories\BulkDeleteCategoriesJob::dispatch(
+            [$this->categoryToDelete],
+            true, // force delete
+            $this->deleteJobId
+        );
+
+        // Close modal
+        $this->cancelForceDelete();
+
+        // Show info message
+        session()->flash('info', 'Proces usuwania kategorii rozpoczęty. Postęp zobaczysz poniżej.');
+    }
+
+    /**
+     * Cancel force delete and close modal
+     *
+     * @return void
+     */
+    public function cancelForceDelete(): void
+    {
+        $this->showForceDeleteModal = false;
+        $this->categoryToDelete = null;
+        $this->deleteWarnings = [];
     }
 
     // ==========================================
@@ -760,6 +905,241 @@ class CategoryTree extends Component
         } catch (\Exception $e) {
             session()->flash('error', 'Błąd podczas dezaktywacji kategorii: ' . $e->getMessage());
         }
+    }
+
+    /**
+     * Bulk delete selected categories
+     *
+     * Business Logic:
+     * - Only categories without products can be deleted
+     * - Only categories without children can be deleted
+     * - Cascade delete descendants via model boot event
+     */
+    public function bulkDelete(): void
+    {
+        if (empty($this->selectedCategories)) {
+            session()->flash('error', 'Nie wybrano żadnych kategorii.');
+            return;
+        }
+
+        try {
+            $cannotDelete = [];
+            $deleted = 0;
+
+            DB::transaction(function () use (&$cannotDelete, &$deleted) {
+                foreach ($this->selectedCategories as $categoryId) {
+                    $category = Category::find($categoryId);
+
+                    if (!$category) {
+                        continue;
+                    }
+
+                    // Check if category has products
+                    if ($category->products()->count() > 0) {
+                        $cannotDelete[] = $category->name . ' (zawiera produkty)';
+                        continue;
+                    }
+
+                    // Check if category has children
+                    if ($category->children()->count() > 0) {
+                        $cannotDelete[] = $category->name . ' (zawiera podkategorie)';
+                        continue;
+                    }
+
+                    // Safe to delete
+                    $category->delete();
+                    $deleted++;
+                }
+            });
+
+            // Build result message
+            $message = '';
+            if ($deleted > 0) {
+                $message .= "Usunięto {$deleted} kategorii. ";
+            }
+            if (!empty($cannotDelete)) {
+                $message .= "Nie można usunąć: " . implode(', ', $cannotDelete);
+            }
+
+            if ($deleted > 0) {
+                session()->flash('message', $message);
+            } else {
+                session()->flash('error', $message ?: 'Nie udało się usunąć żadnej kategorii.');
+            }
+
+            $this->selectedCategories = [];
+
+        } catch (\Exception $e) {
+            Log::error('CategoryTree: Error bulk deleting categories', [
+                'error' => $e->getMessage(),
+                'selected_categories' => $this->selectedCategories
+            ]);
+
+            session()->flash('error', 'Błąd podczas usuwania kategorii: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Bulk move selected categories to new parent
+     *
+     * @param int|null $newParentId New parent category ID (null = move to root)
+     */
+    public function bulkMove(?int $newParentId = null): void
+    {
+        if (empty($this->selectedCategories)) {
+            session()->flash('error', 'Nie wybrano żadnych kategorii.');
+            return;
+        }
+
+        try {
+            $cannotMove = [];
+            $moved = 0;
+
+            DB::transaction(function () use ($newParentId, &$cannotMove, &$moved) {
+                foreach ($this->selectedCategories as $categoryId) {
+                    $category = Category::find($categoryId);
+
+                    if (!$category) {
+                        continue;
+                    }
+
+                    // Cannot move category to itself
+                    if ($newParentId === $categoryId) {
+                        $cannotMove[] = $category->name . ' (nie można przenieść do siebie)';
+                        continue;
+                    }
+
+                    // Cannot move to own descendant
+                    if ($newParentId && $category->isAncestorOf($newParentId)) {
+                        $cannotMove[] = $category->name . ' (nie można przenieść do potomka)';
+                        continue;
+                    }
+
+                    // Check max depth
+                    if ($newParentId) {
+                        $newParent = Category::find($newParentId);
+                        if ($newParent) {
+                            $maxDescendantLevel = $category->getMaxDescendantLevel();
+                            $wouldBeLevel = $newParent->level + 1;
+                            $finalLevel = $wouldBeLevel + $maxDescendantLevel;
+
+                            if ($finalLevel > Category::MAX_LEVEL) {
+                                $cannotMove[] = $category->name . ' (przekroczono maksymalną głębokość)';
+                                continue;
+                            }
+                        }
+                    }
+
+                    // Safe to move
+                    $category->moveTo($newParentId);
+                    $moved++;
+                }
+            });
+
+            // Build result message
+            $message = '';
+            if ($moved > 0) {
+                $message .= "Przeniesiono {$moved} kategorii. ";
+            }
+            if (!empty($cannotMove)) {
+                $message .= "Nie można przenieść: " . implode(', ', $cannotMove);
+            }
+
+            if ($moved > 0) {
+                session()->flash('message', $message);
+            } else {
+                session()->flash('error', $message ?: 'Nie udało się przenieść żadnej kategorii.');
+            }
+
+            $this->selectedCategories = [];
+
+        } catch (\Exception $e) {
+            Log::error('CategoryTree: Error bulk moving categories', [
+                'error' => $e->getMessage(),
+                'selected_categories' => $this->selectedCategories,
+                'new_parent_id' => $newParentId
+            ]);
+
+            session()->flash('error', 'Błąd podczas przenoszenia kategorii: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Bulk export selected categories to CSV
+     *
+     * Format: CSV with category data (id, name, parent, level, products_count)
+     * Download: Browser download as categories_export_YYYY-MM-DD.csv
+     */
+    public function bulkExport(): void
+    {
+        if (empty($this->selectedCategories)) {
+            session()->flash('error', 'Nie wybrano żadnych kategorii.');
+            return;
+        }
+
+        try {
+            $categories = Category::whereIn('id', $this->selectedCategories)
+                                 ->withCount('products')
+                                 ->with('parent')
+                                 ->orderBy('level')
+                                 ->orderBy('name')
+                                 ->get();
+
+            // Build CSV content
+            $csv = "ID,Nazwa,Kategoria nadrzędna,Poziom,Produktów,Slug,Status,Sortowanie\n";
+
+            foreach ($categories as $category) {
+                $csv .= sprintf(
+                    "%d,%s,%s,%d,%d,%s,%s,%d\n",
+                    $category->id,
+                    $this->escapeCsv($category->name),
+                    $this->escapeCsv($category->parent?->name ?? 'ROOT'),
+                    $category->level,
+                    $category->products_count,
+                    $this->escapeCsv($category->slug ?? ''),
+                    $category->is_active ? 'Aktywna' : 'Nieaktywna',
+                    $category->sort_order
+                );
+            }
+
+            // Generate filename with timestamp
+            $filename = 'categories_export_' . date('Y-m-d_His') . '.csv';
+
+            // Dispatch browser download event
+            $this->dispatch('download-csv', [
+                'filename' => $filename,
+                'content' => $csv
+            ]);
+
+            session()->flash('message', "Wyeksportowano {$categories->count()} kategorii.");
+
+        } catch (\Exception $e) {
+            Log::error('CategoryTree: Error bulk exporting categories', [
+                'error' => $e->getMessage(),
+                'selected_categories' => $this->selectedCategories
+            ]);
+
+            session()->flash('error', 'Błąd podczas eksportu kategorii: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Escape CSV field values
+     *
+     * @param string $value
+     * @return string
+     */
+    private function escapeCsv(string $value): string
+    {
+        // Escape double quotes
+        $value = str_replace('"', '""', $value);
+
+        // Wrap in quotes if contains comma, newline, or quote
+        if (strpos($value, ',') !== false || strpos($value, "\n") !== false || strpos($value, '"') !== false) {
+            $value = '"' . $value . '"';
+        }
+
+        return $value;
     }
 
     /**
@@ -942,6 +1322,79 @@ class CategoryTree extends Component
             $prefix = str_repeat('— ', $category->level);
             return [$category->id => $prefix . $category->name];
         })->toArray();
+    }
+
+    // ==========================================
+    // EVENT LISTENERS
+    // ==========================================
+
+    /**
+     * Refresh category tree after delete job completes
+     *
+     * Listens to 'progress-completed' event dispatched by JobProgressBar
+     * when category delete job finishes (completed or failed)
+     *
+     * WORKFLOW:
+     * 1. JobProgressBar detects job completed (status: completed/failed)
+     * 2. Dispatches 'progress-completed' event with progressId (job_id)
+     * 3. CategoryTree receives event and checks if it's category_delete type
+     * 4. Refreshes component to show updated tree (deleted categories removed)
+     *
+     * @param int $progressId JobProgress record ID
+     * @return void
+     */
+    #[On('progress-completed')]
+    public function refreshAfterDelete(int $progressId): void
+    {
+        try {
+            // Get job progress to check if it's category deletion
+            $progress = \App\Models\JobProgress::find($progressId);
+
+            if (!$progress) {
+                Log::debug('CategoryTree: Progress record not found', ['progress_id' => $progressId]);
+                return;
+            }
+
+            // Only refresh if this was a category deletion job
+            if ($progress->job_type !== 'category_delete') {
+                return;
+            }
+
+            Log::info('CategoryTree: Refreshing after category deletion', [
+                'progress_id' => $progressId,
+                'job_id' => $progress->job_id,
+                'status' => $progress->status,
+            ]);
+
+            // Clear deleted categories from selection and expanded nodes
+            $this->selectedCategories = [];
+
+            // Refresh expanded nodes - remove any that no longer exist
+            if (!empty($this->expandedNodes)) {
+                $existingCategories = Category::whereIn('id', $this->expandedNodes)->pluck('id')->toArray();
+                $this->expandedNodes = $existingCategories;
+            }
+
+            // Force component refresh by resetting cached properties
+            unset($this->categories);
+
+            // Show success message if job completed successfully
+            if ($progress->status === 'completed') {
+                $deletedCount = $progress->current_count ?? 0;
+                session()->flash('message', "Pomyślnie usunięto {$deletedCount} kategorii wraz z produktami.");
+            } else if ($progress->status === 'failed') {
+                session()->flash('error', 'Wystąpił błąd podczas usuwania kategorii. Sprawdź logi.');
+            }
+
+            // Save updated preferences
+            $this->saveUserPreferences();
+
+        } catch (\Exception $e) {
+            Log::error('CategoryTree: Error refreshing after delete', [
+                'progress_id' => $progressId,
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 
     // ==========================================
