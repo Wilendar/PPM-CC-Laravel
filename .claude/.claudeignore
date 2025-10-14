@@ -1,0 +1,87 @@
+# .claudeignore - Claude Code File Access Control
+# This file OVERRIDES .gitignore for Claude Code CLI context
+# Lines starting with ! are NEGATIONS (allow access even if in .gitignore)
+
+# ============================================
+# BLOCK: Standard ignored folders (keep blocked)
+# ============================================
+/vendor/
+/node_modules/
+/public/build/
+/storage/app/containers/
+/storage/app/products/images/
+/storage/app/imports/
+/storage/app/exports/
+/storage/logs/*.log
+/tests/coverage/
+/.idea/
+/.vscode/
+
+# ============================================
+# ALLOW: Project Documentation & Management (OVERRIDE .gitignore)
+# These folders MUST be accessible via @ in Claude Code CLI
+# ============================================
+
+# Project Documentation - CRITICAL for Claude Code work
+!/_DOCS/
+!/_DOCS/**
+
+# Agent Reports - CRITICAL for agent coordination
+!/_AGENT_REPORTS/
+!/_AGENT_REPORTS/**
+
+# Project Reports - CRITICAL for status tracking
+!/_REPORTS/
+!/_REPORTS/**
+
+# Development Tools - CRITICAL for deployment & diagnostics
+!/_TOOLS/
+!/_TOOLS/**
+
+# Issues & Fixes Documentation - CRITICAL for problem solving
+!/_ISSUES_FIXES/
+!/_ISSUES_FIXES/**
+
+# Diagnostics - useful for debugging
+!/_DIAGNOSTICS/
+!/_DIAGNOSTICS/**
+
+# Project Plan - CRITICAL for ETAP tracking
+!/Plan_Projektu/
+!/Plan_Projektu/**
+
+# Claude Code Configuration - CRITICAL for agent system
+!/.claude/
+!/.claude/**
+
+# Root Documentation Files - CRITICAL for project rules
+!/CLAUDE.md
+!/AGENTS.md
+
+# References - useful for UI mockups
+!/References/
+!/References/**
+
+# ============================================
+# BLOCK: Temporary & Backup Files (keep blocked)
+# ============================================
+/_TEMP_*
+/_BACKUP_*
+/_WORKING_*
+_TEMP_*.php
+_BACKUP_*.php
+_WORKING_*.php
+*_from_server.*
+temp_*.*
+test_*.php
+test-*.blade.php
+*.backup
+
+# ============================================
+# SECURITY: Sensitive Files (keep blocked)
+# ============================================
+.env
+.env.*
+/storage/*.key
+/auth.json
+cookies*.txt

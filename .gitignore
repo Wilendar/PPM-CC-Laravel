@@ -1,134 +1,51 @@
-# Laravel
+# ============================================
+# MINIMAL .gitignore - Private Repository
+# Only ESSENTIAL technical ignores
+# Documentation & project files ARE TRACKED for Claude Code CLI @ mentions
+# ============================================
+
+# Laravel Dependencies (MUST ignore - too large)
 /vendor/
 /node_modules/
+
+# Environment Secrets (MUST ignore - security)
+/.env
+/.env.*
+
+# Build Artifacts (MUST ignore - generated files)
 /public/build/
 /public/hot
-/storage/*.key
-/.env
-/.env.backup
-/.env.production
-/.phpunit.result.cache
-/Homestead.json
-/Homestead.yaml
-/auth.json
-/npm-debug.log
-/yarn-error.log
+/public/storage
+/bootstrap/cache/*.php
 
-# IDE
-/.idea/
-/.vscode/
-*.swp
-*.swo
-
-# OS
-.DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
-Thumbs.db
-
-# PPM-CC-Laravel Specific - Application Data
+# Runtime Data (MUST ignore - application generated)
 /storage/app/containers/
 /storage/app/products/images/
 /storage/app/imports/
 /storage/app/exports/
 /storage/logs/*.log
-/bootstrap/cache/*.php
-/config/prestashop_stores.json
+/storage/*.key
 
-# Deployment
-/public/vendor/
-/public/storage
-/public/docs/
+# IDE & OS (personal preferences)
+/.idea/
+/.vscode/
+.DS_Store
+*.swp
+*.swo
 
-# Testing
+# Testing (generated files)
 /tests/coverage/
 /.phpunit.cache
+/.phpunit.result.cache
 
 # ============================================
-# PPM-CC-Laravel - Project Documentation & Tools
-# These folders are for local development only
-# and should NOT be tracked in git repository
+# NOTE: Following ARE TRACKED in git (for Claude Code CLI):
+# ✅ CLAUDE.md, AGENTS.md - project instructions
+# ✅ .claude/ - agent system configuration
+# ✅ Plan_Projektu/ - ETAP tracking
+# ✅ _DOCS/ - project documentation (including credentials for private repo)
+# ✅ _ISSUES_FIXES/ - knowledge base
+# ✅ _TOOLS/ - development scripts
+# ✅ _AGENT_REPORTS/ - agent work reports
+# ✅ References/ - UI mockups
 # ============================================
-
-# Agent Reports (Claude Code agent work reports)
-/_AGENT_REPORTS/
-
-# Project Reports (daily summaries, status reports)
-/_REPORTS/
-
-# Development Tools (PowerShell scripts, diagnostics)
-/_TOOLS/
-
-# Diagnostics Files (debugging sessions)
-/_DIAGNOSTICS/
-
-# Issues & Fixes Documentation (problem solving docs)
-/_ISSUES_FIXES/
-
-# Project Documentation (all docs - not part of application code)
-/_DOCS/
-
-# Claude Code Configuration & Project Management
-/.claude/
-/Plan_Projektu/
-CLAUDE.md
-AGENTS.md
-
-# Development Resources & Testing
-/References/
-/_OTHER/
-/_TEST/
-
-# Temporary & Backup Files
-/_TEMP_*
-/_BACKUP_*
-/_WORKING_*
-_TEMP_*.php
-_TEMP_*.blade.php
-_BACKUP_*.php
-_WORKING_*.php
-category-form-server.blade.php
-*-server.css
-
-# Duplicate/Old Folders
-/Plan_Projektu copy/
-
-# ============================================
-# Temporary files from development/testing
-# ============================================
-cookies*.txt
-temp_*.txt
-temp_*.php
-temp_*.html
-temp_*.css
-temp_*.js
-response*.txt
-headers.txt
-final_*.txt
-dashboard_*.txt
-*.backup
-*_from_server.*
-test_results/
-absolute_test.php
-minimal_test.php
-env_debug.php
-create_admin_user.php
-
-# Uploaded content from server (temporary files)
-index_for_upload.php
-final_index.php
-public_html_index.php
-livewire_blade_fix.blade.php
-livewire_js_fix.js
-test-*.blade.php
-test-*.html
-test_*.php
-upload_*.sh
-force-debug.blade.php
-debug-category.blade.php
-simple-test.blade.php
-route-test.blade.php
-/claude

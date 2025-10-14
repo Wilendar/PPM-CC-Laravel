@@ -1,0 +1,109 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pwsh:*)",
+      "Bash($HostidoKey = \"D:\\OneDrive - MPP TRADE\\SSH\\Hostido\\HostidoSSHNoPass.ppk\")",
+      "Bash(pscp:*)",
+      "mcp__context7__get-library-docs",
+      "Bash(php:*)",
+      "Bash(node:*)",
+      "Bash(plink:*)",
+      "Bash(})",
+      "Bash(Select-String -Pattern \"10957|loadShopCategories|Shop categories\" -Context 2,2)",
+      "Bash(findstr:*)",
+      "Bash(curl -s -o /dev/null -w \"HTTP Status: %{http_code}\\nTotal Time: %{time_total}s\\n\" https://ppm.mpptrade.pl/admin/products)",
+      "Bash(Select-String -Pattern \"CategoryPreviewModal|detectCategory|import_context\" -Context 3,3)",
+      "Bash(Select-String -Pattern \"CategoryPreviewModal|detectCategory|show-category-preview\" -Context 2,2)",
+      "Bash(certutil:*)",
+      "Bash(npm run build)",
+      "Bash(Get-Date -Format \"yyyy-MM-dd HH:mm\")",
+      "Read(//c/Users/kamil/.claude/**)",
+      "Bash(Test-Path \"_DOCS/AGENT_USAGE_GUIDE.md\")",
+      "Bash(git add:*)",
+      "Bash(Select-String -Pattern \"^A \")",
+      "Bash(Select-Object -First 20)",
+      "Bash(git commit:*)",
+      "WebSearch"
+    ],
+    "deny": [],
+    "ask": []
+  },
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "pwsh -NoProfile -ExecutionPolicy Bypass -File \".claude\\scripts\\prompt-context-reminder.ps1\"",
+            "timeout": 2000
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "(Write|Edit).*\\.(php|blade\\.php)$",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "pwsh -NoProfile -ExecutionPolicy Bypass -File \".claude\\scripts\\enforce-context7.ps1\"",
+            "timeout": 2000
+          }
+        ]
+      },
+      {
+        "matcher": "Task",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "pwsh -NoProfile -ExecutionPolicy Bypass -File \".claude\\scripts\\agent-report-reminder.ps1\"",
+            "timeout": 2000
+          }
+        ]
+      },
+      {
+        "matcher": "mcp__context7__.*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "pwsh -Command \"Write-Host '✅ Context7 MCP - EXCELLENT!' -ForegroundColor Green\"",
+            "timeout": 1000
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "(Write|Edit).*\\.php",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "pwsh -Command \"Write-Host '✅ PHP CODE MODIFIED' -ForegroundColor Green; Write-Host '• Consider: php artisan test' -ForegroundColor Yellow\"",
+            "timeout": 1000
+          }
+        ]
+      },
+      {
+        "matcher": "Bash.*composer.*install",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "pwsh -Command \"Write-Host '📦 COMPOSER INSTALL COMPLETED' -ForegroundColor Green; Write-Host '• Consider: php artisan migrate, cache:clear' -ForegroundColor Yellow\"",
+            "timeout": 1000
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "pwsh -Command \"Write-Host '📦 CONTEXT COMPACTION' -ForegroundColor Cyan; Write-Host '• Context7 MANDATORY for code generation' -ForegroundColor Red; Write-Host '• NO HARDCODING, NO MOCK DATA' -ForegroundColor Red\"",
+            "timeout": 1000
+          }
+        ]
+      }
+    ]
+  }
+}
