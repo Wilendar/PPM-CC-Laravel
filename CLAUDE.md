@@ -10,124 +10,150 @@ Aplikacja klasy enterprise do zarządzania produktami na wielu sklepach Prestash
 
 ### Stack Technologiczny
 - **Backend**: PHP 8.3 + Laravel 12.x
-- **UI**: Blade + Livewire 3.x + Alpine.js 
-- **Build**: Vite (tylko lokalne buildy)
+- **UI**: Blade + Livewire 3.x + Alpine.js
+- **Build**: Vite 5.4.20 (**TYLKO lokalnie** - nie istnieje na produkcji!)
 - **DB**: MySQL SQL
 - **Cache/Kolejki**: Redis (lub driver database jako fallback)
 - **Import XLSX**: Laravel-Excel (PhpSpreadsheet)
 - **Autoryzacja**: Laravel Socialite (Google Workspace + Microsoft Entra ID) - implementacja na końcu
 
+### 🏗️ Build & Deployment Architecture
+
+**⚠️ KRYTYCZNA ZASADA:** Vite działa TYLKO na lokalnej maszynie development!
+
+**LOKALNE (Development Machine - Windows):**
+- ✅ Node.js + npm
+- ✅ Vite 5.4.20
+- ✅ `npm run build` - buduje assets lokalnie
+- ✅ Output: `public/build/` (hashed filenames + manifest.json)
+
+**PRODUKCJA (Hostido Server):**
+- ❌ **Brak Node.js** (nie jest dostępny/zainstalowany)
+- ❌ **Brak Vite** (nie istnieje na serwerze)
+- ❌ **Brak npm** (nie można buildować na serwerze)
+- ✅ **TYLKO zbudowane pliki** uploadowane z lokalnej maszyny
+
+**WORKFLOW:**
+```
+[Local] → npm run build → [public/build/*] → pscp upload → [Production Server]
+        ↓                                                           ↓
+    Vite builds assets                                    Laravel @vite() helper
+    Creates manifest.json                                 Reads manifest.json
+    Hashes filenames                                      Serves static files
+```
+
+**Laravel Vite Helper (na produkcji):**
+- Odczytuje `public/build/.vite/manifest.json`
+- Mapuje entry points (np. `resources/css/app.css`) → hashed filenames (np. `assets/app-Ct0f_zUF.css`)
+- Generuje `<link>` i `<script>` tagi ze ścieżkami do zbudowanych plików
+
+### 🚨 KRYTYCZNE: Vite Manifest - Dwie Lokalizacje!
+
+**⚠️ PROBLEM:** Vite tworzy manifest w DWÓCH miejscach, ale Laravel używa TYLKO jednego!
+
+**Lokalizacje manifestu:**
+```
+public/build/
+├── .vite/
+│   └── manifest.json          ❌ TEN PLIK JEST IGNOROWANY!
+└── manifest.json               ✅ TEGO UŻYWA LARAVEL!
+```
+
+**ROOT CAUSE:**
+- Vite 5.x domyślnie tworzy manifest w `.vite/manifest.json` (subdirectory)
+- Laravel Vite plugin (`@vite()` directive w Blade) szuka manifestu w `public/build/manifest.json` (ROOT)
+- Jeśli wgrasz TYLKO `.vite/manifest.json`, Laravel go NIE ZNAJDZIE i użyje starego ROOT manifestu!
+
+**OBJAWY problemu:**
+- ✅ `npm run build` działa lokalnie
+- ✅ Upload `.vite/manifest.json` zakończony sukcesem
+- ✅ `php artisan cache:clear` wykonany
+- ❌ Przeglądarka ładuje STARE pliki CSS/JS (z datą sprzed tygodni)
+- ❌ Zmiany CSS nie są widoczne po hard refresh
+- ❌ Manifest wskazuje na nieistniejące lub stare pliki
+
+**✅ ROZWIĄZANIE: Wgrywaj OBA manifesty (lub tylko ROOT)!**
+
+```powershell
+# ❌ BŁĄD: Upload tylko .vite/manifest.json
+pscp -i $HostidoKey -P 64321 `
+  "public/build/.vite/manifest.json" `
+  host379076@...:public/build/.vite/manifest.json
+
+# ✅ POPRAWNIE: Upload ROOT manifest.json
+pscp -i $HostidoKey -P 64321 `
+  "public/build/.vite/manifest.json" `
+  host379076@...:public/build/manifest.json
+
+# LUB oba (bezpieczniej):
+pscp -i $HostidoKey -P 64321 `
+  "public/build/.vite/manifest.json" `
+  host379076@...:public/build/.vite/manifest.json
+
+pscp -i $HostidoKey -P 64321 `
+  "public/build/.vite/manifest.json" `
+  host379076@...:public/build/manifest.json
+```
+
+**KRYTYCZNE:** Deploy MUSI wgrać manifest do ROOT lokalizacji `public/build/manifest.json` (Laravel Vite helper wymaga ROOT, nie subdirectory)
+
+**WERYFIKACJA po deployment:**
+```powershell
+# Sprawdź który plik ładuje przeglądarka
+# DevTools → Network → CSS filter → sprawdź nazwę pliku
+
+# Sprawdź ROOT manifest na produkcji
+plink ... -batch "cat domains/.../public/build/manifest.json | grep components.css"
+
+# Powinno pokazać AKTUALNY hash (np. components-BF7GTy66.css)
+# Jeśli pokazuje STARY hash (np. components-wc8O_2Rd.css) = manifest nie został wgrany!
+```
+
+**DEPLOYMENT CHECKLIST:**
+1. ✅ Lokalnie: `npm run build`
+2. ✅ Upload CSS/JS files: `pscp public/build/assets/* → remote/assets/`
+3. ✅ Upload manifest do ROOT: `pscp public/build/.vite/manifest.json → remote/build/manifest.json`
+4. ✅ Clear cache: `php artisan view:clear && php artisan cache:clear && php artisan config:clear`
+5. ✅ Hard refresh przeglądarki: Ctrl+Shift+R
+6. ✅ DevTools verification: sprawdź które pliki CSS/JS się ładują
+
+**Data wykrycia problemu:** 2025-10-14 (Modal z-index fix deployment)
+
 ### Środowisko Deployment
 - **Domena**: ppm.mpptrade.pl
-- **Hosting**: Hostido.net.pl
+- **Hosting**: Hostido.net.pl (shared hosting - **brak Node.js/npm/Vite**)
 - **SSH**: host379076@host379076.hostido.net.pl:64321 (klucz SSH wymagany)
 - **SSH Key Path**: `D:\OneDrive - MPP TRADE\SSH\Hostido\HostidoSSHNoPass.ppk`
 - **Laravel Root Path**: `domains/ppm.mpptrade.pl/public_html/` (bezpośrednio w public_html, bez podfolderu)
 - **Baza**: host379076_ppm@localhost (MariaDB 10.11.13)
 - **PHP**: 8.3.23 (natywnie dostępny)
 - **Composer**: 2.8.5 (preinstalowany)
+- **Node.js/npm**: ❌ NIE DOSTĘPNE (build tylko lokalnie!)
 
 ## Architektura Aplikacji
 
 ### 🔑 KRYTYCZNA ZASADA ARCHITEKTURY: SKU jako Główny Klucz Produktu
 
-**⚠️ FUNDAMENTALNA REGUŁA - ZAWSZE PRZESTRZEGAJ:**
+**⚠️ FUNDAMENTALNA REGUŁA:** SKU (Stock Keeping Unit) jest UNIWERSALNYM IDENTYFIKATOREM produktu w całej aplikacji.
 
-**SKU (Stock Keeping Unit) jest UNIWERSALNYM IDENTYFIKATOREM produktu w całej aplikacji PPM-CC-Laravel.**
+**DLACZEGO SKU?**
+- ✅ ZAWSZE ten sam SKU dla produktu fizycznego
+- ❌ Różne ID w różnych sklepach PrestaShop
+- ❌ Różne ID w różnych systemach ERP
+- ❌ Możliwy brak external ID (produkt ręczny)
 
-#### **DLACZEGO SKU, nie external ID?**
+**ZASADA SKU FIRST:**
+- ✅ Wyszukiwanie produktu → PRIMARY: SKU
+- ✅ Conflict detection → SKU
+- ✅ Import/export → SKU
+- ✅ Multi-store sync → SKU
+- ❌ External IDs → SECONDARY/FALLBACK only
 
-Produkt w PPM może mieć:
-- ❌ **Różne ID w różnych sklepach PrestaShop** (`prestashop_product_id`: 4017, 5234, 1092...)
-- ❌ **Różne ID w różnych systemach ERP** (Baselinker ID, Subiekt GT ID, Dynamics ID...)
-- ❌ **Brak external ID** (produkt dodany ręcznie przez użytkownika)
-- ✅ **ZAWSZE TEN SAM SKU** - jedyny wspólny wyznacznik tego samego produktu fizycznego!
-
-#### **OBOWIĄZKOWA ZASADA: SKU FIRST**
-
-**✅ ZAWSZE używaj SKU jako PRIMARY lookup method dla:**
-- Wyszukiwania produktu w bazie PPM
-- Porównywania produktów między sklepami
-- Conflict detection podczas importu/re-importu
-- Synchronizacji danych między systemami (PrestaShop ↔ PPM ↔ ERP)
-- Mapowania produktów z external systems
-
-**❌ External IDs są WTÓRNE (secondary/fallback lookup):**
-- `ProductShopData.prestashop_product_id` - tylko dla konkretnego sklepu
-- `ERP mappings` - tylko dla konkretnego systemu ERP
-- **Użyj ich TYLKO jeśli produkt nie ma SKU** (ekstremalnie rzadkie!)
-
-#### **PRZYKŁAD PRAWIDŁOWEGO WORKFLOW:**
-
-```php
-// ✅ CORRECT: PRIMARY - Search by SKU from PrestaShop reference
-$sku = $prestashopProduct['reference'] ?? null; // SKU from PrestaShop
-if ($sku) {
-    $product = Product::where('sku', $sku)->first();
-
-    if ($product) {
-        // ✅ Product EXISTS in PPM
-        // Może być:
-        // - Dodany ręcznie (bez ProductShopData)
-        // - Z innego sklepu (ProductShopData.shop_id !== $currentShopId)
-        // - Z tego samego sklepu (RE-IMPORT)
-        // → CONFLICT DETECTION scenario
-    } else {
-        // ✅ Product NOT in PPM
-        // → FIRST IMPORT scenario
-    }
-}
-
-// ❌ FALLBACK: Only if product has NO SKU (extremely rare)
-if (!$product) {
-    $productShopData = ProductShopData::where('prestashop_product_id', $prestashopProductId)->first();
-    if ($productShopData) {
-        $product = Product::find($productShopData->product_id);
-    }
-}
-```
-
-#### **❌ BŁĘDNY PATTERN (DO UNIKANIA):**
-
-```php
-// ❌ WRONG: Search by shop-specific ID FIRST
-$productShopData = ProductShopData::where('shop_id', $shopId)
-    ->where('prestashop_product_id', $prestashopProductId)
-    ->first();
-// To POMIJA:
-// - Produkty ręcznie dodane (brak ProductShopData)
-// - Produkty z innych sklepów (inny shop_id)
-// - Cross-shop scenarios
-// → FALSE "first import" when it's actually RE-IMPORT!
-```
-
-#### **KONSEKWENCJE dla kodu:**
-
-- ✅ **Conflict detection** MUSI używać SKU jako PRIMARY
-- ✅ **Import/export** MUSI używać SKU jako PRIMARY
-- ✅ **Synchronizacja multi-store** MUSI używać SKU jako PRIMARY
-- ✅ **ERP integration** MUSI używać SKU jako PRIMARY
-- ✅ **Product lookup** ZAWSZE SKU first, external ID fallback
-
-#### **Database Schema:**
-
-```
-products table:
-- id (INT) - Technical primary key (auto-increment)
-- sku (VARCHAR) - ✅ UNIQUE, NOT NULL - BUSINESS PRIMARY KEY
-- name, description, etc.
-
-product_shop_data table (pivot):
-- id (INT)
-- product_id (FK → products.id)
-- shop_id (FK → prestashop_shops.id)
-- prestashop_product_id (INT) - Secondary mapping per shop
-
-ERP mappings:
-- Similar pattern - secondary mappings per ERP system
-```
-
-**PAMIĘTAJ:** SKU to fundament architektury PPM-CC-Laravel. Bez przestrzegania tej zasady system nie działa poprawnie!
+**📖 SZCZEGÓŁOWY PRZEWODNIK:** [`_DOCS/SKU_ARCHITECTURE_GUIDE.md`](_DOCS/SKU_ARCHITECTURE_GUIDE.md)
+- Przykłady prawidłowych/błędnych patterns
+- Database schema
+- Scenariusze użycia (first import, re-import, multi-store)
+- Checklist implementacji
 
 ---
 
@@ -156,66 +182,34 @@ ERP mappings:
 
 ## Komendy i Workflow
 
-### Development Workflow
+### Quick Reference
+
+**Development:**
 ```bash
-# Lokalne środowisko development
-php artisan serve
-php artisan migrate
-php artisan db:seed
-
-# Build assets
-npm install
-npm run dev       # Development
-npm run build     # Production
-
-# Testy
-php artisan test
-./vendor/bin/phpunit
+php artisan serve           # Local dev server
+php artisan migrate         # Run migrations
+npm run build              # Build assets
+php artisan test           # Run tests
 ```
 
-### Deployment na Hostido
+**Deployment (Hostido):**
 ```powershell
-# SSH z kluczem PuTTY (ścieżka do klucza)
 $HostidoKey = "D:\OneDrive - MPP TRADE\SSH\Hostido\HostidoSSHNoPass.ppk"
 
-# Test połączenia
-plink -ssh host379076@host379076.hostido.net.pl -P 64321 -i $HostidoKey -batch "php -v"
+# Upload file
+pscp -i $HostidoKey -P 64321 "local/file" host379076@host379076.hostido.net.pl:remote/path
 
-# Upload pojedynczego pliku
-pscp -i $HostidoKey -P 64321 "local/path/file.php" host379076@host379076.hostido.net.pl:domains/ppm.mpptrade.pl/public_html/path/file.php
-
-# Deployment commands
-plink -ssh host379076@host379076.hostido.net.pl -P 64321 -i $HostidoKey -batch "cd domains/ppm.mpptrade.pl/public_html && composer install --no-dev"
-
-# Migracje i cache (zawsze po upload plików)
-plink -ssh host379076@host379076.hostido.net.pl -P 64321 -i $HostidoKey -batch "cd domains/ppm.mpptrade.pl/public_html && php artisan migrate --force && php artisan view:clear && php artisan cache:clear"
+# Clear cache
+plink -ssh host379076@host379076.hostido.net.pl -P 64321 -i $HostidoKey -batch `
+  "cd domains/ppm.mpptrade.pl/public_html && php artisan cache:clear"
 ```
 
-### 🚀 Quick Commands Reference
-```powershell
-# Szybki upload i cache clear pattern:
-$HostidoKey = "D:\OneDrive - MPP TRADE\SSH\Hostido\HostidoSSHNoPass.ppk"
-pscp -i $HostidoKey -P 64321 "D:\OneDrive - MPP TRADE\Skrypty\PPM-CC-Laravel\path\to\file" host379076@host379076.hostido.net.pl:domains/ppm.mpptrade.pl/public_html/path/to/file
-plink -ssh host379076@host379076.hostido.net.pl -P 64321 -i $HostidoKey -batch "cd domains/ppm.mpptrade.pl/public_html && php artisan view:clear && php artisan cache:clear"
-```
-
-### Ręczne połączenie SSH
-```bash
-# Wymaga klucza SSH (HostidoSSHNoPass.ppk)
-ssh -p 64321 host379076@host379076.hostido.net.pl
-```
-
-### Baza Danych
-```bash
-# Migracje
-php artisan migrate
-php artisan migrate:rollback
-php artisan migrate:status
-
-# Seeders
-php artisan db:seed
-php artisan db:seed --class=ProductSeeder
-```
+**📖 PEŁNY PRZEWODNIK DEPLOYMENT:** [`_DOCS/DEPLOYMENT_GUIDE.md`](_DOCS/DEPLOYMENT_GUIDE.md)
+- Wszystkie komendy SSH/pscp/plink
+- Deployment patterns (single file, multiple files, migrations, assets)
+- Maintenance commands (cache, queue, database)
+- Troubleshooting deployment issues
+- Deployment checklist
 
 ## Kluczowe Funkcjonalności
 
@@ -273,368 +267,181 @@ PPM-CC-Laravel/
 
 ### 🎨 OBOWIĄZKOWA WERYFIKACJA FRONTEND
 
-**⚠️ KRYTYCZNA ZASADA:** ZAWSZE weryfikuj poprawność layout, styles i frontend PRZED informowaniem użytkownika o ukończeniu!
+**⚠️ KRYTYCZNA ZASADA:** ZAWSZE weryfikuj poprawność layout, styles i frontend PRZED informowaniem użytkownika!
 
-#### **AUTOMATED VERIFICATION HOOK**
+**WORKFLOW:**
+1. Wprowadź zmiany (CSS/Blade/HTML)
+2. Build assets: `npm run build`
+3. Deploy na produkcję
+4. **⚠️ KRYTYCZNE:** Screenshot verification
+5. Jeśli problem → FIX → powtórz 1-4
+6. Dopiero gdy OK → informuj użytkownika
 
-```powershell
-# Po każdym wdrożeniu frontend/layout/styles changes
-pwsh _TOOLS/verify_frontend_changes.ps1 -Url "https://ppm.mpptrade.pl/admin/products"
-
-# Z automatycznym otwarciem screenshot
-pwsh _TOOLS/verify_frontend_changes.ps1 -Url "https://ppm.mpptrade.pl/admin/products" -OpenReport
-
-# Skip specific checks (jeśli potrzebne)
-pwsh _TOOLS/verify_frontend_changes.ps1 -Url "..." -SkipScreenshot -SkipDOM
-```
-
-**Hook automatycznie sprawdza:**
-- ✅ Screenshot viewport (1920x1080)
-- ✅ DOM structure (Grid, parent hierarchy, positioning)
-- ✅ Header/spacing issues (overlay, gaps)
-- ❌ Exit code 1 jeśli wykryto problemy (nie informuj użytkownika!)
-- ✅ Exit code 0 jeśli wszystko OK
-
-#### **KIEDY UŻYWAĆ `/analizuj_strone`:**
-
-**OBOWIĄZKOWO** po każdej zmianie dotyczącej:
-- ✅ Layout (flexbox, grid, positioning)
-- ✅ CSS styles (inline styles, classes, media queries)
-- ✅ Blade templates (struktura DOM, divs balance)
-- ✅ Responsive design (mobile/desktop breakpoints)
-- ✅ Z-index / stacking context issues
-- ✅ Sidebar, header, footer positioning
-- ✅ Modals, dropdowns, overlays
-- ✅ Any component that affects page layout
-
-#### **WORKFLOW OBOWIĄZKOWY:**
-
+**NARZĘDZIA:**
 ```bash
-# 1. Wprowadź zmiany w kodzie (CSS/Blade/HTML)
-# 2. Build assets (jeśli CSS)
-npm run build
-
-# 3. Deploy na produkcję
-pscp/plink upload & cache clear
-
-# 4. ⚠️ KRYTYCZNE: Zweryfikuj przez screenshot
-/analizuj_strone
-
-# 5. Jeśli screenshot pokazuje problem → FIX → powtórz 1-4
-# 6. Dopiero gdy screenshot OK → informuj użytkownika
-```
-
-#### **NARZĘDZIA WERYFIKACJI:**
-
-**Screenshot Verification (PODSTAWOWE):**
-```bash
+# Screenshot verification
 node _TOOLS/screenshot_page.cjs https://ppm.mpptrade.pl/admin/products
-```
 
-**DOM Structure Check:**
-```bash
-node _TOOLS/check_dom_structure_new.cjs https://ppm.mpptrade.pl/admin/products
-```
-
-**Computed Styles Analysis:**
-```javascript
-// _TOOLS/check_sidebar_styles.cjs (przykład)
-const computed = window.getComputedStyle(element);
-console.log({
-    position: computed.position,
-    display: computed.display,
-    width: computed.width,
-    zIndex: computed.zIndex
-});
-```
-
-#### **PRZYKŁAD ZŁEGO WORKFLOW (ZABRONIONE):**
-
-```
-❌ BAD:
-1. Zmiana admin.blade.php (sidebar lg:relative)
-2. Upload na produkcję
-3. Clear cache
-4. "✅ Sidebar naprawiony!" ← BEZ WERYFIKACJI!
-
-User: "Nie widzę żadnych zmian"
-Claude: "Przepraszam, sprawdzam..." ← ZA PÓŹNO!
-```
-
-#### **PRZYKŁAD DOBREGO WORKFLOW (WYMAGANE):**
-
-```
-✅ GOOD:
-1. Zmiana admin.blade.php (sidebar lg:relative)
-2. npm run build (jeśli CSS)
-3. Upload na produkcję
-4. Clear cache
-5. node _TOOLS/screenshot_page.cjs <URL>
-6. Analiza screenshota → sidebar NADAL fixed
-7. Root cause: Tailwind @media nie działa
-8. Fix: Dodaj CSS !important w layout.css
-9. Rebuild → Upload → Screenshot
-10. Screenshot pokazuje sidebar OK ✅
-11. Teraz inform user: "✅ Sidebar naprawiony (zweryfikowane)"
-```
-
-#### **CO SPRAWDZAĆ NA SCREENSHOT:**
-
-- ✅ Sidebar NIE zasłania content
-- ✅ Wszystkie kolumny widoczne i klikalne
-- ✅ Responsive breakpoints działają
-- ✅ Modals renderują się na wierzchu
-- ✅ Dropdowns nie chowają się pod content
-- ✅ Layout spójny na różnych szerokościach ekranu
-- ✅ Teksty nie są ucięte (word-wrap)
-- ✅ No horizontal scroll (chyba że zamierzone)
-
-#### **SCREENSHOT STORAGE:**
-
-```
-_TOOLS/screenshots/
-├── page_full_2025-10-08T11-32-00.png      # Full page
-├── page_viewport_2025-10-08T11-32-00.png  # Viewport (1920x1080)
-└── ...
-```
-
-**Zachowuj screenshoty PRZED i PO zmianach** dla porównania!
-
-#### **PRZYPADKI UŻYCIA:**
-
-**Case 1: Sidebar Layout Fix**
-```bash
-# Problem: Sidebar zasłania content
+# lub slash command
 /analizuj_strone
-# → Screenshot pokazuje sidebar fixed zamiast relative
-# → Fix CSS → Rebuild → Deploy → Screenshot again
-# → Verify sidebar position: relative w computed styles
 ```
 
-**Case 2: Modal Z-Index Issue**
-```bash
-# Problem: Modal chowa się pod header
-/analizuj_strone
-# → Check z-index hierarchy
-# → Fix: Header z-50, Modal z-999999
-# → Screenshot verification
-```
-
-**Case 3: Responsive Breakpoints**
-```bash
-# Test multiple viewports:
-node _TOOLS/screenshot_page.cjs --width 375   # Mobile
-node _TOOLS/screenshot_page.cjs --width 768   # Tablet
-node _TOOLS/screenshot_page.cjs --width 1920  # Desktop
-```
-
-#### **INTEGRATION Z AGENTS:**
-
-- **frontend-specialist**: ZAWSZE używa `/analizuj_strone` po zmianach
-- **livewire-specialist**: Weryfikuje components rendering
-- **coding-style-agent**: Sprawdza inline styles violations
-
-**DOKUMENTACJA PEŁNA:** `.claude/commands/analizuj_strone.md`
+**📖 PEŁNY PRZEWODNIK WERYFIKACJI:** [`_DOCS/FRONTEND_VERIFICATION_GUIDE.md`](_DOCS/FRONTEND_VERIFICATION_GUIDE.md)
+- Automated verification hook (PowerShell script)
+- Kiedy używać weryfikacji (layout, CSS, Blade, responsive)
+- Obowiązkowy workflow (krok po kroku)
+- Narzędzia (screenshot, DOM check, computed styles)
+- Przykłady dobrego/złego workflow
+- Przypadki użycia (sidebar fix, modal z-index, responsive)
+- Integration z agents (frontend-specialist, livewire-specialist)
+- Checklist weryfikacji
 
 ### 🔍 DEBUG LOGGING BEST PRACTICES
 
-**⚠️ KRYTYCZNA ZASADA:** Podczas developmentu używaj zaawansowanych logów, po weryfikacji je usuń!
+**⚠️ KRYTYCZNA ZASADA:** Development = Extensive logging → Production = Minimal logging
 
-#### **DEVELOPMENT PHASE - Extensive Logging**
+**WORKFLOW:**
+1. **Development:** Dodaj `Log::debug()` z pełnym kontekstem (types, BEFORE/AFTER state)
+2. **Deploy & Test:** User weryfikuje funkcjonalność
+3. **User Confirmation:** ✅ "działa idealnie"
+4. **Cleanup:** Usuń `Log::debug()`, zostaw tylko `Log::info/warning/error`
+5. **Final Deploy:** Clean version
 
-**KIEDY:** Podczas implementacji nowej funkcjonalności lub debugowania problemu
+**PRODUCTION RULES:**
+- ✅ ZOSTAW: `Log::info()` (operacje biznesowe), `Log::warning()` (nietypowe), `Log::error()` (błędy)
+- ❌ USUŃ: `Log::debug()`, "BEFORE/AFTER", `gettype()`, "CALLED/COMPLETED"
 
-**CO LOGOWAĆ:**
-```php
-// ✅ DEVELOPMENT - Zaawansowane logi z pełnym kontekstem
-Log::debug('removeFromShop CALLED', [
-    'shop_id' => $shopId,
-    'shop_id_type' => gettype($shopId),
-    'exportedShops_BEFORE' => $this->exportedShops,
-    'exportedShops_types' => array_map('gettype', $this->exportedShops),
-    'shopsToRemove_BEFORE' => $this->shopsToRemove,
-]);
-
-Log::debug('Save: Filtering shops to create', [
-    'exportedShops' => $this->exportedShops,
-    'shopsToRemove' => $this->shopsToRemove,
-    'shopsToCreate' => $shopsToCreate,
-]);
-```
-
-**ZALETY:**
-- Możliwość śledzenia typu danych (int vs string)
-- Pełny stan przed/po operacji
-- Łatwiejsze zidentyfikowanie root cause
-- Szybsze debugowanie na produkcji
-
-#### **PRODUCTION PHASE - Minimal Logging**
-
-**KIEDY:** Po weryfikacji przez użytkownika że wszystko działa
-
-**CO POZOSTAWIĆ:**
-```php
-// ✅ PRODUCTION - Tylko istotne operacje i błędy
-Log::info('Shop marked for DB deletion on save', [
-    'product_id' => $this->product?->id,
-    'shop_id' => $shopId,
-    'shopData_id' => $this->shopData[$shopId]['id'],
-]);
-
-Log::warning('removeFromShop ABORTED - shop not found', [
-    'shop_id' => $shopId,
-]);
-
-Log::error('Product save failed', [
-    'error' => $e->getMessage(),
-    'product_id' => $this->product?->id,
-]);
-```
-
-**CO USUNĄĆ:**
-```php
-// ❌ USUŃ po weryfikacji
-Log::debug('...'); // Wszystkie logi debug
-Log::debug('exportedShops_BEFORE', ...); // Stan przed operacją
-Log::debug('exportedShops_types', ...); // Informacje o typach
-```
-
-#### **WORKFLOW:**
-
-1. **Development:** Dodaj `Log::debug()` z pełnym kontekstem
-2. **Deploy na produkcję:** Wszystkie logi zostają (dla testów)
-3. **User Testing:** Użytkownik weryfikuje funkcjonalność
-4. **User Confirmation:** ✅ "działa idealnie"
-5. **Cleanup:** Usuń `Log::debug()`, zostaw tylko `Log::info/warning/error`
-6. **Final Deploy:** Clean version bez debug logów
-
-#### **PRODUCTION LOGGING RULES:**
-
-**ZOSTAW:**
-- ✅ `Log::info()` - Ważne operacje biznesowe (create, update, delete)
-- ✅ `Log::warning()` - Nietypowe sytuacje które nie są błędami
-- ✅ `Log::error()` - Wszystkie błędy i exceptions
-
-**USUŃ:**
-- ❌ `Log::debug()` - Wszelkie debug logi
-- ❌ Logi typu "BEFORE/AFTER"
-- ❌ Logi z typami danych (`gettype()`, `array_map('gettype')`)
-- ❌ Logi "CALLED/COMPLETED"
-
-#### **EXAMPLE - Before/After:**
-
-```php
-// ❌ DEVELOPMENT VERSION (verbose)
-public function removeFromShop(int $shopId): void
-{
-    $shopId = (int) $shopId;
-
-    Log::debug('removeFromShop CALLED', [
-        'shop_id' => $shopId,
-        'shop_id_type' => gettype($shopId),
-        'exportedShops_BEFORE' => $this->exportedShops,
-        'exportedShops_types' => array_map('gettype', $this->exportedShops),
-    ]);
-
-    // ... logic ...
-
-    Log::debug('removeFromShop COMPLETED', [
-        'exportedShops_AFTER' => $this->exportedShops,
-        'shopsToRemove_AFTER' => $this->shopsToRemove,
-    ]);
-}
-
-// ✅ PRODUCTION VERSION (clean)
-public function removeFromShop(int $shopId): void
-{
-    $shopId = (int) $shopId;
-
-    $key = array_search($shopId, $this->exportedShops, false);
-    if ($key === false) {
-        Log::warning('Shop removal failed - not in list', ['shop_id' => $shopId]);
-        return;
-    }
-
-    // ... logic ...
-
-    if (isset($this->shopData[$shopId]['id']) && $this->shopData[$shopId]['id'] !== null) {
-        $this->shopsToRemove[] = $shopId;
-        Log::info('Shop marked for deletion', [
-            'product_id' => $this->product?->id,
-            'shop_id' => $shopId,
-        ]);
-    }
-}
-```
-
-**BENEFITS:**
-- Production logs są czytelne i zwięzłe
-- Nie zaśmiecamy storage logami debug
-- Łatwiejszy monitoring w production
-- Zachowujemy ważne informacje o operacjach biznesowych
+**📖 SZCZEGÓŁOWY PRZEWODNIK:** [`_DOCS/DEBUG_LOGGING_GUIDE.md`](_DOCS/DEBUG_LOGGING_GUIDE.md)
+- Development phase (co i jak logować)
+- Production phase (co pozostawić/usunąć)
+- Workflow (development → production)
+- Production logging rules (info/warning/error)
+- Przykłady before/after (verbose vs clean)
+- Monitoring production logs
+- Cleanup checklist
 
 ### 🚫 KRYTYCZNE ZASADY CSS I STYLÓW
 
-#### **ABSOLUTNY ZAKAZ STYLÓW INLINE**
+#### ⛔ KATEGORYCZNY ZAKAZ INLINE STYLES
 
-**⚠️ BEZWZGLĘDNY ZAKAZ** używania atrybutu `style=""` w HTML/Blade templates!
-
-**❌ ZABRONIONE:**
+**❌ ABSOLUTNIE ZABRONIONE:**
 ```html
-<div style="z-index: 9999; background: #1f2937;">Content</div>
-<button style="color: red; margin-top: 10px;">Button</button>
+<!-- NIGDY TAK NIE RÓB! -->
+<div style="z-index: 9999; background: #1f2937;">...</div>
+<div class="z-[9999] bg-gray-800">...</div>  <!-- Tailwind arbitrary values dla z-index -->
+<button style="color: red; margin-top: 10px;">...</button>
 ```
 
-**✅ POPRAWNIE:**
+**✅ ZAWSZE TAK:**
 ```css
 /* resources/css/components/my-component.css */
-.my-component-header {
-    z-index: 1;
-    background: #1f2937;
+.my-component-modal {
+    z-index: 11;
+    background: var(--color-bg-primary);
 }
 ```
 
 ```html
-<div class="my-component-header">Content</div>
+<div class="my-component-modal">...</div>
 ```
 
-**DLACZEGO:**
-- Konsystencja wyglądu w całej aplikacji
-- Łatwiejsze zarządzanie stylami (maintainability)
-- Lepsze performance (cachowanie CSS)
-- Łatwiejsza implementacja dark mode
-- Reusability klas CSS
-- Enterprise quality standard
+**DLACZEGO ZAKAZ:**
+- ❌ Inline styles = niemożność maintainability
+- ❌ Tailwind arbitrary values (z-[9999]) = trudne do śledzenia
+- ❌ Brak consistency w całej aplikacji
+- ❌ Niemożliwość implementacji dark mode
+- ❌ Trudniejsze debugging CSS issues
+- ✅ CSS classes = centralized, cacheable, maintainable
 
-**PROCES:**
-1. Sprawdź `_DOCS/PPM_Color_Style_Guide.md` czy klasa już istnieje
-2. Stwórz dedykowany plik CSS w `resources/css/` jeśli potrzebny
-3. Dodaj build entry do `vite.config.js` dla nowego pliku
-4. Zbuduj assets: `npm run build`
-5. Użyj klasy CSS w Blade template
-6. NIGDY nie używaj `style=""` attribute
+#### 🚨 VITE MANIFEST ISSUE - DODAWANIE NOWYCH PLIKÓW CSS
 
-#### **ZASADA SPÓJNOŚCI STYLÓW**
+**⚠️ WAŻNE WYJAŚNIENIE:** Vite **NIE ISTNIEJE** na serwerze produkcyjnym (Hostido)! Build robimy LOKALNIE, a na serwer wysyłamy GOTOWE zbudowane pliki.
 
-**WSZYSTKIE** panele administracyjne, formularze i komponenty MUSZĄ używać identycznych:
-- Kolorów (paleta MPP TRADE z PPM_Color_Style_Guide.md)
-- Komponentów (`.enterprise-card`, `.tabs-enterprise`, `.btn-enterprise-*`)
-- Layoutów (consistent spacing/padding/margins)
-- Typografii (Inter font, hierarchia text-h1/h2/h3)
-- Animacji (transitions, hover effects)
+**WORKFLOW NORMALNY:**
+```
+[Local Windows]                           [Production Hostido]
+1. Edit CSS files                         4. Laravel @vite() helper
+2. npm run build (Vite)                   5. Reads manifest.json
+3. pscp upload public/build/ →            6. Serves static files
+```
 
-**CEL:** Użytkownik NIE powinien dostrzec różnic wizualnych między różnymi sekcjami aplikacji.
+**PROBLEM występuje w kroku 5-6:** Laravel Vite helper (`@vite()` directive w Blade) na produkcji ma problemy z odczytaniem/cache manifest.json przy dodawaniu NOWYCH plików CSS:
 
-**CHECKLIST:**
-- [ ] Header i breadcrumbs identyczne jak CategoryForm
-- [ ] Tabs używają `.tabs-enterprise`
-- [ ] Przyciski używają `.btn-enterprise-primary/secondary`
-- [ ] Karty używają `.enterprise-card`
-- [ ] Sidepanel "Szybkie akcje" w identycznym miejscu
-- [ ] Dark mode colors zgodne z paletą
-- [ ] NO inline styles (`style=""` attributes)
+```blade
+{{-- resources/views/layouts/admin.blade.php --}}
+@vite([
+    'resources/css/app.css',
+    'resources/css/admin/components.css',
+    'resources/css/components/new-file.css'  // ← NOWY PLIK!
+])
+```
 
-**REFERENCJA:** CategoryForm (`resources/views/livewire/products/categories/category-form.blade.php`) jest wzorcem dla wszystkich formularzy w aplikacji.
+**OBJAWY:**
+- `Illuminate\Foundation\ViteException`
+- "Unable to locate file in Vite manifest: resources/css/components/new-file.css"
+- ✅ Build lokalnie działa (`npm run build`)
+- ✅ Manifest zawiera entry nowego pliku
+- ✅ Plik istnieje w `public/build/assets/`
+- ✅ Cache wyczyszczony (`php artisan view:clear && cache:clear`)
+- ❌ Laravel Vite helper nadal wyrzuca exception
+
+**ROOT CAUSE:** Laravel Vite helper aggressive caching manifest.json + race condition przy nowych entries
+
+**✅ ROZWIĄZANIE: Dodawaj style do ISTNIEJĄCYCH plików CSS**
+
+Zamiast tworzyć nowe pliki CSS, dodaj swoje style do odpowiedniego istniejącego pliku:
+
+```css
+/* resources/css/admin/components.css */
+
+/* ... existing styles ... */
+
+/* ========================================
+   YOUR NEW COMPONENT STYLES
+   ======================================== */
+
+.your-new-component {
+    /* your styles here */
+}
+```
+
+**ISTNIEJĄCE PLIKI CSS (bezpieczne do rozszerzania):**
+- `resources/css/admin/components.css` - Admin UI components
+- `resources/css/admin/layout.css` - Admin layout i grid
+- `resources/css/products/category-form.css` - Product forms
+- `resources/css/components/category-picker.css` - Category picker
+
+**PROCES DODAWANIA STYLÓW:**
+1. ✅ Znajdź odpowiedni istniejący plik CSS (wg. funkcjonalności)
+2. ✅ Dodaj sekcję z komentarzem opisującym co stylizujesz
+3. ✅ Zdefiniuj klasy CSS (NIGDY inline styles!)
+4. ✅ Build: `npm run build`
+5. ✅ Deploy pliku CSS + built assets
+6. ✅ Clear cache: `php artisan view:clear && php artisan cache:clear`
+
+**KIEDY MOŻNA utworzyć NOWY plik CSS:**
+- Tylko dla DUŻYCH, nowych modułów (>200 linii stylów)
+- Po konsultacji z użytkownikiem
+- Z pełną świadomością potencjalnych problemów Vite manifest
+- Z testem na produkcji PRZED mergem
+
+**ZASADA SPÓJNOŚCI:**
+- Kolory: Paleta MPP TRADE (var(--color-primary))
+- Komponenty: `.enterprise-card`, `.tabs-enterprise`, `.btn-enterprise-*`
+- Layout: Consistent spacing/padding/margins
+- Typography: Inter font, text-h1/h2/h3 hierarchy
+- Animations: `.transition-standard`
+
+**REFERENCJA:** CategoryForm = wzorzec dla wszystkich formularzy
+
+**📖 KOMPLETNY PRZEWODNIK CSS:** [`_DOCS/CSS_STYLING_GUIDE.md`](_DOCS/CSS_STYLING_GUIDE.md)
+- Absolutny zakaz inline styles (dlaczego, przykłady)
+- Proces tworzenia stylów (krok po kroku)
+- Vite manifest issue i rozwiązanie
+- Zasada spójności stylów (kolory, komponenty, layout, typography)
+- Common use cases (modals, responsive, dynamic colors)
+- Code review red flags
+- Testing checklist
 
 ### Issues & Fixes - Szczegółowe rozwiązania problemów
 
@@ -657,6 +464,8 @@ public function removeFromShop(int $shopId): void
 
 #### 🔧 Development Practices
 - **[Debug Logging Best Practices](_ISSUES_FIXES/DEBUG_LOGGING_BEST_PRACTICES.md)** - Extensive logging podczas dev, minimal w production
+- **[Vite Manifest New CSS Files](_ISSUES_FIXES/VITE_MANIFEST_NEW_CSS_FILES_ISSUE.md)** - Problem z dodawaniem nowych plików CSS do Vite manifest na produkcji
+- **[CSS Import Missing from Layout](_ISSUES_FIXES/CSS_IMPORT_MISSING_FROM_LAYOUT.md)** - CSS file nie ładuje się, bo brak w @vite() directive
 
 #### 💡 Quick Reference - Najczęstsze problemy
 ```php
@@ -664,7 +473,9 @@ public function removeFromShop(int $shopId): void
 Route::get('/path', ComponentWithLayout::class); // wire:snapshot issue
 $this->emit('event'); // Livewire 3.x błąd
 'value' => 150.0; // hardcoded fake wartość
-style="z-index: 9999;" // w komponencie Livewire
+style="z-index: 9999; background: #1f2937;" // ❌ INLINE STYLES - KATEGORYCZNIE ZABRONIONE!
+class="z-[9999] bg-gray-800" // ❌ Tailwind arbitrary values dla z-index - ZABRONIONE!
+<div style="color: red;">...</div> // ❌ JAKIEKOLWIEK inline styles - ZABRONIONE!
 @foreach($items as $item) <div>{{ $item->name }}</div> @endforeach // brak wire:key
 <input id="category_{{ $item->id }}"> // nieunikalny ID w multi-context
 @if($condition) <div wire:poll.3s>...</div> @endif // wire:poll wewnątrz @if nie działa
@@ -675,7 +486,7 @@ public int $progressId; // Livewire DI conflict - non-nullable type
 Route::get('/path', fn() => view('wrapper')); // blade wrapper
 $this->dispatch('event'); // Livewire 3.x API
 'value' => mt_rand(80, 300); // realistyczne losowe
-// z-index w admin header, nie komponencie
+class="modal-root" /* CSS: .modal-root { z-index: 11; } */ // ✅ Style przez CSS!
 @foreach($items as $item) <div wire:key="ctx-{{ $context }}-{{ $item->id }}"> // unikalny wire:key
 <input id="category_{{ $context }}_{{ $item->id }}"> // kontekstowy ID
 <div wire:poll.3s> @if($condition)...</@if> </div> // wire:poll POZA @if
@@ -717,144 +528,75 @@ n### FAZA C: System Administration - COMPLETED 2025-01-09
 
 ## 🤖 SYSTEM AGENTÓW CLAUDE CODE
 
-**STATUS:** ✅ AKTYWNY (wdrożony 2025-09-27)
+**STATUS:** ✅ AKTYWNY - 13 specjalistycznych agentów (wdrożony 2025-09-27)
 
-Projekt PPM-CC-Laravel został wyposażony w kompletny system specjalistycznych agentów Claude Code do efektywnego zarządzania złożonością enterprise-class aplikacji.
+### Struktura
 
-### Struktura Agentów
+- **Lokalizacja:** `.claude/agents/`
+- **Raporty:** `_AGENT_REPORTS/`
+- **Pokrycie:** 100% kluczowych obszarów PPM-CC-Laravel
 
-**📁 Lokalizacja:** `.claude/agents/` (13 agentów specjalistycznych)
-**📚 Dokumentacja:** `_DOCS/AGENT_USAGE_GUIDE.md` (przewodnik obowiązkowy)
-**📊 Raporty:** `_AGENT_REPORTS/` (wszystkie wykonane prace)
+### Agenci (Quick Reference)
 
-### 🏗️ Agenci Bazowi (Core Team)
+**Core Team (5):**
+- architect, ask, debugger, coding-style-agent, documentation-reader
 
-| Agent | Model | Specjalizacja | Kiedy używać |
-|-------|-------|---------------|--------------|
-| **architect** | sonnet | Planowanie, architektura, zarządzanie Plan_Projektu/ | ZAWSZE przed nowym ETAP-em, planowanie funkcjonalności |
-| **ask** | sonnet | Odpowiedzi techniczne, analiza kodu, wyjaśnianie | Pytania bez implementacji, analiza istniejącego kodu |
-| **debugger** | sonnet | Systematyczne debugowanie, diagnostyka problemów | Błędy aplikacji, problemy integracji, konflikty |
-| **coding-style-agent** | sonnet | Standardy kodowania, Context7 integration | ZAWSZE przed completion, code review, compliance |
-| **documentation-reader** | sonnet | Zgodność z dokumentacją, weryfikacja requirements | PRZED implementacją, sprawdzanie dependencies |
+**Domain Experts (8):**
+- laravel-expert, livewire-specialist, prestashop-api-expert, erp-integration-expert
+- import-export-specialist, deployment-specialist, frontend-specialist
 
-### 🔧 Agenci Specjaliści (Domain Experts)
+### Workflow Patterns
 
-| Agent | Model | Specjalizacja | ETAP Integration |
-|-------|-------|---------------|------------------|
-| **laravel-expert** | sonnet | Laravel 12.x, Eloquent, Service Layer, Queue | Wszystkie ETAP-y (fundament) |
-| **livewire-specialist** | sonnet | Livewire 3.x, Alpine.js, reactive UI | ETAP_04, ETAP_05 (panele admin) |
-| **prestashop-api-expert** | sonnet | PrestaShop API v8/v9, multi-store sync | **ETAP_07** (PrestaShop API) |
-| **erp-integration-expert** | sonnet | BaseLinker, Subiekt GT, Microsoft Dynamics | **ETAP_08** ⏳ IN PROGRESS |
-| **import-export-specialist** | sonnet | XLSX processing, column mapping | **ETAP_06** (Import/Export) |
-| **deployment-specialist** | sonnet | SSH, PowerShell, Hostido, CI/CD | Wszystkie ETAP-y (deployment) |
-| **frontend-specialist** | sonnet | Blade templates, Alpine.js, responsive design | ETAP_12 (UI/UX) |
-
-### 🔄 Workflow Patterns
-
-**PATTERN 1: Nowa Funkcjonalność**
-```
-1. documentation-reader → sprawdź requirements
-2. architect → zaplanuj implementację
-3. [Specjalista dziedziny] → implementuj
-4. coding-style-agent → code review
-5. deployment-specialist → deploy
-```
-
-**PATTERN 2: Debugging Problem**
-```
-1. debugger → diagnoza problemu
-2. [Specjalista dziedziny] → implementacja fix
-3. coding-style-agent → weryfikacja
-```
-
-**PATTERN 3: ETAP Implementation**
-```
-1. architect → aktualizacja planu ETAP
-2. documentation-reader → compliance requirements
-3. [Multiple specialists] → implementacja sekcji
-4. coding-style-agent → final review
-5. deployment-specialist → production deploy
-6. architect → update plan status ✅
-```
-
-### ⚠️ KRYTYCZNE ZASADY UŻYCIA
-
-1. **ZAWSZE** używaj systemu agentów dla zadań powyżej prostych poprawek
-2. **TYLKO JEDEN** agent in_progress w danym momencie
-3. **OBOWIĄZKOWE** raportowanie w `_AGENT_REPORTS/`
-4. **WYMAGANE** użycie coding-style-agent przed completion
-5. **CONTEXT7 INTEGRATION:** coding-style-agent MUSI używać MCP Context7
-
-### 🎯 Quick Reference
-
-**🔥 Emergency:** debugger → deployment-specialist
-**🆕 New Feature:** architect → documentation-reader → [specialist] → coding-style-agent
+**🆕 New Feature:** architect → documentation-reader → [specialist] → coding-style-agent → deploy
 **🐛 Bug Fix:** debugger → [specialist] → coding-style-agent
-**📦 ETAP Work:** architect → [multiple specialists] → deployment-specialist
+**📦 ETAP:** architect → [multiple specialists] → deployment-specialist → architect (update status)
 
-### 📊 Agent Performance Metrics
+### ⚠️ KRYTYCZNE ZASADY
 
-- **Utworzonych agentów:** 13 (5 bazowych + 8 specjalistów)
-- **Pokrycie dziedzin:** 100% (wszystkie kluczowe obszary PPM-CC-Laravel)
-- **Enterprise compliance:** ✅ (wszystkie agenci uwzględniają enterprise patterns)
-- **Context7 integration:** ✅ (coding-style-agent z MCP)
+1. Używaj agentów dla zadań powyżej prostych poprawek
+2. TYLKO JEDEN agent in_progress jednocześnie
+3. OBOWIĄZKOWE raportowanie w `_AGENT_REPORTS/`
+4. coding-style-agent PRZED completion (ZAWSZE)
+5. Context7 integration MANDATORY
 
-**DOKUMENTACJA:** Szczegółowe instrukcje użycia w `_DOCS/AGENT_USAGE_GUIDE.md`
-
-**MAINTENANCE:** System agentów będzie rozwijany wraz z ewolucją projektu PPM-CC-Laravel
+**📖 SZCZEGÓŁOWA DOKUMENTACJA:** [`_DOCS/AGENT_USAGE_GUIDE.md`](_DOCS/AGENT_USAGE_GUIDE.md)
+- Lista wszystkich agentów z specjalizacjami
+- Workflow patterns (szczegółowe)
+- Kiedy którego agenta używać
+- Agent delegation best practices
+- Raportowanie i tracking
 
 ## 📚 CONTEXT7 INTEGRATION SYSTEM
 
-**STATUS:** ✅ AKTYWNY (wdrożony 2025-09-27)
+**STATUS:** ✅ AKTYWNY - 100% agentów z Context7 (wdrożony 2025-09-27)
 
-PPM-CC-Laravel używa MCP Context7 server dla dostępu do aktualnej dokumentacji bibliotek i best practices. Wszystkich agentów zaktualizowano z obowiązkową integracją Context7.
+### Wybrane Biblioteki
 
-### 🎯 Wybrane Biblioteki Context7
+- **Laravel 12.x:** `/websites/laravel_12_x` (4927 snippets, trust: 7.5)
+- **Livewire 3.x:** `/livewire/livewire` (867 snippets, trust: 7.4)
+- **Alpine.js:** `/alpinejs/alpine` (364 snippets, trust: 6.6)
+- **PrestaShop:** `/prestashop/docs` (3289 snippets, trust: 8.2)
 
-| Technologia | Library ID | Snippets | Trust | Agent Integration |
-|-------------|------------|----------|-------|-------------------|
-| **Laravel 12.x** | `/websites/laravel_12_x` | 4927 | 7.5 | laravel-expert, architect, debugger |
-| **Livewire 3.x** | `/livewire/livewire` | 867 | 7.4 | livewire-specialist, debugger |
-| **Alpine.js** | `/alpinejs/alpine` | 364 | 6.6 | frontend-specialist, livewire-specialist |
-| **PrestaShop** | `/prestashop/docs` | 3289 | 8.2 | prestashop-api-expert |
+### ⚠️ MANDATORY Rules
 
-### ⚠️ MANDATORY Context7 Usage Rules
+1. **PRZED implementacją:** `mcp__context7__get-library-docs`
+2. **ZAWSZE weryfikuj** aktualne patterns
+3. **REFERENCUJ** dokumentację
+4. **UŻYWAJ** właściwych library IDs
 
-**WSZYSTKICH AGENTÓW ZAKTUALIZOWANO** z obowiązkową integracją Context7:
+### Configuration
 
-1. **PRZED każdą implementacją** agent MUSI użyć `mcp__context7__get-library-docs`
-2. **ZAWSZE weryfikować** aktualne patterns z oficjalnych źródeł
-3. **REFERENCOWAĆ** oficjalną dokumentację w odpowiedziach
-4. **UŻYWAĆ** właściwych library IDs dla każdej technologii
+- **API Key:** `ctx7sk-dea67299-09f8-4fab-b4bd-d36297a675c3`
+- **Status:** ✓ Connected
+- **Coverage:** 100% agentów (12/12)
 
-### 🔧 Context7 MCP Configuration
-
-```bash
-# Context7 MCP Server już skonfigurowany
-claude mcp list
-# context7: https://mcp.context7.com/mcp (HTTP) - ✓ Connected
-```
-
-**API Key:** `ctx7sk-dea67299-09f8-4fab-b4bd-d36297a675c3` (już skonfigurowany)
-
-### 📋 Agent Context7 Implementation Status
-
-| Agent | Context7 Status | Primary Library | Updated |
-|-------|----------------|-----------------|---------|
-| **laravel-expert** | ✅ ACTIVE | `/websites/laravel_12_x` | 2025-09-27 |
-| **livewire-specialist** | ✅ ACTIVE | `/livewire/livewire` | 2025-09-27 |
-| **prestashop-api-expert** | ✅ ACTIVE | `/prestashop/docs` | 2025-09-27 |
-| **frontend-specialist** | ✅ ACTIVE | `/alpinejs/alpine` | 2025-09-27 |
-| **coding-style-agent** | ✅ ACTIVE | Multiple libraries | Pre-configured |
-| **documentation-reader** | ✅ ACTIVE | All libraries | 2025-09-27 |
-| **ask** | ✅ ACTIVE | Multiple libraries | 2025-09-27 |
-| **debugger** | ✅ ACTIVE | `/websites/laravel_12_x` | 2025-09-27 |
-| **architect** | ✅ ACTIVE | `/websites/laravel_12_x` | 2025-09-27 |
-| **erp-integration-expert** | ✅ ACTIVE | `/websites/laravel_12_x` | 2025-09-27 |
-| **import-export-specialist** | ✅ ACTIVE | `/websites/laravel_12_x` | 2025-09-27 |
-| **deployment-specialist** | ✅ ACTIVE | `/websites/laravel_12_x` | 2025-09-27 |
-
-**REZULTAT:** 100% agentów ma aktywną integrację Context7 dla zapewnienia aktualnych informacji i best practices.
+**📖 SZCZEGÓŁOWY PRZEWODNIK:** [`_DOCS/CONTEXT7_INTEGRATION_GUIDE.md`](_DOCS/CONTEXT7_INTEGRATION_GUIDE.md)
+- Pełna lista bibliotek z Library IDs
+- Mandatory usage rules (szczegółowe)
+- Agent implementation status (tabela 12 agentów)
+- Usage patterns (przykłady dla każdego agenta)
+- Expected behavior (correct vs incorrect)
+- Troubleshooting Context7 issues
 
 ## Super Admin Account - Testing & Verification
 
