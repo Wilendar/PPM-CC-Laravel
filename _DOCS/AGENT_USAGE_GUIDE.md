@@ -6,16 +6,152 @@
 
 ---
 
-## 📖 WPROWADZENIE
-
-Ten przewodnik określa **kiedy i jak** używać każdego agenta w projekcie PPM-CC-Laravel. Jest to **obowiązkowe** narzędzie dla głównego koordynatora (Claude Code - główna instancja) do efektywnego zarządzania zespołem specjalistycznych agentów.
-
-### ⚡ ZASADY PODSTAWOWE
+## ⚡ ZASADY PODSTAWOWE
 
 1. **ZAWSZE** czytaj raporty agentów przed delegowaniem nowych zadań
 2. **TYLKO JEDEN** agent może być w stanie `in_progress` w danym momencie
 3. **WYMAGANE** raportowanie w `_AGENT_REPORTS/` po każdym zadaniu
 4. **OBOWIĄZKOWE** aktualizowanie TodoWrite podczas pracy agentów
+
+---
+
+## ⛔ KATEGORYCZNY ZAKAZ SYMULACJI I PLACEHOLDERÓW (WSZYSTKIE AGENTY)
+
+**CRITICAL RULE FOR ALL AGENTS:** ZERO TOLERANCE for simulations, placeholders, mock data, or fake operations!
+
+### ❌ ABSOLUTELY FORBIDDEN:
+
+**1. Symulowane operacje bez wykonania rzeczywistych komend:**
+```markdown
+❌ FORBIDDEN:
+- "✅ Uploaded file.php (58 KB)" ← WITHOUT actual pscp command!
+- "✅ Cache cleared successfully" ← WITHOUT actual plink command!
+- "✅ Migration completed" ← WITHOUT actual artisan migrate!
+- "✅ Tests passed (100%)" ← WITHOUT actual php artisan test!
+```
+
+**2. Placeholder dane i wartości:**
+```php
+❌ FORBIDDEN:
+$product->price = 150.0;  // ← Hardcoded fake price!
+'value' => 'Lorem ipsum'; // ← Placeholder text!
+'users' => 250;           // ← Mock count!
+'status' => 'active';     // ← Fake status!
+```
+
+**3. Fake raportowanie bez weryfikacji:**
+```markdown
+❌ FORBIDDEN:
+## VERIFICATION RESULTS
+- ✅ All files deployed successfully ← WITHOUT grep/ls verification!
+- ✅ Application running correctly  ← WITHOUT curl/health check!
+- ✅ Database migrated             ← WITHOUT migrate:status check!
+```
+
+### ✅ MANDATORY - Real Operations Only:
+
+**1. Rzeczywiste komendy z actual output:**
+```bash
+✅ CORRECT - deployment-specialist:
+# Execute REAL command
+pscp -i "..." -P 64321 "file.php" "host@...:domains/.../file.php"
+
+# Wait for actual output
+Output: "file.php | 57 kB | 57.8 kB/s | ETA: 00:00:00 | 100%"
+
+# Report with REAL output
+"✅ Uploaded file.php (57 KB) - confirmed via pscp output"
+```
+
+**2. Prawdziwe dane z bazy/API:**
+```php
+✅ CORRECT - Any agent writing code:
+// Get REAL data from database
+$product = Product::find($productId);
+$price = $product->price;  // ← Real value from DB
+
+// Get REAL data from API
+$response = $apiClient->getProduct($sku);
+$stock = $response['stock']; // ← Real value from API
+```
+
+**3. Weryfikacja po każdej operacji:**
+```bash
+✅ CORRECT - deployment-specialist:
+# 1. Upload file
+pscp -i "..." file.php host@...:domains/.../file.php
+
+# 2. VERIFY file exists on server (MANDATORY)
+plink ... "ls -lh domains/.../file.php"
+Output: "-rw-rw-r-- 1 user user 57K Oct 15 14:14 file.php"
+
+# 3. VERIFY file content (for critical files)
+plink ... "grep -n 'public function' domains/.../file.php | head -3"
+Output: "10: public function index()"
+
+# 4. ONLY THEN report success
+"✅ file.php deployed and VERIFIED on server"
+```
+
+### 📋 VERIFICATION CHECKLIST (Mandatory for ALL Agents):
+
+**deployment-specialist:**
+- [ ] Execute REAL pscp/plink commands
+- [ ] Capture actual command output
+- [ ] Verify file exists on server (ls/stat)
+- [ ] Verify file content on server (grep/cat)
+- [ ] Report ONLY after confirmation
+
+**livewire-specialist / laravel-expert:**
+- [ ] NO hardcoded values (prices, names, counts)
+- [ ] Get data from DB/models ONLY
+- [ ] Use realistic ranges for random data (NOT fixed values)
+- [ ] Validate data types match database schema
+
+**frontend-specialist:**
+- [ ] ZERO inline styles (use CSS classes ONLY)
+- [ ] NO placeholder text ("Lorem ipsum", "Example")
+- [ ] NO fake counts/numbers in UI
+- [ ] Dynamic content from backend ONLY
+
+**coding-style-agent:**
+- [ ] Check for hardcoded values in reviewed code
+- [ ] Flag ANY placeholder/mock data as CRITICAL violation
+- [ ] Verify Context7 patterns match REAL library docs
+
+### 🚫 CONSEQUENCES OF VIOLATION:
+
+**IF ANY AGENT SIMULATES INSTEAD OF EXECUTING:**
+1. ❌ User will see NO changes on production
+2. ❌ Deployment will FAIL silently
+3. ❌ Agent report will be INVALID
+4. ❌ User trust in system DESTROYED
+5. ❌ Agent delegation pattern will be REVISED
+
+**ZASADA:** Jeśli nie możesz wykonać rzeczywistej operacji - **NIE RAPORTUJ SUKCESU**. Zgłoś blokadę i poproś o pomoc.
+
+### ✅ CORRECT Example - deployment-specialist:
+
+```markdown
+## DEPLOYMENT REPORT
+
+**File Upload:**
+- Command: `pscp -i "..." -P 64321 "CategoryTree.php" "host@...:domains/.../CategoryTree.php"`
+- Output: `CategoryTree.php | 57 kB | 57.8 kB/s | 100%`
+- Status: ✅ REAL upload completed
+
+**Cache Clear:**
+- Command: `plink ... "php artisan view:clear && cache:clear"`
+- Output: `INFO Compiled views cleared successfully.`
+- Status: ✅ REAL cache cleared
+
+**Verification:**
+- Command: `plink ... "grep 'showMergeCategoriesModal' .../CategoryTree.php | head -3"`
+- Output: `199:    public $showMergeCategoriesModal = false;`
+- Status: ✅ Code VERIFIED on server (file contains expected code)
+
+**Conclusion:** Deployment VERIFIED - all steps confirmed with real command outputs.
+```
 
 ---
 
