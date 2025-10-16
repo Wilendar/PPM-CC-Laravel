@@ -83,6 +83,7 @@ class JobProgressBar extends Component
                 'total' => 100,
                 'percentage' => 0,
                 'errors' => [],
+                'pending_conflicts' => [],
             ];
             return;
         }
@@ -119,6 +120,7 @@ class JobProgressBar extends Component
                 'total' => 100,
                 'percentage' => 0,
                 'errors' => [],
+                'pending_conflicts' => [],
             ];
         }
     }
@@ -143,6 +145,80 @@ class JobProgressBar extends Component
                 'shop_name' => $this->progress['shop_name'] ?? 'Unknown Shop',
             ]);
         }
+    }
+
+    /**
+     * Resolve single conflict - open CategoryConflictModal
+     * ONLY for single product imports
+     */
+    public function resolveConflict(): void
+    {
+        $conflicts = $this->progress['pending_conflicts'] ?? [];
+
+        if (count($conflicts) === 1) {
+            $conflict = $conflicts[0];
+
+            Log::info('Manual conflict resolution triggered', [
+                'product_id' => $conflict['product_id'],
+                'shop_id' => $conflict['shop_id'],
+                'conflict_type' => $conflict['conflict_type'],
+            ]);
+
+            // Dispatch event to show CategoryConflictModal
+            $this->dispatch('showCategoryConflict',
+                productId: $conflict['product_id'],
+                shopId: $conflict['shop_id']
+            );
+        }
+    }
+
+    /**
+     * Download CSV with conflicted products SKUs
+     * For bulk imports
+     */
+    public function downloadConflictsCsv()
+    {
+        $conflicts = $this->progress['pending_conflicts'] ?? [];
+
+        if (empty($conflicts)) {
+            return;
+        }
+
+        // Get products with SKUs
+        $productIds = array_column($conflicts, 'product_id');
+        $products = \App\Models\Product::whereIn('id', $productIds)
+            ->get(['id', 'sku', 'name']);
+
+        // Build CSV data
+        $csvData = "SKU,Product Name,Product ID,Shop ID,Conflict Type,Detected At\n";
+
+        foreach ($conflicts as $conflict) {
+            $product = $products->firstWhere('id', $conflict['product_id']);
+
+            if ($product) {
+                $csvData .= sprintf(
+                    '"%s","%s",%d,%d,%s,%s' . "\n",
+                    $product->sku,
+                    $product->name,
+                    $conflict['product_id'],
+                    $conflict['shop_id'],
+                    $conflict['conflict_type'],
+                    $conflict['detected_at'] ?? 'N/A'
+                );
+            }
+        }
+
+        Log::info('Conflicts CSV download triggered', [
+            'shop_id' => $this->shopId,
+            'conflicts_count' => count($conflicts),
+        ]);
+
+        // Return download response (Livewire 3.x method)
+        return response()->streamDownload(function () use ($csvData) {
+            echo $csvData;
+        }, 'conflicts_' . now()->format('Y-m-d_His') . '.csv', [
+            'Content-Type' => 'text/csv',
+        ]);
     }
 
     /*
@@ -206,6 +282,30 @@ class JobProgressBar extends Component
     public function getShouldHideProperty(): bool
     {
         return $this->isCompleted && !$this->isVisible;
+    }
+
+    /**
+     * Get conflicts count
+     */
+    public function getConflictCountProperty(): int
+    {
+        return count($this->progress['pending_conflicts'] ?? []);
+    }
+
+    /**
+     * Check if has single conflict (button enabled)
+     */
+    public function getHasSingleConflictProperty(): bool
+    {
+        return $this->conflictCount === 1;
+    }
+
+    /**
+     * Check if has bulk conflicts (CSV download)
+     */
+    public function getHasBulkConflictsProperty(): bool
+    {
+        return $this->conflictCount > 1;
     }
 
     /*

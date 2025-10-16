@@ -358,11 +358,11 @@ class Category extends Model
 
     /**
      * Get full category name with ancestors
-     * 
+     *
      * Business Logic: Hierarchical name dla admin interfaces
      * Format: "Parent > Child > Current"
      *
-     * @return \Illuminate\Database\Eloquent\Casts\Attribute  
+     * @return \Illuminate\Database\Eloquent\Casts\Attribute
      */
     public function fullName(): Attribute
     {
@@ -370,10 +370,26 @@ class Category extends Model
             get: function (): string {
                 $names = $this->ancestors->pluck('name')->toArray();
                 $names[] = $this->name;
-                
+
                 return implode(' > ', $names);
             }
         );
+    }
+
+    /**
+     * Get full category path with ancestors (alias for fullName)
+     *
+     * ADDED 2025-10-13: Alias method for CategoryConflictModal compatibility
+     * Format: "Parent > Child > Current"
+     *
+     * @return string
+     */
+    public function getFullPath(): string
+    {
+        $names = $this->ancestors->pluck('name')->toArray();
+        $names[] = $this->name;
+
+        return implode(' > ', $names);
     }
 
     /**

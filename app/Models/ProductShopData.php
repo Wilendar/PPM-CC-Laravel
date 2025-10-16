@@ -71,13 +71,20 @@ class ProductShopData extends Model
         'attribute_mappings',
         'image_settings',
 
-        // Synchronization control
+        // Synchronization control - CONSOLIDATED 2025-10-13
+        'prestashop_product_id',     // PrestaShop external ID (migrated from external_id)
         'sync_status',
+        'sync_direction',
         'last_sync_at',
+        'last_success_sync_at',
         'last_sync_hash',
-        'sync_errors',
+        'checksum',
+        'error_message',             // Migrated from sync_errors (JSON → TEXT)
         'conflict_data',
         'conflict_detected_at',
+        'retry_count',
+        'max_retries',
+        'priority',
 
         // Publishing control
         'is_published',
@@ -85,7 +92,6 @@ class ProductShopData extends Model
         'unpublished_at',
 
         // External system reference
-        'external_id',
         'external_reference',
     ];
 
@@ -94,11 +100,11 @@ class ProductShopData extends Model
         'category_mappings' => 'array',
         'attribute_mappings' => 'array',
         'image_settings' => 'array',
-        'sync_errors' => 'array',
         'conflict_data' => 'array',
 
         // Datetime fields
         'last_sync_at' => 'datetime',
+        'last_success_sync_at' => 'datetime',
         'conflict_detected_at' => 'datetime',
         'published_at' => 'datetime',
         'unpublished_at' => 'datetime',
@@ -116,10 +122,17 @@ class ProductShopData extends Model
         'tax_rate' => 'decimal:2',
         'sort_order' => 'integer',
         'product_type_id' => 'integer',
+
+        // Sync tracking fields - CONSOLIDATED 2025-10-13
+        'prestashop_product_id' => 'integer',
+        'retry_count' => 'integer',
+        'max_retries' => 'integer',
+        'priority' => 'integer',
     ];
 
     protected $dates = [
         'last_sync_at',
+        'last_success_sync_at',
         'conflict_detected_at',
         'published_at',
         'unpublished_at',
@@ -161,19 +174,40 @@ class ProductShopData extends Model
     // ==========================================
 
     const STATUS_PENDING = 'pending';      // Oczekuje na synchronizację
+    const STATUS_SYNCING = 'syncing';      // W trakcie synchronizacji
     const STATUS_SYNCED = 'synced';        // Zsynchronizowane pomyślnie
     const STATUS_ERROR = 'error';          // Błąd synchronizacji
     const STATUS_CONFLICT = 'conflict';    // Konflikt danych (wymaga interwencji)
     const STATUS_DISABLED = 'disabled';    // Synchronizacja wyłączona
 
+    // SYNC DIRECTION CONSTANTS - CONSOLIDATED 2025-10-13
+    const DIRECTION_PPM_TO_PS = 'ppm_to_ps';           // PPM → PrestaShop
+    const DIRECTION_PS_TO_PPM = 'ps_to_ppm';           // PrestaShop → PPM
+    const DIRECTION_BIDIRECTIONAL = 'bidirectional';   // Dwukierunkowa
+
+    // PRIORITY CONSTANTS - CONSOLIDATED 2025-10-13
+    const PRIORITY_HIGHEST = 1;    // Najwyższy priorytet
+    const PRIORITY_NORMAL = 5;     // Normalny priorytet (default)
+    const PRIORITY_LOWEST = 10;    // Najniższy priorytet
+
     public static function getAvailableStatuses(): array
     {
         return [
             self::STATUS_PENDING => 'Oczekuje synchronizacji',
+            self::STATUS_SYNCING => 'W trakcie synchronizacji',
             self::STATUS_SYNCED => 'Zsynchronizowane',
             self::STATUS_ERROR => 'Błąd synchronizacji',
             self::STATUS_CONFLICT => 'Konflikt danych',
             self::STATUS_DISABLED => 'Wyłączone',
+        ];
+    }
+
+    public static function getAvailableDirections(): array
+    {
+        return [
+            self::DIRECTION_PPM_TO_PS => 'PPM → PrestaShop',
+            self::DIRECTION_PS_TO_PPM => 'PrestaShop → PPM',
+            self::DIRECTION_BIDIRECTIONAL => 'Dwukierunkowa',
         ];
     }
 
@@ -234,6 +268,89 @@ class ProductShopData extends Model
                     ->whereNotNull('conflict_detected_at');
     }
 
+    // ADDITIONAL SCOPES - CONSOLIDATED 2025-10-13
+
+    /**
+     * Scope to filter pending products
+     */
+    public function scopePending($query)
+    {
+        return $query->where('sync_status', self::STATUS_PENDING);
+    }
+
+    /**
+     * Scope to filter syncing products
+     */
+    public function scopeSyncing($query)
+    {
+        return $query->where('sync_status', self::STATUS_SYNCING);
+    }
+
+    /**
+     * Scope to filter synced products
+     */
+    public function scopeSynced($query)
+    {
+        return $query->where('sync_status', self::STATUS_SYNCED);
+    }
+
+    /**
+     * Scope to filter products with errors
+     */
+    public function scopeError($query)
+    {
+        return $query->where('sync_status', self::STATUS_ERROR);
+    }
+
+    /**
+     * Scope to filter products with conflicts
+     */
+    public function scopeConflict($query)
+    {
+        return $query->where('sync_status', self::STATUS_CONFLICT);
+    }
+
+    /**
+     * Scope to filter disabled products
+     */
+    public function scopeDisabled($query)
+    {
+        return $query->where('sync_status', self::STATUS_DISABLED);
+    }
+
+    /**
+     * Scope to filter by sync direction
+     */
+    public function scopeByDirection($query, string $direction)
+    {
+        return $query->where('sync_direction', $direction);
+    }
+
+    /**
+     * Scope to filter by priority
+     */
+    public function scopeByPriority($query, int $priority)
+    {
+        return $query->where('priority', $priority);
+    }
+
+    /**
+     * Scope to filter high priority products (1-3)
+     */
+    public function scopeHighPriority($query)
+    {
+        return $query->where('priority', '<=', 3);
+    }
+
+    /**
+     * Scope to filter products that need retry
+     */
+    public function scopeNeedsRetry($query)
+    {
+        return $query->where('sync_status', self::STATUS_ERROR)
+                    ->whereColumn('retry_count', '<', 'max_retries');
+    }
+
     // ==========================================
     // SYNC STATUS HELPERS
     // ==========================================
@@ -282,27 +399,83 @@ class ProductShopData extends Model
         ]);
     }
 
+    // ADDITIONAL HELPERS - CONSOLIDATED 2025-10-13
+
+    /**
+     * Check if product is pending sync
+     */
+    public function isPending(): bool
+    {
+        return $this->sync_status === self::STATUS_PENDING;
+    }
+
+    /**
+     * Check if product is currently syncing
+     */
+    public function isSyncing(): bool
+    {
+        return $this->sync_status === self::STATUS_SYNCING;
+    }
+
+    /**
+     * Check if sync is disabled
+     */
+    public function isDisabled(): bool
+    {
+        return $this->sync_status === self::STATUS_DISABLED;
+    }
+
+    /**
+     * Check if product can retry sync
+     */
+    public function canRetry(): bool
+    {
+        return $this->retry_count < $this->max_retries;
+    }
+
+    /**
+     * Check if max retries exceeded
+     */
+    public function maxRetriesExceeded(): bool
+    {
+        return $this->retry_count >= $this->max_retries;
+    }
+
     // ==========================================
     // SYNC MANAGEMENT METHODS
     // ==========================================
 
     /**
      * Mark as successfully synced
+     * UPDATED 2025-10-13: Added last_success_sync_at, checksum, prestashop_product_id, retry_count reset
      */
-    public function markAsSynced(string $hash = null): self
+    public function markAsSynced(?int $prestashopProductId = null, ?string $checksum = null): self
     {
-        $this->update([
+        $now = Carbon::now();
+        $hash = $checksum ?? $this->generateDataHash();
+
+        $updateData = [
             'sync_status' => self::STATUS_SYNCED,
-            'last_sync_at' => Carbon::now(),
-            'last_sync_hash' => $hash ?? $this->generateDataHash(),
-            'sync_errors' => null,
+            'last_sync_at' => $now,
+            'last_success_sync_at' => $now,
+            'last_sync_hash' => $hash,
+            'checksum' => $hash,
+            'error_message' => null,
             'conflict_data' => null,
             'conflict_detected_at' => null,
-        ]);
+            'retry_count' => 0,
+        ];
+
+        if ($prestashopProductId !== null) {
+            $updateData['prestashop_product_id'] = $prestashopProductId;
+        }
+
+        $this->update($updateData);
 
         Log::info('ProductShopData marked as synced', [
             'product_id' => $this->product_id,
             'shop_id' => $this->shop_id,
+            'prestashop_product_id' => $this->prestashop_product_id,
             'sync_hash' => $this->last_sync_hash
         ]);
 
@@ -311,19 +484,22 @@ class ProductShopData extends Model
 
     /**
      * Mark as sync error
+     * UPDATED 2025-10-13: Changed sync_errors (JSON) to error_message (TEXT), added retry_count increment
      */
-    public function markAsError(array $errors): self
+    public function markAsError(string $errorMessage): self
     {
         $this->update([
             'sync_status' => self::STATUS_ERROR,
-            'sync_errors' => $errors,
+            'error_message' => $errorMessage,
             'last_sync_at' => Carbon::now(),
+            'retry_count' => $this->retry_count + 1,
         ]);
 
         Log::warning('ProductShopData marked as error', [
             'product_id' => $this->product_id,
             'shop_id' => $this->shop_id,
-            'errors' => $errors
+            'error_message' => $errorMessage,
+            'retry_count' => $this->retry_count
         ]);
 
         return $this;
@@ -374,6 +550,29 @@ class ProductShopData extends Model
         ]);
 
         return $this;
+    }
+
+    // ADDITIONAL SYNC MANAGEMENT - CONSOLIDATED 2025-10-13
+
+    /**
+     * Mark as currently syncing
+     */
+    public function markSyncing(): bool
+    {
+        return $this->update([
+            'sync_status' => self::STATUS_SYNCING,
+            'last_sync_at' => Carbon::now(),
+        ]);
+    }
+
+    /**
+     * Reset retry count (after successful sync or manual reset)
+     */
+    public function resetRetryCount(): bool
+    {
+        return $this->update([
+            'retry_count' => 0,
+        ]);
     }
 
     // ==========================================
@@ -482,11 +681,13 @@ class ProductShopData extends Model
 
     /**
      * Get sync status with icon for UI
+     * UPDATED 2025-10-13: Added STATUS_SYNCING icon
      */
     public function getSyncStatusWithIcon(): string
     {
         $icons = [
             self::STATUS_PENDING => '🔄',
+            self::STATUS_SYNCING => '⏳',
             self::STATUS_SYNCED => '🟢',
             self::STATUS_ERROR => '🔴',
             self::STATUS_CONFLICT => '⚠️',

@@ -11,9 +11,12 @@ return [
     | messages to your logs. The value provided here should match one of
     | the channels defined in the "channels" configuration array.
     |
+    | PPM-CC-Laravel: Changed to 'single' for unified laravel.log
+    | Daily rotation moves old logs to storage/logs/archive/
+    |
     */
 
-    'default' => env('LOG_CHANNEL', 'daily'),
+    'default' => env('LOG_CHANNEL', 'single'),
 
     /*
     |--------------------------------------------------------------------------

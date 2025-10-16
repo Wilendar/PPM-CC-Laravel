@@ -12,7 +12,7 @@ use App\Services\PrestaShop\PriceGroupMapper;
 use App\Services\PrestaShop\WarehouseMapper;
 use App\Models\Product;
 use App\Models\PrestaShopShop;
-use App\Models\ProductSyncStatus;
+use App\Models\ProductShopData;
 use App\Models\SyncLog;
 use App\Exceptions\PrestaShopAPIException;
 
@@ -295,11 +295,13 @@ class ProductSyncStrategy implements ISyncStrategy
     }
 
     /**
-     * Get or create ProductSyncStatus record
+     * Get or create ProductShopData record (CONSOLIDATED 2025-10-13)
+     *
+     * Updated to use ProductShopData instead of deprecated ProductSyncStatus
      */
-    private function getOrCreateSyncStatus(Product $product, PrestaShopShop $shop): ProductSyncStatus
+    private function getOrCreateSyncStatus(Product $product, PrestaShopShop $shop): ProductShopData
     {
-        return ProductSyncStatus::firstOrCreate(
+        return ProductShopData::firstOrCreate(
             [
                 'product_id' => $product->id,
                 'shop_id' => $shop->id,

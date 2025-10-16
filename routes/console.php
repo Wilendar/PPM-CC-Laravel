@@ -45,9 +45,10 @@ Schedule::command('jobs:cleanup-stuck --minutes=30')
     ->runInBackground();
 
 // Automatic log archival - move old logs to archive/ folder
-Schedule::command('logs:archive --keep-days=14')
+// 2025-10-14: Changed time to 00:01 for daily rotation at midnight
+Schedule::command('logs:archive --keep-days=30')
     ->daily()
-    ->at('00:15')
+    ->at('00:01')
     ->withoutOverlapping()
     ->runInBackground();
 

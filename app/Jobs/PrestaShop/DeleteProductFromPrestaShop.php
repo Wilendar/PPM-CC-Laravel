@@ -12,7 +12,6 @@ use Illuminate\Support\Facades\Log;
 use App\Models\Product;
 use App\Models\PrestaShopShop;
 use App\Models\ProductShopData;
-use App\Models\ProductSyncStatus;
 use App\Services\PrestaShop\PrestaShopClientFactory;
 use Carbon\Carbon;
 use Throwable;
@@ -161,26 +160,26 @@ class DeleteProductFromPrestaShop implements ShouldQueue, ShouldBeUnique
     }
 
     /**
-     * Update product sync status after delete operation
+     * Update product sync status after delete operation (CONSOLIDATED 2025-10-13)
      *
-     * CRITICAL: If status is 'deleted' and no error, DELETE the record entirely
-     * Otherwise ProductList will still show old sync status badge!
+     * CRITICAL: ProductShopData is already deleted in handle() before this method is called
+     * This method only needs to handle ERROR cases where delete failed and we want to keep record
+     *
+     * UPDATED: Now uses ProductShopData instead of deprecated ProductSyncStatus
      */
     protected function updateSyncStatus(string $status, ?string $errorMessage): void
     {
-        // If successful delete (status='deleted' and no error), DELETE the sync status record
+        // If successful delete (status='deleted' and no error), ProductShopData is already deleted
+        // No action needed - just log completion
         if ($status === 'deleted' && $errorMessage === null) {
-            ProductSyncStatus::where('product_id', $this->product->id)
-                ->where('shop_id', $this->shop->id)
-                ->delete();
-
-            Log::info('ProductSyncStatus deleted after successful shop delete', [
+            Log::info('ProductShopData already deleted after successful shop delete', [
                 'product_id' => $this->product->id,
                 'shop_id' => $this->shop->id,
             ]);
         } else {
-            // If error during delete, UPDATE status to show error
-            ProductSyncStatus::updateOrCreate(
+            // If error during delete, UPDATE ProductShopData to show error
+            // Use updateOrCreate in case record was already deleted
+            ProductShopData::updateOrCreate(
                 [
                     'product_id' => $this->product->id,
                     'shop_id' => $this->shop->id,
@@ -190,9 +189,14 @@ class DeleteProductFromPrestaShop implements ShouldQueue, ShouldBeUnique
                     'last_sync_at' => now(),
                     'error_message' => $errorMessage,
                     'prestashop_product_id' => null,
-                    'needs_sync' => false,
                 ]
             );
+
+            Log::info('ProductShopData updated with error status', [
+                'product_id' => $this->product->id,
+                'shop_id' => $this->shop->id,
+                'sync_status' => $status,
+            ]);
         }
     }
 

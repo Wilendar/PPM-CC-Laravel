@@ -21,6 +21,19 @@ export default {
         'mpp-orange-dark': '#d1975a',
         'dark-primary': '#ffffff',
         'dark-secondary': '#f3f4f6',
+        // Brand color palette (MPP Orange) - full Tailwind scale
+        'brand': {
+          50: '#fdf6f0',
+          100: '#fae8d6',
+          200: '#f6d1ad',
+          300: '#f0b583',
+          400: '#ea9e64',
+          500: '#e0ac7e', // Main MPP Orange
+          600: '#d1975a',
+          700: '#b87d43',
+          800: '#9f6836',
+          900: '#875628',
+        },
       },
     },
   },

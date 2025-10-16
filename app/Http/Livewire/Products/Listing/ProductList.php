@@ -98,6 +98,23 @@ class ProductList extends Component
     // Bulk Delete Modal
     public bool $showBulkDeleteModal = false;
 
+    // ETAP_07a FAZA 2: Bulk Category Operations
+    // Bulk Assign Categories Modal
+    public bool $showBulkAssignCategoriesModal = false;
+    public array $selectedCategoriesForBulk = [];
+    public ?int $primaryCategoryForBulk = null;
+
+    // Bulk Remove Categories Modal
+    public bool $showBulkRemoveCategoriesModal = false;
+    public array $commonCategories = [];
+    public array $categoriesToRemove = [];
+
+    // Bulk Move Categories Modal
+    public bool $showBulkMoveCategoriesModal = false;
+    public ?int $fromCategoryId = null;
+    public ?int $toCategoryId = null;
+    public string $moveMode = 'replace'; // replace|add_keep
+
     // ETAP_07 FAZA 3: Import Modal State
     public bool $showImportModal = false;
     public ?int $importShopId = null;
@@ -741,9 +758,9 @@ class ProductList extends Component
             ->with([
                 'productType:id,name,slug',
                 // FAZA 1.5: Multi-Store Sync Status - Eager load shop data for sync status display
+                // ETAP_07 OPCJA B (2025-10-13): Consolidated sync tracking in product_shop_data
                 'shopData:id,product_id,shop_id,sync_status,is_published,last_sync_at',
-                // ETAP_07 FAZA 3: Sync Status - Eager load for ProductList UI display
-                'syncStatuses.shop:id,name'
+                'shopData.shop:id,name' // Load shop relation through shopData (replaces syncStatuses.shop)
             ])
             ->select([
                 'id', 'sku', 'name', 'product_type_id', 'manufacturer',
@@ -1814,7 +1831,7 @@ class ProductList extends Component
     }
 
     /**
-     * Open bulk category assignment modal
+     * Open bulk category assignment modal (DEPRECATED - replaced by specific operations)
      */
     public function openBulkCategoryModal(): void
     {
@@ -1823,8 +1840,8 @@ class ProductList extends Component
             return;
         }
 
-        // TODO: Implement category assignment modal
-        $this->dispatch('info', message: 'Funkcja przypisywania kategorii będzie dostępna wkrótce');
+        // Redirect to new Bulk Assign Categories modal
+        $this->openBulkAssignCategories();
     }
 
     /**
@@ -1846,6 +1863,530 @@ class ProductList extends Component
     public function closeBulkDeleteModal(): void
     {
         $this->showBulkDeleteModal = false;
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | BULK CATEGORY OPERATIONS (ETAP_07a FAZA 2)
+    |--------------------------------------------------------------------------
+    */
+
+    /**
+     * Open Bulk Assign Categories modal
+     *
+     * ETAP_07a FAZA 2.2.2.2.1: Bulk Assign Categories
+     */
+    public function openBulkAssignCategories(): void
+    {
+        if (empty($this->selectedProducts)) {
+            $this->dispatch('error', message: 'Nie zaznaczono żadnych produktów');
+            return;
+        }
+
+        // Reset modal state
+        $this->selectedCategoriesForBulk = [];
+        $this->primaryCategoryForBulk = null;
+
+        $this->showBulkAssignCategoriesModal = true;
+    }
+
+    /**
+     * Close Bulk Assign Categories modal
+     */
+    public function closeBulkAssignCategories(): void
+    {
+        $this->showBulkAssignCategoriesModal = false;
+        $this->selectedCategoriesForBulk = [];
+        $this->primaryCategoryForBulk = null;
+    }
+
+    /**
+     * Execute Bulk Assign Categories
+     *
+     * Assigns selected categories to all selected products
+     * Validation: Max 10 categories per product
+     * Synchronous for ≤50 products, Queue for >50
+     */
+    public function bulkAssignCategories(): void
+    {
+        if (empty($this->selectedProducts)) {
+            $this->dispatch('error', message: 'Nie zaznaczono żadnych produktów');
+            return;
+        }
+
+        if (empty($this->selectedCategoriesForBulk)) {
+            $this->dispatch('error', message: 'Wybierz co najmniej jedną kategorię');
+            return;
+        }
+
+        // Validation: Max 10 categories
+        if (count($this->selectedCategoriesForBulk) > 10) {
+            $this->dispatch('error', message: 'Maksymalnie 10 kategorii na produkt');
+            return;
+        }
+
+        try {
+            $productsCount = count($this->selectedProducts);
+            $categoriesCount = count($this->selectedCategoriesForBulk);
+
+            // CRITICAL: Multi-Store Compatibility - ONLY default categories (shop_id = NULL)
+            // Per-shop categories are managed in ProductForm, not bulk operations
+            if ($productsCount <= 50) {
+                // Synchronous processing for small batches
+                DB::transaction(function () {
+                    foreach ($this->selectedProducts as $productId) {
+                        $product = Product::find($productId);
+                        if (!$product) continue;
+
+                        foreach ($this->selectedCategoriesForBulk as $categoryId) {
+                            // Check if already assigned (avoid duplicates)
+                            $exists = DB::table('product_categories')
+                                ->where('product_id', $productId)
+                                ->where('category_id', $categoryId)
+                                ->whereNull('shop_id') // ONLY default categories
+                                ->exists();
+
+                            if (!$exists) {
+                                // Determine if this should be primary
+                                $isPrimary = ($categoryId == $this->primaryCategoryForBulk);
+
+                                // If setting as primary, unset other primary flags for this product
+                                if ($isPrimary) {
+                                    DB::table('product_categories')
+                                        ->where('product_id', $productId)
+                                        ->whereNull('shop_id')
+                                        ->update(['is_primary' => false]);
+                                }
+
+                                // Insert new category assignment
+                                DB::table('product_categories')->insert([
+                                    'product_id' => $productId,
+                                    'category_id' => $categoryId,
+                                    'shop_id' => null, // Default categories
+                                    'is_primary' => $isPrimary,
+                                    'created_at' => now(),
+                                    'updated_at' => now(),
+                                ]);
+                            } elseif ($categoryId == $this->primaryCategoryForBulk) {
+                                // Category already exists, but we need to set it as primary
+                                DB::table('product_categories')
+                                    ->where('product_id', $productId)
+                                    ->whereNull('shop_id')
+                                    ->update(['is_primary' => false]);
+
+                                DB::table('product_categories')
+                                    ->where('product_id', $productId)
+                                    ->where('category_id', $categoryId)
+                                    ->whereNull('shop_id')
+                                    ->update(['is_primary' => true]);
+                            }
+                        }
+
+                        // Touch product to update timestamp
+                        $product->touch();
+                    }
+                });
+
+                $this->dispatch('success', message: "Przypisano {$categoriesCount} kategorii do {$productsCount} produktów");
+
+            } else {
+                // Queue processing for large batches (>50 products)
+                $jobId = (string) \Illuminate\Support\Str::uuid();
+
+                // Dispatch BulkAssignCategories queue job
+                \App\Jobs\Products\BulkAssignCategories::dispatch(
+                    $this->selectedProducts,
+                    $this->selectedCategoriesForBulk,
+                    $this->primaryCategoryForBulk,
+                    $jobId
+                );
+
+                $this->dispatch('info', message: "Przypisywanie {$categoriesCount} kategorii do {$productsCount} produktów rozpoczęte. Postęp zobaczysz poniżej.");
+
+                Log::info('Bulk Assign Categories queued', [
+                    'products_count' => $productsCount,
+                    'categories_count' => $categoriesCount,
+                    'job_id' => $jobId,
+                ]);
+            }
+
+            // Reset selection and close modal
+            $this->resetSelection();
+            $this->closeBulkAssignCategories();
+
+            // Refresh products list
+            unset($this->products);
+
+        } catch (\Exception $e) {
+            Log::error('Bulk Assign Categories failed', [
+                'products' => $this->selectedProducts,
+                'categories' => $this->selectedCategoriesForBulk,
+                'error' => $e->getMessage(),
+            ]);
+
+            $this->dispatch('error', message: 'Błąd podczas przypisywania kategorii: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Open Bulk Remove Categories modal
+     *
+     * ETAP_07a FAZA 2.2.2.2.2: Bulk Remove Categories
+     */
+    public function openBulkRemoveCategories(): void
+    {
+        if (empty($this->selectedProducts)) {
+            $this->dispatch('error', message: 'Nie zaznaczono żadnych produktów');
+            return;
+        }
+
+        // Reset modal state
+        $this->categoriesToRemove = [];
+
+        // Get common categories across selected products
+        $this->commonCategories = $this->getCommonCategories();
+
+        if (empty($this->commonCategories)) {
+            $this->dispatch('warning', message: 'Wybrane produkty nie mają wspólnych kategorii');
+            return;
+        }
+
+        $this->showBulkRemoveCategoriesModal = true;
+    }
+
+    /**
+     * Close Bulk Remove Categories modal
+     */
+    public function closeBulkRemoveCategories(): void
+    {
+        $this->showBulkRemoveCategoriesModal = false;
+        $this->commonCategories = [];
+        $this->categoriesToRemove = [];
+    }
+
+    /**
+     * Execute Bulk Remove Categories
+     *
+     * Removes selected categories from all selected products
+     * Auto-reassigns primary if removing primary category
+     */
+    public function bulkRemoveCategories(): void
+    {
+        if (empty($this->selectedProducts)) {
+            $this->dispatch('error', message: 'Nie zaznaczono żadnych produktów');
+            return;
+        }
+
+        if (empty($this->categoriesToRemove)) {
+            $this->dispatch('error', message: 'Wybierz co najmniej jedną kategorię do usunięcia');
+            return;
+        }
+
+        try {
+            $productsCount = count($this->selectedProducts);
+            $categoriesCount = count($this->categoriesToRemove);
+
+            if ($productsCount <= 50) {
+                // Synchronous processing
+                DB::transaction(function () {
+                    foreach ($this->selectedProducts as $productId) {
+                        $product = Product::find($productId);
+                        if (!$product) continue;
+
+                        // Check if removing primary category
+                        $removingPrimary = DB::table('product_categories')
+                            ->where('product_id', $productId)
+                            ->whereIn('category_id', $this->categoriesToRemove)
+                            ->whereNull('shop_id')
+                            ->where('is_primary', true)
+                            ->exists();
+
+                        // Remove selected categories
+                        DB::table('product_categories')
+                            ->where('product_id', $productId)
+                            ->whereIn('category_id', $this->categoriesToRemove)
+                            ->whereNull('shop_id')
+                            ->delete();
+
+                        // If we removed primary, set first remaining category as primary
+                        if ($removingPrimary) {
+                            $firstRemaining = DB::table('product_categories')
+                                ->where('product_id', $productId)
+                                ->whereNull('shop_id')
+                                ->first();
+
+                            if ($firstRemaining) {
+                                DB::table('product_categories')
+                                    ->where('id', $firstRemaining->id)
+                                    ->update(['is_primary' => true]);
+                            }
+                        }
+
+                        // Touch product to update timestamp
+                        $product->touch();
+                    }
+                });
+
+                $this->dispatch('success', message: "Usunięto {$categoriesCount} kategorii z {$productsCount} produktów");
+
+            } else {
+                // Queue processing for large batches
+                $jobId = (string) \Illuminate\Support\Str::uuid();
+
+                // Dispatch BulkRemoveCategories queue job
+                \App\Jobs\Products\BulkRemoveCategories::dispatch(
+                    $this->selectedProducts,
+                    $this->categoriesToRemove,
+                    $jobId
+                );
+
+                $this->dispatch('info', message: "Usuwanie {$categoriesCount} kategorii z {$productsCount} produktów rozpoczęte. Postęp zobaczysz poniżej.");
+
+                Log::info('Bulk Remove Categories queued', [
+                    'products_count' => $productsCount,
+                    'categories_count' => $categoriesCount,
+                    'job_id' => $jobId,
+                ]);
+            }
+
+            // Reset selection and close modal
+            $this->resetSelection();
+            $this->closeBulkRemoveCategories();
+
+            // Refresh products list
+            unset($this->products);
+
+        } catch (\Exception $e) {
+            Log::error('Bulk Remove Categories failed', [
+                'products' => $this->selectedProducts,
+                'categories' => $this->categoriesToRemove,
+                'error' => $e->getMessage(),
+            ]);
+
+            $this->dispatch('error', message: 'Błąd podczas usuwania kategorii: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Get common categories across selected products
+     *
+     * Returns categories that are assigned to ALL selected products
+     *
+     * @return array Array of category data [id, name, is_primary_in_any]
+     */
+    private function getCommonCategories(): array
+    {
+        if (empty($this->selectedProducts)) {
+            return [];
+        }
+
+        $productsCount = count($this->selectedProducts);
+
+        // Get categories that appear in ALL selected products
+        $commonCategories = DB::table('product_categories')
+            ->join('categories', 'product_categories.category_id', '=', 'categories.id')
+            ->whereIn('product_categories.product_id', $this->selectedProducts)
+            ->whereNull('product_categories.shop_id') // Only default categories
+            ->select(
+                'categories.id',
+                'categories.name',
+                DB::raw('COUNT(DISTINCT product_categories.product_id) as product_count'),
+                DB::raw('MAX(product_categories.is_primary) as is_primary_in_any')
+            )
+            ->groupBy('categories.id', 'categories.name')
+            ->having('product_count', '=', $productsCount) // Present in ALL products
+            ->get()
+            ->toArray();
+
+        return array_map(function ($cat) {
+            return [
+                'id' => $cat->id,
+                'name' => $cat->name,
+                'is_primary_in_any' => (bool) $cat->is_primary_in_any,
+            ];
+        }, $commonCategories);
+    }
+
+    /**
+     * Open Bulk Move Categories modal
+     *
+     * ETAP_07a FAZA 2.2.2.2.3: Bulk Move Categories
+     */
+    public function openBulkMoveCategories(): void
+    {
+        if (empty($this->selectedProducts)) {
+            $this->dispatch('error', message: 'Nie zaznaczono żadnych produktów');
+            return;
+        }
+
+        // Reset modal state
+        $this->fromCategoryId = null;
+        $this->toCategoryId = null;
+        $this->moveMode = 'replace';
+
+        $this->showBulkMoveCategoriesModal = true;
+    }
+
+    /**
+     * Close Bulk Move Categories modal
+     */
+    public function closeBulkMoveCategories(): void
+    {
+        $this->showBulkMoveCategoriesModal = false;
+        $this->fromCategoryId = null;
+        $this->toCategoryId = null;
+        $this->moveMode = 'replace';
+    }
+
+    /**
+     * Execute Bulk Move Categories
+     *
+     * Moves products from one category to another
+     * Two modes: replace (remove FROM, add TO) or add_keep (keep both)
+     */
+    public function bulkMoveCategories(): void
+    {
+        if (empty($this->selectedProducts)) {
+            $this->dispatch('error', message: 'Nie zaznaczono żadnych produktów');
+            return;
+        }
+
+        if (!$this->fromCategoryId || !$this->toCategoryId) {
+            $this->dispatch('error', message: 'Wybierz kategorię źródłową i docelową');
+            return;
+        }
+
+        if ($this->fromCategoryId == $this->toCategoryId) {
+            $this->dispatch('error', message: 'Kategoria źródłowa i docelowa muszą być różne');
+            return;
+        }
+
+        try {
+            $productsCount = count($this->selectedProducts);
+
+            if ($productsCount <= 50) {
+                // Synchronous processing
+                DB::transaction(function () {
+                    $movedCount = 0;
+
+                    foreach ($this->selectedProducts as $productId) {
+                        $product = Product::find($productId);
+                        if (!$product) continue;
+
+                        // Check if product has FROM category
+                        $hasFromCategory = DB::table('product_categories')
+                            ->where('product_id', $productId)
+                            ->where('category_id', $this->fromCategoryId)
+                            ->whereNull('shop_id')
+                            ->exists();
+
+                        if (!$hasFromCategory) {
+                            // Skip products without FROM category
+                            continue;
+                        }
+
+                        $wasPrimary = DB::table('product_categories')
+                            ->where('product_id', $productId)
+                            ->where('category_id', $this->fromCategoryId)
+                            ->whereNull('shop_id')
+                            ->value('is_primary');
+
+                        if ($this->moveMode === 'replace') {
+                            // REPLACE mode: Remove FROM, add TO
+                            DB::table('product_categories')
+                                ->where('product_id', $productId)
+                                ->where('category_id', $this->fromCategoryId)
+                                ->whereNull('shop_id')
+                                ->delete();
+                        }
+
+                        // Add TO category (if not already exists)
+                        $existsTo = DB::table('product_categories')
+                            ->where('product_id', $productId)
+                            ->where('category_id', $this->toCategoryId)
+                            ->whereNull('shop_id')
+                            ->exists();
+
+                        if (!$existsTo) {
+                            DB::table('product_categories')->insert([
+                                'product_id' => $productId,
+                                'category_id' => $this->toCategoryId,
+                                'shop_id' => null,
+                                'is_primary' => $wasPrimary, // Preserve primary status
+                                'created_at' => now(),
+                                'updated_at' => now(),
+                            ]);
+                        } elseif ($wasPrimary) {
+                            // Category exists, but we need to set it as primary
+                            DB::table('product_categories')
+                                ->where('product_id', $productId)
+                                ->whereNull('shop_id')
+                                ->update(['is_primary' => false]);
+
+                            DB::table('product_categories')
+                                ->where('product_id', $productId)
+                                ->where('category_id', $this->toCategoryId)
+                                ->whereNull('shop_id')
+                                ->update(['is_primary' => true]);
+                        }
+
+                        $movedCount++;
+
+                        // Touch product to update timestamp
+                        $product->touch();
+                    }
+
+                    if ($movedCount === 0) {
+                        $this->dispatch('warning', message: 'Żaden produkt nie posiadał kategorii źródłowej');
+                    } else {
+                        $modeText = $this->moveMode === 'replace' ? 'Przeniesiono' : 'Skopiowano';
+                        $this->dispatch('success', message: "{$modeText} {$movedCount} produktów między kategoriami");
+                    }
+                });
+
+            } else {
+                // Queue processing for large batches
+                $jobId = (string) \Illuminate\Support\Str::uuid();
+
+                // Dispatch BulkMoveCategories queue job
+                \App\Jobs\Products\BulkMoveCategories::dispatch(
+                    $this->selectedProducts,
+                    $this->fromCategoryId,
+                    $this->toCategoryId,
+                    $this->moveMode,
+                    $jobId
+                );
+
+                $modeText = $this->moveMode === 'replace' ? 'Przenoszenie' : 'Kopiowanie';
+                $this->dispatch('info', message: "{$modeText} {$productsCount} produktów między kategoriami rozpoczęte. Postęp zobaczysz poniżej.");
+
+                Log::info('Bulk Move Categories queued', [
+                    'products_count' => $productsCount,
+                    'from_category' => $this->fromCategoryId,
+                    'to_category' => $this->toCategoryId,
+                    'mode' => $this->moveMode,
+                    'job_id' => $jobId,
+                ]);
+            }
+
+            // Reset selection and close modal
+            $this->resetSelection();
+            $this->closeBulkMoveCategories();
+
+            // Refresh products list
+            unset($this->products);
+
+        } catch (\Exception $e) {
+            Log::error('Bulk Move Categories failed', [
+                'products' => $this->selectedProducts,
+                'from_category' => $this->fromCategoryId,
+                'to_category' => $this->toCategoryId,
+                'mode' => $this->moveMode,
+                'error' => $e->getMessage(),
+            ]);
+
+            $this->dispatch('error', message: 'Błąd podczas przenoszenia kategorii: ' . $e->getMessage());
+        }
     }
 
     /**

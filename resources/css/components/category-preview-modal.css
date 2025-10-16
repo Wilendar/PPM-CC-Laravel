@@ -1,0 +1,43 @@
+/**
+ * Category Preview Modal - Component Styles
+ * PPM-CC-Laravel Enterprise
+ */
+
+/* Main category preview modal */
+.modal-category-preview-root {
+    position: fixed;
+    inset: 0;
+    overflow-y: auto;
+    z-index: 60; /* FIX 2025-10-15: Increased from 10 to 60 (standard modal level) */
+}
+
+/* Conflict resolution modal - must appear above main modal */
+.modal-conflict-resolution-root {
+    position: fixed;
+    inset: 0;
+    overflow-y: auto;
+    z-index: 70; /* FIX 2025-10-15: Increased from 11 to 70 (overlay modal level) */
+}
+
+/* Create category form overlay - must appear above conflict modal */
+.modal-create-category-form-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 80; /* FIX 2025-10-15: Above conflict modal (70) for create form triggered from CategoryPicker */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: rgba(0, 0, 0, 0.85);
+    backdrop-filter: blur(4px);
+}
+
+/* Modal content z-index hierarchy */
+.modal-category-preview-content {
+    position: relative;
+    z-index: 1;
+}
+
+.modal-conflict-resolution-content {
+    position: relative;
+    z-index: 2;
+}

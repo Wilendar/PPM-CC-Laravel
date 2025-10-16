@@ -8,7 +8,7 @@ use Illuminate\Support\Facades\DB;
 use App\Models\Product;
 use App\Models\Category;
 use App\Models\PrestaShopShop;
-use App\Models\ProductSyncStatus;
+use App\Models\ProductShopData;
 use App\Models\SyncLog;
 use App\Services\PrestaShop\PrestaShopClientFactory;
 use App\Services\PrestaShop\Sync\ProductSyncStrategy;
@@ -228,14 +228,14 @@ class PrestaShopSyncService
         ]);
 
         // Update or create sync status with priority
-        ProductSyncStatus::updateOrCreate(
+        ProductShopData::updateOrCreate(
             [
                 'product_id' => $product->id,
                 'shop_id' => $shop->id,
             ],
             [
                 'priority' => $priority,
-                'sync_status' => ProductSyncStatus::STATUS_PENDING,
+                'sync_status' => ProductShopData::STATUS_PENDING,
             ]
         );
 
@@ -263,13 +263,13 @@ class PrestaShopSyncService
 
         // Mark all products as pending
         foreach ($products as $product) {
-            ProductSyncStatus::updateOrCreate(
+            ProductShopData::updateOrCreate(
                 [
                     'product_id' => $product->id,
                     'shop_id' => $shop->id,
                 ],
                 [
-                    'sync_status' => ProductSyncStatus::STATUS_PENDING,
+                    'sync_status' => ProductShopData::STATUS_PENDING,
                 ]
             );
         }
@@ -381,15 +381,17 @@ class PrestaShopSyncService
     }
 
     /**
-     * Get sync status for product-shop pair
+     * Get sync status for product-shop pair (CONSOLIDATED 2025-10-13)
+     *
+     * Updated to use ProductShopData instead of deprecated ProductSyncStatus
      *
      * @param Product $product Product to check
      * @param PrestaShopShop $shop Shop to check
-     * @return ProductSyncStatus|null Sync status record or null if not found
+     * @return ProductShopData|null Sync status record or null if not found
      */
-    public function getSyncStatus(Product $product, PrestaShopShop $shop): ?ProductSyncStatus
+    public function getSyncStatus(Product $product, PrestaShopShop $shop): ?ProductShopData
     {
-        return ProductSyncStatus::where('product_id', $product->id)
+        return ProductShopData::where('product_id', $product->id)
             ->where('shop_id', $shop->id)
             ->first();
     }
@@ -402,18 +404,18 @@ class PrestaShopSyncService
      */
     public function getSyncStatistics(PrestaShopShop $shop): array
     {
-        $total = ProductSyncStatus::where('shop_id', $shop->id)->count();
-        $synced = ProductSyncStatus::where('shop_id', $shop->id)
-            ->where('sync_status', ProductSyncStatus::STATUS_SYNCED)
+        $total = ProductShopData::where('shop_id', $shop->id)->count();
+        $synced = ProductShopData::where('shop_id', $shop->id)
+            ->where('sync_status', ProductShopData::STATUS_SYNCED)
             ->count();
-        $pending = ProductSyncStatus::where('shop_id', $shop->id)
-            ->where('sync_status', ProductSyncStatus::STATUS_PENDING)
+        $pending = ProductShopData::where('shop_id', $shop->id)
+            ->where('sync_status', ProductShopData::STATUS_PENDING)
             ->count();
-        $errors = ProductSyncStatus::where('shop_id', $shop->id)
-            ->where('sync_status', ProductSyncStatus::STATUS_ERROR)
+        $errors = ProductShopData::where('shop_id', $shop->id)
+            ->where('sync_status', ProductShopData::STATUS_ERROR)
             ->count();
-        $syncing = ProductSyncStatus::where('shop_id', $shop->id)
-            ->where('sync_status', ProductSyncStatus::STATUS_SYNCING)
+        $syncing = ProductShopData::where('shop_id', $shop->id)
+            ->where('sync_status', ProductShopData::STATUS_SYNCING)
             ->count();
 
         $successRate = $total > 0 ? round(($synced / $total) * 100, 2) : 0.0;
@@ -453,8 +455,8 @@ class PrestaShopSyncService
      */
     public function retryFailedSyncs(PrestaShopShop $shop): int
     {
-        $failedSyncs = ProductSyncStatus::where('shop_id', $shop->id)
-            ->where('sync_status', ProductSyncStatus::STATUS_ERROR)
+        $failedSyncs = ProductShopData::where('shop_id', $shop->id)
+            ->where('sync_status', ProductShopData::STATUS_ERROR)
             ->whereColumn('retry_count', '<', 'max_retries')
             ->with('product')
             ->get();
@@ -463,7 +465,7 @@ class PrestaShopSyncService
 
         foreach ($failedSyncs as $syncStatus) {
             if ($syncStatus->product) {
-                $this->queueProductSync($syncStatus->product, $shop, ProductSyncStatus::PRIORITY_HIGHEST);
+                $this->queueProductSync($syncStatus->product, $shop, ProductShopData::PRIORITY_HIGHEST);
                 $count++;
             }
         }
@@ -488,13 +490,13 @@ class PrestaShopSyncService
     public function resetSyncStatus(Product $product, PrestaShopShop $shop): bool
     {
         try {
-            $syncStatus = ProductSyncStatus::where('product_id', $product->id)
+            $syncStatus = ProductShopData::where('product_id', $product->id)
                 ->where('shop_id', $shop->id)
                 ->first();
 
             if ($syncStatus) {
                 $syncStatus->update([
-                    'sync_status' => ProductSyncStatus::STATUS_PENDING,
+                    'sync_status' => ProductShopData::STATUS_PENDING,
                     'error_message' => null,
                     'retry_count' => 0,
                     'checksum' => null,
@@ -529,8 +531,8 @@ class PrestaShopSyncService
      */
     public function getPendingSyncs(PrestaShopShop $shop, int $limit = 50): Collection
     {
-        return ProductSyncStatus::where('shop_id', $shop->id)
-            ->where('sync_status', ProductSyncStatus::STATUS_PENDING)
+        return ProductShopData::where('shop_id', $shop->id)
+            ->where('sync_status', ProductShopData::STATUS_PENDING)
             ->with('product')
             ->orderBy('priority', 'asc')
             ->limit($limit)

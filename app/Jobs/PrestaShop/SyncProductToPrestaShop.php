@@ -11,7 +11,7 @@ use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
 use App\Models\Product;
 use App\Models\PrestaShopShop;
-use App\Models\ProductSyncStatus;
+use App\Models\ProductShopData;
 use App\Models\SyncLog;
 use App\Services\PrestaShop\Sync\ProductSyncStrategy;
 use App\Services\PrestaShop\PrestaShopClientFactory;
@@ -164,20 +164,20 @@ class SyncProductToPrestaShop implements ShouldQueue, ShouldBeUnique
             'error' => $exception->getMessage(),
         ]);
 
-        // Update ProductSyncStatus to error
-        $syncStatus = ProductSyncStatus::firstOrCreate(
+        // Update ProductShopData to error (CONSOLIDATED 2025-10-13)
+        $shopData = ProductShopData::firstOrCreate(
             [
                 'product_id' => $this->product->id,
                 'shop_id' => $this->shop->id,
             ],
             [
-                'sync_status' => ProductSyncStatus::STATUS_PENDING,
+                'sync_status' => ProductShopData::STATUS_PENDING,
                 'retry_count' => 0,
             ]
         );
 
-        $syncStatus->update([
-            'sync_status' => ProductSyncStatus::STATUS_ERROR,
+        $shopData->update([
+            'sync_status' => ProductShopData::STATUS_ERROR,
             'error_message' => 'Job failed after ' . $this->attempts() . ' attempts: ' . $exception->getMessage(),
             'retry_count' => $this->attempts(),
         ]);
@@ -215,14 +215,16 @@ class SyncProductToPrestaShop implements ShouldQueue, ShouldBeUnique
     }
 
     /**
-     * Get sync priority from ProductSyncStatus
+     * Get sync priority from ProductShopData (CONSOLIDATED 2025-10-13)
+     *
+     * Updated to use ProductShopData instead of deprecated ProductSyncStatus
      */
     private function getSyncPriority(): int
     {
-        $syncStatus = ProductSyncStatus::where('product_id', $this->product->id)
+        $shopData = ProductShopData::where('product_id', $this->product->id)
             ->where('shop_id', $this->shop->id)
             ->first();
 
-        return $syncStatus?->priority ?? ProductSyncStatus::PRIORITY_NORMAL;
+        return $shopData?->priority ?? ProductShopData::PRIORITY_NORMAL;
     }
 }

@@ -17,7 +17,6 @@
      x-transition:leave="transition ease-in duration-200"
      x-transition:leave-start="opacity-100 transform scale-100"
      x-transition:leave-end="opacity-0 transform scale-95"
-     wire:poll.3s="fetchProgress"
      class="backdrop-blur-xl rounded-lg shadow-lg overflow-hidden border"
      :class="{
          'bg-gradient-to-r from-blue-900/80 to-cyan-900/80 border-blue-500/30': '{{ $this->status }}' === 'running',
@@ -79,6 +78,32 @@
                     </svg>
                     <span class="text-xs font-bold text-red-400">{{ $this->errorCount }}</span>
                 </button>
+            @endif
+
+            <!-- Conflict Resolution - Single Product (2025-10-13) -->
+            @if($this->conflictCount > 0 && $this->status === 'completed')
+                @if($this->hasSingleConflict)
+                    <button wire:click="resolveConflict"
+                            class="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-orange-500/20 hover:bg-orange-500/30 border border-orange-500/30 transition-colors duration-200">
+                        <svg class="w-4 h-4 text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3l-6.928-12c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                        </svg>
+                        <span class="text-xs font-bold text-orange-400">⚙️ Rozwiąż konflikt</span>
+                    </button>
+                @elseif($this->hasBulkConflicts)
+                    <div class="flex-shrink-0 flex items-center gap-2 px-3 py-1.5 rounded-lg bg-orange-500/20 border border-orange-500/30">
+                        <div class="flex items-center gap-1">
+                            <svg class="w-4 h-4 text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3l-6.928-12c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                            </svg>
+                            <span class="text-xs font-medium text-orange-400">{{ $this->conflictCount }} konfliktów</span>
+                        </div>
+                        <button wire:click="downloadConflictsCsv"
+                                class="px-2 py-0.5 text-xs bg-orange-600 hover:bg-orange-700 text-white rounded transition-colors duration-200">
+                            📥 CSV
+                        </button>
+                    </div>
+                @endif
             @endif
 
             <!-- Close Button -->

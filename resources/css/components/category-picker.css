@@ -1,0 +1,227 @@
+/**
+ * CategoryPicker Component Styles
+ * ETAP_07 FAZA 3D - ETAP 2: Category Picker UI
+ *
+ * Enterprise-quality dark theme styling for hierarchical category tree picker
+ *
+ * Design System: PPM_Color_Style_Guide.md
+ * - MPP Orange primary: #e0ac7e
+ * - Dark backgrounds: #1f2937, #111827
+ * - Glass morphism effects
+ * - Smooth transitions
+ * - NO inline styles
+ */
+
+/* ============================================
+   CONTAINER
+   ============================================ */
+
+.category-picker-container {
+    @apply bg-gray-800/30 rounded-lg border border-gray-700/50 p-4;
+}
+
+/* ============================================
+   HEADER SECTION
+   ============================================ */
+
+.category-picker-header {
+    @apply mb-4;
+}
+
+/* Search Input */
+.category-picker-search {
+    @apply w-full pl-10 pr-10 py-2.5 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent transition-all;
+}
+
+.category-picker-search:focus {
+    @apply bg-gray-600/50;
+}
+
+/* Action Buttons */
+.category-picker-btn-primary {
+    @apply px-4 py-2 text-sm font-semibold text-white bg-brand-600 hover:bg-brand-700 rounded-lg transition-colors duration-200 flex items-center gap-1;
+}
+
+.category-picker-btn-secondary {
+    @apply px-3 py-1.5 text-sm font-semibold text-white bg-gray-600 hover:bg-gray-700 rounded-lg transition-colors duration-200 flex items-center gap-1;
+}
+
+/* Checkbox */
+.category-picker-checkbox {
+    @apply w-4 h-4 rounded border-gray-600 text-brand-600 focus:ring-brand-500 focus:ring-offset-gray-900 cursor-pointer transition-colors;
+}
+
+/* ============================================
+   TREE SECTION
+   ============================================ */
+
+.category-picker-tree {
+    @apply max-h-96 overflow-y-auto bg-gray-900/20 rounded-lg border border-gray-700/30 p-3;
+}
+
+/* Custom Scrollbar (Dark Theme) */
+.category-picker-tree::-webkit-scrollbar {
+    @apply w-2;
+}
+
+.category-picker-tree::-webkit-scrollbar-track {
+    @apply bg-gray-800/50 rounded;
+}
+
+.category-picker-tree::-webkit-scrollbar-thumb {
+    @apply bg-gray-600 rounded hover:bg-gray-500 transition-colors;
+}
+
+/* Empty State */
+.category-picker-empty {
+    @apply text-center py-8;
+}
+
+/* ============================================
+   TREE NODE
+   ============================================ */
+
+.category-picker-node {
+    @apply select-none;
+}
+
+.category-picker-node-row {
+    @apply flex items-center gap-2 py-1.5 px-2 rounded-md hover:bg-gray-700/50 transition-colors cursor-pointer;
+}
+
+.category-picker-node-expanded {
+    @apply bg-gray-700/30;
+}
+
+/* Indentation Spacers (NO inline styles) - Separate flex items for proper spacing */
+.category-indent-spacer {
+    @apply flex-shrink-0;
+}
+
+.category-indent-spacer-0 {
+    @apply w-0;
+}
+
+.category-indent-spacer-1 {
+    @apply w-6;
+}
+
+.category-indent-spacer-2 {
+    @apply w-12;
+}
+
+.category-indent-spacer-3 {
+    @apply w-16;
+}
+
+.category-indent-spacer-4 {
+    @apply w-20;
+}
+
+.category-indent-spacer-5 {
+    @apply w-24;
+}
+
+/* Expand/Collapse Toggle */
+.category-picker-node-toggle {
+    @apply flex-shrink-0 w-6 h-6 flex items-center justify-center rounded hover:bg-gray-600/50 transition-colors;
+}
+
+/* Folder Icon */
+.category-picker-node-icon {
+    @apply flex-shrink-0;
+}
+
+/* Checkbox Container */
+.category-picker-node-checkbox {
+    @apply flex-shrink-0;
+}
+
+/* Label */
+.category-picker-node-label {
+    @apply flex-1 flex items-center gap-2 cursor-pointer text-sm;
+}
+
+.category-picker-node-name {
+    @apply text-gray-200 transition-colors;
+}
+
+.category-picker-node-count {
+    @apply text-xs text-gray-500 transition-colors;
+}
+
+/* Children Container */
+.category-picker-node-children {
+    @apply ml-0 border-l-2 border-gray-700/30;
+}
+
+/* ============================================
+   RESPONSIVE ADJUSTMENTS
+   ============================================ */
+
+@media (max-width: 640px) {
+    .category-picker-header {
+        @apply flex-col;
+    }
+
+    .category-picker-search {
+        @apply text-sm;
+    }
+
+    .category-picker-tree {
+        @apply max-h-64;
+    }
+
+    .category-picker-node-row {
+        @apply py-2;
+    }
+}
+
+/* ============================================
+   ANIMATIONS
+   ============================================ */
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-4px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.category-picker-node-children {
+    animation: fadeIn 0.2s ease-out;
+}
+
+/* ============================================
+   ACCESSIBILITY
+   ============================================ */
+
+.category-picker-checkbox:focus {
+    @apply ring-2 ring-brand-500 ring-offset-2 ring-offset-gray-900;
+}
+
+.category-picker-node-toggle:focus {
+    @apply outline-none ring-2 ring-brand-500 ring-offset-1 ring-offset-gray-800;
+}
+
+/* Keyboard Navigation */
+.category-picker-node-row:focus-within {
+    @apply ring-2 ring-brand-500/50 ring-offset-1 ring-offset-gray-800;
+}
+
+/* ============================================
+   LOADING STATES
+   ============================================ */
+
+.category-picker-loading {
+    @apply opacity-50 pointer-events-none;
+}
+
+.category-picker-loading::after {
+    content: '';
+    @apply absolute inset-0 bg-gray-900/20 rounded-lg flex items-center justify-center;
+}

@@ -8,7 +8,6 @@ use App\Models\ProductType;
 use App\Models\Category;
 use App\Models\PrestaShopShop;
 use App\Models\ProductAttribute;
-use App\Models\ProductSyncStatus;
 use App\Services\PrestaShop\PrestaShopClientFactory;
 use App\Http\Livewire\Products\Management\Traits\ProductFormValidation;
 use App\Http\Livewire\Products\Management\Traits\ProductFormUpdates;
@@ -321,8 +320,20 @@ class ProductForm extends Component
         $this->available_to = $this->product->available_to?->format('Y-m-d\TH:i');
 
         // Load categories using category manager
+        Log::debug('loadProductData: About to load categories', [
+            'product_id' => $this->product->id,
+            'categoryManager_exists' => $this->categoryManager !== null,
+            'shopCategories_before' => $this->shopCategories,
+        ]);
+
         if ($this->categoryManager) {
             $this->categoryManager->loadCategories();
+
+            Log::debug('loadProductData: Categories loaded', [
+                'product_id' => $this->product->id,
+                'defaultCategories_after' => $this->defaultCategories,
+                'shopCategories_after' => $this->shopCategories,
+            ]);
         }
 
         // Store default data
@@ -735,6 +746,34 @@ class ProductForm extends Component
     }
 
     /**
+     * Check if current shop has category conflict that needs resolution
+     * ADDED 2025-10-13: Per-Shop Categories Conflict Detection
+     */
+    public function getHasCategoryConflictProperty(): bool
+    {
+        // Only in shop mode (not default)
+        if (!$this->activeShopId || !$this->product || !$this->product->exists) {
+            return false;
+        }
+
+        $shopData = \App\Models\ProductShopData::where('product_id', $this->product->id)
+            ->where('shop_id', $this->activeShopId)
+            ->first();
+
+        $hasConflict = $shopData && !empty($shopData->conflict_data) && isset($shopData->conflict_data['type']);
+
+        if ($hasConflict) {
+            Log::debug('Category conflict detected', [
+                'product_id' => $this->product->id,
+                'shop_id' => $this->activeShopId,
+                'conflict_type' => $shopData->conflict_data['type'] ?? 'unknown',
+            ]);
+        }
+
+        return $hasConflict;
+    }
+
+    /**
      * CONTEXT-AWARE: Get selected categories for specific context (shop or default)
      * This method prevents cross-tab contamination in multi-store UI
      */
@@ -1079,8 +1118,8 @@ class ProductForm extends Component
         // Remove from local state immediately (optimistic update)
         $this->removeFromShop($shopId);
 
-        // Refresh to update UI
-        $this->loadProductFromDb();
+        // NOTE: removeFromShop() already dispatches 'shops-updated' event for UI refresh
+        // No need for additional loadProductFromDb() call (which doesn't exist anyway)
     }
 
     /**
@@ -1240,7 +1279,9 @@ class ProductForm extends Component
         $this->sort_order = $this->getShopValue($shopId, 'sort_order') ?: $this->sort_order;
 
         // === CATEGORIES ===
-        $this->loadShopCategories($shopId);
+        // REMOVED 2025-10-13: loadShopCategories() uses OLD architecture (ProductShopCategory table)
+        // Categories are now loaded by ProductCategoryManager during mount() using NEW architecture (shop_id in pivot)
+        // $this->loadShopCategories($shopId);
 
         // Force update of computed properties for UI reactivity
         $this->updateCategoryColorCoding();
@@ -1746,14 +1787,24 @@ class ProductForm extends Component
         }
 
         // Fallback: when no in-memory data available (e.g., first load), consult DB
+        // UPDATED 2025-10-13: Use new architecture (shop_id in product_categories)
         if ($this->product && $this->product->exists) {
             try {
-                return \App\Models\ProductShopCategory::getCategoryInheritanceStatus(
-                    $this->product->id,
-                    $this->activeShopId
-                );
+                $shopCategories = $this->product->categoriesForShop($this->activeShopId, false)->pluck('id')->sort()->values()->toArray();
+                $defaultCategories = $this->product->categories()->pluck('id')->sort()->values()->toArray();
+
+                if (empty($shopCategories)) {
+                    return 'inherited'; // No per-shop categories, inherits from default
+                }
+
+                return ($shopCategories === $defaultCategories) ? 'same' : 'different';
             } catch (\Throwable $e) {
-                // Defensive fallback to comparison logic
+                Log::warning('Failed to get category status from DB', [
+                    'error' => $e->getMessage(),
+                    'product_id' => $this->product->id,
+                    'shop_id' => $this->activeShopId,
+                ]);
+                // Continue to final fallback
             }
         }
 
@@ -2050,6 +2101,20 @@ class ProductForm extends Component
                         'is_featured' => $this->is_featured,
                         'sort_order' => $this->sort_order,
                     ]);
+
+                    // CRITICAL FIX (Bug 2): Mark all associated shops as 'pending' after updating default data
+                    // When user edits "Dane domyślne", shops need to be re-synced to reflect new default data
+                    $shopsMarkedPending = \App\Models\ProductShopData::where('product_id', $this->product->id)
+                        ->where('sync_status', '!=', 'disabled') // Don't change disabled shops
+                        ->update(['sync_status' => 'pending']);
+
+                    if ($shopsMarkedPending > 0) {
+                        Log::info('Marked shops as pending after default data update', [
+                            'product_id' => $this->product->id,
+                            'shops_marked' => $shopsMarkedPending,
+                        ]);
+                    }
+
                     $this->successMessage = 'Produkt został zaktualizowany pomyślnie.';
                 } else {
                     // Create new product
@@ -2129,19 +2194,14 @@ class ProductForm extends Component
                     $this->dispatch('product-saved', ['productId' => $this->product->id]);
                 }
 
-                // FIXED: Delete shops marked for removal
+                // FIXED: Delete shops marked for removal (CONSOLIDATED 2025-10-13)
                 if (!empty($this->shopsToRemove) && $this->product) {
                     foreach ($this->shopsToRemove as $shopId) {
-                        // CRITICAL FIX: Delete BOTH ProductShopData AND ProductSyncStatus
-                        // Otherwise ProductList will still show old sync status!
+                        // CONSOLIDATED: ProductShopData now contains all sync tracking
+                        // No need to delete ProductSyncStatus separately (deprecated table)
 
-                        // 1. Delete ProductShopData record
+                        // Delete ProductShopData record (includes all sync tracking)
                         $deletedShopData = \App\Models\ProductShopData::where('product_id', $this->product->id)
-                            ->where('shop_id', $shopId)
-                            ->delete();
-
-                        // 2. Delete ProductSyncStatus record (sync tracking)
-                        $deletedSyncStatus = \App\Models\ProductSyncStatus::where('product_id', $this->product->id)
                             ->where('shop_id', $shopId)
                             ->delete();
 
@@ -2149,7 +2209,6 @@ class ProductForm extends Component
                             'product_id' => $this->product->id,
                             'shop_id' => $shopId,
                             'deleted_shop_data' => $deletedShopData,
-                            'deleted_sync_status' => $deletedSyncStatus,
                         ]);
                     }
                     // Clear the pending removals list
@@ -2460,18 +2519,20 @@ class ProductForm extends Component
     */
 
     /**
-     * Get sync status for specific shop
+     * Get sync status for specific shop (CONSOLIDATED 2025-10-13)
+     *
+     * Updated to use ProductShopData instead of deprecated ProductSyncStatus
      *
      * @param int $shopId
-     * @return ProductSyncStatus|null
+     * @return \App\Models\ProductShopData|null
      */
-    public function getSyncStatusForShop(int $shopId): ?ProductSyncStatus
+    public function getSyncStatusForShop(int $shopId): ?\App\Models\ProductShopData
     {
         if (!$this->product) {
             return null;
         }
 
-        return ProductSyncStatus::where('product_id', $this->product->id)
+        return \App\Models\ProductShopData::where('product_id', $this->product->id)
             ->where('shop_id', $shopId)
             ->first();
     }
@@ -2740,6 +2801,19 @@ class ProductForm extends Component
                 'is_featured' => $changes['is_featured'] ?? $this->product->is_featured,
                 'sort_order' => $changes['sort_order'] ?? $this->product->sort_order,
             ]);
+
+            // CRITICAL FIX (Bug 2): Mark all associated shops as 'pending' after updating default data
+            // When user edits "Dane domyślne", shops need to be re-synced to reflect new default data
+            $shopsMarkedPending = \App\Models\ProductShopData::where('product_id', $this->product->id)
+                ->where('sync_status', '!=', 'disabled') // Don't change disabled shops
+                ->update(['sync_status' => 'pending']);
+
+            if ($shopsMarkedPending > 0) {
+                Log::info('Marked shops as pending after default data update (pending changes)', [
+                    'product_id' => $this->product->id,
+                    'shops_marked' => $shopsMarkedPending,
+                ]);
+            }
 
             // Save categories if they were changed (using full state for save compatibility)
             Log::info('Checking category sync condition', [
@@ -3176,18 +3250,19 @@ class ProductForm extends Component
             // 1. Get shop from DB
             $shop = PrestaShopShop::findOrFail($shopId);
 
-            // 2. Get ProductShopData (contains external_id = PrestaShop product ID)
+            // 2. Get ProductShopData (contains prestashop_product_id = PrestaShop product ID)
+            // ETAP_07 OPCJA B (2025-10-13): Consolidated - external_id replaced by prestashop_product_id
             $shopData = $this->product->shopData()
                 ->where('shop_id', $shopId)
                 ->first();
 
-            if (!$shopData || !$shopData->external_id) {
-                throw new \Exception('Produkt nie jest polaczony z PrestaShop (brak external_id)');
+            if (!$shopData || !$shopData->prestashop_product_id) {
+                throw new \Exception('Produkt nie jest polaczony z PrestaShop (brak prestashop_product_id)');
             }
 
             // 3. Fetch from PrestaShop API
             $client = PrestaShopClientFactory::create($shop);
-            $prestashopData = $client->getProduct($shopData->external_id);
+            $prestashopData = $client->getProduct($shopData->prestashop_product_id);
 
             // Unwrap nested response (PrestaShop API wraps in 'product' key)
             if (isset($prestashopData['product'])) {
@@ -3196,7 +3271,7 @@ class ProductForm extends Component
 
             // 4. Extract essential data for UI
             $this->loadedShopData[$shopId] = [
-                'prestashop_id' => $shopData->external_id,
+                'prestashop_id' => $shopData->prestashop_product_id,
                 'link_rewrite' => data_get($prestashopData, 'link_rewrite.0.value') ?? data_get($prestashopData, 'link_rewrite'),
                 'name' => data_get($prestashopData, 'name.0.value') ?? data_get($prestashopData, 'name'),
                 'description_short' => data_get($prestashopData, 'description_short.0.value') ?? data_get($prestashopData, 'description_short'),
@@ -3215,7 +3290,7 @@ class ProductForm extends Component
             Log::info('Shop data loaded from PrestaShop', [
                 'shop_id' => $shopId,
                 'product_id' => $this->product?->id,
-                'prestashop_id' => $shopData->external_id,
+                'prestashop_id' => $shopData->prestashop_product_id,
                 'link_rewrite' => $this->loadedShopData[$shopId]['link_rewrite'],
             ]);
 
@@ -3260,16 +3335,16 @@ class ProductForm extends Component
             }
         }
 
-        // ETAP_07 REFACTOR: Fallback to ProductSyncStatus (not ProductShopData!)
-        // ProductSyncStatus now contains external_reference (link_rewrite) for URL generation
+        // CONSOLIDATED 2025-10-13: Fallback to ProductShopData
+        // ProductShopData now contains prestashop_product_id and external_reference for URL generation
         if ($this->product && $this->product->exists) {
-            $syncStatus = $this->product->syncStatuses()
+            $shopData = $this->product->shopData()
                 ->where('shop_id', $shopId)
                 ->first();
 
-            if ($syncStatus && $syncStatus->prestashop_product_id) {
-                $productId = $syncStatus->prestashop_product_id;
-                $linkRewrite = $syncStatus->external_reference;
+            if ($shopData && $shopData->prestashop_product_id) {
+                $productId = $shopData->prestashop_product_id;
+                $linkRewrite = $shopData->external_reference;
 
                 if ($linkRewrite) {
                     return rtrim($shop['url'], '/') . "/{$productId}-{$linkRewrite}.html";

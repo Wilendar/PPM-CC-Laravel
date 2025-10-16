@@ -393,11 +393,11 @@ class JobProgressService
                 'percentage' => 0,
                 'errors' => [],
                 'shop_name' => 'Unknown',
+                'pending_conflicts' => [], // 2025-10-13: Category conflict detection
             ];
         }
 
-        // Format for JobProgressBar component
-        return [
+        $result = [
             'status' => $progress->status,
             'message' => $this->formatProgressMessage($progress),
             'current' => $progress->current_count,
@@ -406,7 +406,37 @@ class JobProgressService
             'errors' => $progress->error_details ?? [], // Already cast to array in model
             'shop_name' => $progress->shop?->name ?? 'Unknown Shop',
             'job_id' => $progress->job_id, // For ErrorDetailsModal
+            'pending_conflicts' => [], // Default: no conflicts
         ];
+
+        // === CONFLICT DETECTION (2025-10-13) ===
+        // When import completes, check for products needing resolution
+        if ($progress->status === 'completed' && $progress->job_type === 'import' && $progress->shop_id) {
+            $conflicts = \App\Models\ProductShopData::where('shop_id', $progress->shop_id)
+                ->where('requires_resolution', true)
+                ->orderBy('updated_at', 'desc')
+                ->limit(10) // Limit to first 10 conflicts
+                ->get(['product_id', 'shop_id', 'conflict_data', 'conflict_detected_at']);
+
+            if ($conflicts->isNotEmpty()) {
+                $result['pending_conflicts'] = $conflicts->map(function ($shopData) {
+                    return [
+                        'product_id' => $shopData->product_id,
+                        'shop_id' => $shopData->shop_id,
+                        'conflict_type' => $shopData->conflict_data['type'] ?? 'unknown',
+                        'detected_at' => $shopData->conflict_detected_at,
+                    ];
+                })->toArray();
+
+                Log::info('Pending conflicts detected for completed import', [
+                    'progress_id' => $progressId,
+                    'shop_id' => $progress->shop_id,
+                    'conflict_count' => count($result['pending_conflicts']),
+                ]);
+            }
+        }
+
+        return $result;
     }
 
     /**

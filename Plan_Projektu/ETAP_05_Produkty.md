@@ -463,23 +463,67 @@ Po ukończeniu tej fazy system będzie:
       - **ROUTES:** /admin/products/categories/create działają poprawnie
       - **DEPLOYMENT:** Funkcjonalność zweryfikowana na serwerze produkcyjnym
 
-  - ❌ **2.2 Product-Category Assignment**
-    - ❌ **2.2.1 Category Assignment Interface**
-      - ❌ **2.2.2.1 Product Category Selection**
-        - ❌ 2.2.2.1.1 Multiple category assignment per product
-        - ❌ 2.2.2.1.2 Primary category designation dla PrestaShop
-        **🔗 🔗 POWIAZANIE Z ETAP_07 (punkty 7.5.1.1, 7.5.2.1):** Wybor kategorii glownych musi odpowiadac mapowaniu kategori i transformacjom w integracji PrestaShop.
-        - ❌ 2.2.2.1.3 Category tree selector w product form
-        - ❌ 2.2.2.1.4 Breadcrumb display dla selected categories
-        - ❌ 2.2.2.1.5 Category inheritance rules
-      - ❌ **2.2.2.2 Bulk Category Operations**
-        - ❌ 2.2.2.2.1 Bulk assign categories to products
-        - ❌ 2.2.2.2.2 Bulk remove categories from products
-        - ❌ 2.2.2.2.3 Bulk move products between categories
-        - ❌ 2.2.2.2.4 Category merge functionality
-        - ❌ 2.2.2.2.5 Category deletion z product reassignment
+  - 🛠️ **2.2 Product-Category Assignment**
+    - ✅ **2.2.1 Category Assignment Interface - UKOŃCZONA 2025-10-15**
+      **STATUS:** Category picker w ProductForm w pełni funkcjonalny z per-shop support
+      - ✅ **2.2.2.1 Product Category Selection**
+        - ✅ 2.2.2.1.1 Multiple category assignment per product
+          └──📁 PLIK: resources/views/livewire/products/management/product-form.blade.php (category picker tab)
+          └──📁 PLIK: app/Http/Livewire/Products/Management/Services/ProductCategoryManager.php (category logic)
+        - ✅ 2.2.2.1.2 Primary category designation dla PrestaShop
+          └──📁 PLIK: app/Http/Livewire/Products/Management/ProductForm.php (shopCategories property)
+          **🔗 🔗 POWIAZANIE Z ETAP_07 (punkty 7.5.1.1, 7.5.2.1):** Wybor kategorii glownych musi odpowiadac mapowaniu kategori i transformacjom w integracji PrestaShop.
+        - ✅ 2.2.2.1.3 Category tree selector w product form
+          └──📁 PLIK: resources/views/livewire/products/management/partials/category-tree-item.blade.php (recursive tree)
+        - ✅ 2.2.2.1.4 Breadcrumb display dla selected categories
+          └──📁 PLIK: resources/views/livewire/products/management/product-form.blade.php (breadcrumb UI)
+        - ✅ 2.2.2.1.5 Category inheritance rules
+          └──📁 PLIK: app/Http/Livewire/Products/Management/ProductForm.php (per-shop category inheritance)
+      - ✅ **2.2.2.2 Bulk Category Operations - UKOŃCZONE 2025-10-15 (4/4 COMPLETE)**
+        **📋 PLAN IMPLEMENTACJI:** _AGENT_REPORTS/architect_bulk_category_operations_plan_2025-10-15.md
+        **⏱️ CZAS IMPLEMENTACJI:** 12 godzin (4 zadania ukończone: 3 bulk operations + category merge)
+        **🔧 ARCHITEKTURA:** ProductList bulk infrastructure + CategoryTree merge + queue jobs integration
+
+        - ✅ 2.2.2.2.1 Bulk assign categories to products - UKOŃCZONE 2025-10-15
+          **UI:** Modal z category picker (multi-select), max 10 categories per product
+          **Logic:** Queue-based dla >50 produktów (BulkAssignCategories job), synchronous dla <=50
+          └──📁 PLIK: app/Http/Livewire/Products/Listing/ProductList.php (bulkAssignCategories method)
+          └──📁 PLIK: app/Jobs/Products/BulkAssignCategories.php (queue job)
+          └──📁 PLIK: resources/views/livewire/products/listing/product-list.blade.php (modal UI)
+
+        - ✅ 2.2.2.2.2 Bulk remove categories from products - UKOŃCZONE 2025-10-15
+          **UI:** Modal z listą wspólnych kategorii, warning dla primary category
+          **Logic:** Auto-reassignment primary category po remove, queue dla >50
+          └──📁 PLIK: app/Http/Livewire/Products/Listing/ProductList.php (bulkRemoveCategories method)
+          └──📁 PLIK: app/Jobs/Products/BulkRemoveCategories.php (queue job)
+          └──📁 PLIK: resources/views/livewire/products/listing/product-list.blade.php (modal UI)
+
+        - ✅ 2.2.2.2.3 Bulk move products between categories - UKOŃCZONE 2025-10-15
+          **UI:** Modal FROM/TO selection, 2 tryby (replace/add_keep)
+          **Logic:** Skip produktów bez FROM category, queue dla >50
+          └──📁 PLIK: app/Http/Livewire/Products/Listing/ProductList.php (bulkMoveCategories method)
+          └──📁 PLIK: app/Jobs/Products/BulkMoveCategories.php (queue job)
+          └──📁 PLIK: resources/views/livewire/products/listing/product-list.blade.php (modal UI)
+
+        - ✅ 2.2.2.2.4 Category merge functionality - UKOŃCZONE 2025-10-15
+          **UI:** Modal z source display i target selector (dropdown), warnings display
+          **Logic:** Move products (continue-on-error) + move children (stop-on-error) + delete source, all w DB::transaction
+          **Validation:** 5 checks: both selected, different, exists, circular ref (isAncestorOf), max level (getMaxDescendantLevel)
+          └──📁 PLIK: app/Http/Livewire/Products/Categories/CategoryTree.php (openCategoryMergeModal, mergeCategories, closeCategoryMergeModal methods + 4 properties)
+          └──📁 PLIK: resources/views/livewire/products/categories/category-tree-ultra-clean.blade.php (modal UI lines 925-1058)
+          └──📁 PLIK: resources/views/livewire/products/categories/partials/compact-category-actions.blade.php ("Połącz kategorie" button lines 72-79)
+          └──📁 RAPORT BACKEND: _AGENT_REPORTS/livewire_specialist_category_merge_2025-10-15.md
+          └──📁 RAPORT FRONTEND: _AGENT_REPORTS/frontend_specialist_category_merge_ui_2025-10-15.md
+
+        - ✅ 2.2.2.2.5 Category deletion z product reassignment
+          **STATUS:** JUŻ ZAIMPLEMENTOWANE w CategoryTree.php (2025-10-10)
+          └──📁 PLIK: app/Http/Livewire/Products/Categories/CategoryTree.php (confirmDelete method)
+          └──📁 PLIK: app/Jobs/Categories/BulkDeleteCategoriesJob.php (queue job z cleanup)
 
 - ❌ **3. PRODUCT VARIANTS - SYSTEM WARIANTÓW**
+  **📖 SZCZEGÓŁOWA SPECYFIKACJA:** [ETAP_05a_Produkty.md](ETAP_05a_Produkty.md) - Sekcja 1 (Database Schema, Services, UI)
+  **⚠️ UWAGA:** Punkt 3 został rozbudowany do osobnego dokumentu ze względu na złożoność implementacji wariantów, dziedziczenia danych i integracji z PrestaShop ps_attribute*.
+
   - ❌ **3.1 Variant Management Interface**
     - ❌ **3.1.1 Variant List & Creation**
       - ❌ **3.1.1.1 Product Variants Tab**
@@ -646,6 +690,8 @@ Po ukończeniu tej fazy system będzie:
         - ❌ 6.2.1.2.5 Rollback capabilities dla image changes
 
 - ❌ **7. ATTRIBUTE SYSTEM - EAV IMPLEMENTACJA**
+  **📖 SZCZEGÓŁOWA SPECYFIKACJA:** [ETAP_05a_Produkty.md](ETAP_05a_Produkty.md) - Sekcja 2 (Vehicle Features) i Sekcja 3 (Parts Compatibility)
+  **⚠️ UWAGA:** Punkt 7 został rozbudowany do osobnego dokumentu ze względu na złożoność systemu cech pojazdów (ps_feature*), dopasowań kompatybilności (Oryginał/Zamiennik/Model) i integracji z PrestaShop.
   - ❌ **7.1 Attribute Definition System**
     - ❌ **7.1.1 Attribute Types & Configuration**
       - ❌ **7.1.1.1 Attribute Management**

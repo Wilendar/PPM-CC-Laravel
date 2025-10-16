@@ -13,7 +13,15 @@ use Illuminate\Support\Facades\DB;
  * Manages both default and shop-specific category assignments
  * Separated from main component per CLAUDE.md guidelines
  *
+ * UPDATED 2025-10-13: Per-Shop Categories Architecture
+ * - Uses shop_id column in product_categories pivot table
+ * - shop_id=NULL → Default categories (from first import)
+ * - shop_id=X → Per-shop override (different categories per shop)
+ * - Single table architecture replaces old ProductShopCategory table
+ *
  * @package App\Http\Livewire\Products\Management\Services
+ * @version 2.0 - Per-Shop Categories Support
+ * @since 2025-10-13
  */
 class ProductCategoryManager
 {
@@ -76,6 +84,7 @@ class ProductCategoryManager
 
     /**
      * Load shop-specific categories from database
+     * UPDATED 2025-10-13: Uses new shop_id column in product_categories pivot
      */
     private function loadShopCategories(): void
     {
@@ -83,25 +92,43 @@ class ProductCategoryManager
             return;
         }
 
-        // Get all shop categories for this product
-        $shopCategories = \App\Models\ProductShopCategory::forProduct($this->component->product->id)
-            ->with('shop')
-            ->get()
-            ->groupBy('shop_id');
+        // Get all per-shop categories using new architecture (shop_id in pivot)
+        $allShopCategories = $this->component->product->allCategoriesGroupedByShop();
 
-        foreach ($shopCategories as $shopId => $categories) {
-            $selectedIds = $categories->pluck('category_id')->toArray();
-            $primaryCategory = $categories->where('is_primary', true)->first();
+        Log::debug('loadShopCategories: Raw data from allCategoriesGroupedByShop()', [
+            'product_id' => $this->component->product->id,
+            'default_count' => $allShopCategories['default']->count(),
+            'shops_keys' => array_keys($allShopCategories['shops']),
+            'full_data' => $allShopCategories,
+        ]);
+
+        foreach ($allShopCategories['shops'] as $shopId => $categories) {
+            $selectedIds = $categories->pluck('id')->toArray();
+
+            // Find primary category for this shop
+            $primaryCategory = $categories->first(function ($category) {
+                return $category->pivot->is_primary === 1 || $category->pivot->is_primary === true;
+            });
 
             $this->component->shopCategories[$shopId] = [
                 'selected' => $selectedIds,
-                'primary' => $primaryCategory?->category_id,
+                'primary' => $primaryCategory?->id,
             ];
+
+            Log::debug('loadShopCategories: Shop data loaded', [
+                'product_id' => $this->component->product->id,
+                'shop_id' => $shopId,
+                'selected_ids' => $selectedIds,
+                'primary_id' => $primaryCategory?->id,
+                'component_shopCategories_after' => $this->component->shopCategories[$shopId],
+            ]);
         }
 
-        Log::info('Shop categories loaded', [
+        Log::info('Shop categories loaded (NEW ARCHITECTURE)', [
             'product_id' => $this->component->product->id,
             'shops_with_categories' => array_keys($this->component->shopCategories),
+            'architecture' => 'shop_id in product_categories pivot',
+            'final_shopCategories' => $this->component->shopCategories,
         ]);
     }
 
@@ -274,18 +301,19 @@ class ProductCategoryManager
         }
 
         DB::transaction(function () {
-            // Sync default categories (unchanged)
+            // Sync default categories (shop_id=NULL)
             $this->syncDefaultCategories();
 
-            // DISABLED: Shop-specific categories are now handled by savePendingChangesToShop()
-            // This prevents double-writing and ensures proper context isolation
-            // $this->syncShopCategories();
+            // UPDATED 2025-10-13: Re-enabled with new architecture
+            // Now uses shop_id column in product_categories pivot
+            $this->syncShopCategories();
 
-            Log::info('All categories synced to database', [
+            Log::info('All categories synced to database (NEW ARCHITECTURE)', [
                 'product_id' => $this->component->product->id,
                 'default_categories_count' => count($this->component->defaultCategories['selected'] ?? []),
-                'shop_categories_handled_by' => 'savePendingChangesToShop()',
+                'shop_categories_count' => count($this->component->shopCategories),
                 'primary_category' => $this->component->defaultCategories['primary'] ?? null,
+                'architecture' => 'shop_id in product_categories pivot',
             ]);
         });
     }
@@ -332,16 +360,30 @@ class ProductCategoryManager
             ]);
         }
 
-        // Prepare category data with proper primary flags
+        // UPDATED 2025-10-13: Manual is_primary reset (triggers removed due to MySQL 1442)
+        // Reset all is_primary=0 for this product's default categories BEFORE sync
+        DB::table('product_categories')
+            ->where('product_id', $this->component->product->id)
+            ->whereNull('shop_id') // Only default categories
+            ->update(['is_primary' => false]);
+
+        Log::debug('Default categories is_primary reset to 0', [
+            'product_id' => $this->component->product->id,
+        ]);
+
+        // Prepare category data with proper primary flags and shop_id=NULL
+        // UPDATED 2025-10-13: Add shop_id=null for default categories
         $categoryData = [];
         foreach ($validCategoryIds as $index => $categoryId) {
             $categoryData[$categoryId] = [
                 'is_primary' => $categoryId === $primaryCategoryId,
                 'sort_order' => $index,
+                'shop_id' => null, // Default categories have shop_id=NULL
             ];
         }
 
-        // Use sync to replace all categories at once (triggers removed, this is safe now)
+        // Use sync to replace all categories at once
+        // This will only sync categories with shop_id=NULL (default)
         $this->component->product->categories()->sync($categoryData);
 
         // CRITICAL FIX: Update component with exactly what was saved to database
@@ -361,7 +403,8 @@ class ProductCategoryManager
     }
 
     /**
-     * Sync shop-specific categories to product_shop_categories table
+     * Sync shop-specific categories to product_categories pivot with shop_id
+     * UPDATED 2025-10-13: Uses new shop_id column in product_categories pivot
      */
     private function syncShopCategories(): void
     {
@@ -369,12 +412,43 @@ class ProductCategoryManager
             $selectedCategories = $shopCategoryData['selected'] ?? [];
             $primaryCategoryId = $shopCategoryData['primary'] ?? null;
 
-            \App\Models\ProductShopCategory::setCategoriesForProductShop(
-                $this->component->product->id,
-                $shopId,
-                $selectedCategories,
-                $primaryCategoryId
-            );
+            // UPDATED 2025-10-13: Manual is_primary reset (triggers removed due to MySQL 1442)
+            // Reset all is_primary=0 for this product + shop BEFORE insert
+            DB::table('product_categories')
+                ->where('product_id', $this->component->product->id)
+                ->where('shop_id', $shopId)
+                ->update(['is_primary' => false]);
+
+            Log::debug('Shop categories is_primary reset to 0', [
+                'product_id' => $this->component->product->id,
+                'shop_id' => $shopId,
+            ]);
+
+            // Delete existing per-shop categories for this product + shop
+            DB::table('product_categories')
+                ->where('product_id', $this->component->product->id)
+                ->where('shop_id', $shopId)
+                ->delete();
+
+            // Insert new per-shop categories
+            foreach ($selectedCategories as $index => $categoryId) {
+                DB::table('product_categories')->insert([
+                    'product_id' => $this->component->product->id,
+                    'category_id' => $categoryId,
+                    'shop_id' => $shopId, // Per-shop override
+                    'is_primary' => $categoryId === $primaryCategoryId,
+                    'sort_order' => $index,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+            }
+
+            Log::info('Shop categories synced (NEW ARCHITECTURE)', [
+                'product_id' => $this->component->product->id,
+                'shop_id' => $shopId,
+                'categories' => $selectedCategories,
+                'primary' => $primaryCategoryId,
+            ]);
         }
     }
 

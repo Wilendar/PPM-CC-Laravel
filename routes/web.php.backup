@@ -1,0 +1,460 @@
+<?php
+
+use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
+
+/*
+|--------------------------------------------------------------------------
+| Web Routes
+|--------------------------------------------------------------------------
+|
+| PPM-CC-Laravel Web Routes
+| FAZA A: Spatie Setup + Middleware - Route Protection Implementation
+|
+| Hierarchia uprawnień:
+| 1. Admin - pełny dostęp
+| 2. Manager - zarządzanie produktami + eksport + import  
+| 3. Editor - edycja opisów/zdjęć + eksport
+| 4. Warehouseman - panel dostaw
+| 5. Salesperson - rezerwacje z kontenera
+| 6. Claims - panel reklamacji
+| 7. User - odczyt + wyszukiwarka
+|
+*/
+
+// ==========================================
+// PUBLIC ROUTES (no auth required)
+// ==========================================
+
+Route::get('/', function () {
+    if (Auth::check()) {
+        return redirect()->route('dashboard');
+    }
+    return view('welcome');
+})->name('home');
+
+// Health check for hosting
+Route::get('/up', function () {
+    return response()->json(['status' => 'ok', 'timestamp' => now()]);
+})->name('health');
+
+// ==========================================
+// AUTHENTICATION ROUTES
+// ==========================================
+
+// Laravel built-in auth routes będą dodane w FAZA B
+// Na razie basic login/logout placeholders
+
+Route::get('/login', function () {
+    return view('auth.login');
+})->name('login');
+
+Route::post('/login', function (Request $request) {
+    $request->validate([
+        'email' => 'required|email',
+        'password' => 'required'
+    ]);
+    
+    $credentials = $request->only('email', 'password');
+    $remember = $request->boolean('remember');
+    
+    if (Auth::attempt($credentials, $remember)) {
+        $request->session()->regenerate();
+        $user = Auth::user();
+        
+        \Illuminate\Support\Facades\Log::info('Successful login for user: ' . $user->email);
+        
+        // Redirect based on user role
+        if ($user->hasRole('Admin')) {
+            return redirect()->intended('/admin');
+        }
+        
+        return redirect()->intended(route('dashboard'));
+    }
+    
+    return back()->withErrors([
+        'email' => 'Podane dane logowania są nieprawidłowe.'
+    ])->withInput($request->only('email'));
+})->name('login.store');
+
+Route::post('/logout', function () {
+    Auth::logout();
+    return redirect()->route('home');
+})->name('logout');
+
+// ==========================================
+// AUTHENTICATED ROUTES
+// ==========================================
+
+Route::middleware(['auth'])->group(function () {
+    
+    // Dashboard - wszyscy zalogowani użytkownicy
+    Route::get('/dashboard', function () {
+        return view('dashboard');
+    })->name('dashboard');
+    
+    // Profile management
+    Route::get('/profile', function () {
+        return view('profile.show');
+    })->name('profile.show');
+    
+    Route::put('/profile', function () {
+        // Profile update logic
+        return redirect()->route('profile.show');
+    })->name('profile.update');
+});
+
+// ==========================================
+// ADMIN ROUTES (/admin prefix)
+// ==========================================
+
+Route::prefix('admin')->middleware(['admin'])->name('admin.')->group(function () {
+    
+    // Admin Dashboard - Livewire Component
+    Route::get('/', \App\Http\Livewire\Dashboard\AdminDashboard::class)->name('dashboard');
+    
+    // User Management
+    Route::get('/users', function () {
+        return view('admin.users.index');
+    })->name('users');
+    
+    Route::get('/users/create', function () {
+        return view('admin.users.create');
+    })->name('users.create');
+    
+    Route::get('/users/{user}', function ($user) {
+        return view('admin.users.show', compact('user'));
+    })->name('users.show');
+    
+    Route::get('/users/{user}/edit', function ($user) {
+        return view('admin.users.edit', compact('user'));
+    })->name('users.edit');
+    
+    // System Settings
+    Route::get('/settings', function () {
+        return view('admin.settings.index');
+    })->name('settings');
+    
+    // Audit Logs
+    Route::get('/audit-logs', function () {
+        return view('admin.audit-logs.index');
+    })->name('audit-logs.index');
+    
+    // Shop Management - FAZA B Implementation
+    Route::get('/shops', \App\Http\Livewire\Admin\Shops\ShopManager::class)->name('shops.index');
+    Route::get('/shops/create', \App\Http\Livewire\Admin\Shops\ShopManager::class)->name('shops.create');
+    Route::get('/shops/{shop}', \App\Http\Livewire\Admin\Shops\ShopManager::class)->name('shops.show');
+    Route::get('/shops/{shop}/edit', \App\Http\Livewire\Admin\Shops\ShopManager::class)->name('shops.edit');
+    
+    // ERP Integration Management - FAZA B Implementation
+    Route::get('/integrations', \App\Http\Livewire\Admin\ERP\ERPManager::class)->name('integrations.index');
+    Route::get('/integrations/create', \App\Http\Livewire\Admin\ERP\ERPManager::class)->name('integrations.create');
+    Route::get('/integrations/{connection}', \App\Http\Livewire\Admin\ERP\ERPManager::class)->name('integrations.show');
+    Route::get('/integrations/{connection}/edit', \App\Http\Livewire\Admin\ERP\ERPManager::class)->name('integrations.edit');    
+    // ==========================================
+    // FAZA C: SYSTEM ADMINISTRATION ROUTES
+    // ==========================================
+    
+    // System Settings - FAZA C Implementation
+    Route::get('/system-settings', \App\Http\Livewire\Admin\Settings\SystemSettings::class)
+         ->name('system-settings.index');
+    
+    // Backup Management - FAZA C Implementation
+    Route::prefix('backup')->name('backup.')->group(function () {
+        Route::get('/', \App\Http\Livewire\Admin\Backup\BackupManager::class)->name('index');
+        Route::get('/download/{backup}', function ($backup) {
+            $backupJob = \App\Models\BackupJob::findOrFail($backup);
+            if (!$backupJob->isDownloadable()) {
+                abort(404, 'Backup file not found');
+            }
+            return response()->download($backupJob->getFullPath(), basename($backupJob->file_path));
+        })->name('download');
+    });
+    
+    // Maintenance Management - FAZA C Implementation
+    Route::get('/maintenance', \App\Http\Livewire\Admin\Maintenance\DatabaseMaintenance::class)
+         ->name('maintenance.index');
+    
+    // ==========================================
+    // FAZA D: ADVANCED FEATURES ROUTES
+    // ==========================================
+    
+    // Notification System - FAZA D Implementation
+    Route::prefix('notifications')->name('notifications.')->group(function () {
+        Route::get('/', \App\Http\Livewire\Admin\Notifications\NotificationCenter::class)->name('index');
+        Route::get('/{notification}', function ($notification) {
+            $notificationModel = \App\Models\AdminNotification::findOrFail($notification);
+            return view('admin.notifications.show', compact('notificationModel'));
+        })->name('show');
+    });
+    
+    // Reports & Analytics - FAZA D Implementation
+    Route::prefix('reports')->name('reports.')->group(function () {
+        Route::get('/', \App\Http\Livewire\Admin\Reports\ReportsDashboard::class)->name('index');
+        Route::get('/usage-analytics', \App\Http\Livewire\Admin\Reports\ReportsDashboard::class)->name('usage-analytics');
+        Route::get('/performance', \App\Http\Livewire\Admin\Reports\ReportsDashboard::class)->name('performance');
+        Route::get('/business-intelligence', \App\Http\Livewire\Admin\Reports\ReportsDashboard::class)->name('business-intelligence');
+        Route::get('/integration-performance', \App\Http\Livewire\Admin\Reports\ReportsDashboard::class)->name('integration-performance');
+        Route::get('/{report}', function ($report) {
+            $reportModel = \App\Models\SystemReport::findOrFail($report);
+            return view('admin.reports.show', compact('reportModel'));
+        })->name('show');
+        Route::get('/{report}/download', function ($report) {
+            $reportModel = \App\Models\SystemReport::findOrFail($report);
+            if ($reportModel->status !== 'completed') {
+                abort(404, 'Report not available for download');
+            }
+            $fileName = "report_{$reportModel->type}_{$reportModel->period}_{$reportModel->report_date}.json";
+            return response()->streamDownload(function () use ($reportModel) {
+                echo json_encode($reportModel->data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+            }, $fileName, ['Content-Type' => 'application/json']);
+        })->name('download');
+    });
+    
+    // API Management - FAZA D Implementation  
+    Route::prefix('api-management')->name('api.')->group(function () {
+        Route::get('/', \App\Http\Livewire\Admin\Api\ApiManagement::class)->name('index');
+        Route::get('/monitoring', \App\Http\Livewire\Admin\Api\ApiManagement::class)->name('monitoring');
+        Route::get('/usage', \App\Http\Livewire\Admin\Api\ApiManagement::class)->name('usage');
+        Route::get('/security', \App\Http\Livewire\Admin\Api\ApiManagement::class)->name('security');
+    });
+    
+    // ==========================================
+    // FAZA E: CUSTOMIZATION & THEMES - FINAL PHASE
+    // ==========================================
+    
+    // Admin Panel Customization - FAZA E Implementation
+    Route::prefix('customization')->name('customization.')->group(function () {
+        Route::get('/', \App\Http\Livewire\Admin\Customization\AdminTheme::class)->name('index');
+        Route::get('/themes', \App\Http\Livewire\Admin\Customization\AdminTheme::class)->name('themes');
+        Route::get('/colors', \App\Http\Livewire\Admin\Customization\AdminTheme::class)->name('colors');
+        Route::get('/layout', \App\Http\Livewire\Admin\Customization\AdminTheme::class)->name('layout');
+        Route::get('/branding', \App\Http\Livewire\Admin\Customization\AdminTheme::class)->name('branding');
+        Route::get('/widgets', \App\Http\Livewire\Admin\Customization\AdminTheme::class)->name('widgets');
+        Route::get('/css', \App\Http\Livewire\Admin\Customization\AdminTheme::class)->name('css');
+    });
+});
+
+// ==========================================
+// MANAGER ROUTES (/manager prefix)
+// ==========================================
+
+Route::prefix('manager')->middleware(['manager'])->name('manager.')->group(function () {
+    
+    // Manager Dashboard
+    Route::get('/', function () {
+        return view('manager.dashboard');
+    })->name('dashboard');
+    
+    // Products Management
+    Route::get('/products', function () {
+        return view('manager.products.index');
+    })->name('products.index');
+    
+    Route::get('/products/create', function () {
+        return view('manager.products.create');
+    })->name('products.create');
+    
+    Route::get('/products/{product}', function ($product) {
+        return view('manager.products.show', compact('product'));
+    })->name('products.show');
+    
+    Route::get('/products/{product}/edit', function ($product) {
+        return view('manager.products.edit', compact('product'));
+    })->name('products.edit');
+    
+    // Categories Management
+    Route::get('/categories', function () {
+        return view('manager.categories.index');
+    })->name('categories.index');
+    
+    // Import/Export
+    Route::get('/import', function () {
+        return view('manager.import.index');
+    })->name('import.index');
+    
+    Route::get('/export', function () {
+        return view('manager.export.index');
+    })->name('export.index');
+    
+    // Integrations Control
+    Route::get('/integrations', function () {
+        return view('manager.integrations.index');
+    })->name('integrations.index');
+});
+
+// ==========================================
+// EDITOR ROUTES (specific permissions)
+// ==========================================
+
+Route::prefix('editor')->middleware(['editor'])->name('editor.')->group(function () {
+    
+    // Editor Dashboard
+    Route::get('/', function () {
+        return view('editor.dashboard');
+    })->name('dashboard');
+    
+    // Product Content Editing (no delete)
+    Route::get('/products', function () {
+        return view('editor.products.index');
+    })->name('products.index');
+    
+    Route::get('/products/{product}/edit', function ($product) {
+        return view('editor.products.edit', compact('product'));
+    })->name('products.edit');
+    
+    // Media Management
+    Route::get('/media', function () {
+        return view('editor.media.index');
+    })->name('media.index');
+    
+    // Export only
+    Route::get('/export', function () {
+        return view('editor.export.index');
+    })->name('export.index');
+});
+
+// ==========================================
+// ROLE-SPECIFIC ROUTES
+// ==========================================
+
+// Warehouseman - panel dostaw
+Route::prefix('warehouse')->middleware(['role:Admin,Manager,Warehouseman'])->name('warehouse.')->group(function () {
+    Route::get('/', function () {
+        return view('warehouse.dashboard');
+    })->name('dashboard');
+    
+    Route::get('/deliveries', function () {
+        return view('warehouse.deliveries.index');
+    })->name('deliveries.index');
+});
+
+// Salesperson - rezerwacje z kontenera  
+Route::prefix('sales')->middleware(['role:Admin,Manager,Salesperson'])->name('sales.')->group(function () {
+    Route::get('/', function () {
+        return view('sales.dashboard');
+    })->name('dashboard');
+    
+    Route::get('/reservations', function () {
+        return view('sales.reservations.index');
+    })->name('reservations.index');
+});
+
+// Claims - panel reklamacji
+Route::prefix('claims')->middleware(['role:Admin,Manager,Claims'])->name('claims.')->group(function () {
+    Route::get('/', function () {
+        return view('claims.dashboard');
+    })->name('dashboard');
+    
+    Route::get('/complaints', function () {
+        return view('claims.complaints.index');
+    })->name('complaints.index');
+});
+
+// ==========================================
+// PUBLIC SEARCH & CATALOG (all authenticated users)
+// ==========================================
+
+Route::middleware(['auth'])->group(function () {
+    
+    // Product Search & Catalog
+    Route::get('/products', function () {
+        return view('products.index');
+    })->name('products.index');
+    
+    Route::get('/products/{sku}', function ($sku) {
+        return view('products.show', compact('sku'));
+    })->name('products.show');
+    
+    // Search functionality
+    Route::get('/search', function () {
+        return view('search.index');
+    })->name('search.index');
+    
+    Route::post('/search', function () {
+        return view('search.results');
+    })->name('search.results');
+    
+    // Categories browse
+    Route::get('/categories', function () {
+        return view('categories.index');
+    })->name('categories.index');
+    
+    Route::get('/categories/{category}', function ($category) {
+        return view('categories.show', compact('category'));
+    })->name('categories.show');
+});
+
+// ==========================================
+// PERMISSION-BASED ROUTES (specific actions)
+// ==========================================
+
+// Product management z specific permissions
+Route::middleware(['permission:products.create'])->group(function () {
+    Route::post('/products', function () {
+        // Create product logic
+        return redirect()->route('manager.products.index');
+    })->name('products.store');
+});
+
+Route::middleware(['permission:products.edit'])->group(function () {
+    Route::put('/products/{product}', function ($product) {
+        // Update product logic
+        return redirect()->route('products.show', $product);
+    })->name('products.update');
+});
+
+Route::middleware(['permission:products.delete'])->group(function () {
+    Route::delete('/products/{product}', function ($product) {
+        // Delete product logic (only Admin/Manager)
+        return redirect()->route('manager.products.index');
+    })->name('products.destroy');
+});
+
+// Import/Export specific permissions
+Route::middleware(['permission:import.xlsx'])->group(function () {
+    Route::post('/import/xlsx', function () {
+        // XLSX import logic
+        return redirect()->route('manager.import.index');
+    })->name('import.xlsx');
+});
+
+Route::middleware(['permission:export.all'])->group(function () {
+    Route::get('/export/{format}', function ($format) {
+        // Export logic
+        return response()->download('export.xlsx');
+    })->name('export.download');
+});
+
+// ==========================================
+// FALLBACK & ERROR ROUTES
+// ==========================================
+
+// 403 Forbidden page
+Route::get('/forbidden', function () {
+    return view('errors.403');
+})->name('forbidden');
+
+// ==========================================
+// OAUTH2 ROUTES INCLUSION
+// ==========================================
+
+// Include OAuth2 routes from separate file (disabled until controllers are implemented)
+// require __DIR__.'/oauth.php';
+
+// Test route
+Route::get('/test-dashboard', function () {
+    return 'Dashboard test works!';
+});
+
+// Test admin dashboard without middleware
+Route::get('/test-admin', function () {
+    return view('admin-dashboard-test');
+});
+
+// Catch-all dla nieistniejących routes
+Route::fallback(function () {
+    return view('errors.404');
+});

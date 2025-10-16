@@ -19,7 +19,8 @@
         'resources/css/app.css',
         'resources/css/admin/layout.css',
         'resources/css/admin/components.css',
-        'resources/css/products/category-form.css'
+        'resources/css/products/category-form.css',
+        'resources/css/components/category-picker.css'
     ])
 
     {{-- Alpine.js is included with Livewire 3.x - no need to load separately --}}
@@ -517,6 +518,7 @@
 
     <!-- Global Components -->
     <livewire:components.error-details-modal />
+    <livewire:products.category-conflict-modal />
 
     <!-- Livewire Scripts (includes Alpine.js 3.x built-in) -->
     @livewireScripts

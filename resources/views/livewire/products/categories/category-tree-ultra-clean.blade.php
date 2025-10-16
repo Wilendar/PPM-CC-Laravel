@@ -77,11 +77,103 @@
             </div>
         </div>
     </div>
+    {{-- Bulk Actions Toolbar (visible tylko gdy selectedCategories > 0) --}}
+    @if(count($selectedCategories) > 0)
+    <div class="bg-blue-50 dark:bg-blue-900/20 border-b border-blue-200 dark:border-blue-700 px-6 py-3"
+         x-data="{ bulkMenuOpen: false }"
+         x-transition:enter="transition ease-out duration-200"
+         x-transition:enter-start="opacity-0 -translate-y-2"
+         x-transition:enter-end="opacity-100 translate-y-0">
+        <div class="flex items-center justify-between">
+            <div class="flex items-center space-x-4">
+                <div class="flex items-center space-x-2">
+                    <i class="fas fa-check-circle text-blue-600 dark:text-blue-400"></i>
+                    <span class="text-sm font-medium text-blue-900 dark:text-blue-100">
+                        Zaznaczono: <strong>{{ count($selectedCategories) }}</strong>
+                        {{ count($selectedCategories) === 1 ? 'kategoria' : (count($selectedCategories) < 5 ? 'kategorie' : 'kategorii') }}
+                    </span>
+                </div>
+
+                <div class="relative">
+                    <button @click="bulkMenuOpen = !bulkMenuOpen"
+                            class="inline-flex items-center px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white text-sm font-medium rounded-lg transition-colors">
+                        <i class="fas fa-tasks mr-2"></i>
+                        Operacje masowe
+                        <i class="fas fa-chevron-down ml-2 text-xs" :class="{ 'rotate-180': bulkMenuOpen }"></i>
+                    </button>
+
+                    {{-- Dropdown Menu --}}
+                    <div x-show="bulkMenuOpen"
+                         @click.away="bulkMenuOpen = false"
+                         x-transition:enter="transition ease-out duration-100"
+                         x-transition:enter-start="opacity-0 scale-95"
+                         x-transition:enter-end="opacity-100 scale-100"
+                         x-transition:leave="transition ease-in duration-75"
+                         x-transition:leave-start="opacity-100 scale-100"
+                         x-transition:leave-end="opacity-0 scale-95"
+                         class="absolute left-0 mt-2 w-56 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 z-50"
+                         style="display: none;">
+                        <div class="py-1">
+                            <button wire:click="bulkActivate"
+                                    @click="bulkMenuOpen = false"
+                                    class="w-full flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-green-50 dark:hover:bg-green-900/20 hover:text-green-700 dark:hover:text-green-400 transition-colors">
+                                <i class="fas fa-check-circle w-5 text-green-600 dark:text-green-400"></i>
+                                <span class="ml-3">Aktywuj wybrane</span>
+                            </button>
+
+                            <button wire:click="bulkDeactivate"
+                                    @click="bulkMenuOpen = false"
+                                    class="w-full flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                                <i class="fas fa-pause-circle w-5 text-gray-600 dark:text-gray-400"></i>
+                                <span class="ml-3">Dezaktywuj wybrane</span>
+                            </button>
+
+                            <hr class="my-1 border-gray-200 dark:border-gray-600">
+
+                            <button wire:click="bulkDelete"
+                                    @click="bulkMenuOpen = false"
+                                    class="w-full flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-700 dark:hover:text-red-400 transition-colors">
+                                <i class="fas fa-trash w-5 text-red-600 dark:text-red-400"></i>
+                                <span class="ml-3">Usuń wybrane</span>
+                            </button>
+
+                            <hr class="my-1 border-gray-200 dark:border-gray-600">
+
+                            <button wire:click="bulkExport"
+                                    @click="bulkMenuOpen = false"
+                                    class="w-full flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:text-blue-700 dark:hover:text-blue-400 transition-colors">
+                                <i class="fas fa-download w-5 text-blue-600 dark:text-blue-400"></i>
+                                <span class="ml-3">Eksportuj wybrane</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <button wire:click="deselectAll"
+                    class="text-sm text-gray-600 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400 transition-colors">
+                <i class="fas fa-times-circle mr-1"></i>
+                Odznacz wszystkie
+            </button>
+        </div>
+    </div>
+    @endif
+
     <div class="bg-white dark:bg-gray-800">
         <div style="overflow: visible !important;">
             <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700" style="table-layout: auto; width: 100%;">
                 <thead class="bg-gray-50 dark:bg-gray-900/50">
                     <tr>
+                        {{-- Checkbox Column (Master) --}}
+                        <th class="px-3 py-3 text-left w-12">
+                            <input type="checkbox"
+                                   wire:click="{{ count($selectedCategories) === count($categories) && count($categories) > 0 ? 'deselectAll' : 'selectAll' }}"
+                                   {{ count($selectedCategories) === count($categories) && count($categories) > 0 ? 'checked' : '' }}
+                                   class="rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                                   aria-label="Zaznacz/odznacz wszystkie kategorie"
+                                   title="Zaznacz/odznacz wszystkie widoczne kategorie">
+                        </th>
+
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
                             {{-- Drag Handle Column --}}
                             @if($viewMode === 'tree')
@@ -102,16 +194,19 @@
                            x-init="initSortable()"
                        @endif>
                     @forelse($categories as $category)
-                        <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors category-row"
+                        <tr class="transition-colors category-row {{ in_array($category->id, $selectedCategories) ? 'bg-blue-50 dark:bg-blue-900/10 hover:bg-blue-100 dark:hover:bg-blue-900/20' : 'bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700/50' }} {{ $viewMode === 'tree' && ($category->level ?? 0) > 0 ? (($category->level ?? 0) === 1 ? 'border-l-4 border-l-blue-500' : (($category->level ?? 0) === 2 ? 'border-l-4 border-l-green-500' : (($category->level ?? 0) === 3 ? 'border-l-4 border-l-purple-500' : 'border-l-4 border-l-orange-500'))) : '' }}"
                             data-category-id="{{ $category->id }}"
-                            data-level="{{ $category->level ?? 0 }}"
-                            @if($viewMode === 'tree' && ($category->level ?? 0) > 0)
-                                style="border-left: 3px solid
-                                    @if(($category->level ?? 0) === 1) #3b82f6
-                                    @elseif(($category->level ?? 0) === 2) #10b981
-                                    @elseif(($category->level ?? 0) === 3) #8b5cf6
-                                    @else #f59e0b @endif;"
-                            @endif>
+                            data-level="{{ $category->level ?? 0 }}">
+
+                            {{-- Checkbox Column --}}
+                            <td class="px-3 py-4 whitespace-nowrap w-12">
+                                <input type="checkbox"
+                                       wire:click="toggleSelection({{ $category->id }})"
+                                       {{ in_array($category->id, $selectedCategories) ? 'checked' : '' }}
+                                       class="rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                                       aria-label="Zaznacz kategorię {{ $category->name }}"
+                                       title="Zaznacz kategorię">
+                            </td>
 
                             <td class="px-6 py-4 whitespace-nowrap">
                                 <div class="flex items-center space-x-3">
@@ -226,7 +321,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="5" class="px-6 py-12 text-center">
+                            <td colspan="6" class="px-6 py-12 text-center">
                                 <div class="text-gray-500 dark:text-gray-400">
                                     <i class="fas fa-folder-open text-4xl mb-4"></i>
                                     <h3 class="text-lg font-medium mb-2">Brak kategorii</h3>
@@ -919,6 +1014,141 @@ if (typeof Sortable === 'undefined') {
     @if($deleteProgressId)
     <div class="fixed bottom-4 right-4 z-50" wire:key="delete-progress-{{ $deleteProgressId }}">
         @livewire('components.job-progress-bar', ['jobId' => $deleteProgressId], key('delete-progress-' . $deleteProgressId))
+    </div>
+    @endif
+
+    {{-- Category Merge Modal --}}
+    @if($showMergeCategoriesModal)
+    <div class="fixed inset-0 z-[9999] overflow-y-auto"
+         x-data="{ show: @entangle('showMergeCategoriesModal'), loading: false }"
+         x-show="show"
+         x-transition:enter="ease-out duration-300"
+         x-transition:enter-start="opacity-0"
+         x-transition:enter-end="opacity-100">
+
+        {{-- Backdrop --}}
+        <div class="fixed inset-0 bg-gray-900 bg-opacity-75 transition-opacity"></div>
+
+        {{-- Modal Content --}}
+        <div class="flex min-h-full items-center justify-center p-4">
+            <div class="relative bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-lg w-full p-6"
+                 x-transition:enter="ease-out duration-300"
+                 x-transition:enter-start="opacity-0 translate-y-4"
+                 x-transition:enter-end="opacity-100 translate-y-0">
+
+                {{-- Header --}}
+                <div class="flex items-start mb-4">
+                    <div class="flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-purple-100 dark:bg-purple-900/20">
+                        <i class="fas fa-code-branch text-purple-600 dark:text-purple-400 text-xl"></i>
+                    </div>
+                    <div class="ml-4 flex-1">
+                        <h3 class="text-lg font-semibold text-gray-900 dark:text-white">
+                            Połącz kategorie
+                        </h3>
+                        <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                            Przenieś produkty i podkategorie do kategorii docelowej
+                        </p>
+                    </div>
+                    <button wire:click="closeCategoryMergeModal"
+                            class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                            aria-label="Zamknij">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+
+                {{-- Modal Body --}}
+                <div class="space-y-4 mb-6">
+                    {{-- Source Category Display (read-only) --}}
+                    <div class="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4 border border-gray-200 dark:border-gray-600">
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            Kategoria źródłowa (zostanie usunięta):
+                        </label>
+                        <div class="flex items-center space-x-3">
+                            <div class="w-10 h-10 bg-red-100 dark:bg-red-900/20 rounded-lg flex items-center justify-center">
+                                <i class="fas fa-folder text-red-600 dark:text-red-400"></i>
+                            </div>
+                            <div>
+                                @if($sourceCategoryId)
+                                    @php
+                                        $sourceCategory = \App\Models\Category::find($sourceCategoryId);
+                                    @endphp
+                                    <strong class="text-gray-900 dark:text-white">{{ $sourceCategory?->name ?? 'Nie znaleziono kategorii' }}</strong>
+                                    @if($sourceCategory)
+                                        <div class="text-xs text-gray-500 dark:text-gray-400">
+                                            Produkty: {{ $sourceCategory->products_count ?? 0 }} | Podkategorie: {{ $sourceCategory->children_count ?? 0 }}
+                                        </div>
+                                    @endif
+                                @endif
+                            </div>
+                        </div>
+                    </div>
+
+                    {{-- Target Category Selector --}}
+                    <div>
+                        <label for="targetCategoryId" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            Kategoria docelowa (otrzyma produkty i podkategorie): <span class="text-red-500">*</span>
+                        </label>
+                        <select wire:model="targetCategoryId"
+                                id="targetCategoryId"
+                                class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg
+                                       bg-white dark:bg-gray-700 text-gray-900 dark:text-white
+                                       focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                                required>
+                            <option value="">-- Wybierz kategorię docelową --</option>
+                            @foreach($parentOptions as $categoryId => $categoryName)
+                                @if($categoryId != $sourceCategoryId)
+                                    <option value="{{ $categoryId }}">{{ $categoryName }}</option>
+                                @endif
+                            @endforeach
+                        </select>
+                        @error('targetCategoryId')
+                            <p class="mt-1 text-sm text-red-600 dark:text-red-400">{{ $message }}</p>
+                        @enderror
+                    </div>
+
+                    {{-- Warnings Display --}}
+                    @if(!empty($mergeWarnings))
+                    <div class="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700 rounded-lg p-4">
+                        <h4 class="text-sm font-medium text-yellow-800 dark:text-yellow-400 mb-2 flex items-center">
+                            <i class="fas fa-exclamation-triangle mr-2"></i> Ostrzeżenia:
+                        </h4>
+                        <ul class="list-disc list-inside space-y-1 text-sm text-yellow-700 dark:text-yellow-300">
+                            @foreach($mergeWarnings as $warning)
+                            <li>{{ $warning }}</li>
+                            @endforeach
+                        </ul>
+                    </div>
+                    @endif
+                </div>
+
+                {{-- Modal Footer --}}
+                <div class="flex justify-end space-x-3">
+                    <button wire:click="closeCategoryMergeModal"
+                            type="button"
+                            class="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300
+                                   bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600
+                                   rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
+                            :disabled="loading">
+                        Anuluj
+                    </button>
+                    <button wire:click="mergeCategories"
+                            type="button"
+                            class="px-4 py-2 text-sm font-medium text-white bg-purple-600 hover:bg-purple-700
+                                   rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                            :disabled="loading || !$wire.targetCategoryId"
+                            x-on:click="loading = true">
+                        <span wire:loading.remove wire:target="mergeCategories">
+                            <i class="fas fa-code-branch mr-2"></i>
+                            Połącz kategorie
+                        </span>
+                        <span wire:loading wire:target="mergeCategories" class="flex items-center">
+                            <i class="fas fa-spinner fa-spin mr-2"></i>
+                            Łączenie...
+                        </span>
+                    </button>
+                </div>
+            </div>
+        </div>
     </div>
     @endif
 </div>

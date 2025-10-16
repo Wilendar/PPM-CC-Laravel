@@ -191,6 +191,34 @@ class CategoryTree extends Component
      */
     public $deleteProgressId = null;
 
+    /**
+     * Show category merge modal
+     *
+     * @var bool
+     */
+    public $showMergeCategoriesModal = false;
+
+    /**
+     * Source category ID for merge (kategoria do usunięcia)
+     *
+     * @var int|null
+     */
+    public $sourceCategoryId = null;
+
+    /**
+     * Target category ID for merge (kategoria docelowa)
+     *
+     * @var int|null
+     */
+    public $targetCategoryId = null;
+
+    /**
+     * Merge warnings (produkty, podkategorie)
+     *
+     * @var array
+     */
+    public $mergeWarnings = [];
+
     // ==========================================
     // LIVEWIRE LIFECYCLE METHODS
     // ==========================================
@@ -1202,6 +1230,273 @@ class CategoryTree extends Component
         }
 
         return $children;
+    }
+
+    // ==========================================
+    // CATEGORY MERGE OPERATIONS
+    // ==========================================
+
+    /**
+     * Open category merge modal
+     *
+     * Collects warnings about products and child categories that will be affected
+     * by the merge operation. Source category will be deleted after merge.
+     *
+     * @param int $sourceCategoryId Category to merge FROM (will be deleted)
+     * @return void
+     */
+    public function openCategoryMergeModal(int $sourceCategoryId): void
+    {
+        try {
+            $sourceCategory = Category::with(['products', 'children'])
+                                     ->withCount(['products', 'children'])
+                                     ->find($sourceCategoryId);
+
+            if (!$sourceCategory) {
+                session()->flash('error', 'Kategoria źródłowa nie została znaleziona.');
+                return;
+            }
+
+            $this->sourceCategoryId = $sourceCategoryId;
+            $this->targetCategoryId = null; // Reset target selection
+            $this->mergeWarnings = [];
+
+            // Collect warnings about affected data
+            if ($sourceCategory->products_count > 0) {
+                $this->mergeWarnings[] = "Kategoria zawiera {$sourceCategory->products_count} produktów, które zostaną przeniesione do kategorii docelowej.";
+            }
+
+            if ($sourceCategory->children_count > 0) {
+                $descendantsCount = $sourceCategory->descendants->count();
+
+                if ($descendantsCount > $sourceCategory->children_count) {
+                    $this->mergeWarnings[] = "Kategoria zawiera {$sourceCategory->children_count} bezpośrednich podkategorii i łącznie {$descendantsCount} wszystkich potomków. Zostaną przeniesione do kategorii docelowej.";
+                } else {
+                    $this->mergeWarnings[] = "Kategoria zawiera {$sourceCategory->children_count} podkategorii. Zostaną przeniesione do kategorii docelowej.";
+                }
+            }
+
+            if (empty($this->mergeWarnings)) {
+                $this->mergeWarnings[] = "Kategoria jest pusta (brak produktów i podkategorii).";
+            }
+
+            $this->showMergeCategoriesModal = true;
+
+            Log::info('CategoryTree: Opened merge modal', [
+                'source_category_id' => $sourceCategoryId,
+                'source_category_name' => $sourceCategory->name,
+                'products_count' => $sourceCategory->products_count,
+                'children_count' => $sourceCategory->children_count,
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('CategoryTree: Error opening merge modal', [
+                'source_category_id' => $sourceCategoryId,
+                'error' => $e->getMessage(),
+            ]);
+
+            session()->flash('error', 'Błąd podczas otwierania okna łączenia kategorii: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Close category merge modal and reset state
+     *
+     * @return void
+     */
+    public function closeCategoryMergeModal(): void
+    {
+        $this->showMergeCategoriesModal = false;
+        $this->sourceCategoryId = null;
+        $this->targetCategoryId = null;
+        $this->mergeWarnings = [];
+    }
+
+    /**
+     * Merge source category into target category
+     *
+     * Business Logic:
+     * 1. Move all products from source to target
+     * 2. Update primary category for products if needed
+     * 3. Move all children (subcategories) from source to target
+     * 4. Delete source category
+     *
+     * Validation:
+     * - Source and target must be different
+     * - Target cannot be descendant of source (circular reference)
+     * - Children of source must fit within max level after move
+     *
+     * Error Handling:
+     * - Continue-on-error for product operations
+     * - Transaction for atomicity
+     * - Detailed logging
+     *
+     * @return void
+     */
+    public function mergeCategories(): void
+    {
+        try {
+            // Validation: Check if both categories are selected
+            if (!$this->sourceCategoryId || !$this->targetCategoryId) {
+                session()->flash('error', 'Wybierz kategorię źródłową i docelową.');
+                return;
+            }
+
+            // Validation: Source and target must be different
+            if ($this->sourceCategoryId === $this->targetCategoryId) {
+                session()->flash('error', 'Kategoria źródłowa i docelowa muszą być różne.');
+                return;
+            }
+
+            // Load categories with relationships
+            $sourceCategory = Category::with(['products', 'children'])
+                                     ->find($this->sourceCategoryId);
+
+            $targetCategory = Category::find($this->targetCategoryId);
+
+            if (!$sourceCategory || !$targetCategory) {
+                session()->flash('error', 'Jedna z wybranych kategorii nie została znaleziona.');
+                return;
+            }
+
+            // Validation: Target cannot be descendant of source (circular reference)
+            if ($sourceCategory->isAncestorOf($this->targetCategoryId)) {
+                session()->flash('error', 'Nie można połączyć kategorii z własnym potomkiem (zapętlenie).');
+                return;
+            }
+
+            // Validation: Check max level for children
+            if ($sourceCategory->children()->count() > 0) {
+                $maxDescendantLevel = $sourceCategory->getMaxDescendantLevel();
+                $wouldBeLevel = $targetCategory->level + 1; // Children will be at target's level + 1
+                $finalLevel = $wouldBeLevel + $maxDescendantLevel;
+
+                if ($finalLevel > Category::MAX_LEVEL) {
+                    session()->flash('error', "Nie można połączyć kategorii - przekroczono maksymalną głębokość drzewa (poziom {$finalLevel} > " . Category::MAX_LEVEL . ").");
+                    return;
+                }
+            }
+
+            // Execute merge in transaction
+            $processed = 0;
+            $errors = [];
+
+            DB::transaction(function () use ($sourceCategory, $targetCategory, &$processed, &$errors) {
+                // 1. Move all products from source to target (continue-on-error)
+                $products = $sourceCategory->products;
+
+                foreach ($products as $product) {
+                    try {
+                        // Check if product already has target category (global, not per-shop)
+                        $hasTargetCategory = $product->categories()
+                                                    ->wherePivotNull('shop_id')
+                                                    ->where('categories.id', $targetCategory->id)
+                                                    ->exists();
+
+                        if (!$hasTargetCategory) {
+                            // Attach target category (global)
+                            $product->categories()->attach($targetCategory->id, ['shop_id' => null]);
+                        }
+
+                        // Detach source category (global)
+                        $product->categories()
+                               ->wherePivotNull('shop_id')
+                               ->detach($sourceCategory->id);
+
+                        // Update primary category if source was primary
+                        if ($product->primary_category_id === $sourceCategory->id) {
+                            $product->primary_category_id = $targetCategory->id;
+                            $product->save();
+                        }
+
+                        $processed++;
+
+                    } catch (\Exception $e) {
+                        $errors[] = "Product ID {$product->id}: {$e->getMessage()}";
+
+                        Log::error('CategoryMerge: Error processing product', [
+                            'product_id' => $product->id,
+                            'product_sku' => $product->sku ?? 'N/A',
+                            'source_category_id' => $sourceCategory->id,
+                            'target_category_id' => $targetCategory->id,
+                            'error' => $e->getMessage(),
+                        ]);
+
+                        // Continue with next product (continue-on-error)
+                        continue;
+                    }
+                }
+
+                // 2. Move all children (subcategories) from source to target
+                $children = Category::where('parent_id', $sourceCategory->id)->get();
+
+                foreach ($children as $child) {
+                    try {
+                        $child->parent_id = $targetCategory->id;
+                        $child->save();
+
+                        // Refresh path/level (Category model handles this in boot)
+                        $child->refresh();
+
+                    } catch (\Exception $e) {
+                        $errors[] = "Child category ID {$child->id}: {$e->getMessage()}";
+
+                        Log::error('CategoryMerge: Error moving child category', [
+                            'child_category_id' => $child->id,
+                            'child_category_name' => $child->name,
+                            'source_category_id' => $sourceCategory->id,
+                            'target_category_id' => $targetCategory->id,
+                            'error' => $e->getMessage(),
+                        ]);
+
+                        throw $e; // Stop transaction for critical children errors
+                    }
+                }
+
+                // 3. Delete source category (safe now - no products/children)
+                $sourceCategory->delete();
+            });
+
+            // Remove from selections and expanded nodes
+            $this->selectedCategories = array_diff($this->selectedCategories, [$this->sourceCategoryId]);
+            $this->expandedNodes = array_diff($this->expandedNodes, [$this->sourceCategoryId]);
+
+            // Auto-expand target parent to show merged children
+            if (!in_array($targetCategory->id, $this->expandedNodes)) {
+                $this->expandedNodes[] = $targetCategory->id;
+            }
+
+            // Close modal
+            $this->closeCategoryMergeModal();
+
+            // User feedback
+            if (empty($errors)) {
+                session()->flash('message', "Połączono kategorie: {$sourceCategory->name} → {$targetCategory->name}. Przeniesiono {$processed} produktów.");
+            } else {
+                $errorSummary = implode('; ', array_slice($errors, 0, 3)); // Show max 3 errors
+                $moreErrors = count($errors) > 3 ? ' (i ' . (count($errors) - 3) . ' więcej)' : '';
+
+                session()->flash('warning', "Połączono kategorie, ale wystąpiły błędy: {$errorSummary}{$moreErrors}. Przeniesiono {$processed} produktów.");
+            }
+
+            Log::info('CategoryTree: Categories merged successfully', [
+                'source_category_id' => $sourceCategory->id,
+                'source_category_name' => $sourceCategory->name,
+                'target_category_id' => $targetCategory->id,
+                'target_category_name' => $targetCategory->name,
+                'products_processed' => $processed,
+                'errors_count' => count($errors),
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('CategoryTree: Error merging categories', [
+                'source_category_id' => $this->sourceCategoryId,
+                'target_category_id' => $this->targetCategoryId,
+                'error' => $e->getMessage(),
+            ]);
+
+            session()->flash('error', 'Błąd podczas łączenia kategorii: ' . $e->getMessage());
+        }
     }
 
     // ==========================================

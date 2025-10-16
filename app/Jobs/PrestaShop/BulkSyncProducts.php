@@ -12,7 +12,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Collection;
 use App\Models\Product;
 use App\Models\PrestaShopShop;
-use App\Models\ProductSyncStatus;
+use App\Models\ProductShopData;
 use App\Services\JobProgressService;
 use Illuminate\Bus\Batch;
 use Throwable;
@@ -268,15 +268,17 @@ class BulkSyncProducts implements ShouldQueue
     }
 
     /**
-     * Get product priority from sync status
+     * Get product priority from sync status (CONSOLIDATED 2025-10-13)
+     *
+     * Updated to use ProductShopData instead of deprecated ProductSyncStatus
      */
     private function getProductPriority(Product $product): int
     {
-        $syncStatus = ProductSyncStatus::where('product_id', $product->id)
+        $shopData = ProductShopData::where('product_id', $product->id)
             ->where('shop_id', $this->shop->id)
             ->first();
 
-        return $syncStatus?->priority ?? ProductSyncStatus::PRIORITY_NORMAL;
+        return $shopData?->priority ?? ProductShopData::PRIORITY_NORMAL;
     }
 
     /**

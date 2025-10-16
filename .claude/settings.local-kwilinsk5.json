@@ -1,0 +1,94 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(Select-Object Name)",
+      "Bash(Get-Content \"app\\Http\\Livewire\\Components\\CategoryPreviewModal.php\")",
+      "Bash(Select-String -Pattern \"createQuickCategory|showCreateCategoryForm|hideCreateCategoryForm\" -Context 3,3)",
+      "Bash(powershell:*)",
+      "Bash(Select-String -Path \"app\\Http\\Livewire\\Products\\Listing\\ProductList.php\" -Pattern \"bulk|category\" -Context 2,2)",
+      "Bash(Select-Object -First 30)",
+      "Bash(curl -s \"https://ppm.mpptrade.pl/admin/products/categories\")",
+      "Bash(pwsh:*)"
+    ],
+    "deny": [],
+    "ask": []
+  },
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "pwsh -NoProfile -ExecutionPolicy Bypass -File \".claude\\scripts\\prompt-context-reminder.ps1\"",
+            "timeout": 2000
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "(Write|Edit).*\\.(php|blade\\.php)$",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "pwsh -NoProfile -ExecutionPolicy Bypass -File \".claude\\scripts\\enforce-context7.ps1\"",
+            "timeout": 2000
+          }
+        ]
+      },
+      {
+        "matcher": "Task",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "pwsh -NoProfile -ExecutionPolicy Bypass -File \".claude\\scripts\\agent-report-reminder.ps1\"",
+            "timeout": 2000
+          }
+        ]
+      },
+      {
+        "matcher": "mcp__context7__.*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "pwsh -Command \"Write-Host '✅ Context7 MCP - EXCELLENT!' -ForegroundColor Green\"",
+            "timeout": 1000
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "(Write|Edit).*\\.php",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "pwsh -Command \"Write-Host '✅ PHP CODE MODIFIED' -ForegroundColor Green; Write-Host '• Consider: php artisan test' -ForegroundColor Yellow\"",
+            "timeout": 1000
+          }
+        ]
+      },
+      {
+        "matcher": "Bash.*composer.*install",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "pwsh -Command \"Write-Host '📦 COMPOSER INSTALL COMPLETED' -ForegroundColor Green; Write-Host '• Consider: php artisan migrate, cache:clear' -ForegroundColor Yellow\"",
+            "timeout": 1000
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "pwsh -Command \"Write-Host '📦 CONTEXT COMPACTION' -ForegroundColor Cyan; Write-Host '• Context7 MANDATORY for code generation' -ForegroundColor Red; Write-Host '• NO HARDCODING, NO MOCK DATA' -ForegroundColor Red\"",
+            "timeout": 1000
+          }
+        ]
+      }
+    ]
+  }
+}
