@@ -1,0 +1,3 @@
+Test deployment file
+Created: 2025-10-28
+Purpose: Testing pwsh -NoProfile -Command deployment syntax

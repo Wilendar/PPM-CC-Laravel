@@ -20,6 +20,7 @@
         "vite": "^5.0.0"
     },
     "dependencies": {
-        "alpinejs": "^3.13.0"
+        "alpinejs": "^3.13.0",
+        "vanilla-colorful": "^0.7.2"
     }
 }

@@ -2,7 +2,7 @@
     <!-- Header -->
     <div class="flex justify-between items-center mb-6">
         <div>
-            <h1 class="text-2xl font-bold text-gray-900">Zarządzanie Backupami</h1>
+            <h1 class="text-2xl font-bold text-white">Zarządzanie Backupami</h1>
             <p class="text-gray-600">Tworzenie, przywracanie i zarządzanie kopiami zapasowymi</p>
         </div>
         
@@ -39,58 +39,58 @@
 
     <!-- Stats cards -->
     <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
-        <div class="bg-white rounded-lg shadow p-6">
+        <div class="bg-gray-800 rounded-lg shadow p-6">
             <div class="flex items-center">
                 <div class="p-2 bg-blue-100 rounded-lg">
                     <i class="fas fa-database text-blue-600"></i>
                 </div>
                 <div class="ml-4">
                     <p class="text-sm font-medium text-gray-600">Wszystkie backupy</p>
-                    <p class="text-2xl font-semibold text-gray-900">{{ $stats['total_backups'] ?? 0 }}</p>
+                    <p class="text-2xl font-semibold text-white">{{ $stats['total_backups'] ?? 0 }}</p>
                 </div>
             </div>
         </div>
         
-        <div class="bg-white rounded-lg shadow p-6">
+        <div class="bg-gray-800 rounded-lg shadow p-6">
             <div class="flex items-center">
                 <div class="p-2 bg-green-100 rounded-lg">
                     <i class="fas fa-check-circle text-green-600"></i>
                 </div>
                 <div class="ml-4">
                     <p class="text-sm font-medium text-gray-600">Ukończone</p>
-                    <p class="text-2xl font-semibold text-gray-900">{{ $stats['completed_backups'] ?? 0 }}</p>
+                    <p class="text-2xl font-semibold text-white">{{ $stats['completed_backups'] ?? 0 }}</p>
                 </div>
             </div>
         </div>
         
-        <div class="bg-white rounded-lg shadow p-6">
+        <div class="bg-gray-800 rounded-lg shadow p-6">
             <div class="flex items-center">
                 <div class="p-2 bg-red-100 rounded-lg">
                     <i class="fas fa-exclamation-circle text-red-600"></i>
                 </div>
                 <div class="ml-4">
                     <p class="text-sm font-medium text-gray-600">Nieudane</p>
-                    <p class="text-2xl font-semibold text-gray-900">{{ $stats['failed_backups'] ?? 0 }}</p>
+                    <p class="text-2xl font-semibold text-white">{{ $stats['failed_backups'] ?? 0 }}</p>
                 </div>
             </div>
         </div>
         
-        <div class="bg-white rounded-lg shadow p-6">
+        <div class="bg-gray-800 rounded-lg shadow p-6">
             <div class="flex items-center">
                 <div class="p-2 bg-purple-100 rounded-lg">
                     <i class="fas fa-hdd text-purple-600"></i>
                 </div>
                 <div class="ml-4">
                     <p class="text-sm font-medium text-gray-600">Rozmiar</p>
-                    <p class="text-2xl font-semibold text-gray-900">{{ $this->formatFileSize($stats['total_size_bytes'] ?? 0) }}</p>
+                    <p class="text-2xl font-semibold text-white">{{ $this->formatFileSize($stats['total_size_bytes'] ?? 0) }}</p>
                 </div>
             </div>
         </div>
     </div>
 
     <!-- Disk usage -->
-    <div class="bg-white rounded-lg shadow p-6 mb-6">
-        <h3 class="text-lg font-medium text-gray-900 mb-4">Użycie dysku</h3>
+    <div class="bg-gray-800 rounded-lg shadow p-6 mb-6">
+        <h3 class="text-lg font-medium text-white mb-4">Użycie dysku</h3>
         <div class="space-y-3">
             <div class="flex justify-between text-sm">
                 <span>Wolne miejsce</span>
@@ -107,7 +107,7 @@
     </div>
 
     <!-- Tabs -->
-    <div class="bg-white shadow-sm rounded-lg">
+    <div class="bg-gray-800 shadow-sm rounded-lg">
         <div class="border-b border-gray-200">
             <nav class="-mb-px flex space-x-8 px-6">
                 <button type="button" 
@@ -187,7 +187,7 @@
                                 </th>
                             </tr>
                         </thead>
-                        <tbody class="bg-white divide-y divide-gray-200">
+                        <tbody class="bg-gray-800 divide-y divide-gray-200">
                             @forelse($backups as $backup)
                             <tr class="hover:bg-gray-50">
                                 <td class="px-6 py-4 whitespace-nowrap">
@@ -196,7 +196,7 @@
                                             <i class="fas fa-{{ $backup->type === 'database' ? 'database' : ($backup->type === 'files' ? 'folder' : 'archive') }} text-gray-600"></i>
                                         </div>
                                         <div>
-                                            <div class="text-sm font-medium text-gray-900">{{ $backup->name }}</div>
+                                            <div class="text-sm font-medium text-white">{{ $backup->name }}</div>
                                             @if($backup->creator)
                                             <div class="text-sm text-gray-500">przez {{ $backup->creator->name }}</div>
                                             @endif
@@ -213,7 +213,7 @@
                                         </span>
                                     </div>
                                 </td>
-                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-white">
                                     <div class="space-y-1">
                                         <div>{{ $backup->formatted_size ?: 'N/A' }}</div>
                                         @if($backup->duration)
@@ -221,7 +221,7 @@
                                         @endif
                                     </div>
                                 </td>
-                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-white">
                                     <div class="space-y-1">
                                         <div>{{ $backup->created_at->format('d.m.Y H:i') }}</div>
                                         @if($backup->completed_at)
@@ -297,7 +297,7 @@
             @elseif($activeTab === 'create')
                 <!-- Create backup form -->
                 <div class="max-w-2xl">
-                    <h3 class="text-lg font-medium text-gray-900 mb-4">Utwórz nowy backup</h3>
+                    <h3 class="text-lg font-medium text-white mb-4">Utwórz nowy backup</h3>
                     
                     <div class="space-y-6">
                         <div>
@@ -320,7 +320,7 @@
                         
                         <!-- Configuration options -->
                         <div class="space-y-4">
-                            <h4 class="font-medium text-gray-900">Opcje konfiguracji</h4>
+                            <h4 class="font-medium text-white">Opcje konfiguracji</h4>
                             
                             @foreach($backupConfiguration as $key => $value)
                             <div class="flex items-center justify-between">
@@ -364,7 +364,7 @@
             @elseif($activeTab === 'settings')
                 <!-- Backup settings -->
                 <div class="max-w-2xl">
-                    <h3 class="text-lg font-medium text-gray-900 mb-4">Ustawienia backupów</h3>
+                    <h3 class="text-lg font-medium text-white mb-4">Ustawienia backupów</h3>
                     
                     <div class="space-y-6">
                         <div>

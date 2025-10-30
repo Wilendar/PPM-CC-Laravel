@@ -9,7 +9,7 @@
     
     {{-- Geometric Background Elements --}}
     <div class="absolute inset-0">
-        <div class="absolute top-10 left-10 w-72 h-72 bg-white/5 rounded-full blur-3xl"></div>
+        <div class="absolute top-10 left-10 w-72 h-72 bg-gray-800/5 rounded-full blur-3xl"></div>
         <div class="absolute bottom-10 right-10 w-96 h-96 bg-blue-300/10 rounded-full blur-3xl"></div>
         <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-indigo-300/5 rounded-full blur-2xl"></div>
     </div>
@@ -25,7 +25,7 @@
                     x-transition:enter="transition ease-out duration-1000"
                     x-transition:enter-start="opacity-0 scale-90 -translate-y-4"
                     x-transition:enter-end="opacity-100 scale-100 translate-y-0"
-                    class="inline-flex items-center justify-center w-20 h-20 bg-white/10 backdrop-blur-md rounded-2xl mb-6 border border-white/20"
+                    class="inline-flex items-center justify-center w-20 h-20 bg-gray-800/10 backdrop-blur-md rounded-2xl mb-6 border border-white/20"
                 >
                     <svg class="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
@@ -86,7 +86,7 @@
             >
                 <a 
                     href="{{ route('login') }}" 
-                    class="inline-flex items-center px-8 py-4 bg-white text-blue-600 font-semibold rounded-full 
+                    class="inline-flex items-center px-8 py-4 bg-gray-800 text-blue-600 font-semibold rounded-full 
                            hover:bg-blue-50 hover:scale-105 focus:outline-none focus:ring-4 focus:ring-white/50 
                            transition-all duration-300 shadow-2xl hover:shadow-3xl"
                 >

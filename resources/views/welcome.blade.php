@@ -67,7 +67,7 @@
         <button 
             onclick="toggleDarkMode()" 
             id="theme-toggle"
-            class="p-2 rounded-lg bg-white/10 backdrop-blur-md shadow-md hover:shadow-lg transition-shadow duration-200 text-white hover:text-yellow-400"
+            class="p-2 rounded-lg bg-gray-800/10 backdrop-blur-md shadow-md hover:shadow-lg transition-shadow duration-200 text-white hover:text-yellow-400"
             title="Przełącz motyw"
         >
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -82,7 +82,7 @@
         
         <!-- Geometric Background Elements -->
         <div class="absolute inset-0">
-            <div class="absolute top-10 left-10 w-72 h-72 bg-white/5 rounded-full blur-3xl"></div>
+            <div class="absolute top-10 left-10 w-72 h-72 bg-gray-800/5 rounded-full blur-3xl"></div>
             <div class="absolute bottom-10 right-10 w-96 h-96 bg-blue-300/10 rounded-full blur-3xl"></div>
             <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-indigo-300/5 rounded-full blur-2xl"></div>
         </div>

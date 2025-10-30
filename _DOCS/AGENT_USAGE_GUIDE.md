@@ -492,6 +492,70 @@ AKCJA KOORDYNATORA:
 
 ---
 
+### 🔄 **refactoring-specialist** - Code Refactoring Expert
+**Model:** `sonnet`
+**Specjalizacja:** Enterprise refactoring, separation of concerns, file size compliance
+**Data utworzenia:** 2025-10-16
+
+#### 🔑 KIEDY UŻYWAĆ:
+- ✅ **ZAWSZE** gdy plik przekracza 300 linii (CLAUDE.md violation)
+- ✅ Przed rozpoczęciem ETAP_05a (Product.php 2181 linii → refactor)
+- ✅ Service/Model/Component przekracza max size
+- ✅ Kod wymaga separation of concerns
+- ✅ Planowany refactoring architektury
+- ✅ Przygotowanie do nowych funkcjonalności
+
+#### 📋 PRZYKŁADY ZASTOSOWAŃ:
+```
+✅ "Product.php ma 2181 linii - zrefaktoruj do max 300 linii per file"
+✅ "CompatibilityManager 600 linii - rozbij na mniejsze services"
+✅ "VariantsTab component 500 linii - wydziel business logic"
+✅ "Przygotuj architekturę przed implementacją ETAP_05a"
+```
+
+#### ⚠️ CRITICAL RULES:
+- **MAX 300 LINII** per file (CLAUDE.md mandatory)
+- **Context7 FIRST** - check Laravel/Livewire patterns
+- **SKU-first preserved** - maintain SKU as primary key
+- **No breaking changes** - preserve public API
+- **Tests GREEN** - after EACH extraction
+
+#### 🎯 REFACTORING PATTERNS:
+
+**Large Model → Traits:**
+```
+Product.php (2181 linii)
+→ Product.php (250 linii) + 8 Traits (150 linii each)
+```
+
+**Large Service → Concerns:**
+```
+CompatibilityManager.php (600 linii)
+→ Manager (180 linii) + 4 Concerns (120-140 linii each)
+```
+
+**Large Component → Service + Traits:**
+```
+VariantsTab.php (500 linii)
+→ Component (220 linii) + Service (180 linii) + 3 Traits (110-140 linii each)
+```
+
+#### 📊 WORKFLOW:
+```
+1. Analysis (2-3h) → measure violations, plan split
+2. Context7 check → verify Laravel/Livewire patterns
+3. Execution (4-8h per file) → extract to Traits/Services
+4. Verification → tests GREEN, file sizes OK
+5. Report → _AGENT_REPORTS/refactoring_*.md
+```
+
+#### ⚠️ DEPENDENCIES:
+- **PRZED:** Git backup (commit + push)
+- **AFTER:** coding-style-agent review
+- **VERIFY:** All tests pass, no regressions
+
+---
+
 ## 🔄 WORKFLOW PATTERNS (Wzorce Przepływu Pracy)
 
 ### 📋 PATTERN 1: Nowa Funkcjonalność
@@ -512,12 +576,36 @@ AKCJA KOORDYNATORA:
 4. Test deployment
 ```
 
-### 🔄 PATTERN 3: Refactoring
+### 🔄 PATTERN 3: Refactoring (File Size Violations)
 ```
-1. ask → analiza istniejącego kodu
-2. architect → plan refactoringu
-3. [Specjalista dziedziny] → implementacja
-4. coding-style-agent → compliance check
+1. documentation-reader → verify violations (file sizes >300 lines)
+2. refactoring-specialist → analysis + plan split strategy
+3. refactoring-specialist → execute refactor (Traits/Services extraction)
+4. coding-style-agent → compliance check (Context7, PSR-12)
+5. [Domain specialist if needed] → adjust business logic
+6. Test verification → all tests GREEN
+```
+
+**PRZYKŁAD:**
+```
+USER: "Product.php ma 2181 linii - naruszona zasada CLAUDE.md"
+
+WORKFLOW:
+1. documentation-reader → verify compliance violations
+   Output: "CRITICAL: Product.php 2181 lines (7x limit!)"
+
+2. refactoring-specialist → analysis phase (2-3h)
+   Output: "Plan: Extract 8 Traits (pricing, stock, categories, variants, features, compatibility, multi-store, sync)"
+
+3. refactoring-specialist → execute refactor (12-16h)
+   Output: "Product.php (250 lines) + 8 Traits (<150 lines each)"
+
+4. coding-style-agent → final review
+   Output: "✅ All files ≤300 lines, Context7 compliant, PSR-12 OK"
+
+5. laravel-expert (if needed) → adjust relationships
+
+6. Run tests → verify GREEN
 ```
 
 ### 📦 PATTERN 4: ETAP Implementation
@@ -572,6 +660,7 @@ AKCJA KOORDYNATORA:
 | Code review | coding-style-agent | - |
 | Deployment | deployment-specialist | - |
 | Architecture questions | ask | architect |
+| **Refactoring (>300 lines)** | **refactoring-specialist** | **coding-style-agent** |
 
 ---
 

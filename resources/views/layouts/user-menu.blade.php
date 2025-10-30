@@ -16,7 +16,7 @@
                  class="h-8 w-8 rounded-full object-cover">
         @else
             <div class="h-8 w-8 rounded-full bg-gray-300 dark:bg-gray-600 flex items-center justify-center">
-                <span class="text-xs font-medium text-gray-700 dark:text-gray-300">
+                <span class="text-xs font-medium text-gray-300">
                     {{ substr(Auth::user()->first_name, 0, 1) }}{{ substr(Auth::user()->last_name, 0, 1) }}
                 </span>
             </div>
@@ -37,7 +37,7 @@
          x-transition:leave="transition ease-in duration-75"
          x-transition:leave-start="transform opacity-100 scale-100"
          x-transition:leave-end="transform opacity-0 scale-95"
-         class="origin-top-right absolute right-0 mt-2 w-80 rounded-md shadow-lg bg-white dark:bg-gray-800 ring-1 ring-black ring-opacity-5 divide-y divide-gray-200 dark:divide-gray-700 z-50"
+         class="origin-top-right absolute right-0 mt-2 w-80 rounded-md shadow-lg bg-gray-800 ring-1 ring-black ring-opacity-5 divide-y divide-gray-700 z-50"
          role="menu"
          aria-orientation="vertical"
          aria-labelledby="user-menu-button">
@@ -53,7 +53,7 @@
                              class="h-12 w-12 rounded-full object-cover">
                     @else
                         <div class="h-12 w-12 rounded-full bg-gray-300 dark:bg-gray-600 flex items-center justify-center">
-                            <span class="text-lg font-medium text-gray-700 dark:text-gray-300">
+                            <span class="text-lg font-medium text-gray-300">
                                 {{ substr(Auth::user()->first_name, 0, 1) }}{{ substr(Auth::user()->last_name, 0, 1) }}
                             </span>
                         </div>
@@ -62,7 +62,7 @@
                 
                 {{-- User Details --}}
                 <div class="ml-3 flex-1 min-w-0">
-                    <p class="text-sm font-medium text-gray-900 dark:text-white truncate">
+                    <p class="text-sm font-medium text-white truncate">
                         {{ Auth::user()->first_name }} {{ Auth::user()->last_name }}
                     </p>
                     <p class="text-sm text-gray-500 dark:text-gray-400 truncate">
@@ -93,7 +93,7 @@
         {{-- Account Section --}}
         <div class="py-1" role="none">
             <a href="{{ route('profile.edit') }}" 
-               class="group flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-white" 
+               class="group flex items-center px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-gray-900 dark:hover:text-white" 
                role="menuitem">
                 <svg class="mr-3 h-5 w-5 text-gray-400 group-hover:text-gray-500 dark:group-hover:text-gray-300" 
                      fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -103,7 +103,7 @@
             </a>
 
             <a href="{{ route('profile.sessions') }}" 
-               class="group flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-white" 
+               class="group flex items-center px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-gray-900 dark:hover:text-white" 
                role="menuitem">
                 <svg class="mr-3 h-5 w-5 text-gray-400 group-hover:text-gray-500 dark:group-hover:text-gray-300" 
                      fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -117,7 +117,7 @@
             </a>
 
             <a href="{{ route('profile.activity') }}" 
-               class="group flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-white" 
+               class="group flex items-center px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-gray-900 dark:hover:text-white" 
                role="menuitem">
                 <svg class="mr-3 h-5 w-5 text-gray-400 group-hover:text-gray-500 dark:group-hover:text-gray-300" 
                      fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -135,7 +135,7 @@
             </div>
             
             <a href="{{ route('admin.dashboard') }}" 
-               class="group flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-white" 
+               class="group flex items-center px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-gray-900 dark:hover:text-white" 
                role="menuitem">
                 <svg class="mr-3 h-5 w-5 text-red-400 group-hover:text-red-500" 
                      fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -146,7 +146,7 @@
             </a>
 
             <a href="{{ route('admin.system-info') }}" 
-               class="group flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-white" 
+               class="group flex items-center px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-gray-900 dark:hover:text-white" 
                role="menuitem">
                 <svg class="mr-3 h-5 w-5 text-red-400 group-hover:text-red-500" 
                      fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -164,7 +164,7 @@
             </div>
             
             <a href="{{ route('help.index') }}" 
-               class="group flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-white" 
+               class="group flex items-center px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-gray-900 dark:hover:text-white" 
                role="menuitem">
                 <svg class="mr-3 h-5 w-5 text-gray-400 group-hover:text-gray-500 dark:group-hover:text-gray-300" 
                      fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -174,7 +174,7 @@
             </a>
 
             <a href="{{ route('help.shortcuts') }}" 
-               class="group flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-white" 
+               class="group flex items-center px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-gray-900 dark:hover:text-white" 
                role="menuitem">
                 <svg class="mr-3 h-5 w-5 text-gray-400 group-hover:text-gray-500 dark:group-hover:text-gray-300" 
                      fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -184,7 +184,7 @@
             </a>
 
             <a href="mailto:support@mpptrade.eu" 
-               class="group flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-white" 
+               class="group flex items-center px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-gray-900 dark:hover:text-white" 
                role="menuitem">
                 <svg class="mr-3 h-5 w-5 text-gray-400 group-hover:text-gray-500 dark:group-hover:text-gray-300" 
                      fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -199,7 +199,7 @@
             <form method="POST" action="{{ route('logout') }}">
                 @csrf
                 <button type="submit" 
-                        class="group flex items-center w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-700 dark:hover:text-red-400" 
+                        class="group flex items-center w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-700 dark:hover:text-red-400" 
                         role="menuitem">
                     <svg class="mr-3 h-5 w-5 text-gray-400 group-hover:text-red-500" 
                          fill="none" stroke="currentColor" viewBox="0 0 24 24">

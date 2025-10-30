@@ -2,7 +2,7 @@
     <!-- Header -->
     <div class="flex justify-between items-center mb-6">
         <div>
-            <h1 class="text-2xl font-bold text-gray-900">Konserwacja Systemu</h1>
+            <h1 class="text-2xl font-bold text-white">Konserwacja Systemu</h1>
             <p class="text-gray-600">Zarządzanie zadaniami maintenance i monitorowanie zdrowia systemu</p>
         </div>
         
@@ -39,50 +39,50 @@
 
     <!-- Stats cards -->
     <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
-        <div class="bg-white rounded-lg shadow p-6">
+        <div class="bg-gray-800 rounded-lg shadow p-6">
             <div class="flex items-center">
                 <div class="p-2 bg-blue-100 rounded-lg">
                     <i class="fas fa-tasks text-blue-600"></i>
                 </div>
                 <div class="ml-4">
                     <p class="text-sm font-medium text-gray-600">Wszystkie zadania</p>
-                    <p class="text-2xl font-semibold text-gray-900">{{ $stats['total_tasks'] ?? 0 }}</p>
+                    <p class="text-2xl font-semibold text-white">{{ $stats['total_tasks'] ?? 0 }}</p>
                 </div>
             </div>
         </div>
         
-        <div class="bg-white rounded-lg shadow p-6">
+        <div class="bg-gray-800 rounded-lg shadow p-6">
             <div class="flex items-center">
                 <div class="p-2 bg-yellow-100 rounded-lg">
                     <i class="fas fa-clock text-yellow-600"></i>
                 </div>
                 <div class="ml-4">
                     <p class="text-sm font-medium text-gray-600">Oczekujące</p>
-                    <p class="text-2xl font-semibold text-gray-900">{{ $stats['pending_tasks'] ?? 0 }}</p>
+                    <p class="text-2xl font-semibold text-white">{{ $stats['pending_tasks'] ?? 0 }}</p>
                 </div>
             </div>
         </div>
         
-        <div class="bg-white rounded-lg shadow p-6">
+        <div class="bg-gray-800 rounded-lg shadow p-6">
             <div class="flex items-center">
                 <div class="p-2 bg-green-100 rounded-lg">
                     <i class="fas fa-check-circle text-green-600"></i>
                 </div>
                 <div class="ml-4">
                     <p class="text-sm font-medium text-gray-600">Ukończone</p>
-                    <p class="text-2xl font-semibold text-gray-900">{{ $stats['completed_tasks'] ?? 0 }}</p>
+                    <p class="text-2xl font-semibold text-white">{{ $stats['completed_tasks'] ?? 0 }}</p>
                 </div>
             </div>
         </div>
         
-        <div class="bg-white rounded-lg shadow p-6">
+        <div class="bg-gray-800 rounded-lg shadow p-6">
             <div class="flex items-center">
                 <div class="p-2 bg-purple-100 rounded-lg">
                     <i class="fas fa-sync text-purple-600"></i>
                 </div>
                 <div class="ml-4">
                     <p class="text-sm font-medium text-gray-600">Cykliczne</p>
-                    <p class="text-2xl font-semibold text-gray-900">{{ $stats['recurring_tasks'] ?? 0 }}</p>
+                    <p class="text-2xl font-semibold text-white">{{ $stats['recurring_tasks'] ?? 0 }}</p>
                 </div>
             </div>
         </div>
@@ -140,7 +140,7 @@
     </div>
 
     <!-- Tabs -->
-    <div class="bg-white shadow-sm rounded-lg">
+    <div class="bg-gray-800 shadow-sm rounded-lg">
         <div class="border-b border-gray-200">
             <nav class="-mb-px flex space-x-8 px-6">
                 <button type="button" 
@@ -214,7 +214,7 @@
                                 </th>
                             </tr>
                         </thead>
-                        <tbody class="bg-white divide-y divide-gray-200">
+                        <tbody class="bg-gray-800 divide-y divide-gray-200">
                             @forelse($tasks as $task)
                             <tr class="hover:bg-gray-50">
                                 <td class="px-6 py-4 whitespace-nowrap">
@@ -223,7 +223,7 @@
                                             <i class="fas fa-{{ $task->type === 'database_optimization' ? 'database' : ($task->type === 'log_cleanup' ? 'file-alt' : 'cogs') }} text-gray-600"></i>
                                         </div>
                                         <div>
-                                            <div class="text-sm font-medium text-gray-900">{{ $task->name }}</div>
+                                            <div class="text-sm font-medium text-white">{{ $task->name }}</div>
                                             @if($task->creator)
                                             <div class="text-sm text-gray-500">przez {{ $task->creator->name }}</div>
                                             @endif
@@ -245,7 +245,7 @@
                                         </span>
                                     </div>
                                 </td>
-                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-white">
                                     <div class="space-y-1">
                                         <div>Planowane: {{ $task->scheduled_at->format('d.m.Y H:i') }}</div>
                                         @if($task->completed_at)
@@ -256,7 +256,7 @@
                                         @endif
                                     </div>
                                 </td>
-                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-white">
                                     {{ $task->formatted_duration ?: 'N/A' }}
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
@@ -319,7 +319,7 @@
             @elseif($activeTab === 'create')
                 <!-- Create task form -->
                 <div class="max-w-2xl">
-                    <h3 class="text-lg font-medium text-gray-900 mb-4">Utwórz nowe zadanie maintenance</h3>
+                    <h3 class="text-lg font-medium text-white mb-4">Utwórz nowe zadanie maintenance</h3>
                     
                     <div class="space-y-6">
                         <div>
@@ -370,7 +370,7 @@
                         <!-- Configuration options -->
                         @if(!empty($taskConfiguration))
                         <div class="space-y-4">
-                            <h4 class="font-medium text-gray-900">Opcje konfiguracji</h4>
+                            <h4 class="font-medium text-white">Opcje konfiguracji</h4>
                             
                             @foreach($taskConfiguration as $key => $value)
                             <div class="flex items-center justify-between">
@@ -415,7 +415,7 @@
             @elseif($activeTab === 'health')
                 <!-- System health -->
                 <div class="space-y-6">
-                    <h3 class="text-lg font-medium text-gray-900">Zdrowie systemu</h3>
+                    <h3 class="text-lg font-medium text-white">Zdrowie systemu</h3>
                     
                     @if(isset($systemHealth['error']))
                     <div class="bg-red-50 border border-red-200 rounded-lg p-4">
@@ -425,8 +425,8 @@
                     @else
                     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                         @if(isset($systemHealth['stats']))
-                        <div class="bg-white border rounded-lg p-6">
-                            <h4 class="font-medium text-gray-900 mb-4">Statystyki ogólne</h4>
+                        <div class="bg-gray-800 border rounded-lg p-6">
+                            <h4 class="font-medium text-white mb-4">Statystyki ogólne</h4>
                             <div class="space-y-3">
                                 @foreach($systemHealth['stats'] as $key => $value)
                                 <div class="flex justify-between">
@@ -439,8 +439,8 @@
                         @endif
                         
                         @if(isset($systemHealth['performance']))
-                        <div class="bg-white border rounded-lg p-6">
-                            <h4 class="font-medium text-gray-900 mb-4">Wydajność</h4>
+                        <div class="bg-gray-800 border rounded-lg p-6">
+                            <h4 class="font-medium text-white mb-4">Wydajność</h4>
                             <div class="space-y-3">
                                 @foreach($systemHealth['performance'] as $key => $value)
                                 <div class="flex justify-between">
@@ -464,10 +464,10 @@
     <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
         <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" onclick="closeResultsModal()"></div>
         
-        <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
-            <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+        <div class="inline-block align-bottom bg-gray-800 rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+            <div class="bg-gray-800 px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
                 <div class="flex justify-between items-center mb-4">
-                    <h3 class="text-lg font-medium text-gray-900">Wyniki zadania</h3>
+                    <h3 class="text-lg font-medium text-white">Wyniki zadania</h3>
                     <button onclick="closeResultsModal()" class="text-gray-400 hover:text-gray-600">
                         <i class="fas fa-times"></i>
                     </button>

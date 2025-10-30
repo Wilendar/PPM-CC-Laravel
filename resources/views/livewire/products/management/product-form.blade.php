@@ -42,7 +42,7 @@
             </div>
             <div class="flex gap-4">
                 @if($hasUnsavedChanges)
-                    <span class="inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-full bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300">
+                    <span class="inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-full bg-orange-900/30 text-orange-200 border border-orange-700/50">
                         <i class="fas fa-exclamation-circle mr-1"></i>
                         Niezapisane zmiany
                     </span>
@@ -127,10 +127,10 @@
 
                 {{-- MULTI-STORE MANAGEMENT (Second Line) --}}
                 {{-- Dostępne zarówno w create jak i edit mode --}}
-                    <div class="mt-3 bg-gray-50 dark:bg-gray-800 rounded-lg p-3">
+                    <div class="mt-3 bg-gray-800 rounded-lg p-3">
                         <div class="flex items-center justify-between">
                             <div class="flex items-center space-x-4">
-                                <h4 class="text-sm font-semibold text-gray-900 dark:text-white">
+                                <h4 class="text-sm font-semibold text-white">
                                     <svg class="w-4 h-4 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
                                     </svg>
@@ -140,7 +140,7 @@
                                 {{-- Default Data Toggle --}}
                                 <button type="button"
                                         wire:click="switchToShop(null)"
-                                        class="inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-full transition-colors duration-200 {{ $activeShopId === null ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300' : 'bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600' }}">
+                                        class="inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-full transition-colors duration-200 {{ $activeShopId === null ? 'bg-gradient-to-r from-orange-500 to-orange-600 text-white shadow-md' : 'bg-gray-700 text-gray-300 hover:bg-gray-600' }}">
                                     <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2-2z" />
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 1v4" />
@@ -182,7 +182,7 @@
                                                         wire:click="switchToShop({{ $shop['id'] }})"
                                                         wire:loading.attr="disabled"
                                                         wire:key="shop-btn-{{ $shop['id'] }}"
-                                                        class="inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-l-lg transition-all duration-200 {{ $activeShopId === $shop['id'] ? 'bg-gradient-to-r from-orange-500 to-orange-600 text-white shadow-md' : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600' }}">
+                                                        class="inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-l-lg transition-all duration-200 {{ $activeShopId === $shop['id'] ? 'shop-tab-active' : 'shop-tab-inactive' }}">
                                                     {{-- Shop Connection Status Icon --}}
                                                     @if($shop['connection_status'] === 'connected')
                                                         <svg class="w-3 h-3 mr-1.5 text-green-500" fill="currentColor" viewBox="0 0 20 20">
@@ -264,7 +264,7 @@
                 {{-- BASIC INFORMATION TAB --}}
                 <div class="{{ $activeTab === 'basic' ? '' : 'hidden' }}">
                     <div class="flex items-center justify-between mb-6">
-                        <h3 class="text-lg font-medium text-gray-900 dark:text-white">Informacje podstawowe</h3>
+                        <h3 class="text-lg font-medium text-white">Informacje podstawowe</h3>
 
                         <div class="flex items-center space-x-3">
                             {{-- Load from PrestaShop Button (ETAP_07 FIX) --}}
@@ -287,7 +287,7 @@
                                 @php
                                     $currentShop = collect($availableShops)->firstWhere('id', $activeShopId);
                                 @endphp
-                                <span class="inline-flex items-center px-2.5 py-1 text-xs font-medium rounded-full bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300">
+                                <span class="inline-flex items-center px-2.5 py-1 text-xs font-medium rounded-full bg-orange-900/30 text-orange-200 border border-orange-700/50">
                                     <svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
                                         <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
                                     </svg>
@@ -305,7 +305,7 @@
                             $currentShop = collect($availableShops)->firstWhere('id', $activeShopId);
                         @endphp
 
-                        <div class="mb-4 p-4 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-800 shadow-sm">
+                        <div class="mb-4 p-4 border border-gray-600 rounded-lg bg-gray-800 shadow-sm">
                             <div class="flex items-center justify-between">
                                 {{-- Status Info --}}
                                 <div class="flex items-center space-x-3">
@@ -316,7 +316,7 @@
                                         </h4>
 
                                         @if($syncDisplay['prestashop_id'])
-                                            <p class="text-sm text-gray-600 dark:text-gray-400">
+                                            <p class="text-sm text-gray-400">
                                                 PrestaShop ID: <strong class="font-mono">#{{ $syncDisplay['prestashop_id'] }}</strong>
                                             </p>
                                         @else
@@ -390,7 +390,7 @@
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                         {{-- SKU Field --}}
                         <div class="md:col-span-1">
-                            <label for="sku" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            <label for="sku" class="block text-sm font-medium text-gray-300 mb-2">
                                 SKU produktu <span class="text-red-500">*</span>
                                 @php
                                             $skuIndicator = $this->getFieldStatusIndicator('sku');
@@ -413,7 +413,7 @@
 
                         {{-- Product Type --}}
                         <div class="md:col-span-1">
-                            <label for="product_type_id" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            <label for="product_type_id" class="block text-sm font-medium text-gray-300 mb-2">
                                 Typ produktu <span class="text-red-500">*</span>
                                 @php
                                             $typeIndicator = $this->getFieldStatusIndicator('product_type_id');
@@ -441,7 +441,7 @@
 
                         {{-- Product Name --}}
                         <div class="md:col-span-2">
-                            <label for="name" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            <label for="name" class="block text-sm font-medium text-gray-300 mb-2">
                                 Nazwa produktu <span class="text-red-500">*</span>
                                 {{-- Status indicator --}}
                                 @php
@@ -466,7 +466,7 @@
                         {{-- Slug Field (Optional, Toggleable) --}}
                         <div class="md:col-span-2">
                             <div class="flex items-center justify-between mb-2">
-                                <label for="slug" class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                                <label for="slug" class="block text-sm font-medium text-gray-300">
                                     Slug URL (opcjonalne)
                                 </label>
                                 <button wire:click="toggleSlugField"
@@ -499,14 +499,14 @@
                                 </div>
                             @else
                                 <p class="text-sm text-gray-500 dark:text-gray-400">
-                                    Automatycznie: <code class="bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded">{{ $slug ?: 'automatycznie-generowany-slug' }}</code>
+                                    Automatycznie: <code class="bg-gray-700 px-2 py-1 rounded">{{ $slug ?: 'automatycznie-generowany-slug' }}</code>
                                 </p>
                             @endif
                         </div>
 
                         {{-- Manufacturer --}}
                         <div class="md:col-span-1">
-                            <label for="manufacturer" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            <label for="manufacturer" class="block text-sm font-medium text-gray-300 mb-2">
                                 Producent
                                 @php
                                             $manufacturerIndicator = $this->getFieldStatusIndicator('manufacturer');
@@ -529,7 +529,7 @@
 
                         {{-- Supplier Code --}}
                         <div class="md:col-span-1">
-                            <label for="supplier_code" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            <label for="supplier_code" class="block text-sm font-medium text-gray-300 mb-2">
                                 Kod dostawcy
                                 @php
                                             $supplierIndicator = $this->getFieldStatusIndicator('supplier_code');
@@ -552,7 +552,7 @@
 
                         {{-- EAN Code --}}
                         <div class="md:col-span-1">
-                            <label for="ean" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            <label for="ean" class="block text-sm font-medium text-gray-300 mb-2">
                                 Kod EAN
                                 @php
                                             $eanIndicator = $this->getFieldStatusIndicator('ean');
@@ -575,14 +575,14 @@
 
                         {{-- Sort Order --}}
                         <div class="md:col-span-1">
-                            <label for="sort_order" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            <label for="sort_order" class="block text-sm font-medium text-gray-300 mb-2">
                                 Kolejność sortowania
                             </label>
                             <input wire:model.live="sort_order"
                                    type="number"
                                    id="sort_order"
                                    min="0"
-                                   class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                                   class="{{ $this->getFieldClasses('sort_order') }} @error('sort_order') !border-red-500 @enderror">
                             @error('sort_order')
                                 <p class="mt-1 text-sm text-red-600 dark:text-red-400">{{ $message }}</p>
                             @enderror
@@ -591,18 +591,18 @@
                         {{-- Status Checkboxes --}}
                         <div class="md:col-span-2">
                             <fieldset class="space-y-3">
-                                <legend class="text-sm font-medium text-gray-700 dark:text-gray-300">Status produktu</legend>
+                                <legend class="text-sm font-medium text-gray-300">Status produktu</legend>
 
                                 <div class="flex items-center">
                                     <input wire:click="toggleActiveStatus"
                                            type="checkbox"
                                            {{ $is_active ? 'checked' : '' }}
                                            id="is_active"
-                                           class="rounded border-gray-300 dark:border-gray-600 text-blue-600 shadow-sm focus:border-blue-500 focus:ring-blue-500 cursor-pointer">
-                                    <label for="is_active" class="ml-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
+                                           class="rounded border-gray-600 text-blue-600 shadow-sm focus:border-blue-500 focus:ring-blue-500 cursor-pointer">
+                                    <label for="is_active" class="ml-2 text-sm text-gray-300 cursor-pointer">
                                         Produkt aktywny
                                         @if($is_active)
-                                            <span class="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100">
+                                            <span class="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium product-active-label">
                                                 Aktywny
                                             </span>
                                         @else
@@ -617,8 +617,8 @@
                                     <input wire:model.live="is_variant_master"
                                            type="checkbox"
                                            id="is_variant_master"
-                                           class="rounded border-gray-300 dark:border-gray-600 text-blue-600 shadow-sm focus:border-blue-500 focus:ring-blue-500">
-                                    <label for="is_variant_master" class="ml-2 text-sm text-gray-700 dark:text-gray-300">
+                                           class="rounded border-gray-600 text-blue-600 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                                    <label for="is_variant_master" class="ml-2 text-sm text-gray-300">
                                         Produkt z wariantami
                                     </label>
                                 </div>
@@ -627,11 +627,11 @@
                                     <input wire:model.live="is_featured"
                                            type="checkbox"
                                            id="is_featured"
-                                           class="rounded border-gray-300 dark:border-gray-600 text-blue-600 shadow-sm focus:border-blue-500 focus:ring-blue-500">
-                                    <label for="is_featured" class="ml-2 text-sm text-gray-700 dark:text-gray-300">
+                                           class="rounded border-gray-600 text-blue-600 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                                    <label for="is_featured" class="ml-2 text-sm text-gray-300">
                                         Produkt wyróżniony
                                         @if($is_featured)
-                                            <span class="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-800 dark:text-yellow-100">
+                                            <span class="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium product-featured-label">
                                                 ⭐ Wyróżniony
                                             </span>
                                         @endif
@@ -643,7 +643,7 @@
                         {{-- Publishing Schedule Section --}}
                         <div class="md:col-span-2">
                             <fieldset class="space-y-4">
-                                <legend class="text-sm font-medium text-gray-700 dark:text-gray-300">
+                                <legend class="text-sm font-medium text-gray-300">
                                     <svg class="w-4 h-4 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
                                     </svg>
@@ -652,26 +652,26 @@
 
                                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                     <div>
-                                        <label for="available_from" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                        <label for="available_from" class="block text-sm font-medium text-gray-300 mb-2">
                                             Dostępny od
                                         </label>
                                         <input wire:model.live="available_from"
                                                type="datetime-local"
                                                id="available_from"
-                                               class="block w-full rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm focus:border-orange-500 focus:ring-orange-500 sm:text-sm">
+                                               class="block w-full rounded-md border-gray-600 bg-gray-700 text-white shadow-sm focus:border-orange-500 focus:ring-orange-500 sm:text-sm">
                                         <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
                                             Pozostaw puste dla "od zawsze"
                                         </p>
                                     </div>
 
                                     <div>
-                                        <label for="available_to" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                        <label for="available_to" class="block text-sm font-medium text-gray-300 mb-2">
                                             Dostępny do
                                         </label>
                                         <input wire:model.live="available_to"
                                                type="datetime-local"
                                                id="available_to"
-                                               class="block w-full rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm focus:border-orange-500 focus:ring-orange-500 sm:text-sm">
+                                               class="block w-full rounded-md border-gray-600 bg-gray-700 text-white shadow-sm focus:border-orange-500 focus:ring-orange-500 sm:text-sm">
                                         <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
                                             Pozostaw puste dla "na zawsze"
                                         </p>
@@ -680,7 +680,7 @@
 
                                 {{-- Publishing Status Display --}}
                                 @if($isEditMode && $product)
-                                    <div class="mt-3 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                                    <div class="mt-3 p-3 bg-gray-700 rounded-lg">
                                         <div class="flex items-center space-x-2">
                                             @php
                                             $status = $product->getPublishingStatus();
@@ -696,7 +696,7 @@
                                                 </svg>
                                                 <span class="text-sm font-medium text-red-700 dark:text-red-300">Niedostępny</span>
                                             @endif
-                                            <span class="text-sm text-gray-600 dark:text-gray-400">{{ $status['status_text'] }}</span>
+                                            <span class="text-sm text-gray-400">{{ $status['status_text'] }}</span>
                                         </div>
                                     </div>
                                 @endif
@@ -705,7 +705,7 @@
 
                         {{-- Categories Section --}}
                         <div class="md:col-span-2">
-                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+                            <label class="block text-sm font-medium text-gray-300 mb-3">
                                 Kategorie produktu
                                 {{-- Category Status Indicator --}}
                                 @php
@@ -758,13 +758,13 @@
                                 </div>
 
                                 @if($this->getCategoriesForContext($activeShopId))
-                                    <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">
+                                    <p class="mt-2 text-sm text-gray-400">
                                         Wybrano {{ count($this->getCategoriesForContext($activeShopId)) }} {{ count($this->getCategoriesForContext($activeShopId)) == 1 ? 'kategorię' : 'kategori' }}.
                                         @if($this->getPrimaryCategoryForContext($activeShopId))
                                             Główna: <strong>{{ $availableCategories->find($this->getPrimaryCategoryForContext($activeShopId))?->name }}</strong>
                                         @endif
                                         @if($activeShopId !== null)
-                                            <span class="inline-flex items-center px-2 py-1 text-xs font-medium rounded-full bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300 ml-2">
+                                            <span class="inline-flex items-center px-2 py-1 text-xs font-medium rounded-full bg-orange-900/30 text-orange-200 border border-orange-700/50 ml-2">
                                                 <svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
                                                     <path fill-rule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clip-rule="evenodd"/>
                                                 </svg>
@@ -787,7 +787,7 @@
                 {{-- DESCRIPTION TAB --}}
                 <div class="{{ $activeTab === 'description' ? '' : 'hidden' }}">
                     <div class="flex items-center justify-between mb-6">
-                        <h3 class="text-lg font-medium text-gray-900 dark:text-white">Opisy i SEO</h3>
+                        <h3 class="text-lg font-medium text-white">Opisy i SEO</h3>
 
                         {{-- Active Shop Indicator --}}
                         @if($activeShopId !== null && isset($availableShops))
@@ -795,7 +795,7 @@
                                 $currentShop = collect($availableShops)->firstWhere('id', $activeShopId);
                             @endphp
                             <div class="flex items-center">
-                                <span class="inline-flex items-center px-2.5 py-1 text-xs font-medium rounded-full bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300">
+                                <span class="inline-flex items-center px-2.5 py-1 text-xs font-medium rounded-full bg-orange-900/30 text-orange-200 border border-orange-700/50">
                                     <svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
                                         <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
                                     </svg>
@@ -809,7 +809,7 @@
                         {{-- Short Description --}}
                         <div>
                             <div class="flex items-center justify-between mb-2">
-                                <label for="short_description" class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                                <label for="short_description" class="block text-sm font-medium text-gray-300">
                                     Krótki opis
                                     {{-- Status indicator --}}
                                     @php
@@ -841,7 +841,7 @@
                         {{-- Long Description --}}
                         <div>
                             <div class="flex items-center justify-between mb-2">
-                                <label for="long_description" class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                                <label for="long_description" class="block text-sm font-medium text-gray-300">
                                     Długi opis
                                     @php
                                             $longDescIndicator = $this->getFieldStatusIndicator('long_description');
@@ -870,13 +870,13 @@
                         </div>
 
                         {{-- SEO Fields --}}
-                        <div class="border-t border-gray-200 dark:border-gray-700 pt-6">
-                            <h4 class="text-md font-medium text-gray-900 dark:text-white mb-4">Optymalizacja SEO</h4>
+                        <div class="border-t border-gray-700 pt-6">
+                            <h4 class="text-md font-medium text-white mb-4">Optymalizacja SEO</h4>
 
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 {{-- Meta Title --}}
                                 <div class="md:col-span-2">
-                                    <label for="meta_title" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                    <label for="meta_title" class="block text-sm font-medium text-gray-300 mb-2">
                                         Tytuł SEO (meta title)
                                         @php
                                             $metaTitleIndicator = $this->getFieldStatusIndicator('meta_title');
@@ -899,7 +899,7 @@
 
                                 {{-- Meta Description --}}
                                 <div class="md:col-span-2">
-                                    <label for="meta_description" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                    <label for="meta_description" class="block text-sm font-medium text-gray-300 mb-2">
                                         Opis SEO (meta description)
                                         @php
                                             $metaDescIndicator = $this->getFieldStatusIndicator('meta_description');
@@ -927,7 +927,7 @@
                 {{-- PHYSICAL PROPERTIES TAB --}}
                 <div class="{{ $activeTab === 'physical' ? '' : 'hidden' }}">
                     <div class="flex items-center justify-between mb-6">
-                        <h3 class="text-lg font-medium text-gray-900 dark:text-white">Właściwości fizyczne</h3>
+                        <h3 class="text-lg font-medium text-white">Właściwości fizyczne</h3>
 
                         {{-- Active Shop Indicator --}}
                         @if($activeShopId !== null && isset($availableShops))
@@ -935,7 +935,7 @@
                                 $currentShop = collect($availableShops)->firstWhere('id', $activeShopId);
                             @endphp
                             <div class="flex items-center">
-                                <span class="inline-flex items-center px-2.5 py-1 text-xs font-medium rounded-full bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300">
+                                <span class="inline-flex items-center px-2.5 py-1 text-xs font-medium rounded-full bg-orange-900/30 text-orange-200 border border-orange-700/50">
                                     <svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
                                         <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
                                     </svg>
@@ -948,12 +948,12 @@
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                         {{-- Dimensions Section --}}
                         <div class="md:col-span-2">
-                            <h4 class="text-md font-medium text-gray-900 dark:text-white mb-4">Wymiary</h4>
+                            <h4 class="text-md font-medium text-white mb-4">Wymiary</h4>
 
                             <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
                                 {{-- Height --}}
                                 <div>
-                                    <label for="height" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                    <label for="height" class="block text-sm font-medium text-gray-300 mb-2">
                                         Wysokość (cm)
                                         @php
                                             $heightIndicator = $this->getFieldStatusIndicator('height');
@@ -978,7 +978,7 @@
 
                                 {{-- Width --}}
                                 <div>
-                                    <label for="width" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                    <label for="width" class="block text-sm font-medium text-gray-300 mb-2">
                                         Szerokość (cm)
                                         @php
                                             $widthIndicator = $this->getFieldStatusIndicator('width');
@@ -1003,7 +1003,7 @@
 
                                 {{-- Length --}}
                                 <div>
-                                    <label for="length" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                    <label for="length" class="block text-sm font-medium text-gray-300 mb-2">
                                         Długość (cm)
                                         @php
                                             $lengthIndicator = $this->getFieldStatusIndicator('length');
@@ -1028,10 +1028,10 @@
 
                                 {{-- Calculated Volume --}}
                                 <div>
-                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                    <label class="block text-sm font-medium text-gray-300 mb-2">
                                         Objętość (m³)
                                     </label>
-                                    <div class="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-sm text-gray-600 dark:text-gray-400">
+                                    <div class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-sm text-gray-400">
                                         {{ $calculatedVolume ? number_format($calculatedVolume, 6) : '—' }}
                                     </div>
                                 </div>
@@ -1040,7 +1040,7 @@
 
                         {{-- Weight --}}
                         <div>
-                            <label for="weight" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            <label for="weight" class="block text-sm font-medium text-gray-300 mb-2">
                                 Waga (kg)
                                 @php
                                             $weightIndicator = $this->getFieldStatusIndicator('weight');
@@ -1065,7 +1065,7 @@
 
                         {{-- Tax Rate --}}
                         <div>
-                            <label for="tax_rate" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            <label for="tax_rate" class="block text-sm font-medium text-gray-300 mb-2">
                                 Stawka VAT (%) <span class="text-red-500">*</span>
                                 @php
                                             $taxRateIndicator = $this->getFieldStatusIndicator('tax_rate');
@@ -1110,7 +1110,7 @@
                 {{-- ATTRIBUTES TAB CONTENT --}}
                 <div class="{{ $activeTab === 'attributes' ? '' : 'hidden' }}">
                     <div class="flex items-center justify-between mb-6">
-                        <h3 class="text-lg font-medium text-gray-900 dark:text-white">
+                        <h3 class="text-lg font-medium text-white">
                             <svg class="w-6 h-6 inline mr-2 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
                             </svg>
@@ -1123,7 +1123,7 @@
                                 $currentShop = collect($availableShops)->firstWhere('id', $activeShopId);
                             @endphp
                             <div class="flex items-center">
-                                <span class="inline-flex items-center px-2.5 py-1 text-xs font-medium rounded-full bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300">
+                                <span class="inline-flex items-center px-2.5 py-1 text-xs font-medium rounded-full bg-orange-900/30 text-orange-200 border border-orange-700/50">
                                     <svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
                                         <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
                                     </svg>
@@ -1135,9 +1135,9 @@
 
                     <div class="grid grid-cols-1 gap-6">
                         {{-- Attributes Management per Shop --}}
-                        <div class="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
+                        <div class="bg-gray-800 rounded-lg p-4">
                             <div class="flex items-center justify-between mb-4">
-                                <h4 class="text-md font-medium text-gray-900 dark:text-white flex items-center">
+                                <h4 class="text-md font-medium text-white flex items-center">
                                     <svg class="w-5 h-5 mr-2 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
                                     </svg>
@@ -1152,7 +1152,7 @@
                                     <svg class="w-12 h-12 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
                                     </svg>
-                                    <h3 class="text-lg font-medium text-gray-900 dark:text-white mb-2">System atrybutów</h3>
+                                    <h3 class="text-lg font-medium text-white mb-2">System atrybutów</h3>
                                     <p class="text-sm mb-4">
                                         Zarządzaj atrybutami produktu takimi jak Model, Oryginał, Zamiennik, Kolor, Rozmiar.
                                         <br>Każdy sklep może mieć różne wartości atrybutów.
@@ -1169,7 +1169,7 @@
             </div>
 
                 {{-- Form Footer - ALL ACTION BUTTONS MOVED HERE --}}
-                <div class="px-6 py-4 bg-gray-50 dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 rounded-b-lg">
+                <div class="px-6 py-4 bg-gray-900 border-t border-gray-700 rounded-b-lg">
                     <div class="flex items-center justify-between">
                         {{-- Validation Info --}}
                         <div class="flex items-center text-sm text-gray-500 dark:text-gray-400">
@@ -1189,7 +1189,7 @@
                         {{-- Action Buttons --}}
                         <div class="flex items-center space-x-3">
                             <button wire:click="cancel"
-                                    class="px-4 py-2 border border-gray-300 dark:border-gray-600 text-sm font-medium rounded-lg text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                                    class="px-4 py-2 border border-gray-600 text-sm font-medium rounded-lg text-gray-300 bg-gray-800 hover:bg-gray-700 transition-colors">
                                 Anuluj
                             </button>
 
@@ -1199,7 +1199,7 @@
                                 <button wire:click="resetToDefaults"
                                         wire:loading.attr="disabled"
                                         wire:target="resetToDefaults"
-                                        class="px-4 py-2 border border-yellow-500 dark:border-yellow-400 text-sm font-medium rounded-lg text-yellow-700 dark:text-yellow-300 bg-yellow-50 dark:bg-yellow-900/20 hover:bg-yellow-100 dark:hover:bg-yellow-900/40 transition-colors duration-200">
+                                        class="px-4 py-2 text-sm font-medium rounded-lg btn-reset-defaults transition-colors duration-200">
                                     <div wire:loading.remove wire:target="resetToDefaults">
                                         <svg class="w-4 h-4 mr-2 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -1371,11 +1371,11 @@
                 <div class="fixed inset-0 bg-gray-900 bg-opacity-75 transition-opacity" wire:click="closeShopSelector" style="z-index: 9998 !important;"></div>
 
                 {{-- Modal content --}}
-                <div class="inline-block align-middle bg-white dark:bg-gray-800 rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full relative" style="z-index: 10000 !important;">
+                <div class="inline-block align-middle bg-gray-800 rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full relative" style="z-index: 10000 !important;">
                     {{-- Header --}}
-                    <div class="bg-white dark:bg-gray-800 px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+                    <div class="bg-gray-800 px-6 py-4 border-b border-gray-700">
                         <div class="flex items-center justify-between">
-                            <h3 class="text-lg font-medium text-gray-900 dark:text-white">
+                            <h3 class="text-lg font-medium text-white">
                                 Wybierz sklepy
                             </h3>
                             <button wire:click="closeShopSelector"
@@ -1389,7 +1389,7 @@
 
                     {{-- Content --}}
                     <form wire:submit.prevent="addToShops">
-                        <div class="bg-white dark:bg-gray-800 px-6 py-4 max-h-96 overflow-y-auto">
+                        <div class="bg-gray-800 px-6 py-4 max-h-96 overflow-y-auto">
                             {{-- Error Messages --}}
                             @if($errors->has('general'))
                                 <div class="mb-4 bg-red-100 dark:bg-red-900/20 border border-red-400 dark:border-red-800 text-red-700 dark:text-red-400 px-4 py-3 rounded-lg">
@@ -1397,23 +1397,23 @@
                                 </div>
                             @endif
 
-                            <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                            <p class="text-sm text-gray-400 mb-4">
                                 Wybierz sklepy, do których chcesz dodać ten produkt:
                             </p>
 
                             <div class="space-y-3">
                                 @foreach($availableShops as $shop)
                                     @if(!in_array($shop['id'], $exportedShops))
-                                        <label class="flex items-center p-3 rounded-lg border border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer">
+                                        <label class="flex items-center p-3 rounded-lg border border-gray-200 dark:border-gray-600 hover:bg-gray-700 cursor-pointer">
                                             <input type="checkbox"
                                                    value="{{ $shop['id'] }}"
                                                    wire:model="selectedShopsToAdd"
-                                                   class="h-4 w-4 text-orange-600 border-gray-300 dark:border-gray-600 rounded focus:ring-orange-500 dark:bg-gray-700">
+                                                   class="h-4 w-4 text-orange-600 border-gray-600 rounded focus:ring-orange-500 dark:bg-gray-700">
 
                                             <div class="ml-3 flex-1">
                                                 <div class="flex items-center justify-between">
                                                     <div>
-                                                        <p class="text-sm font-medium text-gray-900 dark:text-white">
+                                                        <p class="text-sm font-medium text-white">
                                                             {{ $shop['name'] }}
                                                         </p>
                                                         <p class="text-xs text-gray-500 dark:text-gray-400">
@@ -1459,10 +1459,10 @@
                         </div>
 
                         {{-- Footer --}}
-                        <div class="bg-gray-50 dark:bg-gray-700 px-6 py-4 flex justify-end space-x-3">
+                        <div class="bg-gray-700 px-6 py-4 flex justify-end space-x-3">
                             <button type="button"
                                     wire:click="closeShopSelector"
-                                    class="inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 text-sm font-medium rounded-lg text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                                    class="inline-flex items-center px-4 py-2 border border-gray-600 text-sm font-medium rounded-lg text-gray-300 bg-gray-800 hover:bg-gray-700 transition-colors">
                                 Anuluj
                             </button>
                             <button type="submit"

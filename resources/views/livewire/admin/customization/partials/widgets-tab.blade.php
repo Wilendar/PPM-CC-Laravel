@@ -1,7 +1,7 @@
 <div class="p-6">
     <div class="flex justify-between items-center mb-6">
         <div>
-            <h3 class="text-lg font-medium text-gray-900 dark:text-white">Zarządzanie Widgetami</h3>
+            <h3 class="text-lg font-medium text-white">Zarządzanie Widgetami</h3>
             <p class="text-sm text-gray-600 dark:text-gray-400">Dostosuj layout i konfigurację widgetów dashboard</p>
         </div>
         
@@ -20,14 +20,14 @@
     <!-- Widget Layout Editor -->
     <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-6 mb-8">
         <div class="flex justify-between items-center mb-4">
-            <h4 class="text-md font-medium text-gray-900 dark:text-white">Edytor Układu Dashboard</h4>
+            <h4 class="text-md font-medium text-white">Edytor Układu Dashboard</h4>
             
             <div class="flex items-center space-x-4">
                 <label class="flex items-center space-x-2">
                     <input type="checkbox" 
                            wire:model.live="dashboardSettings.show_gridlines"
                            class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500">
-                    <span class="text-sm text-gray-700 dark:text-gray-300">Pokaż siatkę</span>
+                    <span class="text-sm text-gray-300">Pokaż siatkę</span>
                 </label>
                 
                 <select wire:model.live="widgetLayout.grid.columns" 
@@ -41,7 +41,7 @@
         </div>
         
         <!-- Grid Layout Preview -->
-        <div class="widget-grid-container bg-white dark:bg-gray-800 rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-500 p-4"
+        <div class="widget-grid-container bg-gray-800 rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-500 p-4"
              x-data="widgetGrid()"
              x-init="initGrid(@this.widgetLayout)"
              :class="{ 'show-grid': $wire.dashboardSettings.show_gridlines }">
@@ -58,7 +58,7 @@
             <div class="widgets-container relative" style="min-height: 400px;">
                 @if(!empty($widgetLayout['widgets']))
                     @foreach($widgetLayout['widgets'] as $index => $widget)
-                        <div class="widget-item draggable bg-white dark:bg-gray-700 rounded-lg shadow border-2 border-transparent hover:border-blue-400 cursor-move"
+                        <div class="widget-item draggable bg-gray-700 rounded-lg shadow border-2 border-transparent hover:border-blue-400 cursor-move"
                              data-widget-id="{{ $widget['id'] }}"
                              data-index="{{ $index }}"
                              style="grid-column: {{ $widget['x'] + 1 }} / span {{ $widget['w'] }}; 
@@ -112,17 +112,17 @@
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
         <!-- Widget Library -->
         <div>
-            <h4 class="text-md font-medium text-gray-900 dark:text-white mb-4">Biblioteka Widgetów</h4>
+            <h4 class="text-md font-medium text-white mb-4">Biblioteka Widgetów</h4>
             
             <div class="space-y-3">
                 @foreach($this->getAvailableWidgets() as $widgetId => $widget)
-                    <div class="flex items-center justify-between p-4 bg-white dark:bg-gray-800 rounded-lg border hover:border-blue-400 transition-colors">
+                    <div class="flex items-center justify-between p-4 bg-gray-800 rounded-lg border hover:border-blue-400 transition-colors">
                         <div class="flex items-center space-x-3">
                             <div class="w-10 h-10 bg-blue-100 dark:bg-blue-900 rounded-lg flex items-center justify-center">
                                 {!! $widget['icon'] !!}
                             </div>
                             <div>
-                                <div class="font-medium text-gray-900 dark:text-white">{{ $widget['name'] }}</div>
+                                <div class="font-medium text-white">{{ $widget['name'] }}</div>
                                 <div class="text-sm text-gray-600 dark:text-gray-400">{{ $widget['description'] }}</div>
                             </div>
                         </div>
@@ -161,16 +161,16 @@
 
         <!-- Widget Configuration -->
         <div>
-            <h4 class="text-md font-medium text-gray-900 dark:text-white mb-4">Konfiguracja Widgetów</h4>
+            <h4 class="text-md font-medium text-white mb-4">Konfiguracja Widgetów</h4>
             
             <div class="space-y-4">
                 <!-- Widget Refresh Settings -->
-                <div class="bg-white dark:bg-gray-800 rounded-lg border p-4">
-                    <h5 class="font-medium text-gray-900 dark:text-white mb-3">Ustawienia Odświeżania</h5>
+                <div class="bg-gray-800 rounded-lg border p-4">
+                    <h5 class="font-medium text-white mb-3">Ustawienia Odświeżania</h5>
                     
                     <div class="space-y-3">
                         <label class="flex items-center justify-between">
-                            <span class="text-sm text-gray-700 dark:text-gray-300">Auto-odświeżanie widgetów</span>
+                            <span class="text-sm text-gray-300">Auto-odświeżanie widgetów</span>
                             <input type="checkbox" 
                                    wire:model.live="dashboardSettings.auto_refresh"
                                    class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500">
@@ -178,7 +178,7 @@
                         
                         @if($dashboardSettings['auto_refresh'] ?? false)
                             <div>
-                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                <label class="block text-sm font-medium text-gray-300 mb-1">
                                     Interwał odświeżania
                                 </label>
                                 <select wire:model.live="dashboardSettings.refresh_interval" 
@@ -194,26 +194,26 @@
                 </div>
 
                 <!-- Widget Appearance -->
-                <div class="bg-white dark:bg-gray-800 rounded-lg border p-4">
-                    <h5 class="font-medium text-gray-900 dark:text-white mb-3">Wygląd Widgetów</h5>
+                <div class="bg-gray-800 rounded-lg border p-4">
+                    <h5 class="font-medium text-white mb-3">Wygląd Widgetów</h5>
                     
                     <div class="space-y-3">
                         <label class="flex items-center justify-between">
-                            <span class="text-sm text-gray-700 dark:text-gray-300">Kompaktowe widgety</span>
+                            <span class="text-sm text-gray-300">Kompaktowe widgety</span>
                             <input type="checkbox" 
                                    wire:model.live="dashboardSettings.compact_widgets"
                                    class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500">
                         </label>
                         
                         <label class="flex items-center justify-between">
-                            <span class="text-sm text-gray-700 dark:text-gray-300">Animacje przejść</span>
+                            <span class="text-sm text-gray-300">Animacje przejść</span>
                             <input type="checkbox" 
                                    wire:model.live="dashboardSettings.enable_animations"
                                    class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500">
                         </label>
                         
                         <label class="flex items-center justify-between">
-                            <span class="text-sm text-gray-700 dark:text-gray-300">Podpowiedzi (tooltips)</span>
+                            <span class="text-sm text-gray-300">Podpowiedzi (tooltips)</span>
                             <input type="checkbox" 
                                    wire:model.live="dashboardSettings.show_tooltips"
                                    class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500">
@@ -222,15 +222,15 @@
                 </div>
 
                 <!-- Widget Data Sources -->
-                <div class="bg-white dark:bg-gray-800 rounded-lg border p-4">
-                    <h5 class="font-medium text-gray-900 dark:text-white mb-3">Źródła Danych</h5>
+                <div class="bg-gray-800 rounded-lg border p-4">
+                    <h5 class="font-medium text-white mb-3">Źródła Danych</h5>
                     
                     <div class="space-y-2 text-sm">
                         @foreach($this->getDataSources() as $source)
                             <div class="flex items-center justify-between py-2">
                                 <div class="flex items-center space-x-2">
                                     <div class="w-3 h-3 rounded-full {{ $source['status'] === 'active' ? 'bg-green-400' : 'bg-red-400' }}"></div>
-                                    <span class="text-gray-700 dark:text-gray-300">{{ $source['name'] }}</span>
+                                    <span class="text-gray-300">{{ $source['name'] }}</span>
                                 </div>
                                 <span class="text-xs text-gray-500">{{ $source['latency'] }}ms</span>
                             </div>
@@ -264,11 +264,11 @@
 
     <!-- Widget Templates -->
     <div class="mt-8 pt-8 border-t border-gray-200 dark:border-gray-600">
-        <h4 class="text-md font-medium text-gray-900 dark:text-white mb-6">Szablony Układów</h4>
+        <h4 class="text-md font-medium text-white mb-6">Szablony Układów</h4>
         
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             @foreach($this->getWidgetTemplates() as $template)
-                <div class="bg-white dark:bg-gray-800 rounded-lg border hover:border-blue-400 transition-colors overflow-hidden">
+                <div class="bg-gray-800 rounded-lg border hover:border-blue-400 transition-colors overflow-hidden">
                     <!-- Template Preview -->
                     <div class="h-32 bg-gray-100 dark:bg-gray-700 p-2">
                         <div class="grid grid-cols-4 gap-1 h-full">
@@ -280,7 +280,7 @@
                     
                     <!-- Template Info -->
                     <div class="p-4">
-                        <h5 class="font-medium text-gray-900 dark:text-white mb-1">{{ $template['name'] }}</h5>
+                        <h5 class="font-medium text-white mb-1">{{ $template['name'] }}</h5>
                         <p class="text-sm text-gray-600 dark:text-gray-400 mb-3">{{ $template['description'] }}</p>
                         
                         <div class="flex justify-between items-center">

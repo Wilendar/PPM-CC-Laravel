@@ -1,6 +1,6 @@
 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
     <!-- Total Products Widget -->
-    <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-lg rounded-xl border border-gray-200 dark:border-gray-700 widget-enter">
+    <div class="bg-gray-800 overflow-hidden shadow-lg rounded-xl border border-gray-700 widget-enter">
         <div class="p-6">
             <div class="flex items-center justify-between">
                 <div class="flex items-center">
@@ -16,7 +16,7 @@
                             Całkowita liczba produktów
                         </h3>
                         <div class="flex items-baseline">
-                            <p class="text-3xl font-bold text-gray-900 dark:text-white">
+                            <p class="text-3xl font-bold text-white">
                                 {{ number_format($totalProducts['total']) }}
                             </p>
                             @if($showTrends && $totalProducts['trend'] !== 0)
@@ -63,7 +63,7 @@
     </div>
 
     <!-- Active Users Widget -->
-    <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-lg rounded-xl border border-gray-200 dark:border-gray-700 widget-enter">
+    <div class="bg-gray-800 overflow-hidden shadow-lg rounded-xl border border-gray-700 widget-enter">
         <div class="p-6">
             <div class="flex items-center justify-between">
                 <div class="flex items-center">
@@ -79,7 +79,7 @@
                             Aktywni użytkownicy
                         </h3>
                         <div class="flex items-baseline">
-                            <p class="text-3xl font-bold text-gray-900 dark:text-white">
+                            <p class="text-3xl font-bold text-white">
                                 {{ $activeUsers['today'] }}
                             </p>
                             <span class="ml-2 text-lg text-gray-500 dark:text-gray-400">
@@ -104,7 +104,7 @@
     </div>
 
     <!-- Categories Stats Widget -->
-    <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-lg rounded-xl border border-gray-200 dark:border-gray-700 widget-enter">
+    <div class="bg-gray-800 overflow-hidden shadow-lg rounded-xl border border-gray-700 widget-enter">
         <div class="p-6">
             <div class="flex items-center justify-between">
                 <div class="flex items-center">
@@ -120,7 +120,7 @@
                             Kategorie
                         </h3>
                         <div class="flex items-baseline">
-                            <p class="text-3xl font-bold text-gray-900 dark:text-white">
+                            <p class="text-3xl font-bold text-white">
                                 {{ $categoriesStats['with_products'] }}
                             </p>
                             <span class="ml-2 text-lg text-gray-500 dark:text-gray-400">
@@ -150,7 +150,7 @@
     </div>
 
     <!-- Stock Alerts Widget -->
-    <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-lg rounded-xl border border-gray-200 dark:border-gray-700 widget-enter">
+    <div class="bg-gray-800 overflow-hidden shadow-lg rounded-xl border border-gray-700 widget-enter">
         <div class="p-6">
             <div class="flex items-center justify-between">
                 <div class="flex items-center">
@@ -202,10 +202,10 @@
     </div>
 
     <!-- Today's Activity Extended Widget (spans full width) -->
-    <div class="md:col-span-2 lg:col-span-4 bg-white dark:bg-gray-800 overflow-hidden shadow-lg rounded-xl border border-gray-200 dark:border-gray-700 widget-enter">
+    <div class="md:col-span-2 lg:col-span-4 bg-gray-800 overflow-hidden shadow-lg rounded-xl border border-gray-700 widget-enter">
         <div class="p-6">
             <div class="flex items-center justify-between mb-4">
-                <h3 class="text-lg font-semibold text-gray-900 dark:text-white">
+                <h3 class="text-lg font-semibold text-white">
                     Aktywność z dzisiaj
                 </h3>
                 <div class="flex items-center space-x-2">
@@ -230,7 +230,7 @@
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
                         </svg>
                     </div>
-                    <div class="text-2xl font-bold text-gray-900 dark:text-white">{{ $todayActivity['products_added'] }}</div>
+                    <div class="text-2xl font-bold text-white">{{ $todayActivity['products_added'] }}</div>
                     <div class="text-sm text-gray-500 dark:text-gray-400">Produkty dodane</div>
                 </div>
                 
@@ -241,7 +241,7 @@
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
                         </svg>
                     </div>
-                    <div class="text-2xl font-bold text-gray-900 dark:text-white">{{ $todayActivity['products_updated'] }}</div>
+                    <div class="text-2xl font-bold text-white">{{ $todayActivity['products_updated'] }}</div>
                     <div class="text-sm text-gray-500 dark:text-gray-400">Produkty zaktualizowane</div>
                 </div>
                 
@@ -252,7 +252,7 @@
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
                         </svg>
                     </div>
-                    <div class="text-2xl font-bold text-gray-900 dark:text-white">{{ $todayActivity['users_logged_in'] }}</div>
+                    <div class="text-2xl font-bold text-white">{{ $todayActivity['users_logged_in'] }}</div>
                     <div class="text-sm text-gray-500 dark:text-gray-400">Logowania</div>
                 </div>
                 
@@ -263,7 +263,7 @@
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
                         </svg>
                     </div>
-                    <div class="text-2xl font-bold text-gray-900 dark:text-white">{{ $todayActivity['sync_events'] }}</div>
+                    <div class="text-2xl font-bold text-white">{{ $todayActivity['sync_events'] }}</div>
                     <div class="text-sm text-gray-500 dark:text-gray-400">Synchronizacje</div>
                 </div>
             </div>

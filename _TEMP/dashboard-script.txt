@@ -1,0 +1,31 @@
+<script>
+function adminDashboard(refreshInterval) {
+    return {
+        refreshInterval: refreshInterval,
+        intervalId: null,
+        
+        init() {
+            this.startAutoRefresh();
+        },
+        
+        startAutoRefresh() {
+            this.stopAutoRefresh();
+            this.intervalId = setInterval(() => {
+                Livewire.dispatch('refreshDashboard');
+            }, this.refreshInterval * 1000);
+        },
+        
+        stopAutoRefresh() {
+            if (this.intervalId) {
+                clearInterval(this.intervalId);
+                this.intervalId = null;
+            }
+        },
+        
+        updateRefreshInterval(newInterval) {
+            this.refreshInterval = newInterval;
+            this.startAutoRefresh();
+        }
+    }
+}
+</script>

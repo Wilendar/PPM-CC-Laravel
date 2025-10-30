@@ -63,13 +63,13 @@
         
         {{-- Import/Export --}}
         @can('products.import')
-        <a href="{{ route('import.index') }}" 
+        <a href="{{ route('import.index') }}"
            class="group flex items-center px-2 py-2 text-sm font-medium rounded-md
-                  {{ request()->routeIs('import.*') 
-                      ? 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-200' 
-                      : 'text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700' 
+                  {{ request()->routeIs('import.*')
+                      ? 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-200'
+                      : 'text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700'
                   }}">
-            <svg class="mr-3 h-5 w-5 {{ request()->routeIs('import.*') ? 'text-green-500' : 'text-gray-400' }}" 
+            <svg class="mr-3 h-5 w-5 {{ request()->routeIs('import.*') ? 'text-green-500' : 'text-gray-400' }}"
                  fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10"></path>
             </svg>
@@ -77,15 +77,50 @@
         </a>
         @endcan
 
+        {{-- CSV Import/Export (NEW SYSTEM - FAZA 6) --}}
+        @can('products.import')
+        <a href="{{ route('csv.import') }}"
+           class="group flex items-center px-2 py-2 text-sm font-medium rounded-md
+                  {{ request()->routeIs('csv.*')
+                      ? 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-200'
+                      : 'text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700'
+                  }}">
+            <svg class="mr-3 h-5 w-5 {{ request()->routeIs('csv.*') ? 'text-green-500' : 'text-gray-400' }}"
+                 fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+            </svg>
+            CSV Import/Export
+            <span class="ml-auto inline-block py-0.5 px-2 text-xs rounded-full bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100">
+                Nowy
+            </span>
+        </a>
+        @endcan
+
+        {{-- Compatibility Management (ETAP_05d FAZA 1) --}}
+        @can('products.manage')
+        <a href="{{ route('compatibility.index') }}"
+           class="group flex items-center px-2 py-2 text-sm font-medium rounded-md
+                  {{ request()->routeIs('compatibility.*')
+                      ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-200'
+                      : 'text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700'
+                  }}">
+            <svg class="mr-3 h-5 w-5 {{ request()->routeIs('compatibility.*') ? 'text-blue-500' : 'text-gray-400' }}"
+                 fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path>
+            </svg>
+            Dopasowania Części
+        </a>
+        @endcan
+
         {{-- Synchronization --}}
         @can('integrations.sync')
-        <a href="{{ route('sync.index') }}" 
+        <a href="{{ route('sync.index') }}"
            class="group flex items-center px-2 py-2 text-sm font-medium rounded-md
-                  {{ request()->routeIs('sync.*') 
-                      ? 'bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-200' 
-                      : 'text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700' 
+                  {{ request()->routeIs('sync.*')
+                      ? 'bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-200'
+                      : 'text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700'
                   }}">
-            <svg class="mr-3 h-5 w-5 {{ request()->routeIs('sync.*') ? 'text-purple-500' : 'text-gray-400' }}" 
+            <svg class="mr-3 h-5 w-5 {{ request()->routeIs('sync.*') ? 'text-purple-500' : 'text-gray-400' }}"
                  fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
             </svg>

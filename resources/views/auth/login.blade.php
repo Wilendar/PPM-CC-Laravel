@@ -9,7 +9,7 @@
     
     {{-- Geometric Background Elements --}}
     <div class="absolute inset-0">
-        <div class="absolute top-10 left-10 w-72 h-72 bg-white/5 rounded-full blur-3xl"></div>
+        <div class="absolute top-10 left-10 w-72 h-72 bg-gray-800/5 rounded-full blur-3xl"></div>
         <div class="absolute bottom-10 right-10 w-96 h-96 bg-orange-300/10 rounded-full blur-3xl"></div>
     </div>
     

@@ -3,9 +3,9 @@
         {{-- Header --}}
         <div>
             <div class="mx-auto h-12 w-auto flex justify-center">
-                <h1 class="text-3xl font-bold text-gray-900">PPM</h1>
+                <h1 class="text-3xl font-bold text-white">PPM</h1>
             </div>
-            <h2 class="mt-6 text-center text-3xl font-extrabold text-gray-900">
+            <h2 class="mt-6 text-center text-3xl font-extrabold text-white">
                 Utwórz nowe konto
             </h2>
             <p class="mt-2 text-center text-sm text-gray-600">
@@ -51,7 +51,7 @@
             {{-- Step 1: Personal Information --}}
             @if($step === 1)
                 <div class="space-y-4">
-                    <h3 class="text-lg font-medium text-gray-900 mb-4">Informacje osobiste</h3>
+                    <h3 class="text-lg font-medium text-white mb-4">Informacje osobiste</h3>
                     
                     {{-- First Name & Last Name Row --}}
                     <div class="grid grid-cols-2 gap-4">
@@ -67,7 +67,7 @@
                                 required 
                                 class="mt-1 appearance-none relative block w-full px-3 py-2 border 
                                        @error('first_name') border-red-300 @else border-gray-300 @enderror
-                                       placeholder-gray-500 text-gray-900 rounded-md focus:outline-none 
+                                       placeholder-gray-500 text-white rounded-md focus:outline-none 
                                        focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                                 placeholder="Twoje imię"
                             >
@@ -88,7 +88,7 @@
                                 required 
                                 class="mt-1 appearance-none relative block w-full px-3 py-2 border 
                                        @error('last_name') border-red-300 @else border-gray-300 @enderror
-                                       placeholder-gray-500 text-gray-900 rounded-md focus:outline-none 
+                                       placeholder-gray-500 text-white rounded-md focus:outline-none 
                                        focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                                 placeholder="Twoje nazwisko"
                             >
@@ -112,7 +112,7 @@
                             required 
                             class="mt-1 appearance-none relative block w-full px-3 py-2 border 
                                    @error('email') border-red-300 @else border-gray-300 @enderror
-                                   placeholder-gray-500 text-gray-900 rounded-md focus:outline-none 
+                                   placeholder-gray-500 text-white rounded-md focus:outline-none 
                                    focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                             placeholder="twoj@email.pl"
                         >
@@ -135,7 +135,7 @@
                             required 
                             class="mt-1 appearance-none relative block w-full px-3 py-2 border 
                                    @error('password') border-red-300 @else border-gray-300 @enderror
-                                   placeholder-gray-500 text-gray-900 rounded-md focus:outline-none 
+                                   placeholder-gray-500 text-white rounded-md focus:outline-none 
                                    focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                             placeholder="Minimum 8 znaków"
                         >
@@ -171,7 +171,7 @@
                             required 
                             class="mt-1 appearance-none relative block w-full px-3 py-2 border 
                                    @error('password') border-red-300 @else border-gray-300 @enderror
-                                   placeholder-gray-500 text-gray-900 rounded-md focus:outline-none 
+                                   placeholder-gray-500 text-white rounded-md focus:outline-none 
                                    focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                             placeholder="Powtórz hasło"
                         >
@@ -182,7 +182,7 @@
             {{-- Step 2: Company Information --}}
             @if($step === 2)
                 <div class="space-y-4">
-                    <h3 class="text-lg font-medium text-gray-900 mb-4">Informacje o firmie (opcjonalne)</h3>
+                    <h3 class="text-lg font-medium text-white mb-4">Informacje o firmie (opcjonalne)</h3>
                     
                     {{-- Company --}}
                     <div>
@@ -195,7 +195,7 @@
                             name="company" 
                             type="text" 
                             class="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300
-                                   placeholder-gray-500 text-gray-900 rounded-md focus:outline-none 
+                                   placeholder-gray-500 text-white rounded-md focus:outline-none 
                                    focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                             placeholder="np. MPP TRADE"
                         >
@@ -215,7 +215,7 @@
                             name="position" 
                             type="text" 
                             class="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300
-                                   placeholder-gray-500 text-gray-900 rounded-md focus:outline-none 
+                                   placeholder-gray-500 text-white rounded-md focus:outline-none 
                                    focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                             placeholder="np. Kierownik sprzedaży"
                         >
@@ -235,7 +235,7 @@
                             name="phone" 
                             type="tel" 
                             class="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300
-                                   placeholder-gray-500 text-gray-900 rounded-md focus:outline-none 
+                                   placeholder-gray-500 text-white rounded-md focus:outline-none 
                                    focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                             placeholder="+48 123 456 789"
                         >
@@ -264,7 +264,7 @@
             {{-- Step 3: Legal Agreements --}}
             @if($step === 3)
                 <div class="space-y-4">
-                    <h3 class="text-lg font-medium text-gray-900 mb-4">Akceptacja regulaminów</h3>
+                    <h3 class="text-lg font-medium text-white mb-4">Akceptacja regulaminów</h3>
                     
                     {{-- Terms of Service --}}
                     <div class="flex items-start">
@@ -343,7 +343,7 @@
                         type="button"
                         wire:click="previousStep"
                         class="group relative flex justify-center py-2 px-4 border border-gray-300 
-                               text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 
+                               text-sm font-medium rounded-md text-gray-700 bg-gray-800 hover:bg-gray-50 
                                focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                     >
                         <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -412,13 +412,13 @@
 
         {{-- Loading Overlay --}}
         <div wire:loading.flex wire:target="register" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 items-center justify-center">
-            <div class="bg-white p-8 rounded-lg shadow-lg">
+            <div class="bg-gray-800 p-8 rounded-lg shadow-lg">
                 <div class="flex items-center">
                     <svg class="animate-spin h-6 w-6 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                         <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                     </svg>
-                    <span class="ml-3 text-gray-900">Tworzenie konta użytkownika...</span>
+                    <span class="ml-3 text-white">Tworzenie konta użytkownika...</span>
                 </div>
             </div>
         </div>

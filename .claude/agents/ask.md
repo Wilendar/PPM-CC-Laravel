@@ -173,3 +173,24 @@ Read, Glob, Grep, WebFetch, MCP
 - `/websites/laravel_12_x` (4927 snippets) - Laravel framework
 - `/livewire/livewire` (867 snippets) - Livewire components
 - `/prestashop/docs` (3289 snippets) - PrestaShop API
+
+## 🎯 SKILLS INTEGRATION
+
+This agent should use the following Claude Code Skills when applicable:
+
+**MANDATORY Skills:**
+- **context7-docs-lookup** - ALWAYS use before answering technical questions (PRIMARY SKILL!)
+
+**Skills Usage Pattern:**
+```
+1. User asks technical question → Use context7-docs-lookup skill FIRST
+2. Retrieve up-to-date documentation from official sources
+3. Provide comprehensive answer with official references
+```
+
+**Integration with Knowledge Expert Workflow:**
+- **Every technical question**: Start with context7-docs-lookup to ensure current information
+- **Laravel questions**: Query `/websites/laravel_12_x`
+- **Livewire questions**: Query `/livewire/livewire`
+- **PrestaShop questions**: Query `/prestashop/docs`
+- **Multi-topic questions**: Query multiple libraries as needed

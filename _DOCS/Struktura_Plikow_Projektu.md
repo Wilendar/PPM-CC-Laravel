@@ -1,8 +1,20 @@
 # STRUKTURA PLIKÓW PROJEKTU PPM-CC-Laravel
 
 **Data utworzenia:** 2025-09-29
-**Wersja:** 1.0
+**Wersja:** 1.1
 **Autor:** Claude Code - Dokumentacja systemowa
+**Ostatnia aktualizacja:** 2025-10-22
+
+## 📚 POWIĄZANA DOKUMENTACJA
+
+**⚠️ ARCHITEKTURA STRON I MENU:** Zobacz [`PPM_ARCHITEKTURA_STRON_MENU.md`](PPM_ARCHITEKTURA_STRON_MENU.md) dla:
+- **21 modułów tematycznych** w `_DOCS/ARCHITEKTURA_PPM/`
+- **49 route'ów aplikacji** (kompletna tabela routingu)
+- **7-poziomowy system uprawnień** (macierz dostępów)
+- **Role-Based Dashboards** (7 wersji per rola użytkownika)
+- **UI/UX Guidelines** + **Design System** + **Implementation Checklist**
+
+Ten dokument skupia się na **strukturze plików fizycznych**, podczas gdy PPM_ARCHITEKTURA_STRON_MENU.md opisuje **architekturę funkcjonalną i routing**.
 
 ## 📋 SPIS TREŚCI
 
@@ -163,7 +175,7 @@ PPM-CC-Laravel/
 |---------|---------------|---------|-------------|
 | **app/Http/Livewire/Admin/** | Panel administratora | ✅ COMPLETED | 12 głównych modułów |
 | **app/Http/Livewire/Products/** | Zarządzanie produktami | ✅ COMPLETED | Categories, Listing, Management |
-| **app/Http/Livewire/Dashboard/** | Dashboard główny | ✅ COMPLETED | Widgets, Analytics |
+| **app/Http/Livewire/Dashboard/** | Dashboard główny | ✅ COMPLETED | Widgets, Analytics + **7 wersji role-based** (Admin, Menadżer, Redaktor, Magazynier, Handlowiec, Reklamacje, Użytkownik) |
 | **resources/views/livewire/** | Templates Blade | ✅ COMPLETED | Odpowiadające pliki .blade.php |
 
 ### 🗄️ BAZA DANYCH
@@ -229,43 +241,64 @@ PPM-CC-Laravel/
 - ✅ `app/Http/Livewire/Products/`
 - ✅ `resources/views/livewire/products/`
 
-### ETAP_06 - Import/Export ⏳
-- 🛠️ `app/Services/` (Import services)
-- ❌ Import wizards, mapowanie XLSX
+### ETAP_06 - Import/Export ✅ COMPLETED (jako Unified Import System w PRODUKTY)
+**⚠️ ARCHITEKTURA v2.0:** Import/Export przeniesiony do sekcji PRODUKTY (nie osobny moduł)
 
-### ETAP_07 - PrestaShop API 🛠️ IN PROGRESS - FAZA 1
-**Status:** Panel konfiguracyjny + synchronizacja produktów/kategorii (bez zdjęć)
+- ✅ `app/Services/CSV/` (6 serwisów)
+  - `TemplateGenerator.php` - Generowanie szablonów XLSX
+  - `ImportMapper.php` - Mapowanie kolumn importu
+  - `ImportValidator.php` - Walidacja danych
+  - `ExportFormatter.php` - Formatowanie eksportu
+  - `BulkOperationService.php` - Operacje masowe
+  - `ErrorReporter.php` - Raportowanie błędów
+- ✅ `app/Http/Livewire/Admin/CSV/ImportPreview.php` - Podgląd importu
+- ✅ `app/Http/Controllers/Admin/CSVExportController.php` - Eksport kontroler
+- ✅ `resources/views/livewire/admin/csv/` - Widoki importu
+- ✅ **9 route'ów CSV** (templates, export, import)
+- ✅ **Unified Import System** - CSV + XLSX w jednym interfejsie
+- ✅ **Template system** - Predefiniowane szablony (POJAZDY/CZĘŚCI)
 
-#### 📁 Services Layer:
+### ETAP_07 - PrestaShop API 🛠️ IN PROGRESS - FAZA 3 (75%)
+**Status:** ✅ FAZA 1+2 COMPLETED | 🔄 FAZA 3 IN PROGRESS (75%)
+- **FAZA 1**: ✅ Panel konfiguracyjny + Sync PPM → PrestaShop (bez zdjęć) - **COMPLETED**
+- **FAZA 2**: ✅ Dynamic category picker + Reverse transformers - **COMPLETED**
+- **FAZA 3**: 🔄 Import PrestaShop → PPM + Real-Time Progress - **75% (3A ✅, 3B 75%, 3C ❌)**
+
+#### 📁 Services Layer (15 plików):
 ```
 app/Services/PrestaShop/
-├── BasePrestaShopClient.php         # Abstract base dla API client
-├── PrestaShop8Client.php            # Implementacja API PrestaShop 8.x
-├── PrestaShop9Client.php            # Implementacja API PrestaShop 9.x
-├── PrestaShopClientFactory.php      # Factory pattern dla versioning
-├── PrestaShopSyncService.php        # Orchestrator synchronizacji
+├── BasePrestaShopClient.php         # ✅ Abstract base dla API client
+├── PrestaShop8Client.php            # ✅ Implementacja API PrestaShop 8.x
+├── PrestaShop9Client.php            # ✅ Implementacja API PrestaShop 9.x
+├── PrestaShopClientFactory.php      # ✅ Factory pattern dla versioning
+├── PrestaShopService.php            # ✅ Main service facade
+├── PrestaShopSyncService.php        # ✅ Orchestrator synchronizacji PPM → PS
+├── PrestaShopImportService.php      # ✅ Import service PS → PPM (FAZA 2)
 ├── Sync/                            # Strategy pattern dla sync operations
-│   ├── ISyncStrategy.php            # Interface strategii sync
-│   ├── ProductSyncStrategy.php      # Strategia sync produktów
-│   ├── CategorySyncStrategy.php     # Strategia sync kategorii
-│   └── ConflictResolver.php         # Rozwiązywanie konfliktów sync
-├── Mappers/                         # Mapowanie danych PPM ↔ PrestaShop
-│   ├── CategoryMapper.php           # Mapowanie kategorii
-│   ├── PriceGroupMapper.php         # Mapowanie grup cenowych
-│   ├── WarehouseMapper.php          # Mapowanie magazynów
-│   └── AttributeMapper.php          # Mapowanie atrybutów
-└── Transformers/                    # Transformacja danych
-    ├── ProductTransformer.php       # Transform Product → PrestaShop format
-    └── CategoryTransformer.php      # Transform Category → PrestaShop format
+│   ├── ISyncStrategy.php            # ✅ Interface strategii sync
+│   ├── ProductSyncStrategy.php      # ✅ Strategia sync produktów
+│   └── CategorySyncStrategy.php     # ✅ Strategia sync kategorii
+├── Mappers (3 pliki):               # Mapowanie danych PPM ↔ PrestaShop
+│   ├── CategoryMapper.php           # ✅ Mapowanie kategorii
+│   ├── PriceGroupMapper.php         # ✅ Mapowanie grup cenowych
+│   └── WarehouseMapper.php          # ✅ Mapowanie magazynów
+└── Transformers (2 pliki):          # Transformacja danych bidirectional
+    ├── ProductTransformer.php       # ✅ Bidirectional Product ↔ PrestaShop
+    └── CategoryTransformer.php      # ✅ Bidirectional Category ↔ PrestaShop
 ```
 
-#### 📁 Queue Jobs:
+#### 📁 Queue Jobs (9 plików):
 ```
 app/Jobs/PrestaShop/
-├── SyncProductToPrestaShop.php      # Job sync pojedynczego produktu
-├── BulkSyncProducts.php             # Job sync masowego produktów
-├── SyncCategoryToPrestaShop.php     # Job sync kategorii
-└── ProcessWebhookEvent.php          # Job przetwarzania webhooków
+├── SyncProductToPrestaShop.php      # ✅ Job sync pojedynczego produktu PPM → PS
+├── BulkSyncProducts.php             # ✅ Job sync masowego produktów PPM → PS
+├── SyncProductsJob.php              # ✅ Alternative bulk sync wrapper
+├── SyncCategoryToPrestaShop.php     # ✅ Job sync kategorii PPM → PS
+├── DeleteProductFromPrestaShop.php  # ✅ Job usuwania produktu z PS
+├── BulkImportProducts.php           # ✅ Job import masowego PS → PPM (FAZA 3A)
+├── BulkCreateCategories.php         # ✅ Job tworzenia kategorii masowo
+├── AnalyzeMissingCategories.php     # ✅ Job analizy brakujących kategorii
+└── ExpirePendingCategoryPreview.php # ✅ Job czyszczenia preview cache
 ```
 
 #### 📁 Controllers/Routes:
@@ -277,12 +310,14 @@ routes/
 └── api.php                          # Route: POST /api/webhooks/prestashop/{shop_id}
 ```
 
-#### 📁 Livewire Components (Extensions):
+#### 📁 Livewire Components (5 plików):
 ```
 app/Http/Livewire/Admin/Shops/
-├── ShopManager.php                  # ✅ EXISTS - rozszerzenie o sync controls
-├── AddShop.php                      # ✅ EXISTS - rozszerzenie o PS connection wizard
-└── SyncController.php               # ✅ EXISTS - rozszerzenie o PS sync operations
+├── ShopManager.php                  # ✅ Shop management + connection health
+├── AddShop.php                      # ✅ Add/Edit shop wizard + PS connection test
+├── SyncController.php               # ✅ Sync operations dashboard + manual triggers
+├── BulkExport.php                   # ✅ Bulk export produktów PPM → PS (FAZA 1)
+└── ImportManager.php                # ✅ Import manager PS → PPM (FAZA 3)
 ```
 
 #### 📁 Views (Extensions):
@@ -302,14 +337,31 @@ database/migrations/
 └── 2025_XX_XX_create_sync_logs_table.php
 ```
 
-**FAZA 1 SCOPE:**
-- ✅ Database structure (4 tables)
-- ⏳ Base API clients (PS8/PS9)
-- ⏳ Product/Category sync strategies
-- ⏳ ShopManager UI extension
-- ❌ Images sync (FAZA 2)
-- ❌ Webhooks (FAZA 3)
-- ❌ Advanced monitoring (FAZA 3)
+**IMPLEMENTACJA PER FAZA:**
+- ✅ **FAZA 1 COMPLETED** (2025-10-08):
+  - ✅ Database structure (4 tables: shop_mappings, product_sync_status, sync_logs, product_shop_data extensions)
+  - ✅ Base API clients (BasePrestaShopClient, PrestaShop8Client, PrestaShop9Client)
+  - ✅ Product/Category sync strategies (ProductSyncStrategy, CategorySyncStrategy)
+  - ✅ ShopManager UI extension + BulkExport component
+  - ✅ Sync PPM → PrestaShop (products, categories, bez zdjęć)
+  - ✅ Queue jobs infrastructure (9 jobs)
+  - ✅ Logging system (sync_logs table)
+
+- ✅ **FAZA 2 COMPLETED** (2025-10-03):
+  - ✅ Dynamic category picker w ProductForm
+  - ✅ Reverse transformers (PrestaShop → PPM data)
+  - ✅ PrestaShopImportService implementation
+  - ✅ Category API endpoints
+
+- 🔄 **FAZA 3 IN PROGRESS** (75% - 2025-10-08):
+  - ✅ 3A: Import PrestaShop → PPM (BulkImportProducts job)
+  - 🔄 3B: Real-Time Progress tracking (75% - deployed, pending user test)
+  - ❌ 3C: Queue monitoring & optimization (not started)
+
+- ❌ **FAZA 4+ PLANNED** (future):
+  - ❌ Images sync
+  - ❌ Webhooks
+  - ❌ Advanced monitoring dashboard
 
 ### ETAP_08 - ERP Integracje ⏳ IN PROGRESS
 - 🛠️ `app/Services/ERP/`
@@ -364,10 +416,16 @@ App\Services\PrestaShop\ProductSync
 3. Po ukończeniu ETAP → zaktualizuj tę dokumentację
 4. Potwierdź zgodność z planem ETAP
 
-**OSTATNIA AKTUALIZACJA:** 2025-10-01 (ETAP_04 completed, ETAP_07 FAZA 1 in progress, ETAP_08 in progress)
+**OSTATNIA AKTUALIZACJA:** 2025-10-22
+- ✅ Dodano referencję do modułowej dokumentacji ARCHITEKTURA_PPM/ (21 modułów)
+- ✅ Zaktualizowano ETAP_06 → COMPLETED (Unified Import System w PRODUKTY)
+- ✅ Zaktualizowano ETAP_07 → FAZA 1+2 COMPLETED, FAZA 3 @ 75% (15 Services + 9 Jobs + 5 Livewire)
+- ✅ Dodano informację o Role-Based Dashboards (7 wersji)
+- ✅ Dodano szczegóły systemu CSV (6 serwisów + 9 route'ów)
+- ⚠️ **AKTUALNY STATUS:** ETAP_04 ✅, ETAP_05 ✅, ETAP_06 ✅, ETAP_07 @ 75% 🔄, ETAP_08 ⏳
 
 ---
 
 **AUTOR:** Claude Code System
 **PROJEKT:** PPM-CC-Laravel
-**WERSJA:** Enterprise 1.0
+**WERSJA:** Enterprise 1.1

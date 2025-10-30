@@ -2,7 +2,7 @@
     <!-- Header -->
     <div class="flex justify-between items-center mb-6">
         <div>
-            <h1 class="text-2xl font-bold text-gray-900">Ustawienia Systemowe</h1>
+            <h1 class="text-2xl font-bold text-white">Ustawienia Systemowe</h1>
             <p class="text-gray-600">Konfiguracja głównych parametrów aplikacji</p>
         </div>
         
@@ -52,13 +52,13 @@
 
     <!-- Loading overlay -->
     <div wire:loading.flex wire:target="loadSettings" class="fixed inset-0 z-50 bg-gray-500 bg-opacity-75 items-center justify-center">
-        <div class="bg-white p-6 rounded-lg shadow-lg">
+        <div class="bg-gray-800 p-6 rounded-lg shadow-lg">
             <i class="fas fa-spinner fa-spin text-2xl text-blue-600 mb-2"></i>
             <p class="text-gray-700">Ładowanie ustawień...</p>
         </div>
     </div>
 
-    <div class="bg-white shadow-sm rounded-lg">
+    <div class="bg-gray-800 shadow-sm rounded-lg">
         <div class="flex border-b border-gray-200">
             <!-- Category tabs -->
             <nav class="flex flex-col w-64 space-y-1 p-4 bg-gray-50 rounded-l-lg">

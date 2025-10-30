@@ -5,12 +5,17 @@
 @php
     // Ensure category data exists
     $categoryId = $category['prestashop_id'] ?? 0;
+    $ppmId = $category['ppm_id'] ?? null; // PPM ID for manual categories
+    $isManual = $category['is_manual'] ?? false; // Flag for manual (non-PrestaShop) categories
     $categoryName = $category['name'] ?? 'Unknown';
     $levelDepth = $category['level_depth'] ?? 0;
     $isActive = $category['active'] ?? $category['is_active'] ?? true;
     $idParent = $category['id_parent'] ?? 0;
     $children = $category['children'] ?? [];
     $existsInPpm = $category['exists_in_ppm'] ?? false;
+
+    // Unique ID for scroll target (use ppm_id for manual, prestashop_id for imports)
+    $uniqueId = $isManual && $ppmId ? "category-ppm-{$ppmId}" : "category-ps-{$categoryId}";
 
     // Visual indentation based on level (24px per level)
     $paddingLeft = $level * 24;
@@ -33,7 +38,7 @@
     }
 @endphp
 
-<div class="category-tree-item-compact">
+<div class="category-tree-item-compact" id="{{ $uniqueId }}" data-category-id="{{ $categoryId }}" data-ppm-id="{{ $ppmId ?? '' }}" data-is-manual="{{ $isManual ? '1' : '0' }}">
     <div class="flex items-center gap-2 py-1.5 px-2 rounded-lg hover:bg-gray-700/30 transition-colors duration-150 {{ $disabled ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer' }} group">
         <!-- Visual Hierarchy Indicators (horizontal bars like in Categories panel) -->
         @if($level > 0)
@@ -47,11 +52,15 @@
         <!-- Checkbox -->
         <label class="flex items-center gap-2 flex-1 cursor-pointer">
         <!-- Checkbox - CRITICAL FIX: wire:model doesn't work in nested components, use Alpine.js + Livewire -->
+        {{-- Use ppm_id for manual categories, prestashop_id for imports --}}
+        @php
+            $checkboxId = $isManual && $ppmId ? $ppmId : $categoryId;
+        @endphp
         <input type="checkbox"
                x-data
-               @click="$wire.toggleCategory({{ $categoryId }})"
+               @click="$wire.toggleCategory({{ $checkboxId }})"
                {{ $disabled ? 'disabled' : '' }}
-               @checked(in_array($categoryId, $this->selectedCategoryIds))
+               @checked(in_array($checkboxId, $this->selectedCategoryIds))
                class="w-4 h-4 rounded border-gray-600 text-brand-600 focus:ring-brand-500 focus:ring-offset-gray-900 flex-shrink-0 {{ $disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer' }}"
                style="accent-color: #e0ac7e;">
 

@@ -11,7 +11,7 @@
                          alt="{{ $user->full_name }}">
                 @else
                     <div class="h-16 w-16 rounded-full bg-gray-300 dark:bg-gray-600 flex items-center justify-center">
-                        <span class="text-xl font-medium text-gray-700 dark:text-gray-300">
+                        <span class="text-xl font-medium text-gray-300">
                             {{ $user->initials }}
                         </span>
                     </div>
@@ -19,7 +19,7 @@
             </div>
             
             <div>
-                <h1 class="text-3xl font-bold text-gray-900 dark:text-white">
+                <h1 class="text-3xl font-bold text-white">
                     {{ $user->full_name }}
                 </h1>
                 <div class="flex items-center space-x-3 mt-1">
@@ -67,7 +67,7 @@
             <div class="flex space-x-2">
                 @can('update', $user)
                     <button wire:click="toggleUserStatus"
-                            class="inline-flex items-center px-3 py-2 border border-gray-300 dark:border-gray-600 shadow-sm text-sm font-medium rounded-md text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600">
+                            class="inline-flex items-center px-3 py-2 border border-gray-600 shadow-sm text-sm font-medium rounded-md text-gray-300 bg-gray-700 hover:bg-gray-600">
                         @if($user->is_active)
                             <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728L5.636 5.636m12.728 12.728L18.364 5.636M5.636 18.364l12.728-12.728"></path>
@@ -82,7 +82,7 @@
                     </button>
                     
                     <button wire:click="openPasswordResetModal"
-                            class="inline-flex items-center px-3 py-2 border border-gray-300 dark:border-gray-600 shadow-sm text-sm font-medium rounded-md text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600">
+                            class="inline-flex items-center px-3 py-2 border border-gray-600 shadow-sm text-sm font-medium rounded-md text-gray-300 bg-gray-700 hover:bg-gray-600">
                         <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
                         </svg>
@@ -114,7 +114,7 @@
                 </a>
                 
                 <a href="{{ route('admin.users.index') }}" 
-                   class="inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600">
+                   class="inline-flex items-center px-4 py-2 border border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-300 bg-gray-700 hover:bg-gray-600">
                     <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
                     </svg>
@@ -129,9 +129,9 @@
         {{-- Left Column - User Information --}}
         <div class="lg:col-span-1 space-y-6">
             {{-- Basic Information Card --}}
-            <div class="bg-white dark:bg-gray-800 shadow-sm rounded-lg border border-gray-200 dark:border-gray-700">
-                <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-                    <h3 class="text-lg font-medium text-gray-900 dark:text-white">
+            <div class="bg-gray-800 shadow-sm rounded-lg border border-gray-700">
+                <div class="px-6 py-4 border-b border-gray-700">
+                    <h3 class="text-lg font-medium text-white">
                         Informacje podstawowe
                     </h3>
                 </div>
@@ -146,7 +146,7 @@
                                 <div class="flex items-center space-x-2">
                                     <input type="text" 
                                            wire:model="editData.first_name" 
-                                           class="flex-1 text-sm rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50 dark:bg-gray-700 dark:text-white">
+                                           class="flex-1 text-sm rounded-md border-gray-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50 dark:bg-gray-700 dark:text-white">
                                     <button wire:click="saveEdit('first_name')" 
                                             class="text-green-600 hover:text-green-500">
                                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -162,7 +162,7 @@
                                 </div>
                             @else
                                 <div class="flex items-center justify-between">
-                                    <span class="text-sm text-gray-900 dark:text-white">{{ $user->first_name }}</span>
+                                    <span class="text-sm text-white">{{ $user->first_name }}</span>
                                     @can('update', $user)
                                         <button wire:click="startEdit('first_name')" 
                                                 class="text-blue-600 hover:text-blue-500">
@@ -186,7 +186,7 @@
                                 <div class="flex items-center space-x-2">
                                     <input type="text" 
                                            wire:model="editData.last_name" 
-                                           class="flex-1 text-sm rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50 dark:bg-gray-700 dark:text-white">
+                                           class="flex-1 text-sm rounded-md border-gray-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50 dark:bg-gray-700 dark:text-white">
                                     <button wire:click="saveEdit('last_name')" 
                                             class="text-green-600 hover:text-green-500">
                                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -202,7 +202,7 @@
                                 </div>
                             @else
                                 <div class="flex items-center justify-between">
-                                    <span class="text-sm text-gray-900 dark:text-white">{{ $user->last_name }}</span>
+                                    <span class="text-sm text-white">{{ $user->last_name }}</span>
                                     @can('update', $user)
                                         <button wire:click="startEdit('last_name')" 
                                                 class="text-blue-600 hover:text-blue-500">
@@ -226,7 +226,7 @@
                                 <div class="flex items-center space-x-2">
                                     <input type="tel" 
                                            wire:model="editData.phone" 
-                                           class="flex-1 text-sm rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50 dark:bg-gray-700 dark:text-white">
+                                           class="flex-1 text-sm rounded-md border-gray-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50 dark:bg-gray-700 dark:text-white">
                                     <button wire:click="saveEdit('phone')" 
                                             class="text-green-600 hover:text-green-500">
                                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -242,7 +242,7 @@
                                 </div>
                             @else
                                 <div class="flex items-center justify-between">
-                                    <span class="text-sm text-gray-900 dark:text-white">{{ $user->phone ?: '-' }}</span>
+                                    <span class="text-sm text-white">{{ $user->phone ?: '-' }}</span>
                                     @can('update', $user)
                                         <button wire:click="startEdit('phone')" 
                                                 class="text-blue-600 hover:text-blue-500">
@@ -266,7 +266,7 @@
                                 <div class="flex items-center space-x-2">
                                     <input type="text" 
                                            wire:model="editData.company" 
-                                           class="flex-1 text-sm rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50 dark:bg-gray-700 dark:text-white">
+                                           class="flex-1 text-sm rounded-md border-gray-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50 dark:bg-gray-700 dark:text-white">
                                     <button wire:click="saveEdit('company')" 
                                             class="text-green-600 hover:text-green-500">
                                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -282,7 +282,7 @@
                                 </div>
                             @else
                                 <div class="flex items-center justify-between">
-                                    <span class="text-sm text-gray-900 dark:text-white">{{ $user->company ?: '-' }}</span>
+                                    <span class="text-sm text-white">{{ $user->company ?: '-' }}</span>
                                     @can('update', $user)
                                         <button wire:click="startEdit('company')" 
                                                 class="text-blue-600 hover:text-blue-500">
@@ -306,7 +306,7 @@
                                 <div class="flex items-center space-x-2">
                                     <input type="text" 
                                            wire:model="editData.position" 
-                                           class="flex-1 text-sm rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50 dark:bg-gray-700 dark:text-white">
+                                           class="flex-1 text-sm rounded-md border-gray-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50 dark:bg-gray-700 dark:text-white">
                                     <button wire:click="saveEdit('position')" 
                                             class="text-green-600 hover:text-green-500">
                                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -322,7 +322,7 @@
                                 </div>
                             @else
                                 <div class="flex items-center justify-between">
-                                    <span class="text-sm text-gray-900 dark:text-white">{{ $user->position ?: '-' }}</span>
+                                    <span class="text-sm text-white">{{ $user->position ?: '-' }}</span>
                                     @can('update', $user)
                                         <button wire:click="startEdit('position')" 
                                                 class="text-blue-600 hover:text-blue-500">
@@ -339,9 +339,9 @@
             </div>
 
             {{-- Account Information Card --}}
-            <div class="bg-white dark:bg-gray-800 shadow-sm rounded-lg border border-gray-200 dark:border-gray-700">
-                <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-                    <h3 class="text-lg font-medium text-gray-900 dark:text-white">
+            <div class="bg-gray-800 shadow-sm rounded-lg border border-gray-700">
+                <div class="px-6 py-4 border-b border-gray-700">
+                    <h3 class="text-lg font-medium text-white">
                         Informacje o koncie
                     </h3>
                 </div>
@@ -351,7 +351,7 @@
                             Email zweryfikowany
                         </span>
                         <div class="flex items-center space-x-2">
-                            <span class="text-sm text-gray-900 dark:text-white">
+                            <span class="text-sm text-white">
                                 {{ $user->email_verified_at ? 'Tak' : 'Nie' }}
                             </span>
                             @can('update', $user)
@@ -367,7 +367,7 @@
                         <span class="text-sm font-medium text-gray-500 dark:text-gray-400">
                             Data rejestracji
                         </span>
-                        <span class="text-sm text-gray-900 dark:text-white">
+                        <span class="text-sm text-white">
                             {{ $user->created_at->format('d.m.Y H:i') }}
                         </span>
                     </div>
@@ -376,7 +376,7 @@
                         <span class="text-sm font-medium text-gray-500 dark:text-gray-400">
                             Ostatnie logowanie
                         </span>
-                        <span class="text-sm text-gray-900 dark:text-white">
+                        <span class="text-sm text-white">
                             @if($user->last_login_at)
                                 {{ $user->last_login_at->format('d.m.Y H:i') }}
                                 <div class="text-xs text-gray-500">
@@ -392,7 +392,7 @@
                         <span class="text-sm font-medium text-gray-500 dark:text-gray-400">
                             Język interfejsu
                         </span>
-                        <span class="text-sm text-gray-900 dark:text-white">
+                        <span class="text-sm text-white">
                             {{ $user->preferred_language === 'pl' ? 'Polski' : 'English' }}
                         </span>
                     </div>
@@ -401,7 +401,7 @@
                         <span class="text-sm font-medium text-gray-500 dark:text-gray-400">
                             Strefa czasowa
                         </span>
-                        <span class="text-sm text-gray-900 dark:text-white">
+                        <span class="text-sm text-white">
                             {{ $user->timezone ?: 'Europe/Warsaw' }}
                         </span>
                     </div>
@@ -409,9 +409,9 @@
             </div>
 
             {{-- Statistics Card --}}
-            <div class="bg-white dark:bg-gray-800 shadow-sm rounded-lg border border-gray-200 dark:border-gray-700">
-                <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-                    <h3 class="text-lg font-medium text-gray-900 dark:text-white">
+            <div class="bg-gray-800 shadow-sm rounded-lg border border-gray-700">
+                <div class="px-6 py-4 border-b border-gray-700">
+                    <h3 class="text-lg font-medium text-white">
                         Statystyki
                     </h3>
                 </div>
@@ -421,7 +421,7 @@
                             <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">
                                 Łącznie logowań
                             </dt>
-                            <dd class="text-sm text-gray-900 dark:text-white">
+                            <dd class="text-sm text-white">
                                 {{ $userStats['total_logins'] }}
                             </dd>
                         </div>
@@ -429,7 +429,7 @@
                             <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">
                                 Dni od rejestracji
                             </dt>
-                            <dd class="text-sm text-gray-900 dark:text-white">
+                            <dd class="text-sm text-white">
                                 {{ $userStats['account_age_days'] }}
                             </dd>
                         </div>
@@ -437,7 +437,7 @@
                             <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">
                                 Aktywne sesje
                             </dt>
-                            <dd class="text-sm text-gray-900 dark:text-white">
+                            <dd class="text-sm text-white">
                                 {{ $userStats['active_sessions'] }}
                             </dd>
                         </div>
@@ -445,7 +445,7 @@
                             <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">
                                 Wszystkich uprawnień
                             </dt>
-                            <dd class="text-sm text-gray-900 dark:text-white">
+                            <dd class="text-sm text-white">
                                 {{ $userStats['total_permissions'] }}
                             </dd>
                         </div>
@@ -457,10 +457,10 @@
         {{-- Right Column - Roles, Permissions, Activity --}}
         <div class="lg:col-span-2 space-y-6">
             {{-- Roles and Permissions Card --}}
-            <div class="bg-white dark:bg-gray-800 shadow-sm rounded-lg border border-gray-200 dark:border-gray-700">
-                <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+            <div class="bg-gray-800 shadow-sm rounded-lg border border-gray-700">
+                <div class="px-6 py-4 border-b border-gray-700">
                     <div class="flex items-center justify-between">
-                        <h3 class="text-lg font-medium text-gray-900 dark:text-white">
+                        <h3 class="text-lg font-medium text-white">
                             Role i uprawnienia
                         </h3>
                         <div class="flex items-center space-x-2">
@@ -482,7 +482,7 @@
                 <div class="px-6 py-4">
                     {{-- User Roles --}}
                     <div class="mb-6">
-                        <h4 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+                        <h4 class="text-sm font-medium text-gray-300 mb-3">
                             Przypisane role ({{ $user->roles->count() }})
                         </h4>
                         <div class="flex flex-wrap gap-2">
@@ -506,7 +506,7 @@
                     {{-- Direct Permissions --}}
                     @if(!empty($directPermissions))
                         <div class="mb-6">
-                            <h4 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+                            <h4 class="text-sm font-medium text-gray-300 mb-3">
                                 Dodatkowe uprawnienia ({{ count($directPermissions) }})
                             </h4>
                             <div class="flex flex-wrap gap-2">
@@ -522,7 +522,7 @@
                     {{-- All Permissions (when expanded) --}}
                     @if($showAllPermissions)
                         <div>
-                            <h4 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+                            <h4 class="text-sm font-medium text-gray-300 mb-3">
                                 Wszystkie uprawnienia użytkownika ({{ count($allUserPermissions) }})
                             </h4>
                             
@@ -531,7 +531,7 @@
                                 <div class="space-y-4">
                                     @foreach($permissionsByModule as $module => $modulePermissions)
                                         <div class="border border-gray-200 dark:border-gray-600 rounded-lg p-4">
-                                            <h5 class="text-sm font-medium text-gray-900 dark:text-white mb-2 capitalize">
+                                            <h5 class="text-sm font-medium text-white mb-2 capitalize">
                                                 {{ $module }}
                                             </h5>
                                             <div class="flex flex-wrap gap-1">
@@ -553,7 +553,7 @@
                                 <div class="space-y-4">
                                     @foreach($rolePermissions as $roleName => $permissions)
                                         <div class="border border-gray-200 dark:border-gray-600 rounded-lg p-4">
-                                            <h5 class="text-sm font-medium text-gray-900 dark:text-white mb-2 role-{{ strtolower($roleName) }}" 
+                                            <h5 class="text-sm font-medium text-white mb-2 role-{{ strtolower($roleName) }}" 
                                                 style="color: var(--role-color)">
                                                 {{ $roleName }} ({{ count($permissions) }} uprawnień)
                                             </h5>
@@ -569,7 +569,7 @@
                                     
                                     @if(!empty($directPermissions))
                                         <div class="border border-gray-200 dark:border-gray-600 rounded-lg p-4">
-                                            <h5 class="text-sm font-medium text-gray-900 dark:text-white mb-2">
+                                            <h5 class="text-sm font-medium text-white mb-2">
                                                 Dodatkowe uprawnienia ({{ count($directPermissions) }})
                                             </h5>
                                             <div class="flex flex-wrap gap-1">
@@ -589,21 +589,21 @@
             </div>
 
             {{-- Activity Timeline Card --}}
-            <div class="bg-white dark:bg-gray-800 shadow-sm rounded-lg border border-gray-200 dark:border-gray-700">
-                <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+            <div class="bg-gray-800 shadow-sm rounded-lg border border-gray-700">
+                <div class="px-6 py-4 border-b border-gray-700">
                     <div class="flex items-center justify-between">
-                        <h3 class="text-lg font-medium text-gray-900 dark:text-white">
+                        <h3 class="text-lg font-medium text-white">
                             Historia aktywności
                         </h3>
                         <div class="flex items-center space-x-2">
                             <select wire:model="activityDays" wire:change="updateActivityFilter($event.target.value, activityType)"
-                                    class="text-sm rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50 dark:bg-gray-700 dark:text-white">
+                                    class="text-sm rounded-md border-gray-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50 dark:bg-gray-700 dark:text-white">
                                 <option value="7">Ostatnie 7 dni</option>
                                 <option value="30">Ostatnie 30 dni</option>
                                 <option value="90">Ostatnie 90 dni</option>
                             </select>
                             <select wire:model="activityType" wire:change="updateActivityFilter(activityDays, $event.target.value)"
-                                    class="text-sm rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50 dark:bg-gray-700 dark:text-white">
+                                    class="text-sm rounded-md border-gray-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50 dark:bg-gray-700 dark:text-white">
                                 <option value="all">Wszystkie</option>
                                 <option value="login">Logowania</option>
                                 <option value="update">Aktualizacje</option>
@@ -643,7 +643,7 @@
                                                 </div>
                                                 <div class="min-w-0 flex-1 pt-1.5 flex justify-between space-x-4">
                                                     <div>
-                                                        <p class="text-sm text-gray-900 dark:text-white">
+                                                        <p class="text-sm text-white">
                                                             {{ $activity['description'] }}
                                                         </p>
                                                         <p class="text-xs text-gray-500 dark:text-gray-400">
@@ -667,7 +667,7 @@
                             <svg class="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48">
                                 <path d="M34 40h10v-4a6 6 0 00-10.712-3.714M34 40H14m20 0v-4a9.971 9.971 0 00-.712-3.714M14 40H4v-4a6 6 0 0110.713-3.714M14 40v-4c0-1.313.253-2.566.713-3.714m0 0A10.003 10.003 0 0124 26c4.21 0 7.813 2.602 9.288 6.286M30 14a6 6 0 11-12 0 6 6 0 0112 0zm12 6a4 4 0 11-8 0 4 4 0 018 0zm-28 0a4 4 0 11-8 0 4 4 0 018 0z" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
                             </svg>
-                            <h3 class="mt-2 text-sm font-medium text-gray-900 dark:text-white">Brak aktywności</h3>
+                            <h3 class="mt-2 text-sm font-medium text-white">Brak aktywności</h3>
                             <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
                                 Brak aktywności w wybranym okresie.
                             </p>
@@ -677,9 +677,9 @@
             </div>
 
             {{-- Login History Card --}}
-            <div class="bg-white dark:bg-gray-800 shadow-sm rounded-lg border border-gray-200 dark:border-gray-700">
-                <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-                    <h3 class="text-lg font-medium text-gray-900 dark:text-white">
+            <div class="bg-gray-800 shadow-sm rounded-lg border border-gray-700">
+                <div class="px-6 py-4 border-b border-gray-700">
+                    <h3 class="text-lg font-medium text-white">
                         Historia logowań
                     </h3>
                 </div>
@@ -701,7 +701,7 @@
                                             @endif
                                         </div>
                                         <div>
-                                            <div class="text-sm font-medium text-gray-900 dark:text-white flex items-center">
+                                            <div class="text-sm font-medium text-white flex items-center">
                                                 {{ $login['browser'] }}
                                                 @if($login['is_current'])
                                                     <span class="ml-2 inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-green-100 text-green-800">
@@ -730,7 +730,7 @@
                             <svg class="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48">
                                 <path d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
                             </svg>
-                            <h3 class="mt-2 text-sm font-medium text-gray-900 dark:text-white">Brak historii logowań</h3>
+                            <h3 class="mt-2 text-sm font-medium text-white">Brak historii logowań</h3>
                             <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
                                 Użytkownik nie logował się jeszcze do systemu.
                             </p>
@@ -747,7 +747,7 @@
             <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
                 <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" wire:click="closePasswordModal"></div>
 
-                <div class="inline-block align-bottom bg-white dark:bg-gray-800 rounded-lg px-4 pt-5 pb-4 text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full sm:p-6">
+                <div class="inline-block align-bottom bg-gray-800 rounded-lg px-4 pt-5 pb-4 text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full sm:p-6">
                     <div>
                         <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100 dark:bg-red-900">
                             <svg class="h-6 w-6 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -755,7 +755,7 @@
                             </svg>
                         </div>
                         <div class="mt-3 text-center sm:mt-5">
-                            <h3 class="text-lg leading-6 font-medium text-gray-900 dark:text-white" id="modal-title">
+                            <h3 class="text-lg leading-6 font-medium text-white" id="modal-title">
                                 Reset hasła użytkownika
                             </h3>
                             <div class="mt-2">
@@ -772,10 +772,10 @@
                                 <input type="password" 
                                        wire:model="newPassword" 
                                        placeholder="Nowe hasło"
-                                       class="flex-1 rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50 dark:bg-gray-700 dark:text-white">
+                                       class="flex-1 rounded-md border-gray-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50 dark:bg-gray-700 dark:text-white">
                                 <button type="button" 
                                         wire:click="generatePassword"
-                                        class="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600">
+                                        class="px-3 py-2 border border-gray-600 rounded-md text-sm font-medium text-gray-300 bg-gray-700 hover:bg-gray-600">
                                     Generuj
                                 </button>
                             </div>
@@ -790,7 +790,7 @@
                             </button>
                             <button wire:click="closePasswordModal" 
                                     type="button" 
-                                    class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 dark:border-gray-600 shadow-sm px-4 py-2 bg-white dark:bg-gray-700 text-base font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:mt-0 sm:col-start-1 sm:text-sm">
+                                    class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-600 shadow-sm px-4 py-2 bg-gray-700 text-base font-medium text-gray-300 hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:mt-0 sm:col-start-1 sm:text-sm">
                                 Anuluj
                             </button>
                         </div>
@@ -830,9 +830,9 @@
 
     {{-- Loading State --}}
     <div wire:loading class="fixed inset-0 z-40 bg-black bg-opacity-25 flex items-center justify-center">
-        <div class="bg-white dark:bg-gray-800 rounded-lg p-6 flex items-center space-x-3">
+        <div class="bg-gray-800 rounded-lg p-6 flex items-center space-x-3">
             <div class="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
-            <span class="text-gray-900 dark:text-white">Ładowanie...</span>
+            <span class="text-white">Ładowanie...</span>
         </div>
     </div>
 </div>

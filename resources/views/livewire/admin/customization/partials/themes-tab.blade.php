@@ -1,8 +1,8 @@
 <div class="p-6">
     <div class="flex justify-between items-center mb-6">
         <div>
-            <h3 class="text-lg font-medium text-gray-900 dark:text-white">Zarządzanie Motywami</h3>
-            <p class="text-sm text-gray-600 dark:text-gray-400">Twórz, importuj i zarządzaj motywami panelu admin</p>
+            <h3 class="text-lg font-medium text-white">Zarządzanie Motywami</h3>
+            <p class="text-sm text-gray-400">Twórz, importuj i zarządzaj motywami panelu admin</p>
         </div>
         
         <div class="flex space-x-2">
@@ -63,9 +63,9 @@
 
     <!-- Theme Creation Form -->
     @if($isCreatingNew)
-        <div class="bg-white dark:bg-gray-800 rounded-lg border shadow-sm p-6 mb-8">
+        <div class="bg-gray-800 rounded-lg border shadow-sm p-6 mb-8">
             <div class="flex justify-between items-center mb-6">
-                <h4 class="text-md font-medium text-gray-900 dark:text-white">Tworzenie Nowego Motywu</h4>
+                <h4 class="text-md font-medium text-white">Tworzenie Nowego Motywu</h4>
                 <button wire:click="$set('isCreatingNew', false)" class="text-gray-500 hover:text-gray-700">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
@@ -76,7 +76,7 @@
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div class="space-y-4">
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        <label class="block text-sm font-medium text-gray-300 mb-2">
                             Nazwa motywu
                         </label>
                         <input type="text" 
@@ -87,7 +87,7 @@
                     
                     <div class="grid grid-cols-3 gap-3">
                         <div>
-                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            <label class="block text-sm font-medium text-gray-300 mb-2">
                                 Kolor podstawowy
                             </label>
                             <input type="color" 
@@ -95,7 +95,7 @@
                                    class="w-full h-10 border border-gray-300 rounded cursor-pointer">
                         </div>
                         <div>
-                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            <label class="block text-sm font-medium text-gray-300 mb-2">
                                 Kolor drugorzędny
                             </label>
                             <input type="color" 
@@ -103,7 +103,7 @@
                                    class="w-full h-10 border border-gray-300 rounded cursor-pointer">
                         </div>
                         <div>
-                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            <label class="block text-sm font-medium text-gray-300 mb-2">
                                 Kolor akcentu
                             </label>
                             <input type="color" 
@@ -115,7 +115,7 @@
                 
                 <div class="space-y-4">
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        <label class="block text-sm font-medium text-gray-300 mb-2">
                             Gęstość layoutu
                         </label>
                         <select wire:model="layoutDensity" 
@@ -128,7 +128,7 @@
                     
                     <div class="grid grid-cols-2 gap-3">
                         <div>
-                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            <label class="block text-sm font-medium text-gray-300 mb-2">
                                 Pozycja sidebar
                             </label>
                             <select wire:model="sidebarPosition" 
@@ -138,7 +138,7 @@
                             </select>
                         </div>
                         <div>
-                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            <label class="block text-sm font-medium text-gray-300 mb-2">
                                 Styl header
                             </label>
                             <select wire:model="headerStyle" 
@@ -168,12 +168,12 @@
 
     <!-- Available Themes Grid -->
     <div class="space-y-6">
-        <h4 class="text-md font-medium text-gray-900 dark:text-white">Dostępne Motywy</h4>
+        <h4 class="text-md font-medium text-white">Dostępne Motywy</h4>
         
         @if(!empty($availableThemes))
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 @foreach($availableThemes as $theme)
-                    <div class="bg-white dark:bg-gray-800 rounded-lg border hover:border-blue-400 transition-colors overflow-hidden
+                    <div class="bg-gray-800 rounded-lg border hover:border-blue-400 transition-colors overflow-hidden
                                {{ $currentTheme && $currentTheme->id === $theme['id'] ? 'ring-2 ring-blue-500' : '' }}">
                         
                         <!-- Theme Preview -->
@@ -183,13 +183,13 @@
                             <!-- Mock Interface -->
                             <div class="flex h-full">
                                 <!-- Sidebar -->
-                                <div class="w-8 bg-white bg-opacity-20 rounded mr-2 {{ $theme['sidebar_position'] === 'right' ? 'order-2 ml-2 mr-0' : '' }}"></div>
+                                <div class="w-8 bg-gray-800 bg-opacity-20 rounded mr-2 {{ $theme['sidebar_position'] === 'right' ? 'order-2 ml-2 mr-0' : '' }}"></div>
                                 
                                 <!-- Content Area -->
-                                <div class="flex-1 bg-white bg-opacity-10 rounded p-2 space-y-1">
-                                    <div class="h-2 bg-white bg-opacity-30 rounded w-3/4"></div>
-                                    <div class="h-2 bg-white bg-opacity-20 rounded w-1/2"></div>
-                                    <div class="h-2 bg-white bg-opacity-20 rounded w-2/3"></div>
+                                <div class="flex-1 bg-gray-800 bg-opacity-10 rounded p-2 space-y-1">
+                                    <div class="h-2 bg-gray-800 bg-opacity-30 rounded w-3/4"></div>
+                                    <div class="h-2 bg-gray-800 bg-opacity-20 rounded w-1/2"></div>
+                                    <div class="h-2 bg-gray-800 bg-opacity-20 rounded w-2/3"></div>
                                 </div>
                             </div>
                             
@@ -205,10 +205,10 @@
                         <div class="p-4">
                             <div class="flex justify-between items-start mb-3">
                                 <div>
-                                    <h5 class="font-medium text-gray-900 dark:text-white">
+                                    <h5 class="font-medium text-white">
                                         {{ $theme['theme_name'] }}
                                     </h5>
-                                    <p class="text-sm text-gray-600 dark:text-gray-400">
+                                    <p class="text-sm text-gray-400">
                                         @if($theme['user_id'] === auth()->id())
                                             Twój motyw
                                         @elseif($theme['is_default'])
@@ -306,10 +306,10 @@
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zM21 5a2 2 0 00-2-2h-4a2 2 0 00-2 2v12a4 4 0 004 4h4a2 2 0 002-2V5z"></path>
                     </svg>
                 </div>
-                <h3 class="text-lg font-medium text-gray-900 dark:text-white mb-2">
+                <h3 class="text-lg font-medium text-white mb-2">
                     Brak dostępnych motywów
                 </h3>
-                <p class="text-gray-600 dark:text-gray-400 mb-6">
+                <p class="text-gray-400 mb-6">
                     Utwórz swój pierwszy niestandardowy motyw lub zaimportuj istniejący.
                 </p>
                 <button wire:click="$set('isCreatingNew', true)" class="btn btn-primary">
@@ -321,7 +321,7 @@
 
     <!-- Import/Export Section -->
     <div class="mt-8 pt-8 border-t border-gray-200 dark:border-gray-600">
-        <h4 class="text-md font-medium text-gray-900 dark:text-white mb-6">Import i Eksport</h4>
+        <h4 class="text-md font-medium text-white mb-6">Import i Eksport</h4>
         
         <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
             <!-- Import Theme -->
@@ -333,8 +333,8 @@
                         </svg>
                     </div>
                     <div>
-                        <h5 class="font-medium text-gray-900 dark:text-white">Import Motywu</h5>
-                        <p class="text-sm text-gray-600 dark:text-gray-400">Wczytaj motyw z pliku JSON</p>
+                        <h5 class="font-medium text-white">Import Motywu</h5>
+                        <p class="text-sm text-gray-400">Wczytaj motyw z pliku JSON</p>
                     </div>
                 </div>
                 
@@ -381,15 +381,15 @@
                         </svg>
                     </div>
                     <div>
-                        <h5 class="font-medium text-gray-900 dark:text-white">Eksport Motywu</h5>
-                        <p class="text-sm text-gray-600 dark:text-gray-400">Pobierz aktualny motyw jako plik JSON</p>
+                        <h5 class="font-medium text-white">Eksport Motywu</h5>
+                        <p class="text-sm text-gray-400">Pobierz aktualny motyw jako plik JSON</p>
                     </div>
                 </div>
                 
                 <div class="space-y-4">
                     @if($currentTheme)
-                        <div class="bg-white dark:bg-gray-600 rounded p-3 text-sm">
-                            <div class="font-medium text-gray-900 dark:text-white mb-1">
+                        <div class="bg-gray-800 dark:bg-gray-600 rounded p-3 text-sm">
+                            <div class="font-medium text-white mb-1">
                                 {{ $currentTheme->theme_name }}
                             </div>
                             <div class="text-gray-600 dark:text-gray-300">
@@ -424,7 +424,7 @@
     <div class="mt-8 pt-8 border-t border-gray-200 dark:border-gray-600">
         <div x-data="{ showSharing: false }">
             <button @click="showSharing = !showSharing" 
-                    class="flex items-center text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-gray-900">
+                    class="flex items-center text-sm font-medium text-gray-300 hover:text-white">
                 <svg class="w-4 h-4 mr-2 transform transition-transform" 
                      :class="{ 'rotate-90': showSharing }" 
                      fill="none" stroke="currentColor" viewBox="0 0 24 24">

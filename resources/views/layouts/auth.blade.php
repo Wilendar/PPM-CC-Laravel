@@ -17,31 +17,13 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    
-    {{-- Tailwind CSS --}}
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        tailwind.config = {
-            darkMode: 'class',
-            theme: {
-                extend: {
-                    fontFamily: {
-                        'sans': ['Inter', 'sans-serif'],
-                    },
-                    colors: {
-                        'ppm': {
-                            'primary': '#e0ac7e',
-                            'primary-dark': '#d1975a',
-                        }
-                    }
-                }
-            }
-        }
-    </script>
-    
-    {{-- Alpine.js --}}
-    <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
-    
+
+    {{-- Vite Assets (includes Tailwind CSS compiled + Alpine.js via Livewire) --}}
+    @vite([
+        'resources/css/app.css',
+        'resources/js/app.js'
+    ])
+
     @livewireStyles
     
     {{-- Additional head content --}}
@@ -106,7 +88,7 @@
     <div class="absolute top-4 right-4 z-20">
         <button 
             @click="darkMode = !darkMode" 
-            class="p-2 rounded-lg bg-white dark:bg-gray-800 shadow-md hover:shadow-lg transition-shadow duration-200"
+            class="p-2 rounded-lg bg-gray-800 shadow-md hover:shadow-lg transition-shadow duration-200"
             :class="darkMode ? 'text-yellow-400' : 'text-gray-600'"
             title="Przełącz motyw"
         >

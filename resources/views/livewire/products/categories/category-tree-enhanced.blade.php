@@ -3,7 +3,7 @@
 
     {{-- Enhanced Content Area --}}
     <div class="flex-1 overflow-hidden">
-        <div class="relative z-30 bg-white dark:bg-gray-800 shadow-lg rounded-2xl m-6 border border-gray-200 dark:border-gray-700 category-container">
+        <div class="relative z-30 bg-gray-800 shadow-lg rounded-2xl m-6 border border-gray-700 category-container">
 
             {{-- Modern Header Section --}}
             <div class="relative overflow-hidden">
@@ -49,13 +49,13 @@
                         {{-- Enhanced Action Controls --}}
                         <div class="flex flex-wrap items-center gap-4">
                             {{-- View Mode Toggle --}}
-                            <div class="relative bg-white dark:bg-gray-700 rounded-2xl p-2 shadow-lg border border-gray-200 dark:border-gray-600">
+                            <div class="relative bg-gray-700 rounded-2xl p-2 shadow-lg border border-gray-200 dark:border-gray-600">
                                 <div class="flex items-center space-x-1">
                                     <button wire:click="$set('viewMode', 'tree')"
                                             class="relative flex items-center px-6 py-3 rounded-xl text-sm font-semibold transition-all duration-300 transform
                                                    {{ $viewMode === 'tree'
                                                       ? 'bg-gradient-to-r from-blue-500 to-indigo-600 text-white shadow-lg scale-105 z-10'
-                                                      : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600 hover:scale-102' }}">
+                                                      : 'text-gray-600 dark:text-gray-300 hover:bg-gray-600 hover:scale-102' }}">
                                         <i class="fas fa-project-diagram mr-2 {{ $viewMode === 'tree' ? 'text-white' : 'text-blue-500' }}"></i>
                                         Drzewo
                                         @if($viewMode === 'tree')
@@ -66,7 +66,7 @@
                                             class="relative flex items-center px-6 py-3 rounded-xl text-sm font-semibold transition-all duration-300 transform
                                                    {{ $viewMode === 'flat'
                                                       ? 'bg-gradient-to-r from-blue-500 to-indigo-600 text-white shadow-lg scale-105 z-10'
-                                                      : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600 hover:scale-102' }}">
+                                                      : 'text-gray-600 dark:text-gray-300 hover:bg-gray-600 hover:scale-102' }}">
                                         <i class="fas fa-th-list mr-2 {{ $viewMode === 'flat' ? 'text-white' : 'text-purple-500' }}"></i>
                                         Lista
                                         @if($viewMode === 'flat')
@@ -80,8 +80,8 @@
                             @if($viewMode === 'tree')
                                 <div class="flex items-center space-x-3">
                                     <button wire:click="expandAll"
-                                            class="group flex items-center px-5 py-3 bg-white dark:bg-gray-700 border-2 border-gray-200 dark:border-gray-600
-                                                   rounded-2xl text-sm font-medium text-gray-700 dark:text-gray-300
+                                            class="group flex items-center px-5 py-3 bg-gray-700 border-2 border-gray-200 dark:border-gray-600
+                                                   rounded-2xl text-sm font-medium text-gray-300
                                                    hover:border-green-300 hover:bg-gradient-to-r hover:from-green-50 hover:to-emerald-50 hover:text-green-700
                                                    dark:hover:border-green-500 dark:hover:from-green-900/20 dark:hover:to-emerald-900/20 dark:hover:text-green-400
                                                    transition-all duration-300 shadow-md hover:shadow-lg transform hover:scale-105">
@@ -89,8 +89,8 @@
                                         Rozwiń
                                     </button>
                                     <button wire:click="collapseAll"
-                                            class="group flex items-center px-5 py-3 bg-white dark:bg-gray-700 border-2 border-gray-200 dark:border-gray-600
-                                                   rounded-2xl text-sm font-medium text-gray-700 dark:text-gray-300
+                                            class="group flex items-center px-5 py-3 bg-gray-700 border-2 border-gray-200 dark:border-gray-600
+                                                   rounded-2xl text-sm font-medium text-gray-300
                                                    hover:border-orange-300 hover:bg-gradient-to-r hover:from-orange-50 hover:to-amber-50 hover:text-orange-700
                                                    dark:hover:border-orange-500 dark:hover:from-orange-900/20 dark:hover:to-amber-900/20 dark:hover:text-orange-400
                                                    transition-all duration-300 shadow-md hover:shadow-lg transform hover:scale-105">
@@ -108,7 +108,7 @@
                                 <div class="absolute inset-0 bg-gradient-to-r from-blue-700 via-indigo-700 to-purple-700 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
                                 <i class="fas fa-plus mr-3 relative z-10 group-hover:rotate-90 transition-transform duration-300"></i>
                                 <span class="relative z-10">Dodaj kategorię</span>
-                                <div class="absolute inset-0 bg-white opacity-0 group-hover:opacity-20 transition-opacity duration-300"></div>
+                                <div class="absolute inset-0 bg-gray-800 opacity-0 group-hover:opacity-20 transition-opacity duration-300"></div>
                             </button>
                         </div>
                     </div>
@@ -116,11 +116,11 @@
             </div>
 
             {{-- Enhanced Filters Section --}}
-            <div class="px-8 py-6 bg-white/50 dark:bg-gray-800/50 border-b border-gray-200 dark:border-gray-700">
+            <div class="px-8 py-6 bg-gray-800/50 dark:bg-gray-800/50 border-b border-gray-700">
                 <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
                     {{-- Enhanced Search --}}
                     <div class="lg:col-span-1">
-                        <label class="block text-sm font-bold text-gray-700 dark:text-gray-200 mb-3 flex items-center">
+                        <label class="block text-sm font-bold text-gray-200 mb-3 flex items-center">
                             <div class="w-2 h-2 bg-blue-500 rounded-full mr-2"></div>
                             Wyszukaj kategorie
                         </label>
@@ -128,7 +128,7 @@
                             <input wire:model.debounce.300ms="search"
                                    type="text"
                                    class="w-full pl-12 pr-12 py-4 border-2 border-gray-200 dark:border-gray-600
-                                          rounded-2xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-lg
+                                          rounded-2xl bg-gray-700 text-white text-lg
                                           focus:ring-4 focus:ring-blue-500/30 focus:border-blue-500 transition-all duration-300
                                           group-hover:border-blue-300 placeholder-gray-400"
                                    placeholder="Wyszukaj po nazwie lub opisie...">
@@ -153,13 +153,13 @@
                     {{-- Status & Products Filters --}}
                     <div class="lg:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-6">
                         <div>
-                            <label class="block text-sm font-bold text-gray-700 dark:text-gray-200 mb-3 flex items-center">
+                            <label class="block text-sm font-bold text-gray-200 mb-3 flex items-center">
                                 <div class="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
                                 Status kategorii
                             </label>
                             <select wire:model="showActiveOnly"
                                     class="w-full px-4 py-4 border-2 border-gray-200 dark:border-gray-600 rounded-2xl
-                                           bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-lg
+                                           bg-gray-700 text-white text-lg
                                            focus:ring-4 focus:ring-blue-500/30 focus:border-blue-500 transition-all duration-300">
                                 <option value="0">🔍 Wszystkie kategorie</option>
                                 <option value="1">✅ Tylko aktywne</option>
@@ -167,13 +167,13 @@
                         </div>
 
                         <div>
-                            <label class="block text-sm font-bold text-gray-700 dark:text-gray-200 mb-3 flex items-center">
+                            <label class="block text-sm font-bold text-gray-200 mb-3 flex items-center">
                                 <div class="w-2 h-2 bg-purple-500 rounded-full mr-2"></div>
                                 Produkty w kategorii
                             </label>
                             <select wire:model="showWithProductsOnly"
                                     class="w-full px-4 py-4 border-2 border-gray-200 dark:border-gray-600 rounded-2xl
-                                           bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-lg
+                                           bg-gray-700 text-white text-lg
                                            focus:ring-4 focus:ring-blue-500/30 focus:border-blue-500 transition-all duration-300">
                                 <option value="0">📦 Wszystkie kategorie</option>
                                 <option value="1">📋 Tylko z produktami</option>
@@ -246,8 +246,8 @@
                                     </button>
                                     <div class="w-px h-6 bg-gray-300 dark:bg-gray-600"></div>
                                     <button wire:click="deselectAll"
-                                            class="group flex items-center px-4 py-2 text-sm font-semibold text-gray-600 dark:text-gray-400
-                                                   hover:bg-gray-100 dark:hover:bg-gray-700/30 rounded-xl transition-all duration-300 transform hover:scale-105">
+                                            class="group flex items-center px-4 py-2 text-sm font-semibold text-gray-400
+                                                   hover:bg-gray-700/30 rounded-xl transition-all duration-300 transform hover:scale-105">
                                         <i class="fas fa-square mr-2 group-hover:text-gray-800 transition-colors duration-300"></i>
                                         Odznacz wszystkie
                                     </button>
@@ -277,7 +277,7 @@
                                     <i class="fas fa-exclamation text-sm text-white"></i>
                                 </div>
                             </div>
-                            <h3 class="text-4xl font-bold text-gray-900 dark:text-white mb-4">
+                            <h3 class="text-4xl font-bold text-white mb-4">
                                 @if(!empty($search))
                                     Brak kategorii spełniających kryteria
                                 @else
@@ -310,16 +310,16 @@
                         <div class="overflow-hidden">
                             <div class="overflow-x-auto">
                                 <table class="w-full">
-                                    <thead class="bg-gradient-to-r from-gray-50 via-blue-50 to-indigo-50 dark:from-gray-700/50 dark:via-blue-900/20 dark:to-indigo-900/20">
+                                    <thead class="bg-gradient-to-r from-gray-700/50 via-blue-900/20 to-indigo-900/20">
                                         <tr>
                                             <th class="w-16 px-8 py-6">
                                                 <input type="checkbox"
                                                        x-model="selectAllFlat"
                                                        @change="toggleSelectAllFlat()"
-                                                       class="w-6 h-6 rounded-xl border-2 border-gray-300 dark:border-gray-600
+                                                       class="w-6 h-6 rounded-xl border-2 border-gray-600
                                                               text-blue-600 focus:ring-4 focus:ring-blue-500/30 transform hover:scale-110 transition-transform duration-200">
                                             </th>
-                                            <th class="px-8 py-6 text-left text-sm font-bold text-gray-700 dark:text-gray-200 uppercase tracking-wider">
+                                            <th class="px-8 py-6 text-left text-sm font-bold text-gray-200 uppercase tracking-wider">
                                                 <button wire:click="$set('sortField', 'name')" class="flex items-center hover:text-blue-600 transition-colors duration-300 group">
                                                     <i class="fas fa-tag mr-2 text-blue-500 group-hover:scale-110 transition-transform duration-300"></i>
                                                     Kategoria
@@ -328,13 +328,13 @@
                                                     @endif
                                                 </button>
                                             </th>
-                                            <th class="px-8 py-6 text-left text-sm font-bold text-gray-700 dark:text-gray-200 uppercase tracking-wider">
+                                            <th class="px-8 py-6 text-left text-sm font-bold text-gray-200 uppercase tracking-wider">
                                                 <div class="flex items-center">
                                                     <i class="fas fa-sitemap mr-2 text-purple-500"></i>
                                                     Hierarchia
                                                 </div>
                                             </th>
-                                            <th class="px-8 py-6 text-left text-sm font-bold text-gray-700 dark:text-gray-200 uppercase tracking-wider">
+                                            <th class="px-8 py-6 text-left text-sm font-bold text-gray-200 uppercase tracking-wider">
                                                 <button wire:click="$set('sortField', 'products_count')" class="flex items-center hover:text-blue-600 transition-colors duration-300 group">
                                                     <i class="fas fa-box mr-2 text-green-500 group-hover:scale-110 transition-transform duration-300"></i>
                                                     Produkty
@@ -343,13 +343,13 @@
                                                     @endif
                                                 </button>
                                             </th>
-                                            <th class="px-8 py-6 text-left text-sm font-bold text-gray-700 dark:text-gray-200 uppercase tracking-wider">
+                                            <th class="px-8 py-6 text-left text-sm font-bold text-gray-200 uppercase tracking-wider">
                                                 <div class="flex items-center">
                                                     <i class="fas fa-toggle-on mr-2 text-indigo-500"></i>
                                                     Status
                                                 </div>
                                             </th>
-                                            <th class="px-8 py-6 text-left text-sm font-bold text-gray-700 dark:text-gray-200 uppercase tracking-wider">
+                                            <th class="px-8 py-6 text-left text-sm font-bold text-gray-200 uppercase tracking-wider">
                                                 <div class="flex items-center">
                                                     <i class="fas fa-cog mr-2 text-gray-500"></i>
                                                     Akcje
@@ -366,7 +366,7 @@
                                                     <input type="checkbox"
                                                            wire:model="selectedCategories"
                                                            value="{{ $category->id }}"
-                                                           class="w-6 h-6 rounded-xl border-2 border-gray-300 dark:border-gray-600
+                                                           class="w-6 h-6 rounded-xl border-2 border-gray-600
                                                                   text-blue-600 focus:ring-4 focus:ring-blue-500/30 transform hover:scale-110 transition-transform duration-200">
                                                 </td>
                                                 <td class="px-8 py-8">
@@ -388,11 +388,11 @@
                                                             @endif
                                                         </div>
                                                         <div class="min-w-0 flex-1">
-                                                            <h4 class="text-xl font-bold text-gray-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors duration-300">
+                                                            <h4 class="text-xl font-bold text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors duration-300">
                                                                 {{ $category->name }}
                                                             </h4>
                                                             @if($category->description)
-                                                                <p class="text-sm text-gray-600 dark:text-gray-400 mt-2 max-w-md leading-relaxed">
+                                                                <p class="text-sm text-gray-400 mt-2 max-w-md leading-relaxed">
                                                                     {{ Str::limit($category->description, 80) }}
                                                                 </p>
                                                             @endif
@@ -403,7 +403,7 @@
                                                     <div class="flex items-center space-x-2">
                                                         @if($category->ancestors->count() > 0)
                                                             @foreach($category->ancestors as $index => $ancestor)
-                                                                <span class="inline-flex items-center px-3 py-1.5 bg-gray-100 dark:bg-gray-700 rounded-xl text-sm font-medium text-gray-700 dark:text-gray-300">
+                                                                <span class="inline-flex items-center px-3 py-1.5 bg-gray-100 dark:bg-gray-700 rounded-xl text-sm font-medium text-gray-300">
                                                                     {{ $ancestor->name }}
                                                                 </span>
                                                                 <i class="fas fa-chevron-right text-xs text-gray-400"></i>
@@ -422,7 +422,7 @@
                                                                 <i class="fas fa-box text-lg text-blue-600 dark:text-blue-400"></i>
                                                             </div>
                                                             <div>
-                                                                <span class="text-2xl font-bold text-gray-900 dark:text-white block">
+                                                                <span class="text-2xl font-bold text-white block">
                                                                     {{ $category->products_count ?? 0 }}
                                                                 </span>
                                                                 <span class="text-xs text-gray-500 dark:text-gray-400">produktów</span>
@@ -482,7 +482,7 @@
                                     <i class="fas fa-th-list text-8xl text-purple-500 dark:text-purple-400"></i>
                                 </div>
                             </div>
-                            <h3 class="text-4xl font-bold text-gray-900 dark:text-white mb-4">
+                            <h3 class="text-4xl font-bold text-white mb-4">
                                 Lista kategorii jest pusta
                             </h3>
                             <p class="text-gray-600 dark:text-gray-300 text-xl mb-10 max-w-2xl mx-auto leading-relaxed">
@@ -504,7 +504,7 @@
             {{-- Loading Indicator --}}
             <div wire:loading.class="flex" wire:loading.class.remove="hidden"
                  wire:target="search,showActiveOnly,showWithProductsOnly,viewMode"
-                 class="hidden absolute inset-0 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm z-50 flex items-center justify-center">
+                 class="hidden absolute inset-0 bg-gray-800/80 dark:bg-gray-800/80 backdrop-blur-sm z-50 flex items-center justify-center">
                 <div class="flex flex-col items-center space-y-4">
                     <div class="relative">
                         <div class="w-20 h-20 border-4 border-blue-200 dark:border-blue-800 rounded-full animate-spin">
@@ -515,7 +515,7 @@
                         </div>
                     </div>
                     <div class="text-center">
-                        <p class="text-xl font-semibold text-gray-700 dark:text-gray-300">Ładowanie kategorii...</p>
+                        <p class="text-xl font-semibold text-gray-300">Ładowanie kategorii...</p>
                         <p class="text-sm text-gray-500 dark:text-gray-400">Proszę czekać</p>
                     </div>
                 </div>

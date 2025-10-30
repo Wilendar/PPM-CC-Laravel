@@ -22,7 +22,7 @@
     {{-- Actions Button --}}
     <button @click="toggle()"
             x-ref="button"
-            class="inline-flex items-center px-3 py-1 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all duration-150"
+            class="inline-flex items-center px-3 py-1 border border-gray-600 rounded-md bg-gray-700 text-sm font-medium text-gray-300 hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all duration-150"
             :class="{ 'ring-2 ring-blue-500 ring-opacity-50': open }">
         <i class="fas fa-ellipsis-v transition-transform duration-150" :class="{ 'rotate-90': open }"></i>
     </button>
@@ -37,7 +37,7 @@
          x-transition:leave="transition ease-in duration-75"
          x-transition:leave-start="transform opacity-100 scale-100"
          x-transition:leave-end="transform opacity-0 scale-95"
-         class="absolute right-0 w-56 rounded-md shadow-lg bg-white dark:bg-gray-700 ring-1 ring-black ring-opacity-5 focus:outline-none z-50"
+         class="absolute right-0 w-56 rounded-md shadow-lg bg-gray-700 ring-1 ring-black ring-opacity-5 focus:outline-none z-50"
          :class="{
              'bottom-full mb-2 origin-bottom-right': dropdownPosition === 'top',
              'top-full mt-2 origin-top-right': dropdownPosition === 'bottom'
@@ -47,7 +47,7 @@
             {{-- View/Edit Action --}}
             <button wire:click="editCategory({{ $category->id }})"
                     @click="open = false"
-                    class="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600 flex items-center"
+                    class="w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600 flex items-center"
                     role="menuitem">
                 <i class="fas fa-edit mr-3 text-blue-600"></i>
                 Edytuj kategorię
@@ -57,7 +57,7 @@
             @if($category->level < \App\Models\Category::MAX_LEVEL)
                 <button wire:click="createCategory({{ $category->id }})"
                         @click="open = false"
-                        class="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600 flex items-center"
+                        class="w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600 flex items-center"
                         role="menuitem">
                     <i class="fas fa-plus mr-3 text-green-600"></i>
                     Dodaj podkategorię
@@ -77,7 +77,7 @@
                 <button wire:click="bulkDeactivate"
                         wire:confirm="Czy na pewno chcesz dezaktywować tę kategorię?"
                         @click="open = false"
-                        class="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600 flex items-center"
+                        class="w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600 flex items-center"
                         role="menuitem">
                     <i class="fas fa-eye-slash mr-3 text-yellow-600"></i>
                     Dezaktywuj
@@ -85,7 +85,7 @@
             @else
                 <button wire:click="bulkActivate"
                         @click="open = false"
-                        class="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600 flex items-center"
+                        class="w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600 flex items-center"
                         role="menuitem">
                     <i class="fas fa-eye mr-3 text-green-600"></i>
                     Aktywuj
@@ -130,7 +130,7 @@
                         setTimeout(() => copied = false, 2000);
                         open = false;
                     "
-                    class="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600 flex items-center"
+                    class="w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600 flex items-center"
                     role="menuitem">
                 <i class="fas fa-copy mr-3 text-gray-600"></i>
                 <span x-text="copied ? 'Skopiowano!' : 'Kopiuj ID ({{ $category->id }})'"></span>

@@ -695,7 +695,9 @@ class CategoryPreviewModal extends Component
                 'validated' => $validated,
             ]);
 
-            DB::transaction(function () use ($validated) {
+            $newCategory = null; // Store created category for tree injection
+
+            DB::transaction(function () use ($validated, &$newCategory) {
                 // Generate unique slug
                 $slug = Str::slug($this->newCategoryForm['name']);
                 $counter = 1;
@@ -713,6 +715,8 @@ class CategoryPreviewModal extends Component
                     'is_active' => $this->newCategoryForm['is_active'],
                     'sort_order' => 0,
                 ]);
+
+                $newCategory = $category; // Store for tree injection
 
                 // Auto-create shop mapping if shop context exists
                 if ($this->shopId) {
@@ -736,11 +740,6 @@ class CategoryPreviewModal extends Component
                     ]);
                 }
 
-                // Auto-select newly created category
-                if (!in_array($category->id, $this->selectedCategoryIds, true)) {
-                    $this->selectedCategoryIds[] = $category->id;
-                }
-
                 Log::info('CategoryPreviewModal: Quick category created', [
                     'preview_id' => $this->previewId,
                     'category_id' => $category->id,
@@ -748,6 +747,56 @@ class CategoryPreviewModal extends Component
                     'parent_id' => $category->parent_id,
                 ]);
             });
+
+            // ENHANCEMENT: Inject newly created category into tree + auto-select + scroll
+            if ($newCategory) {
+                // Build category node structure (matching PrestaShop tree format)
+                $categoryNode = [
+                    'prestashop_id' => 0, // Manual category, no PS ID yet
+                    'ppm_id' => $newCategory->id, // Store PPM ID for scroll target
+                    'name' => $newCategory->name,
+                    'level_depth' => $newCategory->level ?? 0,
+                    'is_active' => $newCategory->is_active,
+                    'active' => $newCategory->is_active,
+                    'id_parent' => $newCategory->parent_id ?? 0,
+                    'children' => [],
+                    'exists_in_ppm' => false, // New category (not from PrestaShop import)
+                    'is_manual' => true, // Flag to distinguish from PrestaShop categories
+                ];
+
+                // Inject into tree at correct position
+                if ($newCategory->parent_id) {
+                    // Find parent in tree and add as child
+                    $this->categoryTree = $this->injectCategoryToTree($this->categoryTree, $categoryNode, $newCategory->parent_id);
+                } else {
+                    // Root category - add at end of root level
+                    $this->categoryTree[] = $categoryNode;
+                }
+
+                // Auto-select newly created category (use PPM ID for manual categories)
+                $categoryIdentifier = $newCategory->id; // Use PPM ID as identifier
+                if (!in_array($categoryIdentifier, $this->selectedCategoryIds, true)) {
+                    $this->selectedCategoryIds[] = $categoryIdentifier;
+                }
+
+                // Dispatch event for UI enhancement: scroll to new category
+                $this->dispatch('category-created', [
+                    'categoryId' => $newCategory->id, // PPM ID
+                    'categoryName' => $newCategory->name,
+                    'parentId' => $newCategory->parent_id,
+                    'isManual' => true,
+                ]);
+
+                Log::info('CategoryPreviewModal: Category injected into tree + auto-selected', [
+                    'preview_id' => $this->previewId,
+                    'category_id' => $newCategory->id,
+                    'name' => $newCategory->name,
+                    'parent_id' => $newCategory->parent_id,
+                    'tree_node_added' => true,
+                    'auto_selected' => true,
+                    'event_dispatched' => 'category-created',
+                ]);
+            }
 
             $this->dispatch('success', message: 'Kategoria została utworzona pomyślnie');
             $this->hideCreateCategoryForm();
@@ -1986,6 +2035,68 @@ class CategoryPreviewModal extends Component
         ]);
 
         return $categoryData;
+    }
+
+    /**
+     * Inject newly created category into tree at correct hierarchical position
+     *
+     * ENHANCEMENT 2025-10-20: Auto-select + scroll to new category after Quick Create
+     *
+     * Recursively searches tree for parent node and injects new category as child.
+     * If parent not found, returns unchanged tree (caller adds at root level).
+     *
+     * @param array $tree Current category tree (hierarchical)
+     * @param array $categoryNode New category node to inject
+     * @param int $parentPpmId Parent PPM category ID
+     * @return array Modified tree with injected category
+     */
+    private function injectCategoryToTree(array $tree, array $categoryNode, int $parentPpmId): array
+    {
+        foreach ($tree as &$node) {
+            // Check if current node is the parent (match by ppm_id OR prestashop_id via mapping)
+            $isParent = false;
+
+            // Match by ppm_id (for manual categories)
+            if (isset($node['ppm_id']) && $node['ppm_id'] === $parentPpmId) {
+                $isParent = true;
+            }
+
+            // Match by mapping lookup (for PrestaShop categories)
+            if (!$isParent && isset($node['prestashop_id']) && $node['prestashop_id'] > 0 && $this->shopId) {
+                $mapping = \App\Models\ShopMapping::where('shop_id', $this->shopId)
+                    ->where('prestashop_id', $node['prestashop_id'])
+                    ->where('mapping_type', \App\Models\ShopMapping::TYPE_CATEGORY)
+                    ->where('is_active', true)
+                    ->first();
+
+                if ($mapping && (int)$mapping->ppm_value === $parentPpmId) {
+                    $isParent = true;
+                }
+            }
+
+            if ($isParent) {
+                // Found parent - inject as child
+                if (!isset($node['children'])) {
+                    $node['children'] = [];
+                }
+                $node['children'][] = $categoryNode;
+
+                Log::debug('CategoryPreviewModal: Category injected into tree', [
+                    'parent_node_name' => $node['name'],
+                    'parent_ppm_id' => $parentPpmId,
+                    'new_category_name' => $categoryNode['name'],
+                ]);
+
+                return $tree; // Found and injected, return modified tree
+            }
+
+            // Recursively search in children
+            if (!empty($node['children'])) {
+                $node['children'] = $this->injectCategoryToTree($node['children'], $categoryNode, $parentPpmId);
+            }
+        }
+
+        return $tree; // Parent not found in this branch
     }
 
     /*

@@ -34,3 +34,7 @@ Hasło: qkS4FuXMMDDN4DJhatg6
 **PRESTASHOP API**
 https://dev.mpptrade.pl/api
 RPV43WNRX8Y7ZJWAPXU3ZA1Z9ZEE9Y22
+
+https://test.kayomoto.pl/api
+
+1ZEUFUI8JTYY5Z9XXQV2RRANZTKK4R77

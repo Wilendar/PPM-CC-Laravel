@@ -18,11 +18,11 @@
 <body class="bg-gray-50 dark:bg-gray-900">
 
     <!-- Simple Header -->
-    <header class="bg-white dark:bg-gray-800 shadow">
+    <header class="bg-gray-800 shadow">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex items-center justify-between h-16">
                 <div class="flex items-center space-x-4">
-                    <a href="{{ route('admin.dashboard') }}" class="text-xl font-bold text-gray-900 dark:text-white">
+                    <a href="{{ route('admin.dashboard') }}" class="text-xl font-bold text-white">
                         PPM Admin
                     </a>
                     <span class="text-gray-400">→</span>
@@ -30,7 +30,7 @@
                         Produkty
                     </a>
                     <span class="text-gray-400">→</span>
-                    <span class="text-gray-900 dark:text-white">Edytuj produkt</span>
+                    <span class="text-white">Edytuj produkt</span>
                 </div>
             </div>
         </div>

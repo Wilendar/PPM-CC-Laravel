@@ -2,7 +2,7 @@
     <!-- Page Header -->
     <div class="flex items-center justify-between mb-6">
         <div>
-            <h1 class="text-2xl font-bold text-gray-900">API Management</h1>
+            <h1 class="text-2xl font-bold text-white">API Management</h1>
             <p class="text-gray-600">Monitor i zarządzaj API systemu</p>
         </div>
         <div class="flex items-center space-x-3">
@@ -11,7 +11,7 @@
                 <label class="text-sm text-gray-600">Auto-odświeżanie:</label>
                 <button wire:click="toggleAutoRefresh" 
                         class="relative inline-flex h-6 w-11 items-center rounded-full {{ $autoRefresh ? 'bg-blue-600' : 'bg-gray-200' }}">
-                    <span class="inline-block h-4 w-4 transform rounded-full bg-white transition {{ $autoRefresh ? 'translate-x-6' : 'translate-x-1' }}"></span>
+                    <span class="inline-block h-4 w-4 transform rounded-full bg-gray-800 transition {{ $autoRefresh ? 'translate-x-6' : 'translate-x-1' }}"></span>
                 </button>
                 @if($autoRefresh)
                     <select wire:model="refreshInterval" class="text-sm border-gray-300 rounded">
@@ -51,50 +51,50 @@
 
     <!-- Statistics Cards -->
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
-        <div class="bg-white rounded-lg shadow p-6">
+        <div class="bg-gray-800 rounded-lg shadow p-6">
             <div class="flex items-center">
                 <div class="p-2 bg-blue-100 rounded-lg">
                     <i class="fas fa-exchange-alt text-blue-600"></i>
                 </div>
                 <div class="ml-4">
                     <p class="text-sm font-medium text-gray-600">Wszystkie żądania</p>
-                    <p class="text-2xl font-bold text-gray-900">{{ number_format($statistics['total_requests']) }}</p>
+                    <p class="text-2xl font-bold text-white">{{ number_format($statistics['total_requests']) }}</p>
                 </div>
             </div>
         </div>
         
-        <div class="bg-white rounded-lg shadow p-6">
+        <div class="bg-gray-800 rounded-lg shadow p-6">
             <div class="flex items-center">
                 <div class="p-2 bg-green-100 rounded-lg">
                     <i class="fas fa-check-circle text-green-600"></i>
                 </div>
                 <div class="ml-4">
                     <p class="text-sm font-medium text-gray-600">Wskaźnik sukcesu</p>
-                    <p class="text-2xl font-bold text-gray-900">{{ $statistics['success_rate'] }}%</p>
+                    <p class="text-2xl font-bold text-white">{{ $statistics['success_rate'] }}%</p>
                 </div>
             </div>
         </div>
         
-        <div class="bg-white rounded-lg shadow p-6">
+        <div class="bg-gray-800 rounded-lg shadow p-6">
             <div class="flex items-center">
                 <div class="p-2 bg-yellow-100 rounded-lg">
                     <i class="fas fa-clock text-yellow-600"></i>
                 </div>
                 <div class="ml-4">
                     <p class="text-sm font-medium text-gray-600">Śr. czas odpowiedzi</p>
-                    <p class="text-2xl font-bold text-gray-900">{{ $statistics['avg_response_time'] }}ms</p>
+                    <p class="text-2xl font-bold text-white">{{ $statistics['avg_response_time'] }}ms</p>
                 </div>
             </div>
         </div>
         
-        <div class="bg-white rounded-lg shadow p-6">
+        <div class="bg-gray-800 rounded-lg shadow p-6">
             <div class="flex items-center">
                 <div class="p-2 bg-red-100 rounded-lg">
                     <i class="fas fa-shield-alt text-red-600"></i>
                 </div>
                 <div class="ml-4">
                     <p class="text-sm font-medium text-gray-600">Podejrzane żądania</p>
-                    <p class="text-2xl font-bold text-gray-900">{{ $statistics['suspicious_requests'] }}</p>
+                    <p class="text-2xl font-bold text-white">{{ $statistics['suspicious_requests'] }}</p>
                 </div>
             </div>
         </div>
@@ -103,14 +103,14 @@
     <!-- Charts Row -->
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
         <!-- Daily Trends Chart -->
-        <div class="bg-white rounded-lg shadow p-6">
-            <h3 class="text-lg font-medium text-gray-900 mb-4">Trendy dzienne (7 dni)</h3>
+        <div class="bg-gray-800 rounded-lg shadow p-6">
+            <h3 class="text-lg font-medium text-white mb-4">Trendy dzienne (7 dni)</h3>
             <canvas id="dailyTrendsChart" height="200"></canvas>
         </div>
 
         <!-- Hourly Distribution Chart -->
-        <div class="bg-white rounded-lg shadow p-6">
-            <h3 class="text-lg font-medium text-gray-900 mb-4">Rozkład godzinowy (dziś)</h3>
+        <div class="bg-gray-800 rounded-lg shadow p-6">
+            <h3 class="text-lg font-medium text-white mb-4">Rozkład godzinowy (dziś)</h3>
             <canvas id="hourlyChart" height="200"></canvas>
         </div>
     </div>
@@ -118,8 +118,8 @@
     <!-- Performance Metrics -->
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
         <!-- Response Time Percentiles -->
-        <div class="bg-white rounded-lg shadow p-6">
-            <h3 class="text-lg font-medium text-gray-900 mb-4">Percentyle czasu odpowiedzi</h3>
+        <div class="bg-gray-800 rounded-lg shadow p-6">
+            <h3 class="text-lg font-medium text-white mb-4">Percentyle czasu odpowiedzi</h3>
             <div class="space-y-3">
                 <div class="flex justify-between">
                     <span class="text-sm text-gray-600">50% (mediana)</span>
@@ -141,13 +141,13 @@
         </div>
 
         <!-- Top Error Endpoints -->
-        <div class="bg-white rounded-lg shadow p-6">
-            <h3 class="text-lg font-medium text-gray-900 mb-4">Najczęściej błędne endpointy</h3>
+        <div class="bg-gray-800 rounded-lg shadow p-6">
+            <h3 class="text-lg font-medium text-white mb-4">Najczęściej błędne endpointy</h3>
             <div class="space-y-2">
                 @forelse($topErrors->take(5) as $error)
                     <div class="flex justify-between items-center">
                         <div class="flex-1 min-w-0">
-                            <p class="text-sm font-medium text-gray-900 truncate">{{ $error->endpoint }}</p>
+                            <p class="text-sm font-medium text-white truncate">{{ $error->endpoint }}</p>
                             <p class="text-xs text-gray-500">HTTP {{ $error->response_code }}</p>
                         </div>
                         <span class="ml-2 px-2 py-1 text-xs bg-red-100 text-red-800 rounded">
@@ -161,8 +161,8 @@
         </div>
 
         <!-- Suspicious Activity -->
-        <div class="bg-white rounded-lg shadow p-6">
-            <h3 class="text-lg font-medium text-gray-900 mb-4">Podejrzana aktywność</h3>
+        <div class="bg-gray-800 rounded-lg shadow p-6">
+            <h3 class="text-lg font-medium text-white mb-4">Podejrzana aktywność</h3>
             <div class="space-y-3">
                 <div class="flex justify-between">
                     <span class="text-sm text-gray-600">Całkowicie podejrzane</span>
@@ -185,7 +185,7 @@
     </div>
 
     <!-- Main Content with Tabs -->
-    <div class="bg-white rounded-lg shadow">
+    <div class="bg-gray-800 rounded-lg shadow">
         <!-- Tabs -->
         <div class="border-b border-gray-200">
             <nav class="flex space-x-8 px-6" aria-label="Tabs">
@@ -299,13 +299,13 @@
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Flagi</th>
                         </tr>
                     </thead>
-                    <tbody class="bg-white divide-y divide-gray-200">
+                    <tbody class="bg-gray-800 divide-y divide-gray-200">
                         @forelse($recentLogs as $log)
                             <tr class="hover:bg-gray-50">
                                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                                     {{ $log->requested_at->format('H:i:s') }}
                                 </td>
-                                <td class="px-6 py-4 text-sm text-gray-900 max-w-xs truncate">
+                                <td class="px-6 py-4 text-sm text-white max-w-xs truncate">
                                     {{ $log->endpoint }}
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap text-sm">
@@ -395,7 +395,7 @@
                         <div class="border border-gray-200 rounded-lg p-4">
                             <div class="flex items-center justify-between">
                                 <div class="flex-1">
-                                    <h4 class="font-medium text-gray-900">{{ $stat->endpoint }}</h4>
+                                    <h4 class="font-medium text-white">{{ $stat->endpoint }}</h4>
                                     <div class="mt-2 grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                                         <div>
                                             <span class="text-gray-500">Żądania:</span>
@@ -433,7 +433,7 @@
                         <div class="border border-gray-200 rounded-lg p-4">
                             <div class="flex items-center justify-between">
                                 <div class="flex-1">
-                                    <h4 class="font-medium text-gray-900">
+                                    <h4 class="font-medium text-white">
                                         {{ $stat->user ? $stat->user->name : 'Anonim' }}
                                         @if($stat->user)
                                             <span class="text-sm text-gray-500 ml-2">{{ $stat->user->email }}</span>

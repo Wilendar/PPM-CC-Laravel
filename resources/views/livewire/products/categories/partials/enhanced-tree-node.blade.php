@@ -22,7 +22,7 @@
      x-init="initializeNode()">
 
     {{-- Enhanced Node Card --}}
-    <div class="relative mb-3 bg-white dark:bg-gray-800 rounded-2xl shadow-md hover:shadow-xl transition-all duration-300 transform hover:scale-[1.02]
+    <div class="relative mb-3 bg-gray-800 rounded-2xl shadow-md hover:shadow-xl transition-all duration-300 transform hover:scale-[1.02]
                 border-2 border-gray-100 dark:border-gray-700 hover:border-blue-200 dark:hover:border-blue-600
                 {{ $isSelected ? 'ring-4 ring-blue-500/20 border-blue-500 dark:border-blue-400' : '' }}"
          draggable="true"
@@ -67,7 +67,7 @@
                 <div class="w-8 h-8 flex items-center justify-center cursor-move rounded-lg
                            bg-gradient-to-r from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-600
                            hover:from-gray-200 hover:to-gray-300 dark:hover:from-gray-600 dark:hover:to-gray-500
-                           border border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500
+                           border border-gray-600 hover:border-gray-400 dark:hover:border-gray-500
                            transition-all duration-300 transform hover:scale-110">
                     <i class="fas fa-grip-vertical text-gray-500 dark:text-gray-400 text-xs"></i>
                 </div>
@@ -78,7 +78,7 @@
                 <input type="checkbox"
                        wire:model="selectedCategories"
                        value="{{ $category->id }}"
-                       class="w-6 h-6 rounded-xl border-2 border-gray-300 dark:border-gray-600
+                       class="w-6 h-6 rounded-xl border-2 border-gray-600
                               text-blue-600 focus:ring-4 focus:ring-blue-500/30 transition-all duration-300
                               transform hover:scale-110">
             </div>
@@ -91,7 +91,7 @@
                                border-2 border-white dark:border-gray-600 group-hover/icon:scale-110
                                transition-all duration-300 transform">
                         @if($category->icon)
-                            <i class="{{ $category->icon }} text-2xl text-gray-700 dark:text-gray-300"></i>
+                            <i class="{{ $category->icon }} text-2xl text-gray-300"></i>
                         @else
                             <i class="fas fa-folder text-2xl text-gray-500 dark:text-gray-400"></i>
                         @endif
@@ -110,7 +110,7 @@
             <div class="flex-grow min-w-0 space-y-2">
                 <div class="flex items-center justify-between">
                     <div class="min-w-0 flex-1">
-                        <h4 class="text-xl font-bold text-gray-900 dark:text-white truncate group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors duration-300">
+                        <h4 class="text-xl font-bold text-white truncate group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors duration-300">
                             {{ $category->name }}
                         </h4>
                         @if($category->description)

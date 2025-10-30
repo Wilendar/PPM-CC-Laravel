@@ -2,7 +2,7 @@
     {{-- Compact CategoryTree Component - Minimal UI for better dropdown compatibility --}}
 
     {{-- Compact Header --}}
-    <div class="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 py-4">
+    <div class="bg-gray-800 border-b border-gray-700 px-6 py-4">
         <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
             {{-- Title and Stats --}}
             <div class="flex items-center space-x-4">
@@ -10,7 +10,7 @@
                     <i class="fas fa-sitemap text-white"></i>
                 </div>
                 <div>
-                    <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Kategorie produktów</h1>
+                    <h1 class="text-2xl font-bold text-white">Kategorie produktów</h1>
                     <div class="text-sm text-gray-500 dark:text-gray-400">
                         {{ $categories->count() }} kategorii • {{ $categories->where('is_active', true)->count() }} aktywnych
                     </div>
@@ -24,8 +24,8 @@
                     <input type="text"
                            x-model="search"
                            placeholder="Szukaj kategorii..."
-                           class="w-64 pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg
-                                  bg-white dark:bg-gray-700 text-gray-900 dark:text-white
+                           class="w-64 pl-10 pr-4 py-2 border border-gray-600 rounded-lg
+                                  bg-gray-700 text-white
                                   focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
                     <i class="fas fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
                 </div>
@@ -34,7 +34,7 @@
                 <label class="flex items-center space-x-2 text-sm">
                     <input type="checkbox" x-model="showActiveOnly"
                            class="rounded border-gray-300 text-blue-600 focus:ring-blue-500">
-                    <span class="text-gray-700 dark:text-gray-300">Tylko aktywne</span>
+                    <span class="text-gray-300">Tylko aktywne</span>
                 </label>
 
                 {{-- Add Category Button --}}
@@ -49,10 +49,10 @@
     </div>
 
     {{-- Compact Category Table --}}
-    <div class="bg-white dark:bg-gray-800 overflow-hidden">
+    <div class="bg-gray-800 overflow-hidden">
         <div class="overflow-x-auto">
             <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                <thead class="bg-gray-50 dark:bg-gray-900/50">
+                <thead class="bg-gray-900/50">
                     <tr>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                             Kategoria
@@ -71,9 +71,9 @@
                         </th>
                     </tr>
                 </thead>
-                <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                <tbody class="bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                     @forelse($categories as $category)
-                        <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
+                        <tr class="hover:bg-gray-700/50 transition-colors">
                             {{-- Category Name with Hierarchy --}}
                             <td class="px-6 py-4 whitespace-nowrap">
                                 <div class="flex items-center space-x-3">
@@ -94,7 +94,7 @@
 
                                     {{-- Category Details --}}
                                     <div>
-                                        <div class="text-sm font-medium text-gray-900 dark:text-white">
+                                        <div class="text-sm font-medium text-white">
                                             {{ $category->name }}
                                         </div>
                                         @if($category->description)
@@ -171,11 +171,11 @@
 
     {{-- Loading States --}}
     <div wire:loading class="fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center z-50">
-        <div class="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-sm w-full mx-4">
+        <div class="bg-gray-800 rounded-lg p-6 max-w-sm w-full mx-4">
             <div class="flex items-center space-x-4">
                 <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
                 <div>
-                    <h4 class="text-lg font-medium text-gray-900 dark:text-white">Ładowanie...</h4>
+                    <h4 class="text-lg font-medium text-white">Ładowanie...</h4>
                     <p class="text-sm text-gray-500 dark:text-gray-400">Proszę czekać</p>
                 </div>
             </div>

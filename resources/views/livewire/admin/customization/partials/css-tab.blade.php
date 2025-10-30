@@ -1,7 +1,7 @@
 <div class="p-6">
     <div class="flex justify-between items-center mb-6">
         <div>
-            <h3 class="text-lg font-medium text-gray-900 dark:text-white">Custom CSS</h3>
+            <h3 class="text-lg font-medium text-white">Custom CSS</h3>
             <p class="text-sm text-gray-600 dark:text-gray-400">Dodaj własne style CSS dla zaawansowanej customizacji</p>
         </div>
         
@@ -26,7 +26,7 @@
         <!-- CSS Editor -->
         <div class="space-y-4">
             <div>
-                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                <label class="block text-sm font-medium text-gray-300 mb-2">
                     Edytor CSS
                 </label>
                 
@@ -135,9 +135,9 @@
         <div class="space-y-6">
             <!-- Live Preview -->
             <div>
-                <h4 class="text-md font-medium text-gray-900 dark:text-white mb-4">Podgląd na Żywo</h4>
+                <h4 class="text-md font-medium text-white mb-4">Podgląd na Żywo</h4>
                 
-                <div class="bg-white dark:bg-gray-800 rounded-lg border p-6" style="min-height: 300px;">
+                <div class="bg-gray-800 rounded-lg border p-6" style="min-height: 300px;">
                     <style id="live-css-preview">
                         {!! $customCss !!}
                     </style>
@@ -167,7 +167,7 @@
 
             <!-- CSS Variables Reference -->
             <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
-                <h5 class="font-medium text-gray-900 dark:text-white mb-3">Dostępne Zmienne CSS</h5>
+                <h5 class="font-medium text-white mb-3">Dostępne Zmienne CSS</h5>
                 
                 <div class="grid grid-cols-1 gap-2 text-sm font-mono">
                     <div class="flex justify-between">
@@ -252,13 +252,13 @@
     <!-- CSS Examples & Templates -->
     <div class="mt-8 pt-8 border-t border-gray-200 dark:border-gray-600">
         <div x-data="{ activeExample: null }">
-            <h4 class="text-md font-medium text-gray-900 dark:text-white mb-6">Przykłady i Szablony CSS</h4>
+            <h4 class="text-md font-medium text-white mb-6">Przykłady i Szablony CSS</h4>
             
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 @foreach($this->getCSSExamples() as $example)
-                    <div class="bg-white dark:bg-gray-800 rounded-lg border hover:border-blue-400 transition-colors overflow-hidden">
+                    <div class="bg-gray-800 rounded-lg border hover:border-blue-400 transition-colors overflow-hidden">
                         <div class="p-4">
-                            <h5 class="font-medium text-gray-900 dark:text-white mb-2">{{ $example['name'] }}</h5>
+                            <h5 class="font-medium text-white mb-2">{{ $example['name'] }}</h5>
                             <p class="text-sm text-gray-600 dark:text-gray-400 mb-3">{{ $example['description'] }}</p>
                             
                             <div class="flex justify-between items-center">

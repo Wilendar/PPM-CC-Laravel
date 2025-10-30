@@ -2,7 +2,7 @@
     <!-- Header z stats i alerts -->
     <div class="mb-6 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
         <div>
-            <h1 class="text-2xl font-bold text-gray-900 dark:text-white">
+            <h1 class="text-2xl font-bold text-white">
                 Logi Audytu
             </h1>
             <p class="text-gray-600 dark:text-gray-400 mt-1">
@@ -61,7 +61,7 @@
     @endif
 
     <!-- Controls bar -->
-    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4 mb-6">
+    <div class="bg-gray-800 rounded-lg shadow-sm border border-gray-700 p-4 mb-6">
         <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
             <!-- Search and view mode -->
             <div class="flex flex-col sm:flex-row items-start sm:items-center space-y-2 sm:space-y-0 sm:space-x-4">
@@ -69,7 +69,7 @@
                     <input type="text" 
                            wire:model.debounce.300ms="search"
                            placeholder="Szukaj w logach..."
-                           class="pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white">
+                           class="pl-10 pr-4 py-2 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white">
                     <svg class="w-5 h-5 text-gray-400 absolute left-3 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
                     </svg>
@@ -77,17 +77,17 @@
                 
                 <div class="flex items-center space-x-2 bg-gray-100 dark:bg-gray-700 rounded-lg p-1">
                     <button wire:click="setViewMode('table')" 
-                            :class="{ 'bg-white dark:bg-gray-800 shadow-sm': $wire.viewMode === 'table' }"
+                            :class="{ 'bg-gray-800 shadow-sm': $wire.viewMode === 'table' }"
                             class="px-3 py-1.5 text-sm rounded-md transition-colors">
                         Tabela
                     </button>
                     <button wire:click="setViewMode('timeline')" 
-                            :class="{ 'bg-white dark:bg-gray-800 shadow-sm': $wire.viewMode === 'timeline' }"
+                            :class="{ 'bg-gray-800 shadow-sm': $wire.viewMode === 'timeline' }"
                             class="px-3 py-1.5 text-sm rounded-md transition-colors">
                         Timeline
                     </button>
                     <button wire:click="setViewMode('chart')" 
-                            :class="{ 'bg-white dark:bg-gray-800 shadow-sm': $wire.viewMode === 'chart' }"
+                            :class="{ 'bg-gray-800 shadow-sm': $wire.viewMode === 'chart' }"
                             class="px-3 py-1.5 text-sm rounded-md transition-colors">
                         Wykresy
                     </button>
@@ -109,11 +109,11 @@
                     Miesiąc
                 </button>
                 
-                <div class="h-4 border-l border-gray-300 dark:border-gray-600"></div>
+                <div class="h-4 border-l border-gray-600"></div>
                 
                 <button wire:click="$toggle('showFilters')" 
                         :class="{ 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-200': $wire.showFilters }"
-                        class="px-3 py-1.5 text-sm rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
+                        class="px-3 py-1.5 text-sm rounded-lg hover:bg-gray-700 transition-colors">
                     <svg class="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"></path>
                     </svg>
@@ -134,9 +134,9 @@
         @if($showFilters)
         <div class="mt-4 pt-4 border-t border-gray-200 dark:border-gray-600 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6 gap-4">
             <div>
-                <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Użytkownik</label>
+                <label class="block text-xs font-medium text-gray-300 mb-1">Użytkownik</label>
                 <select wire:model="userFilter" 
-                        class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white">
+                        class="w-full px-3 py-2 text-sm border border-gray-600 rounded focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white">
                     <option value="all">Wszyscy</option>
                     <option value="system">System</option>
                     @foreach($users as $user)
@@ -146,9 +146,9 @@
             </div>
             
             <div>
-                <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Akcja</label>
+                <label class="block text-xs font-medium text-gray-300 mb-1">Akcja</label>
                 <select wire:model="actionFilter" 
-                        class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white">
+                        class="w-full px-3 py-2 text-sm border border-gray-600 rounded focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white">
                     <option value="all">Wszystkie</option>
                     @foreach($actions as $action)
                         <option value="{{ $action }}">{{ ucfirst(str_replace('_', ' ', $action)) }}</option>
@@ -157,9 +157,9 @@
             </div>
             
             <div>
-                <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Model</label>
+                <label class="block text-xs font-medium text-gray-300 mb-1">Model</label>
                 <select wire:model="modelFilter" 
-                        class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white">
+                        class="w-full px-3 py-2 text-sm border border-gray-600 rounded focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white">
                     <option value="all">Wszystkie</option>
                     @foreach($models as $model)
                         <option value="{{ $model['short'] }}">{{ $model['short'] }}</option>
@@ -168,17 +168,17 @@
             </div>
             
             <div>
-                <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Od daty</label>
+                <label class="block text-xs font-medium text-gray-300 mb-1">Od daty</label>
                 <input type="date" 
                        wire:model="dateFromFilter"
-                       class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white">
+                       class="w-full px-3 py-2 text-sm border border-gray-600 rounded focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white">
             </div>
             
             <div>
-                <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Do daty</label>
+                <label class="block text-xs font-medium text-gray-300 mb-1">Do daty</label>
                 <input type="date" 
                        wire:model="dateToFilter"
-                       class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white">
+                       class="w-full px-3 py-2 text-sm border border-gray-600 rounded focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white">
             </div>
             
             <div class="flex items-end">
@@ -186,7 +186,7 @@
                     <input type="checkbox" 
                            wire:model="suspiciousOnly"
                            class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
-                    <span class="ml-2 text-sm text-gray-700 dark:text-gray-300">Tylko podejrzane</span>
+                    <span class="ml-2 text-sm text-gray-300">Tylko podejrzane</span>
                 </label>
             </div>
         </div>
@@ -212,7 +212,7 @@
     <!-- Main content area -->
     @if($viewMode === 'table')
     <!-- Table view -->
-    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+    <div class="bg-gray-800 rounded-lg shadow-sm border border-gray-700 overflow-hidden">
         @if($logs->count())
             <div class="overflow-x-auto">
                 <table class="w-full">
@@ -247,9 +247,9 @@
                             </th>
                         </tr>
                     </thead>
-                    <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                    <tbody class="bg-gray-800 divide-y divide-gray-700">
                         @foreach($logs as $log)
-                        <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                        <tr class="hover:bg-gray-700/50">
                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
                                 <div>{{ $log->created_at->format('d.m.Y H:i') }}</div>
                                 <div class="text-xs text-gray-500 dark:text-gray-400">{{ $log->created_at->diffForHumans() }}</div>
@@ -358,7 +358,7 @@
             </div>
             
             <!-- Pagination -->
-            <div class="px-6 py-4 border-t border-gray-200 dark:border-gray-700">
+            <div class="px-6 py-4 border-t border-gray-700">
                 {{ $logs->links() }}
             </div>
         @else
@@ -366,7 +366,7 @@
                 <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
                 </svg>
-                <h3 class="mt-4 text-sm font-medium text-gray-900 dark:text-white">Brak logów</h3>
+                <h3 class="mt-4 text-sm font-medium text-white">Brak logów</h3>
                 <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
                     Nie znaleziono logów audytu spełniających kryteria wyszukiwania.
                 </p>
@@ -382,10 +382,10 @@
             <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" 
                  wire:click="closeDetailsModal"></div>
             
-            <div class="inline-block align-bottom bg-white dark:bg-gray-800 rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-4xl sm:w-full">
-                <div class="bg-white dark:bg-gray-800 px-6 pt-6 pb-4">
+            <div class="inline-block align-bottom bg-gray-800 rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-4xl sm:w-full">
+                <div class="bg-gray-800 px-6 pt-6 pb-4">
                     <div class="flex items-center justify-between mb-4">
-                        <h3 class="text-lg leading-6 font-medium text-gray-900 dark:text-white">
+                        <h3 class="text-lg leading-6 font-medium text-white">
                             Szczegóły wpisu audytu
                         </h3>
                         <button wire:click="closeDetailsModal" 
@@ -399,7 +399,7 @@
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <!-- Basic info -->
                         <div>
-                            <h4 class="font-medium text-gray-900 dark:text-white mb-3">Informacje podstawowe</h4>
+                            <h4 class="font-medium text-white mb-3">Informacje podstawowe</h4>
                             <dl class="space-y-2">
                                 <div class="flex justify-between">
                                     <dt class="text-sm text-gray-500 dark:text-gray-400">Data:</dt>
@@ -426,7 +426,7 @@
                         
                         <!-- Technical info -->
                         <div>
-                            <h4 class="font-medium text-gray-900 dark:text-white mb-3">Informacje techniczne</h4>
+                            <h4 class="font-medium text-white mb-3">Informacje techniczne</h4>
                             <dl class="space-y-2">
                                 <div class="flex justify-between">
                                     <dt class="text-sm text-gray-500 dark:text-gray-400">IP Address:</dt>
@@ -443,13 +443,13 @@
                     <!-- Changes -->
                     @if($selectedLog->old_values || $selectedLog->new_values)
                     <div class="mt-6">
-                        <h4 class="font-medium text-gray-900 dark:text-white mb-3">Zmiany</h4>
+                        <h4 class="font-medium text-white mb-3">Zmiany</h4>
                         @php $changes = $this->getFormattedChanges($selectedLog); @endphp
                         @if(count($changes) > 0)
                             <div class="space-y-3">
                                 @foreach($changes as $field => $change)
                                 <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
-                                    <div class="font-medium text-sm text-gray-900 dark:text-white mb-2">{{ $change['field'] }}</div>
+                                    <div class="font-medium text-sm text-white mb-2">{{ $change['field'] }}</div>
                                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                                         <div>
                                             <div class="text-xs text-red-600 dark:text-red-400 font-medium mb-1">Poprzednia wartość:</div>
@@ -486,17 +486,17 @@
             <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" 
                  wire:click="closeExportModal"></div>
             
-            <div class="inline-block align-bottom bg-white dark:bg-gray-800 rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
-                <div class="bg-white dark:bg-gray-800 px-6 pt-6 pb-4">
-                    <h3 class="text-lg leading-6 font-medium text-gray-900 dark:text-white mb-4">
+            <div class="inline-block align-bottom bg-gray-800 rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+                <div class="bg-gray-800 px-6 pt-6 pb-4">
+                    <h3 class="text-lg leading-6 font-medium text-white mb-4">
                         Eksport logów audytu
                     </h3>
                     
                     <div class="space-y-4">
                         <div>
-                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Format eksportu</label>
+                            <label class="block text-sm font-medium text-gray-300 mb-2">Format eksportu</label>
                             <select wire:model="exportFormat" 
-                                    class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white">
+                                    class="w-full px-3 py-2 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white">
                                 <option value="excel">Excel (.xlsx)</option>
                                 <option value="csv">CSV (.csv)</option>
                                 <option value="pdf">PDF (.pdf)</option>
@@ -505,29 +505,29 @@
                         
                         <div class="grid grid-cols-2 gap-4">
                             <div>
-                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Data od</label>
+                                <label class="block text-sm font-medium text-gray-300 mb-2">Data od</label>
                                 <input type="date" 
                                        wire:model="exportDateFrom"
-                                       class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white">
+                                       class="w-full px-3 py-2 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white">
                             </div>
                             
                             <div>
-                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Data do</label>
+                                <label class="block text-sm font-medium text-gray-300 mb-2">Data do</label>
                                 <input type="date" 
                                        wire:model="exportDateTo"
-                                       class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white">
+                                       class="w-full px-3 py-2 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white">
                             </div>
                         </div>
                         
                         <div>
-                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Pola do eksportu</label>
+                            <label class="block text-sm font-medium text-gray-300 mb-2">Pola do eksportu</label>
                             <div class="space-y-2">
                                 @foreach($exportFields as $field => $enabled)
                                 <label class="flex items-center">
                                     <input type="checkbox" 
                                            wire:model="exportFields.{{ $field }}"
                                            class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
-                                    <span class="ml-2 text-sm text-gray-700 dark:text-gray-300">
+                                    <span class="ml-2 text-sm text-gray-300">
                                         {{ ucfirst(str_replace('_', ' ', $field)) }}
                                     </span>
                                 </label>

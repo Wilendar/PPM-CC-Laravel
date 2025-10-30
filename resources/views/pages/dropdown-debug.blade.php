@@ -5,8 +5,8 @@
 
 @section('content')
 <div class="p-8">
-    <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-8">
-        <h1 class="text-3xl font-bold mb-8 text-gray-900 dark:text-white">Alpine.js x-teleport Debug Test</h1>
+    <div class="bg-gray-800 rounded-2xl shadow-lg p-8">
+        <h1 class="text-3xl font-bold mb-8 text-white">Alpine.js x-teleport Debug Test</h1>
 
         <!-- Test 1: Sprawdzenie czy x-teleport działa -->
         <div class="mb-8">
@@ -80,8 +80,8 @@
 
         <!-- Instrukcje debugowania -->
         <div class="bg-gray-100 dark:bg-gray-700 rounded-xl p-6">
-            <h3 class="text-lg font-bold mb-4 text-gray-900 dark:text-white">Instrukcje debugowania:</h3>
-            <ol class="list-decimal list-inside space-y-2 text-sm text-gray-700 dark:text-gray-300">
+            <h3 class="text-lg font-bold mb-4 text-white">Instrukcje debugowania:</h3>
+            <ol class="list-decimal list-inside space-y-2 text-sm text-gray-300">
                 <li>Otwórz Developer Tools (F12)</li>
                 <li>Kliknij "Toggle Test Dropdown" (niebieski przycisk)</li>
                 <li>Sprawdź czy czerwony div pojawia się w prawym górnym rogu</li>

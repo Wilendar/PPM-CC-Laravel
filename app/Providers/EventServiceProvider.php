@@ -12,7 +12,12 @@ class EventServiceProvider extends ServiceProvider
      * @var array<class-string, array<int, class-string>>
      */
     protected $listen = [
-        //
+        \App\Events\AttributeTypeCreated::class => [
+            \App\Listeners\SyncNewAttributeTypeWithPrestaShops::class,
+        ],
+        \App\Events\AttributeValueCreated::class => [
+            \App\Listeners\SyncNewAttributeValueWithPrestaShops::class,
+        ],
     ];
 
     /**

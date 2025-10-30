@@ -3,7 +3,7 @@
     {{-- Page Header --}}
     <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between">
         <div>
-            <h1 class="text-3xl font-bold text-gray-900 dark:text-white">
+            <h1 class="text-3xl font-bold text-white">
                 Zarządzanie Użytkownikami
             </h1>
             <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
@@ -37,7 +37,7 @@
     </div>
 
     {{-- Search and Filters Bar --}}
-    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+    <div class="bg-gray-800 rounded-lg shadow-sm border border-gray-700 p-6">
         <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
             {{-- Search Input --}}
             <div class="flex-1 max-w-lg">
@@ -50,7 +50,7 @@
                     <input type="text" 
                            wire:model.live.debounce.300ms="search" 
                            placeholder="Szukaj użytkowników (nazwa, email, firma)..."
-                           class="block w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md leading-5 bg-white dark:bg-gray-700 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:placeholder-gray-400 dark:focus:placeholder-gray-500 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 text-sm">
+                           class="block w-full pl-10 pr-3 py-2 border border-gray-600 rounded-md leading-5 bg-gray-700 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:placeholder-gray-400 dark:focus:placeholder-gray-500 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 text-sm">
                     
                     {{-- Clear search button --}}
                     @if($search)
@@ -69,7 +69,7 @@
             <div class="flex items-center space-x-3">
                 {{-- Filters Toggle --}}
                 <button wire:click="$toggle('showFilters')" 
-                        class="inline-flex items-center px-3 py-2 border border-gray-300 dark:border-gray-600 shadow-sm text-sm font-medium rounded-md text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                        class="inline-flex items-center px-3 py-2 border border-gray-600 shadow-sm text-sm font-medium rounded-md text-gray-300 bg-gray-700 hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                         :class="{ 'bg-blue-50 border-blue-200 text-blue-700': @this.showFilters }">
                     <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.207A1 1 0 013 6.5V4z"></path>
@@ -83,7 +83,7 @@
                 {{-- Column Settings --}}
                 <div class="relative" x-data="{ open: false }">
                     <button @click="open = !open" 
-                            class="inline-flex items-center px-3 py-2 border border-gray-300 dark:border-gray-600 shadow-sm text-sm font-medium rounded-md text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                            class="inline-flex items-center px-3 py-2 border border-gray-600 shadow-sm text-sm font-medium rounded-md text-gray-300 bg-gray-700 hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
                         <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4"></path>
                         </svg>
@@ -99,11 +99,11 @@
                          x-transition:leave-start="transform opacity-100 scale-100"
                          x-transition:leave-end="transform opacity-0 scale-95"
                          @click.outside="open = false"
-                         class="absolute right-0 z-50 mt-2 w-56 rounded-md bg-white dark:bg-gray-700 shadow-lg ring-1 ring-black ring-opacity-5">
+                         class="absolute right-0 z-50 mt-2 w-56 rounded-md bg-gray-700 shadow-lg ring-1 ring-black ring-opacity-5">
                         
                         <div class="p-4">
                             <div class="flex items-center justify-between mb-3">
-                                <h3 class="text-sm font-medium text-gray-900 dark:text-white">Widoczne kolumny</h3>
+                                <h3 class="text-sm font-medium text-white">Widoczne kolumny</h3>
                                 <div class="flex space-x-1">
                                     <button wire:click="showAllColumns" class="text-xs text-blue-600 hover:text-blue-500">Wszystkie</button>
                                     <span class="text-gray-300">|</span>
@@ -119,7 +119,7 @@
                                                    wire:click="toggleColumn('{{ $column }}')"
                                                    @if($visible) checked @endif
                                                    class="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50">
-                                            <span class="ml-2 text-sm text-gray-700 dark:text-gray-300">
+                                            <span class="ml-2 text-sm text-gray-300">
                                                 {{ ucfirst(str_replace('_', ' ', $column)) }}
                                             </span>
                                         </label>
@@ -149,9 +149,9 @@
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                     {{-- Role Filter --}}
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Rola</label>
+                        <label class="block text-sm font-medium text-gray-300 mb-1">Rola</label>
                         <select wire:model.live="roleFilter" 
-                                class="block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50 dark:bg-gray-700 dark:text-white text-sm">
+                                class="block w-full rounded-md border-gray-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50 dark:bg-gray-700 dark:text-white text-sm">
                             <option value="all">Wszystkie role</option>
                             @foreach($roles as $role)
                                 <option value="{{ $role->name }}">{{ $role->name }}</option>
@@ -161,9 +161,9 @@
 
                     {{-- Company Filter --}}
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Firma</label>
+                        <label class="block text-sm font-medium text-gray-300 mb-1">Firma</label>
                         <select wire:model.live="companyFilter" 
-                                class="block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50 dark:bg-gray-700 dark:text-white text-sm">
+                                class="block w-full rounded-md border-gray-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50 dark:bg-gray-700 dark:text-white text-sm">
                             <option value="all">Wszystkie firmy</option>
                             @foreach($companies as $company)
                                 <option value="{{ $company }}">{{ $company }}</option>
@@ -173,9 +173,9 @@
 
                     {{-- Status Filter --}}
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Status</label>
+                        <label class="block text-sm font-medium text-gray-300 mb-1">Status</label>
                         <select wire:model.live="statusFilter" 
-                                class="block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50 dark:bg-gray-700 dark:text-white text-sm">
+                                class="block w-full rounded-md border-gray-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50 dark:bg-gray-700 dark:text-white text-sm">
                             <option value="all">Wszystkie statusy</option>
                             <option value="active">Aktywni</option>
                             <option value="inactive">Nieaktywni</option>
@@ -184,9 +184,9 @@
 
                     {{-- Last Login Filter --}}
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Ostatnie logowanie</label>
+                        <label class="block text-sm font-medium text-gray-300 mb-1">Ostatnie logowanie</label>
                         <select wire:model.live="lastLoginFilter" 
-                                class="block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50 dark:bg-gray-700 dark:text-white text-sm">
+                                class="block w-full rounded-md border-gray-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50 dark:bg-gray-700 dark:text-white text-sm">
                             <option value="all">Wszystkie</option>
                             <option value="today">Dziś</option>
                             <option value="week">Ostatni tydzień</option>
@@ -199,7 +199,7 @@
                 {{-- Clear Filters Button --}}
                 <div class="mt-4 flex justify-end">
                     <button wire:click="clearFilters" 
-                            class="inline-flex items-center px-3 py-2 border border-gray-300 dark:border-gray-600 shadow-sm text-sm font-medium rounded-md text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600">
+                            class="inline-flex items-center px-3 py-2 border border-gray-600 shadow-sm text-sm font-medium rounded-md text-gray-300 bg-gray-700 hover:bg-gray-600">
                         <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
                         </svg>
@@ -211,10 +211,10 @@
     </div>
 
     {{-- Users Table --}}
-    <div class="bg-white dark:bg-gray-800 shadow-sm rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+    <div class="bg-gray-800 shadow-sm rounded-lg border border-gray-700 overflow-hidden">
         @if($users->count() > 0)
             {{-- Table Controls --}}
-            <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+            <div class="px-6 py-4 border-b border-gray-700 flex items-center justify-between">
                 <div class="flex items-center space-x-4">
                     {{-- Select All Checkbox --}}
                     <label class="flex items-center">
@@ -236,7 +236,7 @@
                     <div class="flex items-center space-x-2">
                         <span class="text-sm text-gray-500 dark:text-gray-400">Pokaż:</span>
                         <select wire:model.live="perPage" 
-                                class="rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50 dark:bg-gray-700 dark:text-white text-sm">
+                                class="rounded-md border-gray-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50 dark:bg-gray-700 dark:text-white text-sm">
                             <option value="10">10</option>
                             <option value="25">25</option>
                             <option value="50">50</option>
@@ -371,9 +371,9 @@
                         </tr>
                     </thead>
 
-                    <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-600">
+                    <tbody class="bg-gray-800 divide-y divide-gray-200 dark:divide-gray-600">
                         @foreach($users as $user)
-                            <tr class="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-150 ease-in-out">
+                            <tr class="hover:bg-gray-700 transition-colors duration-150 ease-in-out">
                                 {{-- Select Checkbox --}}
                                 <td class="px-6 py-4 whitespace-nowrap">
                                     <input type="checkbox" 
@@ -392,7 +392,7 @@
                                                      alt="{{ $user->full_name }}">
                                             @else
                                                 <div class="h-10 w-10 rounded-full bg-gray-300 dark:bg-gray-600 flex items-center justify-center">
-                                                    <span class="text-sm font-medium text-gray-700 dark:text-gray-300">
+                                                    <span class="text-sm font-medium text-gray-300">
                                                         {{ $user->initials }}
                                                     </span>
                                                 </div>
@@ -405,7 +405,7 @@
                                 <td class="px-6 py-4 whitespace-nowrap">
                                     <div class="flex items-center">
                                         <div class="ml-4">
-                                            <div class="text-sm font-medium text-gray-900 dark:text-white">
+                                            <div class="text-sm font-medium text-white">
                                                 <a href="{{ route('admin.users.show', $user) }}" 
                                                    class="hover:text-blue-600 dark:hover:text-blue-400">
                                                     {{ $user->full_name }}
@@ -423,7 +423,7 @@
                                 {{-- Email Column --}}
                                 @if($visibleColumns['email'])
                                     <td class="px-6 py-4 whitespace-nowrap">
-                                        <div class="text-sm text-gray-900 dark:text-white">{{ $user->email }}</div>
+                                        <div class="text-sm text-white">{{ $user->email }}</div>
                                         @if($user->email_verified_at)
                                             <div class="text-xs text-green-600 dark:text-green-400 flex items-center">
                                                 <svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
@@ -445,7 +445,7 @@
                                 {{-- Company Column --}}
                                 @if($visibleColumns['company'])
                                     <td class="px-6 py-4 whitespace-nowrap">
-                                        <div class="text-sm text-gray-900 dark:text-white">{{ $user->company ?? '-' }}</div>
+                                        <div class="text-sm text-white">{{ $user->company ?? '-' }}</div>
                                     </td>
                                 @endif
 
@@ -483,7 +483,7 @@
 
                                 {{-- Last Login Column --}}
                                 @if($visibleColumns['last_login'])
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-white">
                                         @if($user->last_login_at)
                                             <div>{{ $user->last_login_at->format('d.m.Y H:i') }}</div>
                                             <div class="text-xs text-gray-500 dark:text-gray-400">
@@ -561,7 +561,7 @@
             </div>
 
             {{-- Pagination --}}
-            <div class="px-6 py-4 border-t border-gray-200 dark:border-gray-700">
+            <div class="px-6 py-4 border-t border-gray-700">
                 {{ $users->links() }}
             </div>
 
@@ -571,7 +571,7 @@
                 <svg class="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48">
                     <path d="M34 40h10v-4a6 6 0 00-10.712-3.714M34 40H14m20 0v-4a9.971 9.971 0 00-.712-3.714M14 40H4v-4a6 6 0 0110.713-3.714M14 40v-4c0-1.313.253-2.566.713-3.714m0 0A10.003 10.003 0 0124 26c4.21 0 7.813 2.602 9.288 6.286M30 14a6 6 0 11-12 0 6 6 0 0112 0zm12 6a4 4 0 11-8 0 4 4 0 018 0zm-28 0a4 4 0 11-8 0 4 4 0 018 0z" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
                 </svg>
-                <h3 class="mt-2 text-sm font-medium text-gray-900 dark:text-white">Brak użytkowników</h3>
+                <h3 class="mt-2 text-sm font-medium text-white">Brak użytkowników</h3>
                 <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
                     @if($search || $roleFilter !== 'all' || $companyFilter !== 'all' || $statusFilter !== 'all' || $lastLoginFilter !== 'all')
                         Nie znaleziono użytkowników spełniających kryteria wyszukiwania.
@@ -605,7 +605,7 @@
             <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
                 <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" wire:click="closeBulkModal"></div>
 
-                <div class="inline-block align-bottom bg-white dark:bg-gray-800 rounded-lg px-4 pt-5 pb-4 text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full sm:p-6">
+                <div class="inline-block align-bottom bg-gray-800 rounded-lg px-4 pt-5 pb-4 text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full sm:p-6">
                     <div>
                         <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-blue-100 dark:bg-blue-900">
                             <svg class="h-6 w-6 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -613,7 +613,7 @@
                             </svg>
                         </div>
                         <div class="mt-3 text-center sm:mt-5">
-                            <h3 class="text-lg leading-6 font-medium text-gray-900 dark:text-white" id="modal-title">
+                            <h3 class="text-lg leading-6 font-medium text-white" id="modal-title">
                                 Akcje masowe
                             </h3>
                             <div class="mt-2">
@@ -628,7 +628,7 @@
                         {{-- Bulk Action Selection --}}
                         <div>
                             <select wire:model="bulkAction" 
-                                    class="block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50 dark:bg-gray-700 dark:text-white">
+                                    class="block w-full rounded-md border-gray-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50 dark:bg-gray-700 dark:text-white">
                                 <option value="">Wybierz akcję...</option>
                                 <option value="activate">Aktywuj użytkowników</option>
                                 <option value="deactivate">Dezaktywuj użytkowników</option>
@@ -641,11 +641,11 @@
                         {{-- Role Selection for Bulk Role Assignment --}}
                         @if($bulkAction === 'assign_role')
                             <div>
-                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                <label class="block text-sm font-medium text-gray-300 mb-1">
                                     Wybierz rolę do przypisania:
                                 </label>
                                 <select wire:model="bulkRoleId" 
-                                        class="block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50 dark:bg-gray-700 dark:text-white">
+                                        class="block w-full rounded-md border-gray-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50 dark:bg-gray-700 dark:text-white">
                                     <option value="">Wybierz rolę...</option>
                                     @foreach($roles as $role)
                                         <option value="{{ $role->id }}">{{ $role->name }}</option>
@@ -675,9 +675,9 @@
 
     {{-- Loading States --}}
     <div wire:loading class="fixed inset-0 z-40 bg-black bg-opacity-25 flex items-center justify-center">
-        <div class="bg-white dark:bg-gray-800 rounded-lg p-6 flex items-center space-x-3">
+        <div class="bg-gray-800 rounded-lg p-6 flex items-center space-x-3">
             <div class="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
-            <span class="text-gray-900 dark:text-white">Ładowanie...</span>
+            <span class="text-white">Ładowanie...</span>
         </div>
     </div>
 </div>

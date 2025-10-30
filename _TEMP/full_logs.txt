@@ -1,0 +1,200 @@
+[2025-10-24 17:47:44] production.INFO: VehicleFeatureManagement::openTemplateEditor CALLED {"mode":"new"} 
+[2025-10-24 17:47:44] production.INFO: VehicleFeatureManagement::openTemplateEditor CALLED {"mode":"new"} 
+[2025-10-24 17:47:52] production.DEBUG: VehicleFeatureManagement::editTemplate CALLED {"template_id":1} 
+[2025-10-24 17:47:52] production.DEBUG: VehicleFeatureManagement::editTemplate CALLED {"template_id":1} 
+[2025-10-24 17:47:54] production.INFO: VehicleFeatureManagement::openTemplateEditor CALLED {"mode":"new"} 
+[2025-10-24 17:47:54] production.INFO: VehicleFeatureManagement::openTemplateEditor CALLED {"mode":"new"} 
+[2025-10-24 17:47:54] production.INFO: VehicleFeatureManagement::openTemplateEditor CALLED {"mode":"new"} 
+[2025-10-24 17:50:02] production.INFO: VehicleFeatureManagement::deleteTemplate CALLED {"template_id":2} 
+[2025-10-24 17:50:02] production.INFO: VehicleFeatureManagement::deleteTemplate CALLED {"template_id":2} 
+[2025-10-24 17:50:03] production.INFO: VehicleFeatureManagement::deleteTemplate CALLED {"template_id":2} 
+[2025-10-24 17:50:03] production.INFO: VehicleFeatureManagement::deleteTemplate CALLED {"template_id":1} 
+[2025-10-24 17:50:04] production.DEBUG: VehicleFeatureManagement::editTemplate CALLED {"template_id":1} 
+[2025-10-24 17:50:04] production.DEBUG: VehicleFeatureManagement::editTemplate CALLED {"template_id":1} 
+[2025-10-24 17:55:24] production.DEBUG: VehicleFeatureManagement::loadPredefinedTemplates {"count":2} 
+[2025-10-24 17:55:24] production.DEBUG: VehicleFeatureManagement::loadCustomTemplates {"count":0} 
+[2025-10-24 17:55:24] production.DEBUG: VehicleFeatureManagement::loadFeatureLibrary {"groups_count":3,"total_features":10} 
+[2025-10-24 17:56:40] production.DEBUG: VehicleFeatureManagement::editTemplate CALLED {"template_id":1} 
+[2025-10-24 17:56:41] production.INFO: VehicleFeatureManagement::deleteTemplate CALLED {"template_id":1} 
+[2025-10-24 17:56:41] production.DEBUG: VehicleFeatureManagement::editTemplate CALLED {"template_id":2} 
+[2025-10-24 17:56:42] production.INFO: VehicleFeatureManagement::deleteTemplate CALLED {"template_id":2} 
+[2025-10-24 18:00:04] production.ERROR: Unable to call component method. Public method [addVehicle] not found on component {"exception":"[object] (Livewire\\Exceptions\\MethodNotFoundException(code: 0): Unable to call component method. Public method [addVehicle] not found on component at /home/host379076/domains/ppm.mpptrade.pl/public_html/vendor/livewire/livewire/src/Mechanisms/HandleComponents/HandleComponents.php:488)
+[stacktrace]
+#0 /home/host379076/domains/ppm.mpptrade.pl/public_html/vendor/livewire/livewire/src/Mechanisms/HandleComponents/HandleComponents.php(101): Livewire\\Mechanisms\\HandleComponents\\HandleComponents->callMethods()
+#1 /home/host379076/domains/ppm.mpptrade.pl/public_html/vendor/livewire/livewire/src/LivewireManager.php(102): Livewire\\Mechanisms\\HandleComponents\\HandleComponents->update()
+#2 /home/host379076/domains/ppm.mpptrade.pl/public_html/vendor/livewire/livewire/src/Mechanisms/HandleRequests/HandleRequests.php(94): Livewire\\LivewireManager->update()
+#3 /home/host379076/domains/ppm.mpptrade.pl/public_html/vendor/laravel/framework/src/Illuminate/Routing/ControllerDispatcher.php(47): Livewire\\Mechanisms\\HandleRequests\\HandleRequests->handleUpdate()
+#4 /home/host379076/domains/ppm.mpptrade.pl/public_html/vendor/laravel/framework/src/Illuminate/Routing/Route.php(266): Illuminate\\Routing\\ControllerDispatcher->dispatch()
+#5 /home/host379076/domains/ppm.mpptrade.pl/public_html/vendor/laravel/framework/src/Illuminate/Routing/Route.php(212): Illuminate\\Routing\\Route->runController()
+#6 /home/host379076/domains/ppm.mpptrade.pl/public_html/vendor/laravel/framework/src/Illuminate/Routing/Router.php(808): Illuminate\\Routing\\Route->run()
+#7 /home/host379076/domains/ppm.mpptrade.pl/public_html/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(170): Illuminate\\Routing\\Router->Illuminate\\Routing\\{closure}()
+#8 /home/host379076/domains/ppm.mpptrade.pl/public_html/vendor/laravel/framework/src/Illuminate/Routing/Middleware/SubstituteBindings.php(51): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}()
+#9 /home/host379076/domains/ppm.mpptrade.pl/public_html/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Illuminate\\Routing\\Middleware\\SubstituteBindings->handle()
+#10 /home/host379076/domains/ppm.mpptrade.pl/public_html/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/VerifyCsrfToken.php(88): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}()
+#11 /home/host379076/domains/ppm.mpptrade.pl/public_html/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Illuminate\\Foundation\\Http\\Middleware\\VerifyCsrfToken->handle()
+#12 /home/host379076/domains/ppm.mpptrade.pl/public_html/vendor/laravel/framework/src/Illuminate/View/Middleware/ShareErrorsFromSession.php(49): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}()
+#13 /home/host379076/domains/ppm.mpptrade.pl/public_html/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Illuminate\\View\\Middleware\\ShareErrorsFromSession->handle()
+#14 /home/host379076/domains/ppm.mpptrade.pl/public_html/vendor/laravel/framework/src/Illuminate/Session/Middleware/StartSession.php(121): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}()
+#15 /home/host379076/domains/ppm.mpptrade.pl/public_html/vendor/laravel/framework/src/Illuminate/Session/Middleware/StartSession.php(64): Illuminate\\Session\\Middleware\\StartSession->handleStatefulRequest()
+#16 /home/host379076/domains/ppm.mpptrade.pl/public_html/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Illuminate\\Session\\Middleware\\StartSession->handle()
+#17 /home/host379076/domains/ppm.mpptrade.pl/public_html/vendor/laravel/framework/src/Illuminate/Cookie/Middleware/AddQueuedCookiesToResponse.php(37): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}()
+#18 /home/host379076/domains/ppm.mpptrade.pl/public_html/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Illuminate\\Cookie\\Middleware\\AddQueuedCookiesToResponse->handle()
+#19 /home/host379076/domains/ppm.mpptrade.pl/public_html/vendor/laravel/framework/src/Illuminate/Cookie/Middleware/EncryptCookies.php(75): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}()
+#20 /home/host379076/domains/ppm.mpptrade.pl/public_html/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Illuminate\\Cookie\\Middleware\\EncryptCookies->handle()
+#21 /home/host379076/domains/ppm.mpptrade.pl/public_html/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(127): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}()
+#22 /home/host379076/domains/ppm.mpptrade.pl/public_html/vendor/laravel/framework/src/Illuminate/Routing/Router.php(807): Illuminate\\Pipeline\\Pipeline->then()
+#23 /home/host379076/domains/ppm.mpptrade.pl/public_html/vendor/laravel/framework/src/Illuminate/Routing/Router.php(786): Illuminate\\Routing\\Router->runRouteWithinStack()
+#24 /home/host379076/domains/ppm.mpptrade.pl/public_html/vendor/laravel/framework/src/Illuminate/Routing/Router.php(750): Illuminate\\Routing\\Router->runRoute()
+#25 /home/host379076/domains/ppm.mpptrade.pl/public_html/vendor/laravel/framework/src/Illuminate/Routing/Router.php(739): Illuminate\\Routing\\Router->dispatchToRoute()
+#26 /home/host379076/domains/ppm.mpptrade.pl/public_html/vendor/laravel/framework/src/Illuminate/Foundation/Http/Kernel.php(201): Illuminate\\Routing\\Router->dispatch()
+#27 /home/host379076/domains/ppm.mpptrade.pl/public_html/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(170): Illuminate\\Foundation\\Http\\Kernel->Illuminate\\Foundation\\Http\\{closure}()
+#28 /home/host379076/domains/ppm.mpptrade.pl/public_html/vendor/livewire/livewire/src/Features/SupportDisablingBackButtonCache/DisableBackButtonCacheMiddleware.php(19): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}()
+#29 /home/host379076/domains/ppm.mpptrade.pl/public_html/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Livewire\\Features\\SupportDisablingBackButtonCache\\DisableBackButtonCacheMiddleware->handle()
+#30 /home/host379076/domains/ppm.mpptrade.pl/public_html/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/ConvertEmptyStringsToNull.php(27): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}()
+#31 /home/host379076/domains/ppm.mpptrade.pl/public_html/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Illuminate\\Foundation\\Http\\Middleware\\ConvertEmptyStringsToNull->handle()
+#32 /home/host379076/domains/ppm.mpptrade.pl/public_html/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/TrimStrings.php(47): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}()
+#33 /home/host379076/domains/ppm.mpptrade.pl/public_html/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Illuminate\\Foundation\\Http\\Middleware\\TrimStrings->handle()
+#34 /home/host379076/domains/ppm.mpptrade.pl/public_html/vendor/laravel/framework/src/Illuminate/Http/Middleware/ValidatePostSize.php(27): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}()
+#35 /home/host379076/domains/ppm.mpptrade.pl/public_html/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Illuminate\\Http\\Middleware\\ValidatePostSize->handle()
+#36 /home/host379076/domains/ppm.mpptrade.pl/public_html/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/PreventRequestsDuringMaintenance.php(110): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}()
+#37 /home/host379076/domains/ppm.mpptrade.pl/public_html/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Illuminate\\Foundation\\Http\\Middleware\\PreventRequestsDuringMaintenance->handle()
+#38 /home/host379076/domains/ppm.mpptrade.pl/public_html/vendor/laravel/framework/src/Illuminate/Http/Middleware/HandleCors.php(49): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}()
+#39 /home/host379076/domains/ppm.mpptrade.pl/public_html/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Illuminate\\Http\\Middleware\\HandleCors->handle()
+#40 /home/host379076/domains/ppm.mpptrade.pl/public_html/vendor/laravel/framework/src/Illuminate/Http/Middleware/TrustProxies.php(58): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}()
+#41 /home/host379076/domains/ppm.mpptrade.pl/public_html/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Illuminate\\Http\\Middleware\\TrustProxies->handle()
+#42 /home/host379076/domains/ppm.mpptrade.pl/public_html/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/InvokeDeferredCallbacks.php(22): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}()
+#43 /home/host379076/domains/ppm.mpptrade.pl/public_html/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Illuminate\\Foundation\\Http\\Middleware\\InvokeDeferredCallbacks->handle()
+#44 /home/host379076/domains/ppm.mpptrade.pl/public_html/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(127): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}()
+#45 /home/host379076/domains/ppm.mpptrade.pl/public_html/vendor/laravel/framework/src/Illuminate/Foundation/Http/Kernel.php(176): Illuminate\\Pipeline\\Pipeline->then()
+#46 /home/host379076/domains/ppm.mpptrade.pl/public_html/vendor/laravel/framework/src/Illuminate/Foundation/Http/Kernel.php(145): Illuminate\\Foundation\\Http\\Kernel->sendRequestThroughRouter()
+#47 /home/host379076/domains/ppm.mpptrade.pl/public_html/public/index.php(51): Illuminate\\Foundation\\Http\\Kernel->handle()
+#48 /home/host379076/domains/ppm.mpptrade.pl/public_html/index.php(4): require('/home/host37907...')
+#49 {main}
+"} 
+[2025-10-24 18:00:06] production.DEBUG: VehicleFeatureManagement::loadPredefinedTemplates {"count":2} 
+[2025-10-24 18:00:06] production.DEBUG: VehicleFeatureManagement::loadCustomTemplates {"count":0} 
+[2025-10-24 18:00:06] production.DEBUG: VehicleFeatureManagement::loadFeatureLibrary {"groups_count":3,"total_features":10} 
+[2025-10-24 18:00:34] production.DEBUG: VehicleFeatureManagement::loadPredefinedTemplates {"count":2} 
+[2025-10-24 18:00:34] production.DEBUG: VehicleFeatureManagement::loadCustomTemplates {"count":0} 
+[2025-10-24 18:00:34] production.DEBUG: VehicleFeatureManagement::loadFeatureLibrary {"groups_count":3,"total_features":10} 
+[2025-10-24 18:00:53] production.DEBUG: VehicleFeatureManagement::loadPredefinedTemplates {"count":2} 
+[2025-10-24 18:00:53] production.DEBUG: VehicleFeatureManagement::loadCustomTemplates {"count":0} 
+[2025-10-24 18:00:53] production.DEBUG: VehicleFeatureManagement::loadFeatureLibrary {"groups_count":3,"total_features":10} 
+[2025-10-24 18:01:05] production.INFO: VehicleFeatureManagement::deleteTemplate CALLED {"template_id":1} 
+[2025-10-24 18:01:06] production.DEBUG: VehicleFeatureManagement::editTemplate CALLED {"template_id":1} 
+[2025-10-24 18:01:07] production.DEBUG: VehicleFeatureManagement::editTemplate CALLED {"template_id":2} 
+[2025-10-24 18:01:08] production.DEBUG: VehicleFeatureManagement::loadPredefinedTemplates {"count":2} 
+[2025-10-24 18:01:08] production.DEBUG: VehicleFeatureManagement::loadCustomTemplates {"count":0} 
+[2025-10-24 18:01:08] production.DEBUG: VehicleFeatureManagement::loadFeatureLibrary {"groups_count":3,"total_features":10} 
+[2025-10-24 18:01:10] production.DEBUG: VehicleFeatureManagement::editTemplate CALLED {"template_id":1} 
+[2025-10-24 18:01:10] production.INFO: VehicleFeatureManagement::openTemplateEditor CALLED {"mode":"new"} 
+[2025-10-24 18:01:32] production.DEBUG: VehicleFeatureManagement::loadPredefinedTemplates {"count":2} 
+[2025-10-24 18:01:32] production.DEBUG: VehicleFeatureManagement::loadCustomTemplates {"count":0} 
+[2025-10-24 18:01:32] production.DEBUG: VehicleFeatureManagement::loadFeatureLibrary {"groups_count":3,"total_features":10} 
+[2025-10-24 18:01:34] production.DEBUG: VehicleFeatureManagement::editTemplate CALLED {"template_id":1} 
+[2025-10-24 18:01:34] production.DEBUG: VehicleFeatureManagement::editTemplate CALLED {"template_id":1} 
+[2025-10-24 18:01:34] production.DEBUG: VehicleFeatureManagement::editTemplate CALLED {"template_id":1} 
+[2025-10-24 18:02:05] production.DEBUG: VehicleFeatureManagement::editTemplate CALLED {"template_id":2} 
+[2025-10-24 18:02:06] production.DEBUG: VehicleFeatureManagement::editTemplate CALLED {"template_id":2} 
+[2025-10-24 18:02:07] production.DEBUG: VehicleFeatureManagement::editTemplate CALLED {"template_id":2} 
+[2025-10-24 18:02:46] production.INFO: VehicleFeatureManagement::deleteTemplate CALLED {"template_id":2} 
+[2025-10-24 18:02:46] production.INFO: VehicleFeatureManagement::deleteTemplate CALLED {"template_id":2} 
+[2025-10-24 18:02:47] production.INFO: VehicleFeatureManagement::deleteTemplate CALLED {"template_id":2} 
+[2025-10-24 18:02:47] production.INFO: VehicleFeatureManagement::deleteTemplate CALLED {"template_id":2} 
+[2025-10-24 18:02:56] production.DEBUG: VehicleFeatureManagement::editTemplate CALLED {"template_id":2} 
+[2025-10-24 18:02:57] production.DEBUG: VehicleFeatureManagement::editTemplate CALLED {"template_id":2} 
+[2025-10-24 18:02:58] production.INFO: VehicleFeatureManagement::deleteTemplate CALLED {"template_id":1} 
+[2025-10-24 18:02:58] production.DEBUG: VehicleFeatureManagement::editTemplate CALLED {"template_id":1} 
+[2025-10-24 18:07:23] production.DEBUG: VehicleFeatureManagement::loadPredefinedTemplates {"count":2} 
+[2025-10-24 18:07:23] production.DEBUG: VehicleFeatureManagement::loadCustomTemplates {"count":0} 
+[2025-10-24 18:07:23] production.DEBUG: VehicleFeatureManagement::loadFeatureLibrary {"groups_count":3,"total_features":10} 
+[2025-10-24 18:07:26] production.INFO: VehicleFeatureManagement::openTemplateEditor CALLED {"mode":"new"} 
+[2025-10-24 18:07:27] production.INFO: VehicleFeatureManagement::deleteTemplate CALLED {"template_id":2} 
+[2025-10-24 18:07:27] production.DEBUG: VehicleFeatureManagement::editTemplate CALLED {"template_id":2} 
+[2025-10-24 18:07:28] production.INFO: VehicleFeatureManagement::deleteTemplate CALLED {"template_id":1} 
+[2025-10-24 18:07:28] production.DEBUG: VehicleFeatureManagement::editTemplate CALLED {"template_id":1} 
+[2025-10-24 18:12:53] production.ERROR: Unable to call component method. Public method [openBulkActions] not found on component {"exception":"[object] (Livewire\\Exceptions\\MethodNotFoundException(code: 0): Unable to call component method. Public method [openBulkActions] not found on component at /home/host379076/domains/ppm.mpptrade.pl/public_html/vendor/livewire/livewire/src/Mechanisms/HandleComponents/HandleComponents.php:488)
+[stacktrace]
+#0 /home/host379076/domains/ppm.mpptrade.pl/public_html/vendor/livewire/livewire/src/Mechanisms/HandleComponents/HandleComponents.php(101): Livewire\\Mechanisms\\HandleComponents\\HandleComponents->callMethods()
+#1 /home/host379076/domains/ppm.mpptrade.pl/public_html/vendor/livewire/livewire/src/LivewireManager.php(102): Livewire\\Mechanisms\\HandleComponents\\HandleComponents->update()
+#2 /home/host379076/domains/ppm.mpptrade.pl/public_html/vendor/livewire/livewire/src/Mechanisms/HandleRequests/HandleRequests.php(94): Livewire\\LivewireManager->update()
+#3 /home/host379076/domains/ppm.mpptrade.pl/public_html/vendor/laravel/framework/src/Illuminate/Routing/ControllerDispatcher.php(47): Livewire\\Mechanisms\\HandleRequests\\HandleRequests->handleUpdate()
+#4 /home/host379076/domains/ppm.mpptrade.pl/public_html/vendor/laravel/framework/src/Illuminate/Routing/Route.php(266): Illuminate\\Routing\\ControllerDispatcher->dispatch()
+#5 /home/host379076/domains/ppm.mpptrade.pl/public_html/vendor/laravel/framework/src/Illuminate/Routing/Route.php(212): Illuminate\\Routing\\Route->runController()
+#6 /home/host379076/domains/ppm.mpptrade.pl/public_html/vendor/laravel/framework/src/Illuminate/Routing/Router.php(808): Illuminate\\Routing\\Route->run()
+#7 /home/host379076/domains/ppm.mpptrade.pl/public_html/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(170): Illuminate\\Routing\\Router->Illuminate\\Routing\\{closure}()
+#8 /home/host379076/domains/ppm.mpptrade.pl/public_html/vendor/laravel/framework/src/Illuminate/Routing/Middleware/SubstituteBindings.php(51): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}()
+#9 /home/host379076/domains/ppm.mpptrade.pl/public_html/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Illuminate\\Routing\\Middleware\\SubstituteBindings->handle()
+#10 /home/host379076/domains/ppm.mpptrade.pl/public_html/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/VerifyCsrfToken.php(88): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}()
+#11 /home/host379076/domains/ppm.mpptrade.pl/public_html/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Illuminate\\Foundation\\Http\\Middleware\\VerifyCsrfToken->handle()
+#12 /home/host379076/domains/ppm.mpptrade.pl/public_html/vendor/laravel/framework/src/Illuminate/View/Middleware/ShareErrorsFromSession.php(49): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}()
+#13 /home/host379076/domains/ppm.mpptrade.pl/public_html/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Illuminate\\View\\Middleware\\ShareErrorsFromSession->handle()
+#14 /home/host379076/domains/ppm.mpptrade.pl/public_html/vendor/laravel/framework/src/Illuminate/Session/Middleware/StartSession.php(121): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}()
+#15 /home/host379076/domains/ppm.mpptrade.pl/public_html/vendor/laravel/framework/src/Illuminate/Session/Middleware/StartSession.php(64): Illuminate\\Session\\Middleware\\StartSession->handleStatefulRequest()
+#16 /home/host379076/domains/ppm.mpptrade.pl/public_html/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Illuminate\\Session\\Middleware\\StartSession->handle()
+#17 /home/host379076/domains/ppm.mpptrade.pl/public_html/vendor/laravel/framework/src/Illuminate/Cookie/Middleware/AddQueuedCookiesToResponse.php(37): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}()
+#18 /home/host379076/domains/ppm.mpptrade.pl/public_html/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Illuminate\\Cookie\\Middleware\\AddQueuedCookiesToResponse->handle()
+#19 /home/host379076/domains/ppm.mpptrade.pl/public_html/vendor/laravel/framework/src/Illuminate/Cookie/Middleware/EncryptCookies.php(75): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}()
+#20 /home/host379076/domains/ppm.mpptrade.pl/public_html/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Illuminate\\Cookie\\Middleware\\EncryptCookies->handle()
+#21 /home/host379076/domains/ppm.mpptrade.pl/public_html/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(127): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}()
+#22 /home/host379076/domains/ppm.mpptrade.pl/public_html/vendor/laravel/framework/src/Illuminate/Routing/Router.php(807): Illuminate\\Pipeline\\Pipeline->then()
+#23 /home/host379076/domains/ppm.mpptrade.pl/public_html/vendor/laravel/framework/src/Illuminate/Routing/Router.php(786): Illuminate\\Routing\\Router->runRouteWithinStack()
+#24 /home/host379076/domains/ppm.mpptrade.pl/public_html/vendor/laravel/framework/src/Illuminate/Routing/Router.php(750): Illuminate\\Routing\\Router->runRoute()
+#25 /home/host379076/domains/ppm.mpptrade.pl/public_html/vendor/laravel/framework/src/Illuminate/Routing/Router.php(739): Illuminate\\Routing\\Router->dispatchToRoute()
+#26 /home/host379076/domains/ppm.mpptrade.pl/public_html/vendor/laravel/framework/src/Illuminate/Foundation/Http/Kernel.php(201): Illuminate\\Routing\\Router->dispatch()
+#27 /home/host379076/domains/ppm.mpptrade.pl/public_html/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(170): Illuminate\\Foundation\\Http\\Kernel->Illuminate\\Foundation\\Http\\{closure}()
+#28 /home/host379076/domains/ppm.mpptrade.pl/public_html/vendor/livewire/livewire/src/Features/SupportDisablingBackButtonCache/DisableBackButtonCacheMiddleware.php(19): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}()
+#29 /home/host379076/domains/ppm.mpptrade.pl/public_html/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Livewire\\Features\\SupportDisablingBackButtonCache\\DisableBackButtonCacheMiddleware->handle()
+#30 /home/host379076/domains/ppm.mpptrade.pl/public_html/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/ConvertEmptyStringsToNull.php(27): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}()
+#31 /home/host379076/domains/ppm.mpptrade.pl/public_html/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Illuminate\\Foundation\\Http\\Middleware\\ConvertEmptyStringsToNull->handle()
+#32 /home/host379076/domains/ppm.mpptrade.pl/public_html/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/TrimStrings.php(47): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}()
+#33 /home/host379076/domains/ppm.mpptrade.pl/public_html/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Illuminate\\Foundation\\Http\\Middleware\\TrimStrings->handle()
+#34 /home/host379076/domains/ppm.mpptrade.pl/public_html/vendor/laravel/framework/src/Illuminate/Http/Middleware/ValidatePostSize.php(27): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}()
+#35 /home/host379076/domains/ppm.mpptrade.pl/public_html/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Illuminate\\Http\\Middleware\\ValidatePostSize->handle()
+#36 /home/host379076/domains/ppm.mpptrade.pl/public_html/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/PreventRequestsDuringMaintenance.php(110): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}()
+#37 /home/host379076/domains/ppm.mpptrade.pl/public_html/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Illuminate\\Foundation\\Http\\Middleware\\PreventRequestsDuringMaintenance->handle()
+#38 /home/host379076/domains/ppm.mpptrade.pl/public_html/vendor/laravel/framework/src/Illuminate/Http/Middleware/HandleCors.php(49): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}()
+#39 /home/host379076/domains/ppm.mpptrade.pl/public_html/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Illuminate\\Http\\Middleware\\HandleCors->handle()
+#40 /home/host379076/domains/ppm.mpptrade.pl/public_html/vendor/laravel/framework/src/Illuminate/Http/Middleware/TrustProxies.php(58): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}()
+#41 /home/host379076/domains/ppm.mpptrade.pl/public_html/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Illuminate\\Http\\Middleware\\TrustProxies->handle()
+#42 /home/host379076/domains/ppm.mpptrade.pl/public_html/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/InvokeDeferredCallbacks.php(22): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}()
+#43 /home/host379076/domains/ppm.mpptrade.pl/public_html/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Illuminate\\Foundation\\Http\\Middleware\\InvokeDeferredCallbacks->handle()
+#44 /home/host379076/domains/ppm.mpptrade.pl/public_html/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(127): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}()
+#45 /home/host379076/domains/ppm.mpptrade.pl/public_html/vendor/laravel/framework/src/Illuminate/Foundation/Http/Kernel.php(176): Illuminate\\Pipeline\\Pipeline->then()
+#46 /home/host379076/domains/ppm.mpptrade.pl/public_html/vendor/laravel/framework/src/Illuminate/Foundation/Http/Kernel.php(145): Illuminate\\Foundation\\Http\\Kernel->sendRequestThroughRouter()
+#47 /home/host379076/domains/ppm.mpptrade.pl/public_html/public/index.php(51): Illuminate\\Foundation\\Http\\Kernel->handle()
+#48 /home/host379076/domains/ppm.mpptrade.pl/public_html/index.php(4): require('/home/host37907...')
+#49 {main}
+"} 
+[2025-10-24 18:13:06] production.DEBUG: VehicleFeatureManagement::loadPredefinedTemplates {"count":2} 
+[2025-10-24 18:13:06] production.DEBUG: VehicleFeatureManagement::loadCustomTemplates {"count":0} 
+[2025-10-24 18:13:06] production.DEBUG: VehicleFeatureManagement::loadFeatureLibrary {"groups_count":3,"total_features":10} 
+[2025-10-24 18:13:12] production.DEBUG: VehicleFeatureManagement::loadPredefinedTemplates {"count":2} 
+[2025-10-24 18:13:12] production.DEBUG: VehicleFeatureManagement::loadCustomTemplates {"count":0} 
+[2025-10-24 18:13:12] production.DEBUG: VehicleFeatureManagement::loadFeatureLibrary {"groups_count":3,"total_features":10} 
+[2025-10-24 18:13:38] production.DEBUG: VehicleFeatureManagement::loadPredefinedTemplates {"count":2} 
+[2025-10-24 18:13:38] production.DEBUG: VehicleFeatureManagement::loadCustomTemplates {"count":0} 
+[2025-10-24 18:13:38] production.DEBUG: VehicleFeatureManagement::loadFeatureLibrary {"groups_count":3,"total_features":10} 
+[2025-10-24 18:13:39] production.DEBUG: VehicleFeatureManagement::editTemplate CALLED {"template_id":1} 
+[2025-10-24 18:13:40] production.DEBUG: VehicleFeatureManagement::editTemplate CALLED {"template_id":2} 
+[2025-10-24 18:13:41] production.INFO: VehicleFeatureManagement::openTemplateEditor CALLED {"mode":"new"} 
+[2025-10-24 18:13:42] production.INFO: VehicleFeatureManagement::openTemplateEditor CALLED {"mode":"new"} 
+[2025-10-24 18:15:25] production.DEBUG: VehicleFeatureManagement::loadPredefinedTemplates {"count":2} 
+[2025-10-24 18:15:25] production.DEBUG: VehicleFeatureManagement::loadCustomTemplates {"count":0} 
+[2025-10-24 18:15:25] production.DEBUG: VehicleFeatureManagement::loadFeatureLibrary {"groups_count":3,"total_features":10} 
+[2025-10-24 18:16:16] production.DEBUG: VehicleFeatureManagement::loadPredefinedTemplates {"count":2} 
+[2025-10-24 18:16:16] production.DEBUG: VehicleFeatureManagement::loadCustomTemplates {"count":0} 
+[2025-10-24 18:16:16] production.DEBUG: VehicleFeatureManagement::loadFeatureLibrary {"groups_count":3,"total_features":10} 
+[2025-10-24 18:16:17] production.DEBUG: VehicleFeatureManagement::editTemplate CALLED {"template_id":2} 
+[2025-10-24 18:16:19] production.INFO: VehicleFeatureManagement::openTemplateEditor CALLED {"mode":"new"} 
+[2025-10-24 18:16:20] production.DEBUG: VehicleFeatureManagement::editTemplate CALLED {"template_id":1} 
+[2025-10-24 18:16:21] production.DEBUG: VehicleFeatureManagement::editTemplate CALLED {"template_id":1} 
+[2025-10-24 18:16:21] production.DEBUG: VehicleFeatureManagement::editTemplate CALLED {"template_id":1} 
+[2025-10-24 18:16:51] production.INFO: VehicleFeatureManagement::deleteTemplate CALLED {"template_id":2} 
+[2025-10-24 18:16:51] production.INFO: VehicleFeatureManagement::deleteTemplate CALLED {"template_id":2} 
+[2025-10-24 18:16:52] production.INFO: VehicleFeatureManagement::deleteTemplate CALLED {"template_id":2} 
+[2025-10-24 18:16:52] production.INFO: VehicleFeatureManagement::deleteTemplate CALLED {"template_id":2} 
+[2025-10-24 18:16:54] production.INFO: VehicleFeatureManagement::deleteTemplate CALLED {"template_id":1} 
+[2025-10-24 18:16:54] production.INFO: VehicleFeatureManagement::deleteTemplate CALLED {"template_id":1} 
+[2025-10-24 18:17:09] production.INFO: VehicleFeatureManagement::openTemplateEditor CALLED {"mode":"new"} 
+[2025-10-24 18:17:10] production.INFO: VehicleFeatureManagement::openTemplateEditor CALLED {"mode":"new"} 

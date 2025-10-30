@@ -18,7 +18,7 @@
 
         <!-- Dropdown -->
         @if($showDropdown)
-            <div class="absolute right-0 mt-2 w-96 bg-white border border-gray-200 rounded-lg shadow-xl z-50"
+            <div class="absolute right-0 mt-2 w-96 bg-gray-800 border border-gray-200 rounded-lg shadow-xl z-50"
                  x-transition:enter="transition ease-out duration-200"
                  x-transition:enter-start="opacity-0 scale-95"
                  x-transition:enter-end="opacity-100 scale-100"
@@ -29,7 +29,7 @@
                 <!-- Header -->
                 <div class="px-4 py-3 border-b border-gray-200">
                     <div class="flex items-center justify-between">
-                        <h3 class="text-lg font-semibold text-gray-900">Powiadomienia</h3>
+                        <h3 class="text-lg font-semibold text-white">Powiadomienia</h3>
                         @if($unreadCount > 0)
                             <button wire:click="markAllAsRead" 
                                     class="text-sm text-blue-600 hover:text-blue-800">
@@ -58,7 +58,7 @@
                                     <i class="{{ $notification->type_icon }} {{ $notification->priority_color }} text-lg"></i>
                                 </div>
                                 <div class="flex-1 min-w-0">
-                                    <p class="text-sm font-medium text-gray-900 truncate">
+                                    <p class="text-sm font-medium text-white truncate">
                                         {{ $notification->title }}
                                     </p>
                                     <p class="text-sm text-gray-600 line-clamp-2">
@@ -100,7 +100,7 @@
             <!-- Page Header -->
             <div class="flex items-center justify-between">
                 <div>
-                    <h1 class="text-2xl font-bold text-gray-900">Centrum powiadomień</h1>
+                    <h1 class="text-2xl font-bold text-white">Centrum powiadomień</h1>
                     <p class="text-gray-600">Zarządzaj powiadomieniami systemowymi</p>
                 </div>
                 <div class="flex items-center space-x-3">
@@ -116,57 +116,57 @@
 
             <!-- Statistics Cards -->
             <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
-                <div class="bg-white rounded-lg shadow p-6">
+                <div class="bg-gray-800 rounded-lg shadow p-6">
                     <div class="flex items-center">
                         <div class="p-2 bg-blue-100 rounded-lg">
                             <i class="fas fa-bell text-blue-600"></i>
                         </div>
                         <div class="ml-4">
                             <p class="text-sm font-medium text-gray-600">Wszystkie</p>
-                            <p class="text-2xl font-bold text-gray-900">{{ $statistics['total'] ?? 0 }}</p>
+                            <p class="text-2xl font-bold text-white">{{ $statistics['total'] ?? 0 }}</p>
                         </div>
                     </div>
                 </div>
                 
-                <div class="bg-white rounded-lg shadow p-6">
+                <div class="bg-gray-800 rounded-lg shadow p-6">
                     <div class="flex items-center">
                         <div class="p-2 bg-orange-100 rounded-lg">
                             <i class="fas fa-envelope text-orange-600"></i>
                         </div>
                         <div class="ml-4">
                             <p class="text-sm font-medium text-gray-600">Nieprzeczytane</p>
-                            <p class="text-2xl font-bold text-gray-900">{{ $statistics['unread'] ?? 0 }}</p>
+                            <p class="text-2xl font-bold text-white">{{ $statistics['unread'] ?? 0 }}</p>
                         </div>
                     </div>
                 </div>
                 
-                <div class="bg-white rounded-lg shadow p-6">
+                <div class="bg-gray-800 rounded-lg shadow p-6">
                     <div class="flex items-center">
                         <div class="p-2 bg-red-100 rounded-lg">
                             <i class="fas fa-exclamation-triangle text-red-600"></i>
                         </div>
                         <div class="ml-4">
                             <p class="text-sm font-medium text-gray-600">Krytyczne</p>
-                            <p class="text-2xl font-bold text-gray-900">{{ $statistics['critical'] ?? 0 }}</p>
+                            <p class="text-2xl font-bold text-white">{{ $statistics['critical'] ?? 0 }}</p>
                         </div>
                     </div>
                 </div>
                 
-                <div class="bg-white rounded-lg shadow p-6">
+                <div class="bg-gray-800 rounded-lg shadow p-6">
                     <div class="flex items-center">
                         <div class="p-2 bg-green-100 rounded-lg">
                             <i class="fas fa-shield-alt text-green-600"></i>
                         </div>
                         <div class="ml-4">
                             <p class="text-sm font-medium text-gray-600">Bezpieczeństwo</p>
-                            <p class="text-2xl font-bold text-gray-900">{{ $statistics['by_type']['security'] ?? 0 }}</p>
+                            <p class="text-2xl font-bold text-white">{{ $statistics['by_type']['security'] ?? 0 }}</p>
                         </div>
                     </div>
                 </div>
             </div>
 
             <!-- Filters and Tabs -->
-            <div class="bg-white rounded-lg shadow">
+            <div class="bg-gray-800 rounded-lg shadow">
                 <div class="border-b border-gray-200">
                     <!-- Tabs -->
                     <nav class="flex space-x-8 px-6" aria-label="Tabs">
@@ -249,7 +249,7 @@
                                     </div>
                                     <div class="flex-1 min-w-0">
                                         <div class="flex items-center space-x-2">
-                                            <h3 class="text-lg font-medium text-gray-900">
+                                            <h3 class="text-lg font-medium text-white">
                                                 {{ $notification->title }}
                                             </h3>
                                             @if(!$notification->is_read)

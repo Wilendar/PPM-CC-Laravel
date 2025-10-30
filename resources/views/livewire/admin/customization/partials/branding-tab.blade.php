@@ -1,8 +1,8 @@
 <div class="p-6">
     <div class="flex justify-between items-center mb-6">
         <div>
-            <h3 class="text-lg font-medium text-gray-900 dark:text-white">Branding Firmy</h3>
-            <p class="text-sm text-gray-600 dark:text-gray-400">Dostosuj logo, nazwę i kolory firmowe</p>
+            <h3 class="text-lg font-medium text-white">Branding Firmy</h3>
+            <p class="text-sm text-gray-400">Dostosuj logo, nazwę i kolory firmowe</p>
         </div>
         
         <button wire:click="updateBranding" class="btn btn-primary">
@@ -17,7 +17,7 @@
         <!-- Company Logo Section -->
         <div class="space-y-6">
             <div>
-                <h4 class="text-md font-medium text-gray-900 dark:text-white mb-4">Logo Firmy</h4>
+                <h4 class="text-md font-medium text-white mb-4">Logo Firmy</h4>
                 
                 <!-- Current Logo Display -->
                 <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-6 mb-4">
@@ -39,7 +39,7 @@
 
                 <!-- Logo Upload -->
                 <div class="space-y-3">
-                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    <label class="block text-sm font-medium text-gray-300">
                         Prześlij nowe logo
                     </label>
                     
@@ -72,18 +72,18 @@
 
             <!-- Logo Positioning -->
             <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
-                <h5 class="text-sm font-medium text-gray-900 dark:text-white mb-3">Pozycjonowanie Logo</h5>
+                <h5 class="text-sm font-medium text-white mb-3">Pozycjonowanie Logo</h5>
                 
                 <div class="grid grid-cols-3 gap-2 text-xs">
-                    <div class="bg-white dark:bg-gray-600 p-2 rounded text-center">
+                    <div class="bg-gray-800 dark:bg-gray-600 p-2 rounded text-center">
                         <div class="font-semibold">Sidebar</div>
                         <div class="text-gray-500">40x30px</div>
                     </div>
-                    <div class="bg-white dark:bg-gray-600 p-2 rounded text-center">
+                    <div class="bg-gray-800 dark:bg-gray-600 p-2 rounded text-center">
                         <div class="font-semibold">Header</div>
                         <div class="text-gray-500">120x40px</div>
                     </div>
-                    <div class="bg-white dark:bg-gray-600 p-2 rounded text-center">
+                    <div class="bg-gray-800 dark:bg-gray-600 p-2 rounded text-center">
                         <div class="font-semibold">Login</div>
                         <div class="text-gray-500">200x60px</div>
                     </div>
@@ -98,12 +98,12 @@
         <!-- Company Information -->
         <div class="space-y-6">
             <div>
-                <h4 class="text-md font-medium text-gray-900 dark:text-white mb-4">Informacje Firmy</h4>
+                <h4 class="text-md font-medium text-white mb-4">Informacje Firmy</h4>
                 
                 <div class="space-y-4">
                     <!-- Company Name -->
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        <label class="block text-sm font-medium text-gray-300 mb-2">
                             Nazwa firmy
                         </label>
                         <input type="text" 
@@ -117,7 +117,7 @@
                     
                     <!-- Company Description -->
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        <label class="block text-sm font-medium text-gray-300 mb-2">
                             Opis firmy (opcjonalny)
                         </label>
                         <textarea wire:model.live="dashboardSettings.company_description" 
@@ -133,19 +133,19 @@
 
             <!-- Brand Colors Palette -->
             <div>
-                <h4 class="text-md font-medium text-gray-900 dark:text-white mb-4">Paleta Kolorów Firmowych</h4>
+                <h4 class="text-md font-medium text-white mb-4">Paleta Kolorów Firmowych</h4>
                 
                 <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
                     <div class="space-y-3">
                         <!-- Current Company Colors -->
                         @if(!empty($companyColors))
                             <div>
-                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                <label class="block text-sm font-medium text-gray-300 mb-2">
                                     Aktualne kolory firmowe
                                 </label>
                                 <div class="flex flex-wrap gap-2">
                                     @foreach($companyColors as $index => $color)
-                                        <div class="flex items-center space-x-2 bg-white dark:bg-gray-600 rounded-lg p-2 group">
+                                        <div class="flex items-center space-x-2 bg-gray-800 dark:bg-gray-600 rounded-lg p-2 group">
                                             <div class="w-8 h-8 rounded-lg border-2 border-gray-200" 
                                                  style="background-color: {{ $color }}"></div>
                                             <div>
@@ -168,7 +168,7 @@
                         
                         <!-- Add New Color -->
                         <div x-data="{ newColor: '#' + Math.floor(Math.random()*16777215).toString(16) }">
-                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            <label class="block text-sm font-medium text-gray-300 mb-2">
                                 Dodaj nowy kolor firmowy
                             </label>
                             <div class="flex items-center space-x-3">
@@ -211,11 +211,11 @@
 
     <!-- Branding Preview -->
     <div class="mt-8 pt-8 border-t border-gray-200 dark:border-gray-600">
-        <h4 class="text-md font-medium text-gray-900 dark:text-white mb-6">Podgląd Brandingu</h4>
+        <h4 class="text-md font-medium text-white mb-6">Podgląd Brandingu</h4>
         
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
             <!-- Header Preview -->
-            <div class="bg-white dark:bg-gray-800 rounded-lg border shadow-sm overflow-hidden">
+            <div class="bg-gray-800 rounded-lg border shadow-sm overflow-hidden">
                 <div class="bg-gradient-to-r from-blue-600 to-blue-700 px-4 py-3">
                     <div class="flex items-center space-x-3">
                         @if($currentTheme && $currentTheme->company_logo)
@@ -223,7 +223,7 @@
                                  alt="Logo" 
                                  class="h-8 w-auto">
                         @else
-                            <div class="w-8 h-8 bg-white bg-opacity-20 rounded flex items-center justify-center">
+                            <div class="w-8 h-8 bg-gray-800 bg-opacity-20 rounded flex items-center justify-center">
                                 <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path>
                                 </svg>
@@ -233,7 +233,7 @@
                     </div>
                 </div>
                 <div class="p-4">
-                    <div class="text-sm text-gray-600 dark:text-gray-400">Podgląd nagłówka aplikacji</div>
+                    <div class="text-sm text-gray-400">Podgląd nagłówka aplikacji</div>
                 </div>
             </div>
 
@@ -251,15 +251,15 @@
                             </svg>
                         </div>
                     @endif
-                    <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+                    <h3 class="text-lg font-semibold text-white mb-2">
                         {{ $companyName ?: 'PPM Admin' }}
                     </h3>
                     @if($dashboardSettings['company_description'] ?? false)
-                        <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                        <p class="text-sm text-gray-400 mb-4">
                             {{ $dashboardSettings['company_description'] }}
                         </p>
                     @endif
-                    <div class="bg-white dark:bg-gray-800 rounded p-3">
+                    <div class="bg-gray-800 rounded p-3">
                         <div class="text-xs text-gray-500">Podgląd strony logowania</div>
                     </div>
                 </div>
@@ -269,7 +269,7 @@
         <!-- Color Palette Display -->
         @if(!empty($companyColors))
             <div class="mt-6 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                <h5 class="text-sm font-medium text-gray-900 dark:text-white mb-3">Paleta kolorów w użyciu:</h5>
+                <h5 class="text-sm font-medium text-white mb-3">Paleta kolorów w użyciu:</h5>
                 <div class="flex space-x-2">
                     @foreach($companyColors as $color)
                         <div class="flex flex-col items-center">
@@ -287,7 +287,7 @@
     <div class="mt-8 pt-8 border-t border-gray-200 dark:border-gray-600">
         <div x-data="{ showGuidelines: false }">
             <button @click="showGuidelines = !showGuidelines" 
-                    class="flex items-center text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-gray-900">
+                    class="flex items-center text-sm font-medium text-gray-300 hover:text-white">
                 <svg class="w-4 h-4 mr-2 transform transition-transform" 
                      :class="{ 'rotate-90': showGuidelines }" 
                      fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -304,8 +304,8 @@
                 
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm">
                     <div>
-                        <h5 class="font-medium text-gray-900 dark:text-white mb-2">Logo</h5>
-                        <ul class="text-gray-600 dark:text-gray-400 space-y-1">
+                        <h5 class="font-medium text-white mb-2">Logo</h5>
+                        <ul class="text-gray-400 space-y-1">
                             <li>• Preferowany format: SVG (skalowalny)</li>
                             <li>• PNG z przezroczystym tłem jako alternatywa</li>
                             <li>• Minimalna szerokość: 120px</li>
@@ -315,8 +315,8 @@
                     </div>
                     
                     <div>
-                        <h5 class="font-medium text-gray-900 dark:text-white mb-2">Kolory</h5>
-                        <ul class="text-gray-600 dark:text-gray-400 space-y-1">
+                        <h5 class="font-medium text-white mb-2">Kolory</h5>
+                        <ul class="text-gray-400 space-y-1">
                             <li>• Maksymalnie 5-6 kolorów w palecie</li>
                             <li>• Uwzględnij kontrast dla dostępności</li>
                             <li>• Jedna dominująca barwa + uzupełniające</li>

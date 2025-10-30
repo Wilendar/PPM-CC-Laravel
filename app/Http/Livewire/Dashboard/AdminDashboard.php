@@ -44,7 +44,10 @@ class AdminDashboard extends Component
     public $refreshInterval = 60; // seconds
     public $autoRefresh = true;
     public $refreshOptions = [30, 60, 300]; // 30s, 1min, 5min
-    
+
+    // User role for role-based dashboard content
+    public $userRole = 'Admin';
+
     // Dashboard data
     public $dashboardStats = [];
     public $systemHealth = [];
@@ -78,8 +81,8 @@ class AdminDashboard extends Component
 
     public function mount()
     {
-        Log::info('AdminDashboard mount() called - loading with NEW progress bar logic');
-        
+        Log::info('AdminDashboard mount() called - loading with unified layout and role-based content');
+
         // TEMPORARY: Authorization disabled for development testing
         /*
         // Check admin authorization
@@ -87,16 +90,32 @@ class AdminDashboard extends Component
             abort(403, 'Unauthorized access to admin dashboard.');
         }
         */
-        
-        // Initialize dashboard data
+
+        // Detect user role for role-based dashboard content
+        $this->userRole = $this->getUserRole();
+
+        // Initialize dashboard data based on role
         $this->loadDashboardData();
+    }
+
+    /**
+     * Get current user role
+     */
+    private function getUserRole(): string
+    {
+        // TEMPORARY: Default to 'Admin' for development
+        // In production, use: auth()->user()->role
+        if (auth()->check() && auth()->user()->role) {
+            return auth()->user()->role;
+        }
+        return 'Admin'; // Development fallback
     }
 
     public function render()
     {
-        // TEMPORARY: Use simplified layout for development
+        // Use unified admin layout with sidebar
         return view('livewire.dashboard.admin-dashboard')
-            ->layout('layouts.admin-dev', [
+            ->layout('layouts.admin', [
                 'title' => 'Admin Dashboard - PPM'
             ]);
     }

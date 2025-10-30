@@ -88,7 +88,7 @@
 <body class="bg-gray-100 dark:bg-gray-900 font-sans antialiased">
     <div class="min-h-screen flex">
         {{-- Sidebar --}}
-        <aside class="fixed inset-y-0 left-0 z-50 w-64 bg-white dark:bg-gray-800 shadow-lg transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-0"
+        <aside class="fixed inset-y-0 left-0 z-50 w-64 bg-gray-800 shadow-lg transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-0"
                :class="{ 'translate-x-0': sidebarOpen, '-translate-x-full': !sidebarOpen }">
             
             {{-- Logo --}}
@@ -101,7 +101,7 @@
             
             {{-- User Info --}}
             @auth
-            <div class="p-4 border-b border-gray-200 dark:border-gray-700">
+            <div class="p-4 border-b border-gray-700">
                 <div class="flex items-center">
                     <div class="flex-shrink-0">
                         @if(Auth::user()->avatar)
@@ -110,14 +110,14 @@
                                  class="h-10 w-10 rounded-full object-cover">
                         @else
                             <div class="h-10 w-10 rounded-full bg-gray-300 dark:bg-gray-600 flex items-center justify-center">
-                                <span class="text-sm font-medium text-gray-700 dark:text-gray-300">
+                                <span class="text-sm font-medium text-gray-300">
                                     {{ substr(Auth::user()->first_name, 0, 1) }}{{ substr(Auth::user()->last_name, 0, 1) }}
                                 </span>
                             </div>
                         @endif
                     </div>
                     <div class="ml-3 min-w-0 flex-1">
-                        <p class="text-sm font-medium text-gray-900 dark:text-white truncate">
+                        <p class="text-sm font-medium text-white truncate">
                             {{ Auth::user()->first_name }} {{ Auth::user()->last_name }}
                         </p>
                         <p class="text-xs text-gray-500 dark:text-gray-400 truncate">
@@ -150,12 +150,12 @@
         {{-- Main Content --}}
         <div class="flex-1 flex flex-col lg:pl-64">
             {{-- Top Header --}}
-            <header class="bg-white dark:bg-gray-800 shadow-sm">
+            <header class="bg-gray-800 shadow-sm">
                 <div class="px-4 sm:px-6 lg:px-8">
                     <div class="flex justify-between items-center py-4">
                         {{-- Mobile menu button --}}
                         <button @click="sidebarOpen = !sidebarOpen" 
-                                class="lg:hidden -ml-0.5 -mt-0.5 h-12 w-12 inline-flex items-center justify-center rounded-md text-gray-500 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500">
+                                class="lg:hidden -ml-0.5 -mt-0.5 h-12 w-12 inline-flex items-center justify-center rounded-md text-gray-500 hover:text-white focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500">
                             <span class="sr-only">Open sidebar</span>
                             <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
@@ -164,7 +164,7 @@
                         
                         {{-- Page title --}}
                         <div class="flex-1 min-w-0 lg:ml-0 ml-4">
-                            <h2 class="text-2xl font-bold leading-7 text-gray-900 dark:text-white sm:text-3xl sm:truncate">
+                            <h2 class="text-2xl font-bold leading-7 text-white sm:text-3xl sm:truncate">
                                 @yield('page-title', 'Dashboard')
                             </h2>
                         </div>

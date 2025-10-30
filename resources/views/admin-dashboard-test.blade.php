@@ -9,14 +9,14 @@
 </head>
 <body class="bg-gray-50 antialiased">
     <!-- Header -->
-    <div class="bg-white shadow border-b border-gray-200 mb-8">
+    <div class="bg-gray-800 shadow border-b border-gray-200 mb-8">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex items-center justify-between h-16">
                 <div class="flex items-center">
                     <div class="h-8 w-8 bg-blue-600 rounded-lg flex items-center justify-center mr-3">
                         <span class="text-white font-bold text-sm">PPM</span>
                     </div>
-                    <h1 class="text-xl font-semibold text-gray-900">
+                    <h1 class="text-xl font-semibold text-white">
                         Admin Dashboard Test
                     </h1>
                 </div>
@@ -58,7 +58,7 @@
         <!-- Mock Dashboard Widgets -->
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
             <!-- Total Products Widget -->
-            <div class="bg-white overflow-hidden shadow rounded-lg">
+            <div class="bg-gray-800 overflow-hidden shadow rounded-lg">
                 <div class="p-5">
                     <div class="flex items-center">
                         <div class="flex-shrink-0">
@@ -73,7 +73,7 @@
                                 <dt class="text-sm font-medium text-gray-500 truncate">
                                     Produkty
                                 </dt>
-                                <dd class="text-2xl font-semibold text-gray-900">
+                                <dd class="text-2xl font-semibold text-white">
                                     1,247
                                 </dd>
                             </dl>
@@ -83,7 +83,7 @@
             </div>
 
             <!-- Active Users Widget -->
-            <div class="bg-white overflow-hidden shadow rounded-lg">
+            <div class="bg-gray-800 overflow-hidden shadow rounded-lg">
                 <div class="p-5">
                     <div class="flex items-center">
                         <div class="flex-shrink-0">
@@ -98,7 +98,7 @@
                                 <dt class="text-sm font-medium text-gray-500 truncate">
                                     Aktywni użytkownicy
                                 </dt>
-                                <dd class="text-2xl font-semibold text-gray-900">
+                                <dd class="text-2xl font-semibold text-white">
                                     7
                                 </dd>
                             </dl>
@@ -108,7 +108,7 @@
             </div>
 
             <!-- System Health Widget -->
-            <div class="bg-white overflow-hidden shadow rounded-lg">
+            <div class="bg-gray-800 overflow-hidden shadow rounded-lg">
                 <div class="p-5">
                     <div class="flex items-center">
                         <div class="flex-shrink-0">
@@ -133,7 +133,7 @@
             </div>
 
             <!-- Performance Widget -->
-            <div class="bg-white overflow-hidden shadow rounded-lg">
+            <div class="bg-gray-800 overflow-hidden shadow rounded-lg">
                 <div class="p-5">
                     <div class="flex items-center">
                         <div class="flex-shrink-0">
@@ -148,7 +148,7 @@
                                 <dt class="text-sm font-medium text-gray-500 truncate">
                                     Response Time
                                 </dt>
-                                <dd class="text-2xl font-semibold text-gray-900">
+                                <dd class="text-2xl font-semibold text-white">
                                     285ms
                                 </dd>
                             </dl>
@@ -159,16 +159,16 @@
         </div>
 
         <!-- Deployment Status -->
-        <div class="bg-white shadow rounded-lg">
+        <div class="bg-gray-800 shadow rounded-lg">
             <div class="px-6 py-4 border-b border-gray-200">
-                <h3 class="text-lg font-medium text-gray-900">
+                <h3 class="text-lg font-medium text-white">
                     Deployment Status
                 </h3>
             </div>
             <div class="p-6">
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
-                        <h4 class="text-sm font-medium text-gray-900 mb-3">Frontend Components</h4>
+                        <h4 class="text-sm font-medium text-white mb-3">Frontend Components</h4>
                         <div class="space-y-2">
                             <div class="flex items-center">
                                 <div class="w-3 h-3 bg-green-400 rounded-full mr-3"></div>
@@ -194,7 +194,7 @@
                     </div>
                     
                     <div>
-                        <h4 class="text-sm font-medium text-gray-900 mb-3">Backend Components</h4>
+                        <h4 class="text-sm font-medium text-white mb-3">Backend Components</h4>
                         <div class="space-y-2">
                             <div class="flex items-center">
                                 <div class="w-3 h-3 bg-green-400 rounded-full mr-3"></div>

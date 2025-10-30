@@ -2,14 +2,14 @@
     {{-- Flash Messages Component --}}
     <x-flash-messages />
 
-    <div class="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 py-4">
+    <div class="bg-gray-800 border-b border-gray-700 px-6 py-4">
         <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
             <div class="flex items-center space-x-4">
                 <div class="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center">
                     <i class="fas fa-sitemap text-white"></i>
                 </div>
                 <div>
-                    <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Kategorie produktów</h1>
+                    <h1 class="text-2xl font-bold text-white">Kategorie produktów</h1>
                     <div class="text-sm text-gray-500 dark:text-gray-400">
                         {{ $categories->count() }} kategorii • {{ $categories->where('is_active', true)->count() }} aktywnych
                     </div>
@@ -17,20 +17,16 @@
             </div>
             <div class="flex flex-wrap items-center gap-3">
                 {{-- View Mode Toggle --}}
-                <div class="flex items-center bg-gray-100 dark:bg-gray-700 rounded-lg p-1">
+                <div class="flex items-center bg-gray-700 rounded-lg p-1">
                     <button wire:click="$set('viewMode', 'tree')"
                             class="flex items-center px-3 py-1.5 text-sm font-medium rounded-md transition-colors
-                                   {{ $viewMode === 'tree'
-                                      ? 'bg-white dark:bg-gray-600 text-blue-600 dark:text-blue-400 shadow-sm'
-                                      : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300' }}">
+                                   {{ $viewMode === 'tree' ? 'category-view-toggle-active' : 'category-view-toggle-inactive' }}">
                         <i class="fas fa-sitemap mr-2"></i>
                         Drzewo
                     </button>
                     <button wire:click="$set('viewMode', 'flat')"
                             class="flex items-center px-3 py-1.5 text-sm font-medium rounded-md transition-colors
-                                   {{ $viewMode === 'flat'
-                                      ? 'bg-white dark:bg-gray-600 text-blue-600 dark:text-blue-400 shadow-sm'
-                                      : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300' }}">
+                                   {{ $viewMode === 'flat' ? 'category-view-toggle-active' : 'category-view-toggle-inactive' }}">
                         <i class="fas fa-list mr-2"></i>
                         Lista
                     </button>
@@ -38,39 +34,30 @@
 
                 <div class="relative">
                     <input type="text" wire:model.live="search" placeholder="Szukaj kategorii..."
-                           class="w-64 pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg
-                                  bg-white dark:bg-gray-700 text-gray-900 dark:text-white
-                                  focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
+                           class="category-search-input">
                     <i class="fas fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
                 </div>
 
                 <label class="flex items-center space-x-2 text-sm">
-                    <input type="checkbox" wire:model.live="showActiveOnly"
-                           class="rounded border-gray-300 text-blue-600 focus:ring-blue-500">
-                    <span class="text-gray-700 dark:text-gray-300">Tylko aktywne</span>
+                    <input type="checkbox" wire:model.live="showActiveOnly" class="category-checkbox">
+                    <span class="text-gray-300">Tylko aktywne</span>
                 </label>
 
                 {{-- Tree Controls (only visible in tree mode) --}}
                 @if($viewMode === 'tree')
                     <div class="flex items-center gap-2">
-                        <button wire:click="expandAll"
-                                class="px-3 py-1.5 text-sm text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
-                                title="Rozwiń wszystkie">
+                        <button wire:click="expandAll" class="category-expand-btn" title="Rozwiń wszystkie">
                             <i class="fas fa-expand-arrows-alt mr-1"></i>
                             Rozwiń
                         </button>
-                        <button wire:click="collapseAll"
-                                class="px-3 py-1.5 text-sm text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
-                                title="Zwiń wszystkie">
+                        <button wire:click="collapseAll" class="category-expand-btn" title="Zwiń wszystkie">
                             <i class="fas fa-compress-arrows-alt mr-1"></i>
                             Zwiń
                         </button>
                     </div>
                 @endif
 
-                <a href="/admin/products/categories/create"
-                   class="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700
-                          text-white text-sm font-medium rounded-lg transition-colors">
+                <a href="/admin/products/categories/create" class="category-add-btn">
                     <i class="fas fa-plus mr-2"></i>
                     Dodaj kategorię
                 </a>
@@ -79,7 +66,7 @@
     </div>
     {{-- Bulk Actions Toolbar (visible tylko gdy selectedCategories > 0) --}}
     @if(count($selectedCategories) > 0)
-    <div class="bg-blue-50 dark:bg-blue-900/20 border-b border-blue-200 dark:border-blue-700 px-6 py-3"
+    <div class="category-bulk-bar"
          x-data="{ bulkMenuOpen: false }"
          x-transition:enter="transition ease-out duration-200"
          x-transition:enter-start="opacity-0 -translate-y-2"
@@ -87,16 +74,15 @@
         <div class="flex items-center justify-between">
             <div class="flex items-center space-x-4">
                 <div class="flex items-center space-x-2">
-                    <i class="fas fa-check-circle text-blue-600 dark:text-blue-400"></i>
-                    <span class="text-sm font-medium text-blue-900 dark:text-blue-100">
+                    <i class="fas fa-check-circle category-bulk-icon"></i>
+                    <span class="category-bulk-text">
                         Zaznaczono: <strong>{{ count($selectedCategories) }}</strong>
                         {{ count($selectedCategories) === 1 ? 'kategoria' : (count($selectedCategories) < 5 ? 'kategorie' : 'kategorii') }}
                     </span>
                 </div>
 
                 <div class="relative">
-                    <button @click="bulkMenuOpen = !bulkMenuOpen"
-                            class="inline-flex items-center px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white text-sm font-medium rounded-lg transition-colors">
+                    <button @click="bulkMenuOpen = !bulkMenuOpen" class="category-bulk-btn">
                         <i class="fas fa-tasks mr-2"></i>
                         Operacje masowe
                         <i class="fas fa-chevron-down ml-2 text-xs" :class="{ 'rotate-180': bulkMenuOpen }"></i>
@@ -111,20 +97,20 @@
                          x-transition:leave="transition ease-in duration-75"
                          x-transition:leave-start="opacity-100 scale-100"
                          x-transition:leave-end="opacity-0 scale-95"
-                         class="absolute left-0 mt-2 w-56 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 z-50"
+                         class="absolute left-0 mt-2 w-56 bg-gray-800 rounded-lg shadow-xl border border-gray-700 z-50"
                          style="display: none;">
                         <div class="py-1">
                             <button wire:click="bulkActivate"
                                     @click="bulkMenuOpen = false"
-                                    class="w-full flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-green-50 dark:hover:bg-green-900/20 hover:text-green-700 dark:hover:text-green-400 transition-colors">
+                                    class="w-full flex items-center px-4 py-2 text-sm text-gray-300 hover:bg-green-50 dark:hover:bg-green-900/20 hover:text-green-700 dark:hover:text-green-400 transition-colors">
                                 <i class="fas fa-check-circle w-5 text-green-600 dark:text-green-400"></i>
                                 <span class="ml-3">Aktywuj wybrane</span>
                             </button>
 
                             <button wire:click="bulkDeactivate"
                                     @click="bulkMenuOpen = false"
-                                    class="w-full flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
-                                <i class="fas fa-pause-circle w-5 text-gray-600 dark:text-gray-400"></i>
+                                    class="w-full flex items-center px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 transition-colors">
+                                <i class="fas fa-pause-circle w-5 text-gray-400"></i>
                                 <span class="ml-3">Dezaktywuj wybrane</span>
                             </button>
 
@@ -132,7 +118,7 @@
 
                             <button wire:click="bulkDelete"
                                     @click="bulkMenuOpen = false"
-                                    class="w-full flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-700 dark:hover:text-red-400 transition-colors">
+                                    class="w-full flex items-center px-4 py-2 text-sm text-gray-300 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-700 dark:hover:text-red-400 transition-colors">
                                 <i class="fas fa-trash w-5 text-red-600 dark:text-red-400"></i>
                                 <span class="ml-3">Usuń wybrane</span>
                             </button>
@@ -141,7 +127,7 @@
 
                             <button wire:click="bulkExport"
                                     @click="bulkMenuOpen = false"
-                                    class="w-full flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:text-blue-700 dark:hover:text-blue-400 transition-colors">
+                                    class="w-full flex items-center px-4 py-2 text-sm text-gray-300 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:text-blue-700 dark:hover:text-blue-400 transition-colors">
                                 <i class="fas fa-download w-5 text-blue-600 dark:text-blue-400"></i>
                                 <span class="ml-3">Eksportuj wybrane</span>
                             </button>
@@ -151,7 +137,7 @@
             </div>
 
             <button wire:click="deselectAll"
-                    class="text-sm text-gray-600 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400 transition-colors">
+                    class="text-sm text-gray-400 hover:text-red-600 dark:hover:text-red-400 transition-colors">
                 <i class="fas fa-times-circle mr-1"></i>
                 Odznacz wszystkie
             </button>
@@ -159,17 +145,17 @@
     </div>
     @endif
 
-    <div class="bg-white dark:bg-gray-800">
+    <div class="bg-gray-800">
         <div style="overflow: visible !important;">
-            <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700" style="table-layout: auto; width: 100%;">
-                <thead class="bg-gray-50 dark:bg-gray-900/50">
+            <table class="min-w-full divide-y divide-gray-700" style="table-layout: auto; width: 100%;">
+                <thead class="bg-gray-900/50">
                     <tr>
                         {{-- Checkbox Column (Master) --}}
                         <th class="px-3 py-3 text-left w-12">
                             <input type="checkbox"
                                    wire:click="{{ count($selectedCategories) === count($categories) && count($categories) > 0 ? 'deselectAll' : 'selectAll' }}"
                                    {{ count($selectedCategories) === count($categories) && count($categories) > 0 ? 'checked' : '' }}
-                                   class="rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                                   class="category-checkbox"
                                    aria-label="Zaznacz/odznacz wszystkie kategorie"
                                    title="Zaznacz/odznacz wszystkie widoczne kategorie">
                         </th>
@@ -187,14 +173,14 @@
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Akcje</th>
                     </tr>
                 </thead>
-                <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700 sortable-tbody"
+                <tbody class="bg-gray-800 divide-y divide-gray-700 sortable-tbody"
                        style="overflow: visible !important;"
                        @if($viewMode === 'tree')
                            x-data="categoryDragDrop"
                            x-init="initSortable()"
                        @endif>
                     @forelse($categories as $category)
-                        <tr class="transition-colors category-row {{ in_array($category->id, $selectedCategories) ? 'bg-blue-50 dark:bg-blue-900/10 hover:bg-blue-100 dark:hover:bg-blue-900/20' : 'bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700/50' }} {{ $viewMode === 'tree' && ($category->level ?? 0) > 0 ? (($category->level ?? 0) === 1 ? 'border-l-4 border-l-blue-500' : (($category->level ?? 0) === 2 ? 'border-l-4 border-l-green-500' : (($category->level ?? 0) === 3 ? 'border-l-4 border-l-purple-500' : 'border-l-4 border-l-orange-500'))) : '' }}"
+                        <tr class="transition-colors category-row {{ in_array($category->id, $selectedCategories) ? 'category-row-selected' : 'bg-gray-800 hover:bg-gray-700/50' }} {{ $viewMode === 'tree' && ($category->level ?? 0) > 0 ? 'category-level-border' : '' }}"
                             data-category-id="{{ $category->id }}"
                             data-level="{{ $category->level ?? 0 }}">
 
@@ -203,7 +189,7 @@
                                 <input type="checkbox"
                                        wire:click="toggleSelection({{ $category->id }})"
                                        {{ in_array($category->id, $selectedCategories) ? 'checked' : '' }}
-                                       class="rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                                       class="category-checkbox"
                                        aria-label="Zaznacz kategorię {{ $category->name }}"
                                        title="Zaznacz kategorię">
                             </td>
@@ -224,50 +210,51 @@
                                             @for($i = 0; $i < ($category->level ?? 0); $i++)
                                                 <div class="w-6 h-px bg-gradient-to-r from-gray-300 to-transparent"></div>
                                             @endfor
-                                            <i class="fas fa-arrow-turn-down-right text-xs text-blue-500"></i>
+                                            <i class="fas fa-arrow-turn-down-right text-xs category-hierarchy-arrow"></i>
                                         </div>
                                     @endif
 
                                     {{-- Category Expand/Collapse Button (Tree Mode Only) --}}
                                     @if($viewMode === 'tree' && $category->children_count > 0)
                                         <button wire:click="toggleNode({{ $category->id }})"
-                                                class="w-5 h-5 rounded-full bg-gray-200 dark:bg-gray-600 flex items-center justify-center hover:bg-blue-200 dark:hover:bg-blue-700 transition-colors text-xs"
+                                                class="category-node-toggle"
                                                 title="{{ in_array($category->id, $expandedNodes) ? 'Zwiń' : 'Rozwiń' }} podkategorie">
-                                            <i class="fas fa-{{ in_array($category->id, $expandedNodes) ? 'minus' : 'plus' }} text-gray-600 dark:text-gray-300"></i>
+                                            <i class="fas fa-{{ in_array($category->id, $expandedNodes) ? 'minus' : 'plus' }} text-gray-300"></i>
                                         </button>
                                     @else
                                         <div class="w-5 h-5"></div> {{-- Spacer for alignment --}}
                                     @endif
 
                                     {{-- Category Icon & Details --}}
-                                    <div class="w-8 h-8 {{ $viewMode === 'tree' ?
-                                        (($category->level ?? 0) === 0 ? 'bg-blue-100 dark:bg-blue-900/20' :
-                                         (($category->level ?? 0) === 1 ? 'bg-green-100 dark:bg-green-900/20' :
-                                          (($category->level ?? 0) === 2 ? 'bg-purple-100 dark:bg-purple-900/20' :
-                                           'bg-orange-100 dark:bg-orange-900/20'))) :
-                                        'bg-gray-100 dark:bg-gray-700' }} rounded-lg flex items-center justify-center">
-                                        @if($viewMode === 'tree')
-                                            <i class="fas fa-folder text-sm
-                                                {{ ($category->level ?? 0) === 0 ? 'text-blue-600 dark:text-blue-400' :
-                                                   (($category->level ?? 0) === 1 ? 'text-green-600 dark:text-green-400' :
-                                                    (($category->level ?? 0) === 2 ? 'text-purple-600 dark:text-purple-400' :
-                                                     'text-orange-600 dark:text-orange-400')) }}"></i>
-                                        @else
-                                            <i class="fas fa-folder text-gray-600 dark:text-gray-400 text-sm"></i>
-                                        @endif
-                                    </div>
+                                    @if($viewMode === 'tree')
+                                        <div class="category-icon-bg
+                                            {{ ($category->level ?? 0) === 0 ? 'category-icon-bg-level-0' :
+                                               (($category->level ?? 0) === 1 ? 'category-icon-bg-level-1' :
+                                                (($category->level ?? 0) === 2 ? 'category-icon-bg-level-2' :
+                                                 'category-icon-bg-level-3')) }}">
+                                            <i class="fas fa-{{ $category->children_count > 0 ? 'folder-open' : 'folder' }} category-icon
+                                                {{ ($category->level ?? 0) === 0 ? 'category-icon-level-0' :
+                                                   (($category->level ?? 0) === 1 ? 'category-icon-level-1' :
+                                                    (($category->level ?? 0) === 2 ? 'category-icon-level-2' :
+                                                     'category-icon-level-3')) }}"></i>
+                                        </div>
+                                    @else
+                                        <div class="w-8 h-8 bg-gray-700 rounded-lg flex items-center justify-center">
+                                            <i class="fas fa-folder text-gray-400 text-sm"></i>
+                                        </div>
+                                    @endif
 
                                     <div>
-                                        <div class="text-sm font-medium text-gray-900 dark:text-white
+                                        <div class="text-sm font-medium text-white
                                              {{ $viewMode === 'tree' && ($category->level ?? 0) > 0 ? 'text-sm' : 'text-base' }}">
                                             {{ $category->name }}
 
                                             {{-- Child Count Badge (Tree Mode) --}}
                                             @if($viewMode === 'tree' && $category->children_count > 0)
-                                                <span class="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs
-                                                    {{ ($category->level ?? 0) === 0 ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400' :
-                                                       (($category->level ?? 0) === 1 ? 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400' :
-                                                        'bg-purple-100 text-purple-800 dark:bg-purple-900/20 dark:text-purple-400') }}">
+                                                <span class="ml-2 category-badge-subcategories
+                                                    {{ ($category->level ?? 0) === 0 ? 'category-badge-subcategories-level-0' :
+                                                       (($category->level ?? 0) === 1 ? 'category-badge-subcategories-level-1' :
+                                                        'category-badge-subcategories-level-2') }}">
                                                     {{ $category->children_count }} {{ $category->children_count === 1 ? 'podkategoria' : 'podkategorii' }}
                                                 </span>
                                             @endif
@@ -280,11 +267,7 @@
                             </td>
 
                             <td class="px-6 py-4 whitespace-nowrap">
-                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
-                                           {{ ($category->level ?? 0) == 0 ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400' :
-                                              (($category->level ?? 0) == 1 ? 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400' :
-                                               (($category->level ?? 0) == 2 ? 'bg-purple-100 text-purple-800 dark:bg-purple-900/20 dark:text-purple-400' :
-                                                'bg-orange-100 text-orange-800 dark:bg-orange-900/20 dark:text-orange-400')) }}">
+                                <span class="category-badge-level">
                                     Poziom {{ $category->level ?? 0 }}
                                 </span>
                             </td>
@@ -294,21 +277,19 @@
                                     <i class="fas fa-box text-xs"></i>
                                     <span>{{ $category->products_count ?? 0 }}</span>
                                     @if($category->products_count > 0)
-                                        <span class="text-xs text-blue-600 dark:text-blue-400">(+{{ $category->primary_products_count ?? 0 }} głównych)</span>
+                                        <span class="category-primary-count">(+{{ $category->primary_products_count ?? 0 }} głównych)</span>
                                     @endif
                                 </div>
                             </td>
 
                             <td class="px-6 py-4 whitespace-nowrap">
                                 @if($category->is_active ?? true)
-                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
-                                               bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400">
+                                    <span class="category-status-active">
                                         <i class="fas fa-check-circle mr-1"></i>
                                         Aktywna
                                     </span>
                                 @else
-                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
-                                               bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300">
+                                    <span class="category-status-inactive">
                                         <i class="fas fa-pause-circle mr-1"></i>
                                         Nieaktywna
                                     </span>
@@ -326,9 +307,7 @@
                                     <i class="fas fa-folder-open text-4xl mb-4"></i>
                                     <h3 class="text-lg font-medium mb-2">Brak kategorii</h3>
                                     <p class="text-sm">Dodaj pierwszą kategorię aby rozpocząć organizację produktów.</p>
-                                    <a href="/admin/products/categories/create"
-                                       class="inline-flex items-center mt-4 px-4 py-2 bg-blue-600 hover:bg-blue-700
-                                              text-white text-sm font-medium rounded-lg transition-colors">
+                                    <a href="/admin/products/categories/create" class="category-add-btn mt-4">
                                         <i class="fas fa-plus mr-2"></i>
                                         Dodaj kategorię
                                     </a>
@@ -341,11 +320,11 @@
         </div>
     </div>
     <div wire:loading class="fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center z-50">
-        <div class="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-sm w-full mx-4">
+        <div class="bg-gray-800 rounded-lg p-6 max-w-sm w-full mx-4">
             <div class="flex items-center space-x-4">
-                <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                <div class="animate-spin category-loading-spinner"></div>
                 <div>
-                    <h4 class="text-lg font-medium text-gray-900 dark:text-white">Ładowanie...</h4>
+                    <h4 class="text-lg font-medium text-white">Ładowanie...</h4>
                     <p class="text-sm text-gray-500 dark:text-gray-400">Proszę czekać</p>
                 </div>
             </div>
@@ -570,17 +549,17 @@ if (typeof Sortable === 'undefined') {
             <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
                 <div class="fixed inset-0 bg-gray-900 bg-opacity-50 transition-opacity" @click="$wire.closeModal()"></div>
 
-                <div class="inline-block align-bottom bg-white dark:bg-gray-800 rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-4xl sm:w-full">
+                <div class="inline-block align-bottom bg-gray-800 rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-4xl sm:w-full">
                     <form wire:submit.prevent="saveCategory">
                         {{-- Modal Header with Tabs --}}
-                        <div class="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+                        <div class="bg-gray-800 border-b border-gray-700">
                             <div class="px-6 py-4">
                                 <div class="flex items-center justify-between mb-4">
                                     <div class="flex items-center">
                                         <div class="flex-shrink-0 flex items-center justify-center h-10 w-10 rounded-full bg-blue-100 dark:bg-blue-900">
                                             <i class="fas fa-folder text-blue-600 dark:text-blue-400"></i>
                                         </div>
-                                        <h3 class="ml-4 text-xl font-semibold text-gray-900 dark:text-white">
+                                        <h3 class="ml-4 text-xl font-semibold text-white">
                                             {{ $modalMode === 'create' ? 'Dodaj kategorię' : 'Edytuj kategorię' }}
                                         </h3>
                                     </div>
@@ -611,19 +590,19 @@ if (typeof Sortable === 'undefined') {
                         </div>
 
                         {{-- Modal Content --}}
-                        <div class="bg-white dark:bg-gray-800 px-6 py-6 max-h-96 overflow-y-auto">
+                        <div class="bg-gray-800 px-6 py-6 max-h-96 overflow-y-auto">
 
                             {{-- Basic Tab --}}
                             <div x-show="activeTab === 'basic'" class="space-y-6">
                                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                                     {{-- Nazwa kategorii --}}
                                     <div class="md:col-span-2">
-                                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                        <label class="block text-sm font-medium text-gray-300 mb-2">
                                             Nazwa kategorii *
                                         </label>
                                         <input type="text" wire:model.defer="categoryForm.name"
-                                               class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md
-                                                      bg-white dark:bg-gray-700 text-gray-900 dark:text-white
+                                               class="w-full px-3 py-2 border border-gray-600 rounded-md
+                                                      bg-gray-700 text-white
                                                       focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                                                required>
                                         @error('categoryForm.name')
@@ -633,12 +612,12 @@ if (typeof Sortable === 'undefined') {
 
                                     {{-- Slug --}}
                                     <div>
-                                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                        <label class="block text-sm font-medium text-gray-300 mb-2">
                                             Slug (URL)
                                         </label>
                                         <input type="text" wire:model.defer="categoryForm.slug"
-                                               class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md
-                                                      bg-white dark:bg-gray-700 text-gray-900 dark:text-white
+                                               class="w-full px-3 py-2 border border-gray-600 rounded-md
+                                                      bg-gray-700 text-white
                                                       focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
                                         @error('categoryForm.slug')
                                             <p class="mt-1 text-sm text-red-600 dark:text-red-400">{{ $message }}</p>
@@ -647,12 +626,12 @@ if (typeof Sortable === 'undefined') {
 
                                     {{-- Kolejność sortowania --}}
                                     <div>
-                                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                        <label class="block text-sm font-medium text-gray-300 mb-2">
                                             Kolejność sortowania
                                         </label>
                                         <input type="number" wire:model.defer="categoryForm.sort_order"
-                                               class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md
-                                                      bg-white dark:bg-gray-700 text-gray-900 dark:text-white
+                                               class="w-full px-3 py-2 border border-gray-600 rounded-md
+                                                      bg-gray-700 text-white
                                                       focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                                                min="0">
                                         @error('categoryForm.sort_order')
@@ -663,12 +642,12 @@ if (typeof Sortable === 'undefined') {
 
                                 {{-- Opis długi --}}
                                 <div>
-                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                    <label class="block text-sm font-medium text-gray-300 mb-2">
                                         Opis kategorii
                                     </label>
                                     <textarea wire:model.defer="categoryForm.description" rows="4"
-                                              class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md
-                                                     bg-white dark:bg-gray-700 text-gray-900 dark:text-white
+                                              class="w-full px-3 py-2 border border-gray-600 rounded-md
+                                                     bg-gray-700 text-white
                                                      focus:border-blue-500 focus:ring-1 focus:ring-blue-500"></textarea>
                                     @error('categoryForm.description')
                                         <p class="mt-1 text-sm text-red-600 dark:text-red-400">{{ $message }}</p>
@@ -677,12 +656,12 @@ if (typeof Sortable === 'undefined') {
 
                                 {{-- Opis krótki --}}
                                 <div>
-                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                    <label class="block text-sm font-medium text-gray-300 mb-2">
                                         Krótki opis (dla listy kategorii)
                                     </label>
                                     <textarea wire:model.defer="categoryForm.short_description" rows="2"
-                                              class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md
-                                                     bg-white dark:bg-gray-700 text-gray-900 dark:text-white
+                                              class="w-full px-3 py-2 border border-gray-600 rounded-md
+                                                     bg-gray-700 text-white
                                                      focus:border-blue-500 focus:ring-1 focus:ring-blue-500"></textarea>
                                     @error('categoryForm.short_description')
                                         <p class="mt-1 text-sm text-red-600 dark:text-red-400">{{ $message }}</p>
@@ -694,14 +673,14 @@ if (typeof Sortable === 'undefined') {
                                     <div class="flex items-center">
                                         <input type="checkbox" wire:model.defer="categoryForm.is_active"
                                                class="rounded border-gray-300 text-blue-600 focus:ring-blue-500">
-                                        <label class="ml-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+                                        <label class="ml-2 text-sm font-medium text-gray-300">
                                             Kategoria aktywna
                                         </label>
                                     </div>
                                     <div class="flex items-center">
                                         <input type="checkbox" wire:model.defer="categoryForm.is_featured"
                                                class="rounded border-gray-300 text-blue-600 focus:ring-blue-500">
-                                        <label class="ml-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+                                        <label class="ml-2 text-sm font-medium text-gray-300">
                                             Kategoria wyróżniona
                                         </label>
                                     </div>
@@ -713,12 +692,12 @@ if (typeof Sortable === 'undefined') {
                                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                                     {{-- Meta Title --}}
                                     <div class="md:col-span-2">
-                                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                        <label class="block text-sm font-medium text-gray-300 mb-2">
                                             Meta Title
                                         </label>
                                         <input type="text" wire:model.defer="categoryForm.meta_title"
-                                               class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md
-                                                      bg-white dark:bg-gray-700 text-gray-900 dark:text-white
+                                               class="w-full px-3 py-2 border border-gray-600 rounded-md
+                                                      bg-gray-700 text-white
                                                       focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
                                         @error('categoryForm.meta_title')
                                             <p class="mt-1 text-sm text-red-600 dark:text-red-400">{{ $message }}</p>
@@ -727,12 +706,12 @@ if (typeof Sortable === 'undefined') {
 
                                     {{-- Meta Description --}}
                                     <div class="md:col-span-2">
-                                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                        <label class="block text-sm font-medium text-gray-300 mb-2">
                                             Meta Description
                                         </label>
                                         <textarea wire:model.defer="categoryForm.meta_description" rows="3"
-                                                  class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md
-                                                         bg-white dark:bg-gray-700 text-gray-900 dark:text-white
+                                                  class="w-full px-3 py-2 border border-gray-600 rounded-md
+                                                         bg-gray-700 text-white
                                                          focus:border-blue-500 focus:ring-1 focus:ring-blue-500"></textarea>
                                         @error('categoryForm.meta_description')
                                             <p class="mt-1 text-sm text-red-600 dark:text-red-400">{{ $message }}</p>
@@ -741,12 +720,12 @@ if (typeof Sortable === 'undefined') {
 
                                     {{-- Meta Keywords --}}
                                     <div>
-                                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                        <label class="block text-sm font-medium text-gray-300 mb-2">
                                             Meta Keywords
                                         </label>
                                         <input type="text" wire:model.defer="categoryForm.meta_keywords"
-                                               class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md
-                                                      bg-white dark:bg-gray-700 text-gray-900 dark:text-white
+                                               class="w-full px-3 py-2 border border-gray-600 rounded-md
+                                                      bg-gray-700 text-white
                                                       focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
                                         @error('categoryForm.meta_keywords')
                                             <p class="mt-1 text-sm text-red-600 dark:text-red-400">{{ $message }}</p>
@@ -755,12 +734,12 @@ if (typeof Sortable === 'undefined') {
 
                                     {{-- Canonical URL --}}
                                     <div>
-                                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                        <label class="block text-sm font-medium text-gray-300 mb-2">
                                             Canonical URL
                                         </label>
                                         <input type="url" wire:model.defer="categoryForm.canonical_url"
-                                               class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md
-                                                      bg-white dark:bg-gray-700 text-gray-900 dark:text-white
+                                               class="w-full px-3 py-2 border border-gray-600 rounded-md
+                                                      bg-gray-700 text-white
                                                       focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
                                         @error('categoryForm.canonical_url')
                                             <p class="mt-1 text-sm text-red-600 dark:text-red-400">{{ $message }}</p>
@@ -769,33 +748,33 @@ if (typeof Sortable === 'undefined') {
 
                                     {{-- Open Graph --}}
                                     <div class="md:col-span-2">
-                                        <h4 class="text-lg font-medium text-gray-900 dark:text-white mb-4">Open Graph</h4>
+                                        <h4 class="text-lg font-medium text-white mb-4">Open Graph</h4>
                                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                                             <div>
-                                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                                <label class="block text-sm font-medium text-gray-300 mb-2">
                                                     OG Title
                                                 </label>
                                                 <input type="text" wire:model.defer="categoryForm.og_title"
-                                                       class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md
-                                                              bg-white dark:bg-gray-700 text-gray-900 dark:text-white
+                                                       class="w-full px-3 py-2 border border-gray-600 rounded-md
+                                                              bg-gray-700 text-white
                                                               focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
                                             </div>
                                             <div>
-                                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                                <label class="block text-sm font-medium text-gray-300 mb-2">
                                                     OG Image URL
                                                 </label>
                                                 <input type="url" wire:model.defer="categoryForm.og_image"
-                                                       class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md
-                                                              bg-white dark:bg-gray-700 text-gray-900 dark:text-white
+                                                       class="w-full px-3 py-2 border border-gray-600 rounded-md
+                                                              bg-gray-700 text-white
                                                               focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
                                             </div>
                                             <div class="md:col-span-2">
-                                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                                <label class="block text-sm font-medium text-gray-300 mb-2">
                                                     OG Description
                                                 </label>
                                                 <textarea wire:model.defer="categoryForm.og_description" rows="2"
-                                                          class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md
-                                                                 bg-white dark:bg-gray-700 text-gray-900 dark:text-white
+                                                          class="w-full px-3 py-2 border border-gray-600 rounded-md
+                                                                 bg-gray-700 text-white
                                                                  focus:border-blue-500 focus:ring-1 focus:ring-blue-500"></textarea>
                                             </div>
                                         </div>
@@ -808,13 +787,13 @@ if (typeof Sortable === 'undefined') {
                                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                                     {{-- Ikona --}}
                                     <div>
-                                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                        <label class="block text-sm font-medium text-gray-300 mb-2">
                                             Ikona (Font Awesome)
                                         </label>
                                         <input type="text" wire:model.defer="categoryForm.icon"
                                                placeholder="np. fas fa-car"
-                                               class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md
-                                                      bg-white dark:bg-gray-700 text-gray-900 dark:text-white
+                                               class="w-full px-3 py-2 border border-gray-600 rounded-md
+                                                      bg-gray-700 text-white
                                                       focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
                                         @error('categoryForm.icon')
                                             <p class="mt-1 text-sm text-red-600 dark:text-red-400">{{ $message }}</p>
@@ -823,12 +802,12 @@ if (typeof Sortable === 'undefined') {
 
                                     {{-- Ścieżka ikony --}}
                                     <div>
-                                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                        <label class="block text-sm font-medium text-gray-300 mb-2">
                                             Ścieżka do pliku ikony
                                         </label>
                                         <input type="text" wire:model.defer="categoryForm.icon_path"
-                                               class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md
-                                                      bg-white dark:bg-gray-700 text-gray-900 dark:text-white
+                                               class="w-full px-3 py-2 border border-gray-600 rounded-md
+                                                      bg-gray-700 text-white
                                                       focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
                                         @error('categoryForm.icon_path')
                                             <p class="mt-1 text-sm text-red-600 dark:text-red-400">{{ $message }}</p>
@@ -837,12 +816,12 @@ if (typeof Sortable === 'undefined') {
 
                                     {{-- Banner path --}}
                                     <div class="md:col-span-2">
-                                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                        <label class="block text-sm font-medium text-gray-300 mb-2">
                                             Ścieżka do bannera kategorii
                                         </label>
                                         <input type="text" wire:model.defer="categoryForm.banner_path"
-                                               class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md
-                                                      bg-white dark:bg-gray-700 text-gray-900 dark:text-white
+                                               class="w-full px-3 py-2 border border-gray-600 rounded-md
+                                                      bg-gray-700 text-white
                                                       focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
                                         @error('categoryForm.banner_path')
                                             <p class="mt-1 text-sm text-red-600 dark:text-red-400">{{ $message }}</p>
@@ -851,13 +830,13 @@ if (typeof Sortable === 'undefined') {
 
                                     {{-- Visual Settings jako JSON textarea --}}
                                     <div class="md:col-span-2">
-                                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                        <label class="block text-sm font-medium text-gray-300 mb-2">
                                             Ustawienia wizualne (JSON)
                                         </label>
                                         <textarea wire:model.defer="categoryForm.visual_settings" rows="4"
                                                   placeholder='{"color_primary": "#3B82F6", "color_secondary": "#EFF6FF"}'
-                                                  class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md
-                                                         bg-white dark:bg-gray-700 text-gray-900 dark:text-white font-mono text-sm
+                                                  class="w-full px-3 py-2 border border-gray-600 rounded-md
+                                                         bg-gray-700 text-white font-mono text-sm
                                                          focus:border-blue-500 focus:ring-1 focus:ring-blue-500"></textarea>
                                         @error('categoryForm.visual_settings')
                                             <p class="mt-1 text-sm text-red-600 dark:text-red-400">{{ $message }}</p>
@@ -871,13 +850,13 @@ if (typeof Sortable === 'undefined') {
                                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                                     {{-- Visibility Settings jako JSON textarea --}}
                                     <div class="md:col-span-2">
-                                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                        <label class="block text-sm font-medium text-gray-300 mb-2">
                                             Ustawienia widoczności (JSON)
                                         </label>
                                         <textarea wire:model.defer="categoryForm.visibility_settings" rows="6"
                                                   placeholder='{"is_visible": true, "show_in_menu": true, "show_in_filter": true, "show_product_count": true}'
-                                                  class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md
-                                                         bg-white dark:bg-gray-700 text-gray-900 dark:text-white font-mono text-sm
+                                                  class="w-full px-3 py-2 border border-gray-600 rounded-md
+                                                         bg-gray-700 text-white font-mono text-sm
                                                          focus:border-blue-500 focus:ring-1 focus:ring-blue-500"></textarea>
                                         @error('categoryForm.visibility_settings')
                                             <p class="mt-1 text-sm text-red-600 dark:text-red-400">{{ $message }}</p>
@@ -891,13 +870,13 @@ if (typeof Sortable === 'undefined') {
                                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                                     {{-- Default Values jako JSON textarea --}}
                                     <div class="md:col-span-2">
-                                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                        <label class="block text-sm font-medium text-gray-300 mb-2">
                                             Domyślne wartości dla produktów (JSON)
                                         </label>
                                         <textarea wire:model.defer="categoryForm.default_values" rows="6"
                                                   placeholder='{"default_tax_rate": 23.00, "default_weight": null, "default_dimensions": {"height": null, "width": null, "length": null}}'
-                                                  class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md
-                                                         bg-white dark:bg-gray-700 text-gray-900 dark:text-white font-mono text-sm
+                                                  class="w-full px-3 py-2 border border-gray-600 rounded-md
+                                                         bg-gray-700 text-white font-mono text-sm
                                                          focus:border-blue-500 focus:ring-1 focus:ring-blue-500"></textarea>
                                         @error('categoryForm.default_values')
                                             <p class="mt-1 text-sm text-red-600 dark:text-red-400">{{ $message }}</p>
@@ -923,7 +902,7 @@ if (typeof Sortable === 'undefined') {
                                 </span>
                             </button>
                             <button type="button" wire:click="closeModal"
-                                    class="inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-6 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 dark:bg-gray-600 dark:text-gray-300 dark:border-gray-500 dark:hover:bg-gray-500 transition-colors">
+                                    class="inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-6 py-2 bg-gray-800 text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 dark:bg-gray-600 dark:text-gray-300 dark:border-gray-500 dark:hover:bg-gray-500 transition-colors">
                                 <i class="fas fa-times mr-2"></i>
                                 Anuluj
                             </button>
@@ -948,7 +927,7 @@ if (typeof Sortable === 'undefined') {
 
         {{-- Modal Content --}}
         <div class="flex min-h-full items-center justify-center p-4">
-            <div class="relative bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-lg w-full p-6"
+            <div class="relative bg-gray-800 rounded-lg shadow-xl max-w-lg w-full p-6"
                  x-transition:enter="ease-out duration-300"
                  x-transition:enter-start="opacity-0 translate-y-4"
                  x-transition:enter-end="opacity-100 translate-y-0">
@@ -959,7 +938,7 @@ if (typeof Sortable === 'undefined') {
                         <i class="fas fa-exclamation-triangle text-red-600 dark:text-red-400 text-xl"></i>
                     </div>
                     <div class="ml-4 flex-1">
-                        <h3 class="text-lg font-semibold text-gray-900 dark:text-white">
+                        <h3 class="text-lg font-semibold text-white">
                             Wymuszenie usunięcia kategorii
                         </h3>
                         <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
@@ -988,7 +967,7 @@ if (typeof Sortable === 'undefined') {
 
                 {{-- Confirmation Text --}}
                 <div class="mb-6">
-                    <p class="text-sm text-gray-600 dark:text-gray-400">
+                    <p class="text-sm text-gray-400">
                         <strong>Operacja nieodwracalna!</strong> Wszystkie przypisania produktów do tej kategorii oraz podkategorie zostaną permanentnie usunięte.
                     </p>
                 </div>
@@ -996,7 +975,7 @@ if (typeof Sortable === 'undefined') {
                 {{-- Actions --}}
                 <div class="flex justify-end space-x-3">
                     <button wire:click="cancelForceDelete"
-                            class="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600">
+                            class="px-4 py-2 text-sm font-medium text-gray-300 bg-gray-700 border border-gray-600 rounded-lg hover:bg-gray-600">
                         Anuluj
                     </button>
                     <button wire:click="confirmForceDelete"
@@ -1031,7 +1010,7 @@ if (typeof Sortable === 'undefined') {
 
         {{-- Modal Content --}}
         <div class="flex min-h-full items-center justify-center p-4">
-            <div class="relative bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-lg w-full p-6"
+            <div class="relative bg-gray-800 rounded-lg shadow-xl max-w-lg w-full p-6"
                  x-transition:enter="ease-out duration-300"
                  x-transition:enter-start="opacity-0 translate-y-4"
                  x-transition:enter-end="opacity-100 translate-y-0">
@@ -1042,7 +1021,7 @@ if (typeof Sortable === 'undefined') {
                         <i class="fas fa-code-branch text-purple-600 dark:text-purple-400 text-xl"></i>
                     </div>
                     <div class="ml-4 flex-1">
-                        <h3 class="text-lg font-semibold text-gray-900 dark:text-white">
+                        <h3 class="text-lg font-semibold text-white">
                             Połącz kategorie
                         </h3>
                         <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
@@ -1060,7 +1039,7 @@ if (typeof Sortable === 'undefined') {
                 <div class="space-y-4 mb-6">
                     {{-- Source Category Display (read-only) --}}
                     <div class="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4 border border-gray-200 dark:border-gray-600">
-                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        <label class="block text-sm font-medium text-gray-300 mb-2">
                             Kategoria źródłowa (zostanie usunięta):
                         </label>
                         <div class="flex items-center space-x-3">
@@ -1072,7 +1051,7 @@ if (typeof Sortable === 'undefined') {
                                     @php
                                         $sourceCategory = \App\Models\Category::find($sourceCategoryId);
                                     @endphp
-                                    <strong class="text-gray-900 dark:text-white">{{ $sourceCategory?->name ?? 'Nie znaleziono kategorii' }}</strong>
+                                    <strong class="text-white">{{ $sourceCategory?->name ?? 'Nie znaleziono kategorii' }}</strong>
                                     @if($sourceCategory)
                                         <div class="text-xs text-gray-500 dark:text-gray-400">
                                             Produkty: {{ $sourceCategory->products_count ?? 0 }} | Podkategorie: {{ $sourceCategory->children_count ?? 0 }}
@@ -1085,13 +1064,13 @@ if (typeof Sortable === 'undefined') {
 
                     {{-- Target Category Selector --}}
                     <div>
-                        <label for="targetCategoryId" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        <label for="targetCategoryId" class="block text-sm font-medium text-gray-300 mb-2">
                             Kategoria docelowa (otrzyma produkty i podkategorie): <span class="text-red-500">*</span>
                         </label>
                         <select wire:model="targetCategoryId"
                                 id="targetCategoryId"
-                                class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg
-                                       bg-white dark:bg-gray-700 text-gray-900 dark:text-white
+                                class="w-full px-3 py-2 border border-gray-600 rounded-lg
+                                       bg-gray-700 text-white
                                        focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                                 required>
                             <option value="">-- Wybierz kategorię docelową --</option>
@@ -1125,9 +1104,9 @@ if (typeof Sortable === 'undefined') {
                 <div class="flex justify-end space-x-3">
                     <button wire:click="closeCategoryMergeModal"
                             type="button"
-                            class="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300
-                                   bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600
-                                   rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
+                            class="px-4 py-2 text-sm font-medium text-gray-300
+                                   bg-gray-700 border border-gray-600
+                                   rounded-lg hover:bg-gray-600 transition-colors"
                             :disabled="loading">
                         Anuluj
                     </button>

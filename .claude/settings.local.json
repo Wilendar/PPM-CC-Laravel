@@ -1,35 +1,79 @@
 {
   "permissions": {
     "allow": [
-      "Bash(Select-Object Name)",
-      "Bash(Get-Content \"app\\Http\\Livewire\\Components\\CategoryPreviewModal.php\")",
-      "Bash(Select-String -Pattern \"createQuickCategory|showCreateCategoryForm|hideCreateCategoryForm\" -Context 3,3)",
-      "Bash(powershell:*)",
-      "Bash(pwsh:*)",
-      "Bash(Select-String -Path \"app\\Http\\Livewire\\Products\\Listing\\ProductList.php\" -Pattern \"bulk|category\" -Context 2,2)",
-      "Bash(Select-Object -First 30)",
-      "Bash(curl -s \"https://ppm.mpptrade.pl/admin/products/categories\")",
-      "SlashCommand(/optimize-doc:*)",
-      "Bash(git add CLAUDE.md)",
-      "Bash(git commit -m \"$(cat <<''EOF''\ndocs: optimize CLAUDE.md for conciseness\n\nOptymalizacja głównego pliku dokumentacji projektu:\n- Skrócono sekcję \"DLACZEGO dwa manifesty?\" (4 bullet → 1 linia essence)\n- Skrócono ROOT CAUSE w Vite Manifest CSS Issue (5 bullet → 1 linia)\n- Zachowano wszystkie execution-critical treści\n- Usunięto tylko edukacyjne WHY explanations\n\nLinie zmienione: 98-102, 388-395\nOszczędność: ~10 linii\nStatus: Plik był już bardzo dobrze zoptymalizowany\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude <noreply@anthropic.com>\nEOF\n)\")",
-      "Bash(git add AGENTS.md)",
-      "Bash(git commit -m \"$(cat <<''EOF''\ndocs: optimize AGENTS.md - remove duplicates, add references to CLAUDE.md\n\nOptymalizacja pliku AGENTS.md:\n- Poprawiono nagłówek: # CLAUDE.md → # AGENTS.md - Agent Instructions & Workflow\n- Usunięto duplikaty z CLAUDE.md (~140 linii):\n  * Projekt/Stack/Architektura (linie 40-86)\n  * Kluczowe Funkcjonalności/Integracje (linie 165-210)\n  * Zasady Development/Kolejność (linie 211-239)\n  * Super Admin Account (linie 249-278)\n- Zastąpiono referencjami do CLAUDE.md\n- Złagodzono język: \"MUSISZ tworzyć\" → \"Twórz\"\n- Zachowano wszystkie execution-critical instrukcje dla agentów:\n  * Deployment workflow\n  * Zasady aktualizacji planu\n  * System dokumentacji prac agentów\n  * Krytyczne zasady raportowania\n\nLinie usunięte: ~140\nFokus: Plik AGENTS.md skupia się na instrukcjach dla agentów, nie duplikuje dokumentacji projektu\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude <noreply@anthropic.com>\nEOF\n)\")",
-      "Bash(git add \"_DOCS/AGENT_USAGE_GUIDE.md\")",
-      "Bash(git commit -m \"$(cat <<''EOF''\ndocs: optimize AGENT_USAGE_GUIDE.md - minimal changes\n\nMinima optymalizacja AGENT_USAGE_GUIDE.md:\n- Usunięto edukacyjny wstęp (linie 9-12)\n- Zachowano 100% execution-critical content:\n  * Boundary demonstrations (❌ vs ✅)\n  * Sequential workflows\n  * Verification checklists\n  * Agent patterns i use cases\n  * Quick reference tables\n\nLinie usunięte: 4\nStatus: Plik był już bardzo dobrze zoptymalizowany\nWszystkie instrukcje dla agentów pozostały nietknięte\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude <noreply@anthropic.com>\nEOF\n)\")",
-      "Bash(git add \"_DOCS/CONTEXT7_INTEGRATION_GUIDE.md\")",
-      "Bash(git commit -m \"docs: optimize CONTEXT7_INTEGRATION_GUIDE.md\n\nOptymalizacja CONTEXT7_INTEGRATION_GUIDE.md:\n- Usunięto sekcję Benefits (edukacyjne WHY) - 23 linie\n- Usunięto Quality Impact metrics (edukacyjne WHY) - 5 linii\n- Zachowano 100% execution-critical:\n  * Library IDs table\n  * Mandatory usage rules\n  * Agent implementation status\n  * Usage patterns (sequential workflows)\n  * Boundary demonstrations (✅ vs ❌)\n  * Troubleshooting\n  * Configuration checklist\n\nLinie usunięte: ~28\nPlik był bardzo dobrze napisany - większość to operational content\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude <noreply@anthropic.com>\")",
-      "Bash(git add \"_DOCS/CSS_STYLING_GUIDE.md\" \"_DOCS/CONTEXT7_INTEGRATION_GUIDE.md\")",
-      "Bash(git commit -m \"docs: batch optimize _DOCS/ guides (CSS + Context7)\n\nBatch optymalizacja przewodników _DOCS/:\n\n1. CSS_STYLING_GUIDE.md:\n   - Usunięto sekcję DLACZEGO ZAKAZ (edukacyjne WHY) - 33 linie\n   - Zachowano 100% execution-critical:\n     * Boundary demonstrations (❌ vs ✅)\n     * Sequential workflow (6-step process)\n     * Common use cases (4 scenarios)\n     * Code review checklist\n     * Testing checklist\n\n2. CONTEXT7_INTEGRATION_GUIDE.md:\n   - Usunięto Benefits + Quality Impact (edukacyjne WHY) - 28 linii\n   - Zachowano 100% execution-critical:\n     * Library IDs table\n     * Mandatory usage rules\n     * Usage patterns\n     * Troubleshooting\n\nŁącznie usunięto: ~61 linii\nWszystkie operational patterns i checklists zachowane\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude <noreply@anthropic.com>\")",
-      "Bash(git add \"_DOCS/DEBUG_LOGGING_GUIDE.md\")",
-      "Bash(git commit -m \"docs: optimize DEBUG_LOGGING_GUIDE.md\n\nOptymalizacja DEBUG_LOGGING_GUIDE.md:\n- Usunięto ZALETY EXTENSIVE LOGGING (edukacyjne WHY) - 8 linii\n- Usunięto BENEFITS OF MINIMAL PRODUCTION LOGGING (edukacyjne WHY) - 10 linii\n- Zachowano 100% execution-critical:\n  * Sequential 6-step workflow\n  * Development/Production code examples (before/after)\n  * Production logging rules (info/warning/error)\n  * Cleanup checklist\n  * Monitoring commands\n  * Log levels hierarchy\n\nLinie usunięte: ~18\nWszystkie operational patterns i workflows zachowane\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude <noreply@anthropic.com>\")",
-      "Bash(git show:*)",
-      "mcp__context7__get-library-docs",
+      "Read(//c/Users/wilen/.claude/skills/hostido-deployment/**)",
+      "Bash($HostidoKey = \"D:\\OneDrive - MPP TRADE\\SSH\\Hostido\\HostidoSSHNoPass.ppk\")",
+      "Bash(pscp:*)",
+      "Bash(plink:*)",
+      "Bash(pwsh -Command:*)",
+      "Bash(pwsh -NoProfile -ExecutionPolicy Bypass -File \"D:\\OneDrive - MPP TRADE\\AI Instrukcje\\claude-config\\.claude\\hooks\\wrapper_list_reports.ps1\")",
+      "Bash(node:*)",
+      "Bash(findstr:*)",
+      "Skill(livewire-troubleshooting)",
+      "Bash(pwsh -NoProfile -Command:*)",
+      "Bash(Get-Date -Format \"yyyy-MM-dd HH:mm:ss\")",
+      "Bash(New-Item -ItemType Directory -Force -Path \"D:\\OneDrive - MPP TRADE\\Skrypty\\PPM-CC-Laravel\\_DOCS\\.handover\")",
+      "Bash(Out-Null)",
+      "Bash(Write-Host \"Folder created/verified\")",
       "WebFetch(domain:github.com)",
-      "WebSearch",
-      "Bash(Get-Content \"D:\\OneDrive - MPP TRADE\\Skrypty\\PPM-CC-Laravel\\Plan_Projektu\\ETAP_05a_Produkty.md\")",
-      "Bash(Select-String -Pattern \"^###|^####|^#####\")",
-      "Bash(Select-Object -First 50)",
-      "Bash(git add:*)"
+      "Bash(npm info:*)",
+      "Bash(npm install:*)",
+      "Bash(npm run build:*)",
+      "Bash(dir /s node_modulesvanilla-colorful)",
+      "Skill(context7-docs-lookup)",
+      "Bash(cat:*)",
+      "Bash(Test-Path \"D:\\OneDrive - MPP TRADE\\Skrypty\\PPM-CC-Laravel\\public\\build\\assets\\components-Dl-p7YnV.css\")",
+      "Bash(Test-Path \"D:\\OneDrive - MPP TRADE\\Skrypty\\PPM-CC-Laravel\\public\\build\\.vite\\manifest.json\")",
+      "Bash(Test-Path \"D:\\OneDrive - MPP TRADE\\Skrypty\\PPM-CC-Laravel\\app\\Http\\Livewire\\Components\\AttributeColorPicker.php\")",
+      "Bash(Test-Path \"D:\\OneDrive - MPP TRADE\\Skrypty\\PPM-CC-Laravel\\app\\Http\\Livewire\\Admin\\Variants\\AttributeSystemManager.php\")",
+      "Bash(Test-Path \"D:\\OneDrive - MPP TRADE\\Skrypty\\PPM-CC-Laravel\\app\\Http\\Livewire\\Admin\\Variants\\AttributeValueManager.php\")",
+      "Bash(curl -I https://ppm.mpptrade.pl/public/build/assets/components-Dl-p7YnV.css)",
+      "Bash(curl -I https://ppm.mpptrade.pl/public/build/assets/app-slbyj789.css)",
+      "Bash(curl -I https://ppm.mpptrade.pl/public/build/assets/layout-CBQLZIVc.css)",
+      "Bash($RemoteBase = \"host379076@host379076.hostido.net.pl:domains/ppm.mpptrade.pl/public_html\")",
+      "Bash(pwsh -NoProfile -ExecutionPolicy Bypass -File \"D:\\OneDrive - MPP TRADE\\Skrypty\\PPM-CC-Laravel\\_TEMP\\deploy_inline_fix.ps1\")",
+      "Bash(pwsh -NoProfile -ExecutionPolicy Bypass -File \"D:\\OneDrive - MPP TRADE\\Skrypty\\PPM-CC-Laravel\\_TEMP\\deploy_x_teleport_fix.ps1\")",
+      "Bash(pwsh -NoProfile -ExecutionPolicy Bypass -File \"D:\\OneDrive - MPP TRADE\\Skrypty\\PPM-CC-Laravel\\_TEMP\\deploy_multi_root_fix.ps1\")",
+      "Bash(dir:*)",
+      "Bash(curl -I \"https://ppm.mpptrade.pl/admin/variants\")",
+      "Bash(curl:*)",
+      "Read(//c/Users/kamil/.claude/skills/frontend-verification/**)",
+      "Read(//c/Users/kamil/.claude/skills/hostido-deployment/**)",
+      "Bash(pwsh -ExecutionPolicy Bypass -File \"_TOOLS\\deploy_ui_standards_fix.ps1\")",
+      "Skill(hostido-deployment)",
+      "Bash(pwsh -NoProfile -ExecutionPolicy Bypass -Command \"$HostidoKey = ''D:\\OneDrive - MPP TRADE\\SSH\\Hostido\\HostidoSSHNoPass.ppk''; pscp -i $HostidoKey -P 64321 ''resources/views/layouts/auth.blade.php'' host379076@host379076.hostido.net.pl:domains/ppm.mpptrade.pl/public_html/resources/views/layouts/auth.blade.php\")",
+      "Skill(frontend-verification)",
+      "Bash(pwsh -NoProfile -ExecutionPolicy Bypass -File \"D:\\OneDrive - MPP TRADE\\Skrypty\\PPM-CC-Laravel\\_TOOLS\\fix_light_mode.ps1\")",
+      "Bash(pwsh -NoProfile -ExecutionPolicy Bypass -File \"D:\\OneDrive - MPP TRADE\\Skrypty\\PPM-CC-Laravel\\_TOOLS\\fix_all_white_backgrounds.ps1\")",
+      "Bash(pwsh -NoProfile -ExecutionPolicy Bypass -File \"D:\\OneDrive - MPP TRADE\\Skrypty\\PPM-CC-Laravel\\_TOOLS\\fix_remaining_white_backgrounds.ps1\")",
+      "Bash(pwsh -NoProfile -ExecutionPolicy Bypass -Command \"$HostidoKey = ''D:\\OneDrive - MPP TRADE\\SSH\\Hostido\\HostidoSSHNoPass.ppk''; $RemoteBase = ''host379076@host379076.hostido.net.pl:domains/ppm.mpptrade.pl/public_html/resources/views''; Write-Host ''Deploying layouts folder...'' -ForegroundColor Cyan; pscp -i $HostidoKey -P 64321 -r ''resources/views/layouts'' \"\"$RemoteBase/\"\"\")",
+      "Bash(pwsh -NoProfile -ExecutionPolicy Bypass -Command \"$HostidoKey = ''D:\\OneDrive - MPP TRADE\\SSH\\Hostido\\HostidoSSHNoPass.ppk''; $RemoteBase = ''host379076@host379076.hostido.net.pl:domains/ppm.mpptrade.pl/public_html/resources/views''; Write-Host ''Deploying auth folder...'' -ForegroundColor Cyan; pscp -i $HostidoKey -P 64321 ''resources/views/auth/login.blade.php'' \"\"$RemoteBase/auth/login.blade.php\"\"\")",
+      "Bash(pwsh -NoProfile -ExecutionPolicy Bypass -Command \"$HostidoKey = ''D:\\OneDrive - MPP TRADE\\SSH\\Hostido\\HostidoSSHNoPass.ppk''; $RemoteBase = ''host379076@host379076.hostido.net.pl:domains/ppm.mpptrade.pl/public_html/resources/views''; Write-Host ''Deploying livewire/admin folder (complete)...'' -ForegroundColor Cyan; pscp -i $HostidoKey -P 64321 -r ''resources/views/livewire/admin'' \"\"$RemoteBase/livewire/\"\"\")",
+      "Bash(pwsh -NoProfile -ExecutionPolicy Bypass -File \"D:\\OneDrive - MPP TRADE\\Skrypty\\PPM-CC-Laravel\\_TOOLS\\deploy_white_backgrounds_fix.ps1\")",
+      "Bash(pwsh -NoProfile -ExecutionPolicy Bypass -File \"D:\\OneDrive - MPP TRADE\\Skrypty\\PPM-CC-Laravel\\_TOOLS\\clear_cache_after_deployment.ps1\")",
+      "Bash(pwsh -NoProfile -ExecutionPolicy Bypass -File \"D:\\OneDrive - MPP TRADE\\Skrypty\\PPM-CC-Laravel\\_TOOLS\\deploy_category_thead_fix.ps1\")",
+      "Bash(pwsh -NoProfile -ExecutionPolicy Bypass -File \"D:\\OneDrive - MPP TRADE\\Skrypty\\PPM-CC-Laravel\\_TOOLS\\deploy_dark_input_fields_fix.ps1\")",
+      "Bash(pwsh -NoProfile -ExecutionPolicy Bypass -File \"D:\\OneDrive - MPP TRADE\\Skrypty\\PPM-CC-Laravel\\_TOOLS\\deploy_productform_php_fix.ps1\")",
+      "Bash(pwsh -NoProfile -ExecutionPolicy Bypass -File \"D:\\OneDrive - MPP TRADE\\Skrypty\\PPM-CC-Laravel\\_TOOLS\\deploy_productform_blade_fix.ps1\")",
+      "Bash(pwsh -NoProfile -ExecutionPolicy Bypass -File \"_TOOLS\\deploy_style_fixes.ps1\")",
+      "Bash(pwsh -NoProfile -ExecutionPolicy Bypass -File \"_TOOLS\\deploy_final_style_fixes.ps1\")",
+      "Bash(pwsh -NoProfile -ExecutionPolicy Bypass -File \"_TOOLS\\deploy_ppm_style_compliance.ps1\")",
+      "Bash(pwsh -NoProfile -ExecutionPolicy Bypass -Command \"$HostidoKey = ''D:\\OneDrive - MPP TRADE\\SSH\\Hostido\\HostidoSSHNoPass.ppk''; $RemoteBase = ''host379076@host379076.hostido.net.pl:domains/ppm.mpptrade.pl/public_html''; Write-Host ''=== DEPLOYING CATEGORY VIEW IMPROVEMENTS ==='' -ForegroundColor Cyan; Write-Host ''[1/4] Uploading ALL assets...'' -ForegroundColor Yellow; pscp -i $HostidoKey -P 64321 -r ''public/build/assets/*'' \"\"$RemoteBase/public/build/assets/\"\"; Write-Host ''[2/4] Uploading manifest to ROOT...'' -ForegroundColor Yellow; pscp -i $HostidoKey -P 64321 ''public/build/.vite/manifest.json'' \"\"$RemoteBase/public/build/manifest.json\"\"; Write-Host ''[3/4] Uploading category-tree-ultra-clean.blade.php...'' -ForegroundColor Yellow; pscp -i $HostidoKey -P 64321 ''resources/views/livewire/products/categories/category-tree-ultra-clean.blade.php'' \"\"$RemoteBase/resources/views/livewire/products/categories/category-tree-ultra-clean.blade.php\"\"; Write-Host ''[4/4] Clearing cache...'' -ForegroundColor Yellow; plink -ssh host379076@host379076.hostido.net.pl -P 64321 -i $HostidoKey -batch ''cd domains/ppm.mpptrade.pl/public_html && php artisan view:clear && php artisan cache:clear && php artisan config:clear''; Write-Host ''=== DEPLOYMENT COMPLETE ==='' -ForegroundColor Green\")",
+      "Bash(pwsh -NoProfile -ExecutionPolicy Bypass -File \"_TOOLS\\deploy_category_view.ps1\")",
+      "Bash(pwsh -NoProfile -ExecutionPolicy Bypass -File \"_TOOLS/deploy_category_view.ps1\")",
+      "Bash(pwsh -NoProfile -ExecutionPolicy Bypass -File \"_TOOLS/deploy_variants_ppm_colors.ps1\")",
+      "Bash(pwsh:*)",
+      "Bash(powershell:*)",
+      "Bash(php artisan tinker:*)",
+      "WebFetch(domain:dev.mpptrade.pl)",
+      "WebFetch(domain:demo.mpptrade.pl)",
+      "WebFetch(domain:test.kayomoto.pl)",
+      "Bash(Select-String -Pattern \"QUEUE_CONNECTION|DB_HOST|DB_DATABASE\")",
+      "Bash(New-Item -ItemType Directory -Force -Path \"D:\\OneDrive - MPP TRADE\\Skrypty\\PPM-CC-Laravel\\_TEMP\\claude_session_archive\")",
+      "Bash(Write-Host \"Folder created: _TEMP/claude_session_archive/\" -ForegroundColor Green)",
+      "Bash(php -l:*)",
+      "Bash(Write-Host \"[1/3] Uploading PrestaShop8Client...\" -ForegroundColor Yellow)",
+      "WebSearch"
     ],
     "deny": [],
     "ask": []
@@ -40,8 +84,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "pwsh -NoProfile -ExecutionPolicy Bypass -File \".claude\\scripts\\prompt-context-reminder.ps1\"",
-            "timeout": 2000
+            "command": "pwsh -NoProfile -ExecutionPolicy Bypass -File \".claude\\scripts\\prompt-context-reminder-with-recovery.ps1\"",
+            "timeout": 3000
           }
         ]
       }
@@ -107,6 +151,18 @@
             "type": "command",
             "command": "pwsh -Command \"Write-Host '📦 CONTEXT COMPACTION' -ForegroundColor Cyan; Write-Host '• Context7 MANDATORY for code generation' -ForegroundColor Red; Write-Host '• NO HARDCODING, NO MOCK DATA' -ForegroundColor Red\"",
             "timeout": 1000
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "matcher": "compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python _TOOLS/post_autocompact_recovery.py",
+            "timeout": 5000
           }
         ]
       }

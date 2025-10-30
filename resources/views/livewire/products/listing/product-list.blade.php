@@ -306,12 +306,12 @@
                                      x-transition:leave="transition ease-in duration-75"
                                      x-transition:leave-start="opacity-100 scale-100"
                                      x-transition:leave-end="opacity-0 scale-95"
-                                     class="absolute left-0 mt-2 w-56 rounded-md shadow-lg bg-white dark:bg-gray-700 ring-1 ring-black ring-opacity-5 z-50"
+                                     class="absolute left-0 mt-2 w-56 rounded-md shadow-lg bg-gray-700 ring-1 ring-black ring-opacity-5 z-50"
                                      style="display: none;">
                                     <div class="py-1" role="menu">
                                         <button wire:click="openBulkAssignCategories"
                                                 @click="open = false"
-                                                class="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600 flex items-center">
+                                                class="w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600 flex items-center">
                                             <svg class="w-4 h-4 mr-2 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
                                             </svg>
@@ -320,7 +320,7 @@
 
                                         <button wire:click="openBulkRemoveCategories"
                                                 @click="open = false"
-                                                class="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600 flex items-center">
+                                                class="w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600 flex items-center">
                                             <svg class="w-4 h-4 mr-2 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
                                             </svg>
@@ -329,7 +329,7 @@
 
                                         <button wire:click="openBulkMoveCategories"
                                                 @click="open = false"
-                                                class="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600 flex items-center">
+                                                class="w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600 flex items-center">
                                             <svg class="w-4 h-4 mr-2 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/>
                                             </svg>
@@ -338,6 +338,13 @@
                                     </div>
                                 </div>
                             </div>
+                            <button wire:click="bulkExportCsv"
+                                    class="px-3 py-1 text-sm bg-green-600 hover:bg-green-700 text-white rounded transition-all duration-300">
+                                <svg class="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                                </svg>
+                                Export CSV
+                            </button>
                             <button wire:click="openQuickSendModal"
                                     class="px-3 py-1 text-sm bg-purple-600 hover:bg-purple-700 text-white rounded transition-all duration-300">
                                 <svg class="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1111,10 +1118,10 @@ class="fixed top-4 right-4 z-50">
 
         {{-- Modal Content --}}
         <div class="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
-            <div class="inline-block bg-white dark:bg-gray-800 rounded-lg px-4 pt-5 pb-4 text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full sm:p-6">
+            <div class="inline-block bg-gray-800 rounded-lg px-4 pt-5 pb-4 text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full sm:p-6">
                 {{-- Header --}}
                 <div class="flex justify-between items-center mb-4">
-                    <h3 class="text-lg font-medium text-gray-900 dark:text-white">
+                    <h3 class="text-lg font-medium text-white">
                         Wyślij produkty na sklepy
                     </h3>
                     <button wire:click="closeQuickSendModal" class="text-gray-500 hover:text-gray-700">
@@ -1126,20 +1133,20 @@ class="fixed top-4 right-4 z-50">
 
                 {{-- Content --}}
                 <div class="mb-4">
-                    <p class="text-sm text-gray-600 dark:text-gray-400 mb-3">
+                    <p class="text-sm text-gray-400 mb-3">
                         Wybierz sklepy, na które chcesz wysłać {{ count($selectedProducts) }} {{ count($selectedProducts) == 1 ? 'produkt' : (count($selectedProducts) < 5 ? 'produkty' : 'produktów') }}:
                     </p>
 
                     @if(count($this->availableShops) > 0)
                         <div class="space-y-2 max-h-64 overflow-y-auto border border-gray-200 dark:border-gray-600 rounded-lg p-3">
                             @foreach($this->availableShops as $shop)
-                                <label class="flex items-center p-2 hover:bg-gray-50 dark:hover:bg-gray-700 rounded cursor-pointer">
+                                <label class="flex items-center p-2 hover:bg-gray-700 rounded cursor-pointer">
                                     <input type="checkbox"
                                            wire:model="selectedShopsForBulk"
                                            value="{{ $shop->id }}"
                                            class="mr-3 h-4 w-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500">
                                     <div class="flex-1">
-                                        <div class="text-sm font-medium text-gray-900 dark:text-white">
+                                        <div class="text-sm font-medium text-white">
                                             {{ $shop->name }}
                                         </div>
                                         <div class="text-xs text-gray-500 dark:text-gray-400">
@@ -1170,7 +1177,7 @@ class="fixed top-4 right-4 z-50">
                     </span>
                     <div class="flex space-x-3">
                         <button wire:click="closeQuickSendModal"
-                                class="px-4 py-2 border border-gray-300 dark:border-gray-600 text-sm font-medium rounded-lg text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                                class="px-4 py-2 border border-gray-600 text-sm font-medium rounded-lg text-gray-300 bg-gray-800 hover:bg-gray-700 transition-colors">
                             Anuluj
                         </button>
                         <button wire:click="bulkSendToShops"
@@ -1189,10 +1196,10 @@ class="fixed top-4 right-4 z-50">
 {{-- CRITICAL FIX 2025-10-07: Added permanent delete confirmation modal for single product --}}
 @if($showDeleteModal)
 <div class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50" wire:click.self="cancelDelete">
-    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-2xl w-full max-w-md p-6">
+    <div class="bg-gray-800 rounded-lg shadow-2xl w-full max-w-md p-6">
         {{-- Header --}}
         <div class="flex items-center justify-between mb-4">
-            <h3 class="text-xl font-bold text-gray-900 dark:text-white flex items-center">
+            <h3 class="text-xl font-bold text-white flex items-center">
                 <svg class="w-6 h-6 text-red-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-1.964-1.333-2.732 0L3.732 16c-.77 1.333.192 3 1.732 3z"/>
                 </svg>
@@ -1207,7 +1214,7 @@ class="fixed top-4 right-4 z-50">
 
         {{-- Body --}}
         <div class="mb-6">
-            <p class="text-gray-700 dark:text-gray-300 mb-3">
+            <p class="text-gray-300 mb-3">
                 Czy na pewno chcesz <span class="font-bold text-red-600">TRWALE USUNĄĆ</span> produkt?
             </p>
             <div class="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3">
@@ -1225,7 +1232,7 @@ class="fixed top-4 right-4 z-50">
         {{-- Footer - Actions --}}
         <div class="flex justify-end space-x-3">
             <button wire:click="cancelDelete"
-                    class="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors">
+                    class="px-4 py-2 text-sm font-medium text-gray-300 bg-gray-700 border border-gray-600 rounded-lg hover:bg-gray-600 transition-colors">
                 Anuluj
             </button>
             <button wire:click="deleteProduct"
@@ -1243,10 +1250,10 @@ class="fixed top-4 right-4 z-50">
 {{-- BULK DELETE CONFIRMATION MODAL --}}
 @if($showBulkDeleteModal)
 <div class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50" wire:click.self="closeBulkDeleteModal">
-    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-2xl w-full max-w-md p-6">
+    <div class="bg-gray-800 rounded-lg shadow-2xl w-full max-w-md p-6">
         {{-- Header --}}
         <div class="flex items-center justify-between mb-4">
-            <h3 class="text-xl font-bold text-gray-900 dark:text-white flex items-center">
+            <h3 class="text-xl font-bold text-white flex items-center">
                 <svg class="w-6 h-6 text-red-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-1.964-1.333-2.732 0L3.732 16c-.77 1.333.192 3 1.732 3z"/>
                 </svg>
@@ -1261,7 +1268,7 @@ class="fixed top-4 right-4 z-50">
 
         {{-- Body --}}
         <div class="mb-6">
-            <p class="text-gray-700 dark:text-gray-300 mb-3">
+            <p class="text-gray-300 mb-3">
                 Czy na pewno chcesz <span class="font-bold text-red-600">TRWALE USUNĄĆ</span>
                 <span class="font-bold text-red-600">{{ $this->selectedCount }}</span>
                 {{ $this->selectedCount == 1 ? 'produkt' : ($this->selectedCount < 5 ? 'produkty' : 'produktów') }}?
@@ -1281,7 +1288,7 @@ class="fixed top-4 right-4 z-50">
         {{-- Footer - Actions --}}
         <div class="flex justify-end space-x-3">
             <button wire:click="closeBulkDeleteModal"
-                    class="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors">
+                    class="px-4 py-2 text-sm font-medium text-gray-300 bg-gray-700 border border-gray-600 rounded-lg hover:bg-gray-600 transition-colors">
                 Anuluj
             </button>
             <button wire:click="confirmBulkDelete"
@@ -1299,10 +1306,10 @@ class="fixed top-4 right-4 z-50">
 {{-- BULK ASSIGN CATEGORIES MODAL (ETAP_07a FAZA 2.2.2.2.1) --}}
 @if($showBulkAssignCategoriesModal)
 <div class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50" wire:click.self="closeBulkAssignCategories">
-    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-2xl w-full max-w-2xl p-6 max-h-[90vh] overflow-y-auto">
+    <div class="bg-gray-800 rounded-lg shadow-2xl w-full max-w-2xl p-6 max-h-[90vh] overflow-y-auto">
         {{-- Header --}}
         <div class="flex items-center justify-between mb-4">
-            <h3 class="text-xl font-bold text-gray-900 dark:text-white flex items-center">
+            <h3 class="text-xl font-bold text-white flex items-center">
                 <svg class="w-6 h-6 text-orange-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/>
                 </svg>
@@ -1317,7 +1324,7 @@ class="fixed top-4 right-4 z-50">
 
         {{-- Body --}}
         <div class="mb-6">
-            <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">
+            <p class="text-sm text-gray-400 mb-4">
                 Przypisujesz kategorie do <strong class="text-orange-500">{{ count($selectedProducts) }}</strong>
                 {{ count($selectedProducts) == 1 ? 'produktu' : (count($selectedProducts) < 5 ? 'produktów' : 'produktów') }}.
                 Wybierz maksymalnie 10 kategorii.
@@ -1325,23 +1332,23 @@ class="fixed top-4 right-4 z-50">
 
             {{-- Category Picker - Multi-select Tree --}}
             <div class="mb-4">
-                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                <label class="block text-sm font-medium text-gray-300 mb-2">
                     Wybierz kategorie:
                 </label>
-                <div class="border border-gray-300 dark:border-gray-600 rounded-lg p-4 max-h-96 overflow-y-auto bg-gray-50 dark:bg-gray-900">
+                <div class="border border-gray-600 rounded-lg p-4 max-h-96 overflow-y-auto bg-gray-50 dark:bg-gray-900">
                     @if(count($categories) > 0)
                         @foreach($categories as $category)
                             @php
                                 $isSelected = in_array($category->id, $selectedCategoriesForBulk);
                                 $indent = $category->level * 1.5;
                             @endphp
-                            <label class="flex items-center p-2 hover:bg-white dark:hover:bg-gray-800 rounded cursor-pointer mb-1"
+                            <label class="flex items-center p-2 hover:bg-gray-800 dark:hover:bg-gray-800 rounded cursor-pointer mb-1"
                                    style="padding-left: {{ $indent }}rem;">
                                 <input type="checkbox"
                                        wire:model.live="selectedCategoriesForBulk"
                                        value="{{ $category->id }}"
                                        class="mr-3 h-4 w-4 text-orange-500 border-gray-300 rounded focus:ring-orange-500">
-                                <span class="text-sm font-medium text-gray-900 dark:text-white">
+                                <span class="text-sm font-medium text-white">
                                     {{ $category->name }}
                                 </span>
                                 <span class="ml-2 text-xs text-gray-500">
@@ -1372,11 +1379,11 @@ class="fixed top-4 right-4 z-50">
             {{-- Primary Category Selection --}}
             @if(count($selectedCategoriesForBulk) > 0)
                 <div class="mb-4">
-                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    <label class="block text-sm font-medium text-gray-300 mb-2">
                         Kategoria główna (opcjonalnie):
                     </label>
                     <select wire:model.live="primaryCategoryForBulk"
-                            class="form-input w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white">
+                            class="form-input w-full rounded-lg border-gray-600 dark:bg-gray-700 dark:text-white">
                         <option value="">Bez kategorii głównej</option>
                         @foreach($categories->whereIn('id', $selectedCategoriesForBulk) as $category)
                             <option value="{{ $category->id }}">{{ $category->name }}</option>
@@ -1392,7 +1399,7 @@ class="fixed top-4 right-4 z-50">
         {{-- Footer --}}
         <div class="flex justify-end space-x-3">
             <button wire:click="closeBulkAssignCategories"
-                    class="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors">
+                    class="px-4 py-2 text-sm font-medium text-gray-300 bg-gray-700 border border-gray-600 rounded-lg hover:bg-gray-600 transition-colors">
                 Anuluj
             </button>
             <button wire:click="bulkAssignCategories"
@@ -1411,10 +1418,10 @@ class="fixed top-4 right-4 z-50">
 {{-- BULK REMOVE CATEGORIES MODAL (ETAP_07a FAZA 2.2.2.2.2) --}}
 @if($showBulkRemoveCategoriesModal)
 <div class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50" wire:click.self="closeBulkRemoveCategories">
-    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-2xl w-full max-w-2xl p-6 max-h-[90vh] overflow-y-auto">
+    <div class="bg-gray-800 rounded-lg shadow-2xl w-full max-w-2xl p-6 max-h-[90vh] overflow-y-auto">
         {{-- Header --}}
         <div class="flex items-center justify-between mb-4">
-            <h3 class="text-xl font-bold text-gray-900 dark:text-white flex items-center">
+            <h3 class="text-xl font-bold text-white flex items-center">
                 <svg class="w-6 h-6 text-red-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
                 </svg>
@@ -1429,26 +1436,26 @@ class="fixed top-4 right-4 z-50">
 
         {{-- Body --}}
         <div class="mb-6">
-            <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">
+            <p class="text-sm text-gray-400 mb-4">
                 Usuwasz kategorie z <strong class="text-orange-500">{{ count($selectedProducts) }}</strong>
                 {{ count($selectedProducts) == 1 ? 'produktu' : (count($selectedProducts) < 5 ? 'produktów' : 'produktów') }}.
             </p>
 
             {{-- Common Categories List --}}
             <div class="mb-4">
-                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                <label class="block text-sm font-medium text-gray-300 mb-2">
                     Wspólne kategorie (obecne we wszystkich wybranych produktach):
                 </label>
 
                 @if(count($commonCategories) > 0)
-                    <div class="border border-gray-300 dark:border-gray-600 rounded-lg p-4 bg-gray-50 dark:bg-gray-900 max-h-96 overflow-y-auto">
+                    <div class="border border-gray-600 rounded-lg p-4 bg-gray-50 dark:bg-gray-900 max-h-96 overflow-y-auto">
                         @foreach($commonCategories as $category)
-                            <label class="flex items-center p-2 hover:bg-white dark:hover:bg-gray-800 rounded cursor-pointer mb-1">
+                            <label class="flex items-center p-2 hover:bg-gray-800 dark:hover:bg-gray-800 rounded cursor-pointer mb-1">
                                 <input type="checkbox"
                                        wire:model.live="categoriesToRemove"
                                        value="{{ $category['id'] }}"
                                        class="mr-3 h-4 w-4 text-red-500 border-gray-300 rounded focus:ring-red-500">
-                                <span class="text-sm font-medium text-gray-900 dark:text-white">
+                                <span class="text-sm font-medium text-white">
                                     {{ $category['name'] }}
                                 </span>
                                 @if($category['is_primary_in_any'])
@@ -1489,7 +1496,7 @@ class="fixed top-4 right-4 z-50">
         {{-- Footer --}}
         <div class="flex justify-end space-x-3">
             <button wire:click="closeBulkRemoveCategories"
-                    class="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors">
+                    class="px-4 py-2 text-sm font-medium text-gray-300 bg-gray-700 border border-gray-600 rounded-lg hover:bg-gray-600 transition-colors">
                 Anuluj
             </button>
             <button wire:click="bulkRemoveCategories"
@@ -1508,10 +1515,10 @@ class="fixed top-4 right-4 z-50">
 {{-- BULK MOVE CATEGORIES MODAL (ETAP_07a FAZA 2.2.2.2.3) --}}
 @if($showBulkMoveCategoriesModal)
 <div class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50" wire:click.self="closeBulkMoveCategories">
-    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-2xl w-full max-w-2xl p-6 max-h-[90vh] overflow-y-auto">
+    <div class="bg-gray-800 rounded-lg shadow-2xl w-full max-w-2xl p-6 max-h-[90vh] overflow-y-auto">
         {{-- Header --}}
         <div class="flex items-center justify-between mb-4">
-            <h3 class="text-xl font-bold text-gray-900 dark:text-white flex items-center">
+            <h3 class="text-xl font-bold text-white flex items-center">
                 <svg class="w-6 h-6 text-blue-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/>
                 </svg>
@@ -1526,7 +1533,7 @@ class="fixed top-4 right-4 z-50">
 
         {{-- Body --}}
         <div class="mb-6">
-            <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">
+            <p class="text-sm text-gray-400 mb-4">
                 Przeniesiesz <strong class="text-orange-500">{{ count($selectedProducts) }}</strong>
                 {{ count($selectedProducts) == 1 ? 'produkt' : (count($selectedProducts) < 5 ? 'produkty' : 'produktów') }}
                 z jednej kategorii do drugiej.
@@ -1534,11 +1541,11 @@ class="fixed top-4 right-4 z-50">
 
             {{-- FROM Category --}}
             <div class="mb-4">
-                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                <label class="block text-sm font-medium text-gray-300 mb-2">
                     Z kategorii (źródłowa):
                 </label>
                 <select wire:model.live="fromCategoryId"
-                        class="form-input w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white">
+                        class="form-input w-full rounded-lg border-gray-600 dark:bg-gray-700 dark:text-white">
                     <option value="">Wybierz kategorię źródłową</option>
                     @foreach($categories as $category)
                         <option value="{{ $category->id }}">
@@ -1550,11 +1557,11 @@ class="fixed top-4 right-4 z-50">
 
             {{-- TO Category --}}
             <div class="mb-4">
-                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                <label class="block text-sm font-medium text-gray-300 mb-2">
                     Do kategorii (docelowa):
                 </label>
                 <select wire:model.live="toCategoryId"
-                        class="form-input w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white">
+                        class="form-input w-full rounded-lg border-gray-600 dark:bg-gray-700 dark:text-white">
                     <option value="">Wybierz kategorię docelową</option>
                     @foreach($categories as $category)
                         <option value="{{ $category->id }}" @if($category->id == $fromCategoryId) disabled @endif>
@@ -1566,35 +1573,35 @@ class="fixed top-4 right-4 z-50">
 
             {{-- Move Mode --}}
             <div class="mb-4">
-                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                <label class="block text-sm font-medium text-gray-300 mb-2">
                     Tryb przenoszenia:
                 </label>
                 <div class="space-y-2">
-                    <label class="flex items-start p-3 border border-gray-300 dark:border-gray-600 rounded-lg cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 {{ $moveMode === 'replace' ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-500' : '' }}">
+                    <label class="flex items-start p-3 border border-gray-600 rounded-lg cursor-pointer hover:bg-gray-700 {{ $moveMode === 'replace' ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-500' : '' }}">
                         <input type="radio"
                                wire:model.live="moveMode"
                                value="replace"
                                class="mt-1 mr-3 text-blue-500 border-gray-300 focus:ring-blue-500">
                         <div class="flex-1">
-                            <div class="font-medium text-gray-900 dark:text-white">
+                            <div class="font-medium text-white">
                                 Zamień kategorię
                             </div>
-                            <div class="text-xs text-gray-600 dark:text-gray-400">
+                            <div class="text-xs text-gray-400">
                                 Usuń kategorię źródłową i dodaj docelową (produkt przestanie być w starej kategorii)
                             </div>
                         </div>
                     </label>
 
-                    <label class="flex items-start p-3 border border-gray-300 dark:border-gray-600 rounded-lg cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 {{ $moveMode === 'add_keep' ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-500' : '' }}">
+                    <label class="flex items-start p-3 border border-gray-600 rounded-lg cursor-pointer hover:bg-gray-700 {{ $moveMode === 'add_keep' ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-500' : '' }}">
                         <input type="radio"
                                wire:model.live="moveMode"
                                value="add_keep"
                                class="mt-1 mr-3 text-blue-500 border-gray-300 focus:ring-blue-500">
                         <div class="flex-1">
-                            <div class="font-medium text-gray-900 dark:text-white">
+                            <div class="font-medium text-white">
                                 Dodaj i zachowaj obie
                             </div>
-                            <div class="text-xs text-gray-600 dark:text-gray-400">
+                            <div class="text-xs text-gray-400">
                                 Dodaj kategorię docelową zachowując źródłową (produkt będzie w obu kategoriach)
                             </div>
                         </div>
@@ -1619,7 +1626,7 @@ class="fixed top-4 right-4 z-50">
         {{-- Footer --}}
         <div class="flex justify-end space-x-3">
             <button wire:click="closeBulkMoveCategories"
-                    class="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors">
+                    class="px-4 py-2 text-sm font-medium text-gray-300 bg-gray-700 border border-gray-600 rounded-lg hover:bg-gray-600 transition-colors">
                 Anuluj
             </button>
             <button wire:click="bulkMoveCategories"
@@ -1638,7 +1645,7 @@ class="fixed top-4 right-4 z-50">
 {{-- IMPORT FROM PRESTASHOP MODAL --}}
 @if($showImportModal)
 <div class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50">
-    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden">
+    <div class="bg-gray-800 rounded-lg shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden">
 
         {{-- Facebook-style Stagger Animation for Categories --}}
         <style>
@@ -1672,8 +1679,8 @@ class="fixed top-4 right-4 z-50">
         </style>
 
         {{-- Modal Header --}}
-        <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
-            <h3 class="text-xl font-semibold text-gray-900 dark:text-white">
+        <div class="px-6 py-4 border-b border-gray-700 flex items-center justify-between">
+            <h3 class="text-xl font-semibold text-white">
                 📥 Import produktów z PrestaShop
             </h3>
             <button wire:click="closeImportModal" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
@@ -1689,12 +1696,12 @@ class="fixed top-4 right-4 z-50">
             {{-- Step 1: Shop Selection --}}
             @if(!$importShopId)
                 <div class="mb-6">
-                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    <label class="block text-sm font-medium text-gray-300 mb-2">
                         1️⃣ Wybierz sklep PrestaShop
                     </label>
                     {{-- CRITICAL FIX: Use computed property $this->availableShops instead of inline query --}}
                     <select wire:model.live="importShopId"
-                            class="form-select w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white focus:ring-2 focus:ring-orange-500 focus:border-orange-500">
+                            class="form-select w-full rounded-lg border-gray-600 dark:bg-gray-700 dark:text-white focus:ring-2 focus:ring-orange-500 focus:border-orange-500">
                         <option value="">-- Wybierz sklep --</option>
                         @foreach($this->availableShops as $shop)
                             <option value="{{ $shop->id }}">
@@ -1718,8 +1725,8 @@ class="fixed top-4 right-4 z-50">
                 <div class="mb-6">
                     <div class="flex items-center justify-between mb-4">
                         <div>
-                            <span class="text-sm text-gray-600 dark:text-gray-400">Sklep:</span>
-                            <strong class="text-gray-900 dark:text-white ml-2">
+                            <span class="text-sm text-gray-400">Sklep:</span>
+                            <strong class="text-white ml-2">
                                 {{ $this->availableShops->find($importShopId)->name ?? 'N/A' }}
                             </strong>
                         </div>
@@ -1729,17 +1736,17 @@ class="fixed top-4 right-4 z-50">
                     </div>
 
                     {{-- Mode Tabs --}}
-                    <div class="flex space-x-2 mb-4 border-b border-gray-200 dark:border-gray-700">
+                    <div class="flex space-x-2 mb-4 border-b border-gray-700">
                         <button wire:click="$set('importMode', 'all')"
-                                class="px-4 py-2 border-b-2 {{ $importMode === 'all' ? 'border-orange-500 text-orange-500' : 'border-transparent text-gray-600 dark:text-gray-400' }}">
+                                class="px-4 py-2 border-b-2 {{ $importMode === 'all' ? 'border-orange-500 text-orange-500' : 'border-transparent text-gray-400' }}">
                             📦 Wszystkie
                         </button>
                         <button wire:click="$set('importMode', 'category')"
-                                class="px-4 py-2 border-b-2 {{ $importMode === 'category' ? 'border-orange-500 text-orange-500' : 'border-transparent text-gray-600 dark:text-gray-400' }}">
+                                class="px-4 py-2 border-b-2 {{ $importMode === 'category' ? 'border-orange-500 text-orange-500' : 'border-transparent text-gray-400' }}">
                             📁 Kategoria
                         </button>
                         <button wire:click="$set('importMode', 'individual')"
-                                class="px-4 py-2 border-b-2 {{ $importMode === 'individual' ? 'border-orange-500 text-orange-500' : 'border-transparent text-gray-600 dark:text-gray-400' }}">
+                                class="px-4 py-2 border-b-2 {{ $importMode === 'individual' ? 'border-orange-500 text-orange-500' : 'border-transparent text-gray-400' }}">
                             ✅ Wybrane produkty
                         </button>
                     </div>
@@ -1747,10 +1754,10 @@ class="fixed top-4 right-4 z-50">
                     {{-- MODE: All Products --}}
                     @if($importMode === 'all')
                         <div class="p-6 bg-yellow-50 dark:bg-yellow-900 dark:bg-opacity-20 rounded-lg">
-                            <h4 class="font-semibold text-gray-900 dark:text-white mb-2">
+                            <h4 class="font-semibold text-white mb-2">
                                 ⚠️ Import wszystkich produktów
                             </h4>
-                            <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                            <p class="text-sm text-gray-400 mb-4">
                                 Zaimportujesz WSZYSTKIE produkty ze sklepu PrestaShop.
                                 Operacja może zająć kilka minut w zależności od liczby produktów.
                             </p>
@@ -1772,7 +1779,7 @@ class="fixed top-4 right-4 z-50">
                                             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                                             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                                         </svg>
-                                        <p class="mt-2 text-gray-600 dark:text-gray-400">Ładowanie kategorii z PrestaShop...</p>
+                                        <p class="mt-2 text-gray-400">Ładowanie kategorii z PrestaShop...</p>
                                     </div>
 
                                     {{-- Empty state - shows when not loading and no categories --}}
@@ -1784,7 +1791,7 @@ class="fixed top-4 right-4 z-50">
                                 </div>
                             @else
                                 <div class="mb-4">
-                                    <label class="flex items-center text-sm text-gray-700 dark:text-gray-300">
+                                    <label class="flex items-center text-sm text-gray-300">
                                         <input type="checkbox" wire:model.live="importIncludeSubcategories"
                                                class="form-checkbox mr-2 text-orange-500">
                                         Uwzględnij podkategorie
@@ -1792,7 +1799,7 @@ class="fixed top-4 right-4 z-50">
                                 </div>
 
                                 {{-- ALPINE.JS OPTIMIZED: Client-side expand/collapse with skeleton loaders --}}
-                                <div class="border border-gray-300 dark:border-gray-600 rounded-lg max-h-64 overflow-y-auto p-4"
+                                <div class="border border-gray-600 rounded-lg max-h-64 overflow-y-auto p-4"
                                      x-data="{
                                          expanded: $wire.entangle('expandedCategories'),
                                          loading: null,
@@ -1910,7 +1917,7 @@ class="fixed top-4 right-4 z-50">
 
                                             {{-- Category Button --}}
                                             <button wire:click="selectImportCategory({{ $category['id'] }})"
-                                                    class="flex-1 text-left py-2 px-4 rounded hover:bg-gray-100 dark:hover:bg-gray-700 {{ $importCategoryId === $category['id'] ? 'bg-orange-500 bg-opacity-20 border border-orange-500' : '' }}">
+                                                    class="flex-1 text-left py-2 px-4 rounded hover:bg-gray-700 {{ $importCategoryId === $category['id'] ? 'bg-orange-500 bg-opacity-20 border border-orange-500' : '' }}">
                                                 <span class="font-medium">{{ $category['name'] }}</span>
                                                 <span class="text-xs text-gray-500 ml-2">
                                                     ({{ $category['nb_products_recursive'] ?? 0 }} prod.)
@@ -1968,14 +1975,14 @@ class="fixed top-4 right-4 z-50">
                         <div>
                             {{-- CRITICAL: Search Input --}}
                             <div class="mb-4">
-                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                <label class="block text-sm font-medium text-gray-300 mb-2">
                                     🔍 Wyszukaj produkt (po nazwie lub SKU)
                                 </label>
                                 <div class="relative">
                                     <input type="text"
                                            wire:model.live.debounce.500ms="importSearch"
                                            placeholder="Wpisz min. 3 znaki nazwy lub SKU..."
-                                           class="form-input w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white pr-10">
+                                           class="form-input w-full rounded-lg border-gray-600 dark:bg-gray-700 dark:text-white pr-10">
                                     <div wire:loading wire:target="loadPrestaShopProducts" class="absolute right-3 top-1/2 transform -translate-y-1/2">
                                         <svg class="animate-spin h-5 w-5 text-orange-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                                             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
@@ -2002,7 +2009,7 @@ class="fixed top-4 right-4 z-50">
                                             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                                             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                                         </svg>
-                                        <p class="mt-2 text-gray-600 dark:text-gray-400">
+                                        <p class="mt-2 text-gray-400">
                                             @if(!empty($importSearch))
                                                 Wyszukiwanie produktów...
                                             @else
@@ -2026,31 +2033,31 @@ class="fixed top-4 right-4 z-50">
                                     </div>
                                 </div>
                             @else
-                                <div class="mb-2 text-sm text-gray-600 dark:text-gray-400">
+                                <div class="mb-2 text-sm text-gray-400">
                                     Znaleziono: <strong>{{ count($prestashopProducts) }}</strong> produktów
                                     @if(count($selectedProductsToImport) > 0)
                                         | Wybrano: <strong class="text-orange-500">{{ count($selectedProductsToImport) }}</strong>
                                     @endif
                                 </div>
 
-                                <div class="border border-gray-300 dark:border-gray-600 rounded-lg max-h-64 overflow-y-auto">
+                                <div class="border border-gray-600 rounded-lg max-h-64 overflow-y-auto">
                                     @foreach($prestashopProducts as $product)
                                         @php
                                             $isSelected = in_array($product['id'], $selectedProductsToImport);
                                             $existsInPPM = App\Models\Product::where('sku', $product['reference'] ?? '')->exists();
                                         @endphp
 
-                                        <label class="flex items-center p-3 hover:bg-gray-50 dark:hover:bg-gray-700 border-b border-gray-200 dark:border-gray-700 cursor-pointer {{ $isSelected ? 'bg-orange-500 bg-opacity-10' : '' }}">
+                                        <label class="flex items-center p-3 hover:bg-gray-700 border-b border-gray-700 cursor-pointer {{ $isSelected ? 'bg-orange-500 bg-opacity-10' : '' }}">
                                             <input type="checkbox"
                                                    wire:click="toggleProductSelection({{ $product['id'] }})"
                                                    {{ $isSelected ? 'checked' : '' }}
                                                    class="form-checkbox mr-3 text-orange-500">
 
                                             <div class="flex-1">
-                                                <div class="font-medium text-gray-900 dark:text-white">
+                                                <div class="font-medium text-white">
                                                     {{ $product['name'] ?? 'Brak nazwy' }}
                                                 </div>
-                                                <div class="text-sm text-gray-600 dark:text-gray-400">
+                                                <div class="text-sm text-gray-400">
                                                     SKU: <strong>{{ $product['reference'] ?? 'N/A' }}</strong>
                                                     | ID: {{ $product['id'] }}
                                                 </div>
@@ -2079,7 +2086,7 @@ class="fixed top-4 right-4 z-50">
         </div>
 
         {{-- Modal Footer --}}
-        <div class="px-6 py-4 border-t border-gray-200 dark:border-gray-700 flex justify-end">
+        <div class="px-6 py-4 border-t border-gray-700 flex justify-end">
             <button wire:click="closeImportModal" class="btn-secondary px-4 py-2 text-sm font-medium rounded-lg">
                 Anuluj
             </button>

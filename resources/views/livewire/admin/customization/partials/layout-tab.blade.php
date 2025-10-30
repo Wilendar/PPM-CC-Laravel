@@ -1,8 +1,8 @@
 <div class="p-6">
     <div class="flex justify-between items-center mb-6">
         <div>
-            <h3 class="text-lg font-medium text-gray-900 dark:text-white">Ustawienia Layoutu</h3>
-            <p class="text-sm text-gray-600 dark:text-gray-400">Dostosuj układ i gęstość interfejsu</p>
+            <h3 class="text-lg font-medium text-white">Ustawienia Layoutu</h3>
+            <p class="text-sm text-gray-400">Dostosuj układ i gęstość interfejsu</p>
         </div>
         
         <button wire:click="updateLayout" class="btn btn-primary">
@@ -16,7 +16,7 @@
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
         <!-- Layout Density -->
         <div class="space-y-4">
-            <h4 class="text-md font-medium text-gray-900 dark:text-white">Gęstość Layoutu</h4>
+            <h4 class="text-md font-medium text-white">Gęstość Layoutu</h4>
             
             <div class="space-y-3">
                 <!-- Compact -->
@@ -27,8 +27,8 @@
                            value="compact" 
                            class="mt-1">
                     <div class="flex-1">
-                        <div class="font-medium text-gray-900 dark:text-white">Kompaktowy</div>
-                        <div class="text-sm text-gray-600 dark:text-gray-400">
+                        <div class="font-medium text-white">Kompaktowy</div>
+                        <div class="text-sm text-gray-400">
                             Mniejsze odstępy, węższa sidebar (200px), niższy header (50px)
                         </div>
                         <div class="mt-2 text-xs text-gray-500">
@@ -56,8 +56,8 @@
                            value="normal" 
                            class="mt-1">
                     <div class="flex-1">
-                        <div class="font-medium text-gray-900 dark:text-white">Normalny</div>
-                        <div class="text-sm text-gray-600 dark:text-gray-400">
+                        <div class="font-medium text-white">Normalny</div>
+                        <div class="text-sm text-gray-400">
                             Standardowe odstępy, sidebar (250px), header (60px)
                         </div>
                         <div class="mt-2 text-xs text-gray-500">
@@ -85,8 +85,8 @@
                            value="spacious" 
                            class="mt-1">
                     <div class="flex-1">
-                        <div class="font-medium text-gray-900 dark:text-white">Przestronny</div>
-                        <div class="text-sm text-gray-600 dark:text-gray-400">
+                        <div class="font-medium text-white">Przestronny</div>
+                        <div class="text-sm text-gray-400">
                             Duże odstępy, szersza sidebar (280px), wyższy header (70px)
                         </div>
                         <div class="mt-2 text-xs text-gray-500">
@@ -111,7 +111,7 @@
         <div class="space-y-6">
             <!-- Sidebar Position -->
             <div class="space-y-4">
-                <h4 class="text-md font-medium text-gray-900 dark:text-white">Pozycja Sidebar</h4>
+                <h4 class="text-md font-medium text-white">Pozycja Sidebar</h4>
                 
                 <div class="grid grid-cols-2 gap-3">
                     <label class="flex flex-col items-center p-4 border-2 rounded-lg cursor-pointer transition-colors
@@ -123,7 +123,7 @@
                         <div class="w-12 h-8 bg-gray-100 rounded border overflow-hidden mb-2">
                             <div class="flex h-full">
                                 <div class="w-1/3 bg-blue-400"></div>
-                                <div class="flex-1 bg-white"></div>
+                                <div class="flex-1 bg-gray-800"></div>
                             </div>
                         </div>
                         <span class="text-sm font-medium">Po lewej</span>
@@ -137,7 +137,7 @@
                                class="sr-only">
                         <div class="w-12 h-8 bg-gray-100 rounded border overflow-hidden mb-2">
                             <div class="flex h-full">
-                                <div class="flex-1 bg-white"></div>
+                                <div class="flex-1 bg-gray-800"></div>
                                 <div class="w-1/3 bg-blue-400"></div>
                             </div>
                         </div>
@@ -148,7 +148,7 @@
 
             <!-- Header Style -->
             <div class="space-y-4">
-                <h4 class="text-md font-medium text-gray-900 dark:text-white">Styl Nagłówka</h4>
+                <h4 class="text-md font-medium text-white">Styl Nagłówka</h4>
                 
                 <div class="space-y-3">
                     <label class="flex items-center space-x-3 p-3 border-2 rounded-lg cursor-pointer transition-colors
@@ -158,7 +158,7 @@
                                value="fixed">
                         <div>
                             <div class="font-medium">Przyklejony</div>
-                            <div class="text-sm text-gray-600 dark:text-gray-400">
+                            <div class="text-sm text-gray-400">
                                 Header zawsze widoczny na górze
                             </div>
                         </div>
@@ -171,7 +171,7 @@
                                value="static">
                         <div>
                             <div class="font-medium">Statyczny</div>
-                            <div class="text-sm text-gray-600 dark:text-gray-400">
+                            <div class="text-sm text-gray-400">
                                 Header przewija się z zawartością
                             </div>
                         </div>
@@ -184,7 +184,7 @@
                                value="floating">
                         <div>
                             <div class="font-medium">Pływający</div>
-                            <div class="text-sm text-gray-600 dark:text-gray-400">
+                            <div class="text-sm text-gray-400">
                                 Header z lekkim cieniem
                             </div>
                         </div>
@@ -196,15 +196,15 @@
 
     <!-- Dashboard Settings -->
     <div class="mt-8 pt-8 border-t border-gray-200 dark:border-gray-600">
-        <h4 class="text-md font-medium text-gray-900 dark:text-white mb-6">Ustawienia Dashboard</h4>
+        <h4 class="text-md font-medium text-white mb-6">Ustawienia Dashboard</h4>
         
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             <!-- Auto Refresh -->
             <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
                 <label class="flex items-center justify-between">
                     <div>
-                        <div class="font-medium text-gray-900 dark:text-white">Auto-odświeżanie</div>
-                        <div class="text-sm text-gray-600 dark:text-gray-400">
+                        <div class="font-medium text-white">Auto-odświeżanie</div>
+                        <div class="text-sm text-gray-400">
                             Automatyczne odświeżanie danych dashboard
                         </div>
                     </div>
@@ -215,7 +215,7 @@
                 
                 @if($dashboardSettings['auto_refresh'] ?? false)
                     <div class="mt-3">
-                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        <label class="block text-sm font-medium text-gray-300 mb-2">
                             Interwał odświeżania (sekundy)
                         </label>
                         <select wire:model.live="dashboardSettings.refresh_interval" 
@@ -233,8 +233,8 @@
             <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
                 <label class="flex items-center justify-between">
                     <div>
-                        <div class="font-medium text-gray-900 dark:text-white">Podpowiedzi</div>
-                        <div class="text-sm text-gray-600 dark:text-gray-400">
+                        <div class="font-medium text-white">Podpowiedzi</div>
+                        <div class="text-sm text-gray-400">
                             Wyświetlaj pomocne podpowiedzi
                         </div>
                     </div>
@@ -248,8 +248,8 @@
             <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
                 <label class="flex items-center justify-between">
                     <div>
-                        <div class="font-medium text-gray-900 dark:text-white">Kompaktowe widgety</div>
-                        <div class="text-sm text-gray-600 dark:text-gray-400">
+                        <div class="font-medium text-white">Kompaktowe widgety</div>
+                        <div class="text-sm text-gray-400">
                             Mniejsze widgety na dashboard
                         </div>
                     </div>
@@ -263,8 +263,8 @@
             <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
                 <label class="flex items-center justify-between">
                     <div>
-                        <div class="font-medium text-gray-900 dark:text-white">Siatka układu</div>
-                        <div class="text-sm text-gray-600 dark:text-gray-400">
+                        <div class="font-medium text-white">Siatka układu</div>
+                        <div class="text-sm text-gray-400">
                             Pokaż siatkę przy układaniu widgetów
                         </div>
                     </div>
@@ -278,8 +278,8 @@
             <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
                 <label class="flex items-center justify-between">
                     <div>
-                        <div class="font-medium text-gray-900 dark:text-white">Animacje</div>
-                        <div class="text-sm text-gray-600 dark:text-gray-400">
+                        <div class="font-medium text-white">Animacje</div>
+                        <div class="text-sm text-gray-400">
                             Płynne przejścia i animacje
                         </div>
                     </div>
@@ -291,7 +291,7 @@
 
             <!-- Date Format -->
             <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
-                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                <label class="block text-sm font-medium text-gray-300 mb-2">
                     Format daty i czasu
                 </label>
                 <select wire:model.live="dashboardSettings.date_format" 
@@ -317,7 +317,7 @@
 
     <!-- Layout Preview -->
     <div class="mt-8 pt-8 border-t border-gray-200 dark:border-gray-600">
-        <h4 class="text-md font-medium text-gray-900 dark:text-white mb-4">Podgląd Layoutu</h4>
+        <h4 class="text-md font-medium text-white mb-4">Podgląd Layoutu</h4>
         
         <div class="bg-gray-100 dark:bg-gray-800 rounded-lg p-4">
             <div class="preview-container" style="height: 200px; position: relative;">
@@ -335,7 +335,7 @@
                 
                 <!-- Content Preview -->
                 <div class="absolute top-8 bottom-0 {{ $sidebarPosition === 'right' ? 'left-0 right-24' : 'left-20 right-0' }}
-                           bg-white dark:bg-gray-700 rounded-br{{ $sidebarPosition === 'right' ? '' : '-none' }} p-2">
+                           bg-gray-700 rounded-br{{ $sidebarPosition === 'right' ? '' : '-none' }} p-2">
                     <div class="space-y-2">
                         <div class="h-2 bg-gray-400 rounded" style="width: 60%"></div>
                         <div class="h-2 bg-gray-300 rounded" style="width: 80%"></div>
@@ -344,7 +344,7 @@
                 </div>
             </div>
             
-            <p class="text-sm text-gray-600 dark:text-gray-400 mt-2 text-center">
+            <p class="text-sm text-gray-400 mt-2 text-center">
                 Layout: {{ ucfirst($layoutDensity) }} | 
                 Sidebar: {{ $sidebarPosition === 'left' ? 'Po lewej' : 'Po prawej' }} |
                 Header: {{ ucfirst($headerStyle) }}

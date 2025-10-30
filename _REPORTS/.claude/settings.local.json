@@ -1,0 +1,24 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__context7__get-library-docs",
+      "Read(//d/OneDrive - MPP TRADE/Skrypty/PPM-CC-Laravel/app/Http/Livewire/Products/Categories/**)",
+      "Read(//d/OneDrive - MPP TRADE/Skrypty/PPM-CC-Laravel/_DOCS/**)",
+      "Read(//d/OneDrive - MPP TRADE/Skrypty/PPM-CC-Laravel/resources/views/livewire/components/**)",
+      "Read(//d/OneDrive - MPP TRADE/Skrypty/PPM-CC-Laravel/app/Http/Livewire/Components/**)",
+      "Read(//d/OneDrive - MPP TRADE/Skrypty/PPM-CC-Laravel/Plan_Projektu/**)",
+      "Read(//d/OneDrive - MPP TRADE/Skrypty/PPM-CC-Laravel/**)",
+      "Bash(npm run build)",
+      "Bash($HostidoKey = \"D:\\OneDrive - MPP TRADE\\SSH\\Hostido\\HostidoSSHNoPass.ppk\")",
+      "Bash(pscp:*)",
+      "Bash(plink:*)",
+      "Bash(node:*)",
+      "Bash(pwsh -Command \"$HostidoKey = ''D:\\OneDrive - MPP TRADE\\SSH\\Hostido\\HostidoSSHNoPass.ppk''; pscp -i $HostidoKey -P 64321 ''D:\\OneDrive - MPP TRADE\\Skrypty\\PPM-CC-Laravel\\resources\\css\\admin\\components.css'' host379076@host379076.hostido.net.pl:domains/ppm.mpptrade.pl/public_html/resources/css/admin/components.css\")",
+      "Bash(pwsh -Command \"$HostidoKey = ''D:\\OneDrive - MPP TRADE\\SSH\\Hostido\\HostidoSSHNoPass.ppk''; pscp -i $HostidoKey -P 64321 ''D:\\OneDrive - MPP TRADE\\Skrypty\\PPM-CC-Laravel\\public\\build\\.vite\\manifest.json'' host379076@host379076.hostido.net.pl:domains/ppm.mpptrade.pl/public_html/public/build/.vite/manifest.json\")",
+      "Bash(pwsh:*)",
+      "Bash(Get-Date -Format \"yyyy-MM-dd HH:mm\")"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

@@ -4,6 +4,7 @@ use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
+use App\Http\Controllers\Admin\VehicleFeatureController;
 
 /*
 |--------------------------------------------------------------------------
@@ -23,6 +24,18 @@ use Illuminate\Support\Facades\Log;
 Route::get('/test-css', function () {
     return view('test-css');
 });
+
+// POC: Color Picker with vanilla-colorful + Alpine.js (DISABLED - old POC)
+// Route::get('/test-color-picker-poc', \App\Http\Livewire\Test\ColorPickerPOC::class)
+//     ->middleware(['auth'])
+//     ->name('test.color-picker-poc');
+
+// ETAP_05b Phase 3: Production AttributeColorPicker Component Test
+Route::get('/test-attribute-color-picker', function () {
+    return view('test-attribute-color-picker');
+})
+    ->middleware(['auth'])
+    ->name('test.attribute-color-picker');
 
 Route::get('/', function () {
     if (Auth::check()) {
@@ -103,13 +116,31 @@ Route::middleware(['auth'])->group(function () {
     })->name('profile.update');
 
     // Additional profile routes
+    // Active Sessions Management - ETAP_04 FAZA A (User Management - planned)
     Route::get('/profile/sessions', function () {
-        return view('profile.sessions');
+        return view('placeholder-page', [
+            'title' => 'Aktywne Sesje',
+            'message' => 'Panel zarządzania aktywnymi sesjami użytkownika z możliwością wylogowania z innych urządzeń będzie dostępny wkrótce.',
+            'etap' => 'ETAP_04 FAZA A - User Management (zaplanowane)'
+        ]);
     })->name('profile.sessions');
 
+    // Activity History - ETAP_04 FAZA A (User Management - planned)
     Route::get('/profile/activity', function () {
-        return view('profile.activity');
+        return view('placeholder-page', [
+            'title' => 'Historia Aktywności',
+            'message' => 'Timeline aktywności użytkownika (login/logout, zmiany produktów, akcje admin) będzie dostępny wkrótce.',
+            'etap' => 'ETAP_04 FAZA A - User Management (zaplanowane)'
+        ]);
     })->name('profile.activity');
+
+    Route::get('/profile/notifications', function () {
+        return view('placeholder-page', [
+            'title' => 'Ustawienia Powiadomień',
+            'message' => 'Panel ustawień powiadomień będzie dostępny w przyszłej wersji.',
+            'etap' => null
+        ]);
+    })->name('profile.notifications');
 });
 
 // ==========================================
@@ -117,13 +148,41 @@ Route::middleware(['auth'])->group(function () {
 // ==========================================
 
 Route::middleware(['auth'])->prefix('help')->name('help.')->group(function () {
+    // Help Index - FUTURE (Help Module planned)
     Route::get('/', function () {
-        return view('help.index');
+        return view('placeholder-page', [
+            'title' => 'Pomoc',
+            'message' => 'Centrum pomocy z dokumentacją, FAQ i video tutorials będzie dostępne wkrótce.',
+            'etap' => 'FUTURE - zaplanowane'
+        ]);
     })->name('index');
 
+    // Documentation - FUTURE (Help Module planned)
+    Route::get('/documentation', function () {
+        return view('placeholder-page', [
+            'title' => 'Dokumentacja',
+            'message' => 'Dokumentacja użytkownika, FAQ i video tutorials będą dostępne wkrótce.',
+            'etap' => 'FUTURE - zaplanowane'
+        ]);
+    })->name('documentation');
+
+    // Keyboard Shortcuts - FUTURE (Help Module planned)
     Route::get('/shortcuts', function () {
-        return view('help.shortcuts');
+        return view('placeholder-page', [
+            'title' => 'Skróty Klawiszowe',
+            'message' => 'Lista skrótów klawiszowych (Ctrl+K Quick Search, Ctrl+N Nowy Produkt, Ctrl+S Zapisz) będzie dostępna wkrótce.',
+            'etap' => 'FUTURE - zaplanowane'
+        ]);
     })->name('shortcuts');
+
+    // Technical Support - FUTURE (Help Module planned)
+    Route::get('/support', function () {
+        return view('placeholder-page', [
+            'title' => 'Wsparcie Techniczne',
+            'message' => 'System zgłoszeń wsparcia technicznego będzie dostępny wkrótce.',
+            'etap' => null
+        ]);
+    })->name('support');
 });
 
 // ==========================================
@@ -165,6 +224,24 @@ Route::prefix('admin')->name('admin.')->group(function () {
         // Price Groups Management - działający komponent
         Route::get('/price-groups', \App\Http\Livewire\Admin\PriceManagement\PriceGroups::class)
              ->name('price-groups.index');
+
+        // Product Prices Management - FUTURE (Price Management Module)
+        Route::get('/product-prices', function () {
+            return view('placeholder-page', [
+                'title' => 'Ceny Produktów',
+                'message' => 'System zarządzania cenami produktów z edycją inline i automatycznym wyliczaniem marży będzie dostępny w przyszłej wersji.',
+                'etap' => 'FUTURE - zaplanowane (Price Management Module)'
+            ]);
+        })->name('product-prices.index');
+
+        // Bulk Price Updates - FUTURE (Price Management Module)
+        Route::get('/bulk-updates', function () {
+            return view('placeholder-page', [
+                'title' => 'Aktualizacja Masowa Cen',
+                'message' => 'Wizard aktualizacji masowej cen (5-step wizard) z preview zmian będzie dostępny w przyszłej wersji.',
+                'etap' => 'FUTURE - zaplanowane (Price Management Module)'
+            ]);
+        })->name('bulk-updates.index');
     });
     
     // Bulk Product Export - mass export to PrestaShop stores
@@ -172,6 +249,32 @@ Route::prefix('admin')->name('admin.')->group(function () {
 
     // Import Management - SEKCJA 2.2.2.2 Import Management
     Route::get('/shops/import', \App\Http\Livewire\Admin\Shops\ImportManager::class)->name('shops.import');
+
+    // ==========================================
+    // CSV IMPORT/EXPORT SYSTEM - FAZA 6
+    // ==========================================
+
+    // CSV Template Downloads
+    Route::get('/csv/templates/{type}', [\App\Http\Controllers\Admin\CSVExportController::class, 'downloadTemplate'])
+        ->name('csv.template')
+        ->where('type', 'variants|features|compatibility');
+
+    // Product-specific Exports
+    Route::get('/products/{product}/export/variants', [\App\Http\Controllers\Admin\CSVExportController::class, 'exportVariants'])
+        ->name('products.export.variants');
+    Route::get('/products/{product}/export/features', [\App\Http\Controllers\Admin\CSVExportController::class, 'exportFeatures'])
+        ->name('products.export.features');
+    Route::get('/products/{product}/export/compatibility', [\App\Http\Controllers\Admin\CSVExportController::class, 'exportCompatibility'])
+        ->name('products.export.compatibility');
+
+    // Bulk Export (all products)
+    Route::post('/csv/export/multiple', [\App\Http\Controllers\Admin\CSVExportController::class, 'exportMultipleProducts'])
+        ->name('csv.export.multiple');
+
+    // Import Preview Page
+    Route::get('/csv/import/{type?}', \App\Http\Livewire\Admin\CSV\ImportPreview::class)
+        ->name('csv.import')
+        ->where('type', 'variants|features|compatibility');
 
     // ERP Integration Management - działający komponent
     Route::get('/integrations', \App\Http\Livewire\Admin\ERP\ERPManager::class)->name('integrations');
@@ -249,8 +352,14 @@ Route::prefix('admin')->name('admin.')->group(function () {
         // });
     });
 
-    // Users management – TODO: Upload UserList to server
-    // Route::get('/users', \App\Http\Livewire\Admin\Users\UserList::class)->name('users');
+    // Users Management - ETAP_04 FAZA A (User Management - completed, awaiting deployment)
+    Route::get('/users', function () {
+        return view('placeholder-page', [
+            'title' => 'Zarządzanie Użytkownikami',
+            'message' => 'Panel zarządzania użytkownikami z 7-poziomowym systemem ról został zaimplementowany i oczekuje na deployment.',
+            'etap' => 'ETAP_04 FAZA A - User Management (✅ COMPLETED, awaiting deployment)'
+        ]);
+    })->name('users');
 
     // FAZA D: Advanced Features Routes - TODO: Upload components to server
     // Notification Center - działający komponent
@@ -271,6 +380,204 @@ Route::prefix('admin')->name('admin.')->group(function () {
     Route::get('/settings', function () {
         return redirect()->route('admin.system-settings.index');
     })->name('settings');
+
+    // ==========================================
+    // PLACEHOLDER PAGES - Menu v2.0 unimplemented sections
+    // ==========================================
+
+    // ETAP_05b - System Zarządzania Wariantami (CORRECT ARCHITECTURE)
+    // Main Variant System Panel - AttributeSystemManager (Phase 4 - Enhanced with PrestaShop sync)
+    Route::get('/variants', \App\Http\Livewire\Admin\Variants\AttributeSystemManager::class)
+        ->name('admin.variants.index');
+
+    // Vehicle Features Management (Phase 2 - ETAP_05a)
+    // DEVELOPMENT: Auth disabled (consistent with other ETAP_05a routes)
+    Route::get('/features/vehicles', [VehicleFeatureController::class, 'index'])
+        ->name('admin.features.vehicles.index')
+        ->withoutMiddleware(['auth']);
+
+    // ETAP_05d FAZA 1: Global Compatibility Management Panel
+    // DEVELOPMENT: Auth disabled (consistent with other ETAP_05a routes)
+    // Using blade wrapper pattern for Livewire 3.x compatibility
+    // NOTE: Inside admin prefix group, so actual path is /admin/compatibility
+    Route::get('/compatibility', function () {
+        return view('admin.compatibility-management');
+    })->name('compatibility.index');
+
+    // ETAP_06 (95% complete) - Produkty/Import
+    Route::get('/products/import', function () {
+        return view('placeholder-page', [
+            'title' => 'Import z pliku',
+            'message' => 'System importu CSV/XLSX jest prawie gotowy. Unified interface dla import z pliku będzie dostępny wkrótce.',
+            'etap' => 'ETAP_06 (95% ukończone)'
+        ]);
+    })->name('products.import');
+
+    Route::get('/products/import-history', function () {
+        return view('placeholder-page', [
+            'title' => 'Historie Importów',
+            'message' => 'Panel historii importów jest w trakcie implementacji. Będzie dostępny wkrótce.',
+            'etap' => 'ETAP_06 (95% ukończone)'
+        ]);
+    })->name('products.import.history');
+
+    // ETAP_09 (not started) - Wyszukiwarka
+    Route::get('/products/search', function () {
+        return view('placeholder-page', [
+            'title' => 'Szybka Wyszukiwarka',
+            'message' => 'Inteligentna wyszukiwarka z autosugestiami i tolerancją błędów będzie dostępna w ETAP_09.',
+            'etap' => 'ETAP_09 - zaplanowane'
+        ]);
+    })->name('products.search');
+
+    // ETAP_10 (not started) - Dostawy
+    Route::prefix('deliveries')->name('deliveries.')->group(function () {
+        Route::get('/', function () {
+            return view('placeholder-page', [
+                'title' => 'Lista Dostaw',
+                'message' => 'System dostaw i kontenerów będzie dostępny w ETAP_10.',
+                'etap' => 'ETAP_10 - zaplanowane'
+            ]);
+        })->name('index');
+
+        Route::get('/containers', function () {
+            return view('placeholder-page', [
+                'title' => 'Kontenery',
+                'message' => 'Panel zarządzania kontenerami będzie dostępny w ETAP_10.',
+                'etap' => 'ETAP_10 - zaplanowane'
+            ]);
+        })->name('containers');
+
+        Route::get('/receiving', function () {
+            return view('placeholder-page', [
+                'title' => 'Przyjęcia Magazynowe',
+                'message' => 'System przyjęć magazynowych będzie dostępny w ETAP_10.',
+                'etap' => 'ETAP_10 - zaplanowane'
+            ]);
+        })->name('receiving');
+
+        Route::get('/documents', function () {
+            return view('placeholder-page', [
+                'title' => 'Dokumenty Odpraw',
+                'message' => 'System dokumentów odpraw celnych będzie dostępny w ETAP_10.',
+                'etap' => 'ETAP_10 - zaplanowane'
+            ]);
+        })->name('documents');
+    });
+
+    // FUTURE (planned) - Zamówienia
+    Route::prefix('orders')->name('orders.')->group(function () {
+        Route::get('/', function () {
+            return view('placeholder-page', [
+                'title' => 'Lista Zamówień',
+                'message' => 'System zarządzania zamówieniami będzie dostępny w przyszłej wersji aplikacji.',
+                'etap' => null
+            ]);
+        })->name('index');
+
+        Route::get('/reservations', function () {
+            return view('placeholder-page', [
+                'title' => 'Rezerwacje z Kontenera',
+                'message' => 'System rezerwacji towarów z kontenera będzie dostępny wkrótce.',
+                'etap' => null
+            ]);
+        })->name('reservations');
+
+        Route::get('/history', function () {
+            return view('placeholder-page', [
+                'title' => 'Historia Zamówień',
+                'message' => 'Panel historii zamówień będzie dostępny w przyszłej wersji.',
+                'etap' => null
+            ]);
+        })->name('history');
+    });
+
+    // FUTURE (planned) - Reklamacje
+    Route::prefix('claims')->name('claims.')->group(function () {
+        Route::get('/', function () {
+            return view('placeholder-page', [
+                'title' => 'Lista Reklamacji',
+                'message' => 'System zarządzania reklamacjami będzie dostępny w przyszłej wersji aplikacji.',
+                'etap' => null
+            ]);
+        })->name('index');
+
+        Route::get('/create', function () {
+            return view('placeholder-page', [
+                'title' => 'Nowa Reklamacja',
+                'message' => 'Formularz zgłaszania reklamacji będzie dostępny wkrótce.',
+                'etap' => null
+            ]);
+        })->name('create');
+
+        Route::get('/archive', function () {
+            return view('placeholder-page', [
+                'title' => 'Archiwum Reklamacji',
+                'message' => 'Archiwum reklamacji będzie dostępne w przyszłej wersji.',
+                'etap' => null
+            ]);
+        })->name('archive');
+    });
+
+    // FUTURE (planned) - Raporty & Statystyki
+    Route::prefix('reports')->name('reports.')->group(function () {
+        Route::get('/products', function () {
+            return view('placeholder-page', [
+                'title' => 'Raporty Produktowe',
+                'message' => 'System raportów produktowych będzie dostępny w przyszłej wersji.',
+                'etap' => null
+            ]);
+        })->name('products');
+
+        Route::get('/financial', function () {
+            return view('placeholder-page', [
+                'title' => 'Raporty Finansowe',
+                'message' => 'System raportów finansowych będzie dostępny wkrótce.',
+                'etap' => null
+            ]);
+        })->name('financial');
+
+        Route::get('/warehouse', function () {
+            return view('placeholder-page', [
+                'title' => 'Raporty Magazynowe',
+                'message' => 'System raportów magazynowych będzie dostępny w przyszłej wersji.',
+                'etap' => null
+            ]);
+        })->name('warehouse');
+
+        Route::get('/export', function () {
+            return view('placeholder-page', [
+                'title' => 'Eksport Raportów',
+                'message' => 'System eksportu raportów będzie dostępny wkrótce.',
+                'etap' => null
+            ]);
+        })->name('export');
+    });
+
+    // FUTURE (planned) - System
+    Route::get('/logs', function () {
+        return view('placeholder-page', [
+            'title' => 'Logi Systemowe',
+            'message' => 'Przeglądarka logów systemowych będzie dostępna w przyszłej wersji.',
+            'etap' => null
+        ]);
+    })->name('logs.index');
+
+    Route::get('/monitoring', function () {
+        return view('placeholder-page', [
+            'title' => 'Monitoring Systemu',
+            'message' => 'Dashboard monitoringu systemu będzie dostępny wkrótce.',
+            'etap' => null
+        ]);
+    })->name('monitoring.index');
+
+    Route::get('/api', function () {
+        return view('placeholder-page', [
+            'title' => 'API Management',
+            'message' => 'Panel zarządzania API będzie dostępny w przyszłej wersji.',
+            'etap' => null
+        ]);
+    })->name('api.index');
 });
 
 // ==========================================

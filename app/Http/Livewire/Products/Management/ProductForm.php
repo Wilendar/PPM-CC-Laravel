@@ -1891,19 +1891,22 @@ class ProductForm extends Component
     public function getCategoryClasses(): string
     {
         $status = $this->getCategoryStatus();
-        $baseClasses = 'p-4 border rounded-lg transition-all duration-200';
+        $baseClasses = 'p-4 rounded-lg transition-all duration-200';
 
         switch ($status) {
             case 'default':
-                return $baseClasses . ' border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800';
+                return $baseClasses . ' border border-gray-700 bg-gray-800';
             case 'inherited':
-                return $baseClasses . ' border-purple-300 dark:border-purple-500 bg-purple-50 dark:bg-purple-900/20';
+                // CSS class defined in components.css
+                return $baseClasses . ' category-status-inherited';
             case 'same':
-                return $baseClasses . ' border-green-300 dark:border-green-500 bg-green-50 dark:bg-green-900/20';
+                // CSS class defined in components.css
+                return $baseClasses . ' category-status-same';
             case 'different':
-                return $baseClasses . ' border-orange-300 dark:border-orange-500 bg-orange-50 dark:bg-orange-900/20';
+                // CSS class defined in components.css
+                return $baseClasses . ' category-status-different';
             default:
-                return $baseClasses . ' border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800';
+                return $baseClasses . ' border border-gray-700 bg-gray-800';
         }
     }
 
@@ -1918,23 +1921,23 @@ class ProductForm extends Component
 
         switch ($status) {
             case 'default':
-                // Normal mode - standard styling
-                return $baseClasses . ' border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:border-orange-500';
+                // Normal mode - standard styling (DARK THEME ONLY)
+                return $baseClasses . ' border-gray-600 bg-gray-700 text-white focus:border-orange-500';
 
             case 'inherited':
-                // Inherited - purple/blue tint, italic
-                return $baseClasses . ' border-purple-300 dark:border-purple-500 bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300 italic focus:border-purple-500';
+                // Inherited - CSS class defined in components.css
+                return $baseClasses . ' field-status-inherited';
 
             case 'same':
-                // Same as default - green tint
-                return $baseClasses . ' border-green-300 dark:border-green-500 bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300 focus:border-green-500';
+                // Same as default - CSS class defined in components.css
+                return $baseClasses . ' field-status-same';
 
             case 'different':
-                // Different from default - orange tint, bold
-                return $baseClasses . ' border-orange-300 dark:border-orange-500 bg-orange-50 dark:bg-orange-900/20 text-orange-700 dark:text-orange-300 font-medium focus:border-orange-500';
+                // Different from default - CSS class defined in components.css
+                return $baseClasses . ' field-status-different';
 
             default:
-                return $baseClasses . ' border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:border-orange-500';
+                return $baseClasses . ' border-gray-600 bg-gray-700 text-white focus:border-orange-500';
         }
     }
 
@@ -1957,21 +1960,21 @@ class ProductForm extends Component
                 return [
                     'show' => true,
                     'text' => 'Dziedziczone',
-                    'class' => 'bg-purple-100 text-purple-800 dark:bg-purple-800 dark:text-purple-100'
+                    'class' => 'status-label-inherited'
                 ];
 
             case 'same':
                 return [
                     'show' => true,
                     'text' => 'Zgodne',
-                    'class' => 'bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100'
+                    'class' => 'status-label-same'
                 ];
 
             case 'different':
                 return [
                     'show' => true,
                     'text' => 'Własne',
-                    'class' => 'bg-orange-100 text-orange-800 dark:bg-orange-800 dark:text-orange-100'
+                    'class' => 'status-label-different'
                 ];
 
             default:

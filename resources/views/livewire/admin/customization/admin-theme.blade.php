@@ -2,10 +2,10 @@
     <!-- Header -->
     <div class="flex justify-between items-center mb-6">
         <div>
-            <h1 class="text-2xl font-bold text-gray-900 dark:text-white">
+            <h1 class="text-2xl font-bold text-white">
                 Customizacja Panelu Admin
             </h1>
-            <p class="text-gray-600 dark:text-gray-400 mt-1">
+            <p class="text-gray-400 mt-1">
                 Dostosuj wygląd i zachowanie panelu administracyjnego
             </p>
         </div>
@@ -58,13 +58,13 @@
     <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
         <!-- Sidebar Navigation -->
         <div class="lg:col-span-1">
-            <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+            <div class="bg-gray-800 rounded-lg shadow p-6">
                 <h3 class="text-lg font-medium mb-4">Kategorie</h3>
                 
                 <nav class="space-y-2">
                     <button wire:click="switchTab('colors')" 
                             class="w-full text-left px-3 py-2 rounded-lg transition-colors
-                                   {{ $activeTab === 'colors' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-200' : 'hover:bg-gray-100 dark:hover:bg-gray-700' }}">
+                                   {{ $activeTab === 'colors' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-200' : 'hover:bg-gray-700' }}">
                         <svg class="w-4 h-4 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zM21 5a2 2 0 00-2-2h-4a2 2 0 00-2 2v12a4 4 0 004 4h4a2 2 0 002-2V5z"></path>
                         </svg>
@@ -73,7 +73,7 @@
                     
                     <button wire:click="switchTab('layout')" 
                             class="w-full text-left px-3 py-2 rounded-lg transition-colors
-                                   {{ $activeTab === 'layout' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-200' : 'hover:bg-gray-100 dark:hover:bg-gray-700' }}">
+                                   {{ $activeTab === 'layout' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-200' : 'hover:bg-gray-700' }}">
                         <svg class="w-4 h-4 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z"></path>
                         </svg>
@@ -82,7 +82,7 @@
                     
                     <button wire:click="switchTab('branding')" 
                             class="w-full text-left px-3 py-2 rounded-lg transition-colors
-                                   {{ $activeTab === 'branding' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-200' : 'hover:bg-gray-100 dark:hover:bg-gray-700' }}">
+                                   {{ $activeTab === 'branding' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-200' : 'hover:bg-gray-700' }}">
                         <svg class="w-4 h-4 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path>
                         </svg>
@@ -91,7 +91,7 @@
                     
                     <button wire:click="switchTab('widgets')" 
                             class="w-full text-left px-3 py-2 rounded-lg transition-colors
-                                   {{ $activeTab === 'widgets' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-200' : 'hover:bg-gray-100 dark:hover:bg-gray-700' }}">
+                                   {{ $activeTab === 'widgets' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-200' : 'hover:bg-gray-700' }}">
                         <svg class="w-4 h-4 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zM21 5a2 2 0 00-2-2h-4a2 2 0 00-2 2v12a4 4 0 004 4h4a2 2 0 002-2V5z"></path>
                         </svg>
@@ -100,7 +100,7 @@
                     
                     <button wire:click="switchTab('css')" 
                             class="w-full text-left px-3 py-2 rounded-lg transition-colors
-                                   {{ $activeTab === 'css' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-200' : 'hover:bg-gray-100 dark:hover:bg-gray-700' }}">
+                                   {{ $activeTab === 'css' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-200' : 'hover:bg-gray-700' }}">
                         <svg class="w-4 h-4 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"></path>
                         </svg>
@@ -109,7 +109,7 @@
                     
                     <button wire:click="switchTab('themes')" 
                             class="w-full text-left px-3 py-2 rounded-lg transition-colors
-                                   {{ $activeTab === 'themes' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-200' : 'hover:bg-gray-100 dark:hover:bg-gray-700' }}">
+                                   {{ $activeTab === 'themes' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-200' : 'hover:bg-gray-700' }}">
                         <svg class="w-4 h-4 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
                         </svg>
@@ -121,7 +121,7 @@
 
         <!-- Main Content Area -->
         <div class="lg:col-span-3">
-            <div class="bg-white dark:bg-gray-800 rounded-lg shadow">
+            <div class="bg-gray-800 rounded-lg shadow">
                 
                 <!-- Colors Tab -->
                 @if($activeTab === 'colors')
@@ -168,7 +168,7 @@
              x-transition:leave-start="opacity-100"
              x-transition:leave-end="opacity-0">
             
-            <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-6xl w-full h-5/6 m-4 overflow-hidden">
+            <div class="bg-gray-800 rounded-lg shadow-xl max-w-6xl w-full h-5/6 m-4 overflow-hidden">
                 <div class="flex justify-between items-center p-4 border-b">
                     <h3 class="text-lg font-medium">Podgląd Motywu</h3>
                     <button wire:click="togglePreview" class="text-gray-500 hover:text-gray-700">
@@ -194,7 +194,7 @@
 
     <!-- Loading Overlay -->
     <div wire:loading class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-        <div class="bg-white rounded-lg p-6 flex items-center space-x-3">
+        <div class="bg-gray-800 rounded-lg p-6 flex items-center space-x-3">
             <div class="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
             <span>Ładowanie...</span>
         </div>

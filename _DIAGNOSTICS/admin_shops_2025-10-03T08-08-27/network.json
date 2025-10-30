@@ -1,0 +1,44 @@
+[
+  {
+    "url": "https://ppm.mpptrade.pl/public/build/assets/category-form-CBqfE0rW.css",
+    "status": 200,
+    "statusText": "",
+    "contentType": "text/css",
+    "timestamp": "2025-10-03T08:08:31.104Z"
+  },
+  {
+    "url": "https://ppm.mpptrade.pl/public/build/assets/app-CeRcqIjg.css",
+    "status": 200,
+    "statusText": "",
+    "contentType": "text/css",
+    "timestamp": "2025-10-03T08:08:31.106Z"
+  },
+  {
+    "url": "https://ppm.mpptrade.pl/public/build/assets/layout-5nQ48JE_.css",
+    "status": 200,
+    "statusText": "",
+    "contentType": "text/css",
+    "timestamp": "2025-10-03T08:08:31.106Z"
+  },
+  {
+    "url": "https://ppm.mpptrade.pl/public/build/assets/components-d2InyHmp.css",
+    "status": 200,
+    "statusText": "",
+    "contentType": "text/css",
+    "timestamp": "2025-10-03T08:08:31.107Z"
+  },
+  {
+    "url": "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css",
+    "status": 200,
+    "statusText": "",
+    "contentType": "text/css; charset=utf-8",
+    "timestamp": "2025-10-03T08:08:31.176Z"
+  },
+  {
+    "url": "https://ppm.mpptrade.pl/livewire/livewire.js?id=df3a17f2",
+    "status": 200,
+    "statusText": "",
+    "contentType": "application/javascript; charset=utf-8",
+    "timestamp": "2025-10-03T08:08:31.373Z"
+  }
+]

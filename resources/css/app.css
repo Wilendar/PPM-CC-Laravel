@@ -79,6 +79,56 @@ body {
     display: none !important;
 }
 
+/* Form Elements - Dark Theme (PPM Enterprise) */
+.dark input[type="text"],
+.dark input[type="email"],
+.dark input[type="password"],
+.dark input[type="number"],
+.dark input[type="date"],
+.dark input[type="datetime-local"],
+.dark input[type="time"],
+.dark input[type="url"],
+.dark input[type="search"],
+.dark input[type="tel"],
+.dark select,
+.dark textarea {
+    background-color: #374151;  /* gray-700 */
+    color: #f3f4f6;  /* gray-100 */
+    border-color: #4b5563;  /* gray-600 */
+}
+
+.dark input[type="text"]::placeholder,
+.dark input[type="email"]::placeholder,
+.dark input[type="password"]::placeholder,
+.dark input[type="number"]::placeholder,
+.dark input[type="date"]::placeholder,
+.dark input[type="datetime-local"]::placeholder,
+.dark input[type="time"]::placeholder,
+.dark input[type="url"]::placeholder,
+.dark input[type="search"]::placeholder,
+.dark input[type="tel"]::placeholder,
+.dark textarea::placeholder {
+    color: #9ca3af;  /* gray-400 */
+}
+
+.dark input[type="text"]:disabled,
+.dark input[type="email"]:disabled,
+.dark input[type="password"]:disabled,
+.dark input[type="number"]:disabled,
+.dark input[type="date"]:disabled,
+.dark input[type="datetime-local"]:disabled,
+.dark input[type="time"]:disabled,
+.dark input[type="url"]:disabled,
+.dark input[type="search"]:disabled,
+.dark input[type="tel"]:disabled,
+.dark select:disabled,
+.dark textarea:disabled {
+    background-color: #1f2937;  /* gray-800 */
+    color: #6b7280;  /* gray-500 */
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
 /* Focus States - Enterprise Style */
 input:focus,
 select:focus,

@@ -80,9 +80,41 @@ class DatabaseSeeder extends Seeder
         $this->command->newLine();
 
         // =================================================================
+        // ETAP_05a: VARIANTS, FEATURES & COMPATIBILITY SEEDERS
+        // =================================================================
+
+        $this->command->info('🎯 PHASE 4: Variants, Features & Compatibility');
+        $this->command->info('⏱️  Estimated time: ~15 seconds');
+        $this->command->newLine();
+
+        // Attribute Types - Variant attributes (Size, Color, Material)
+        $this->call(AttributeTypeSeeder::class);
+        $this->command->newLine();
+
+        // Attribute Values - Predefined values for attribute types
+        $this->call(AttributeValueSeeder::class);
+        $this->command->newLine();
+
+        // Feature Types - Product features (Engine Type, Power, Weight, etc.)
+        $this->call(FeatureTypeSeeder::class);
+        $this->command->newLine();
+
+        // Compatibility Attributes - Original, Replacement, Performance
+        $this->call(CompatibilityAttributeSeeder::class);
+        $this->command->newLine();
+
+        // Compatibility Sources - Manufacturer, TecDoc, Manual Entry
+        $this->call(CompatibilitySourceSeeder::class);
+        $this->command->newLine();
+
+        // Vehicle Models - Example motorcycles for testing
+        $this->call(VehicleModelSeeder::class);
+        $this->command->newLine();
+
+        // =================================================================
         // SEEDING SUMMARY & VALIDATION
         // =================================================================
-        
+
         $this->showSeedingSummary();
         $this->validateSeedingIntegrity();
         

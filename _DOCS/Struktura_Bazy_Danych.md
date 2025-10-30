@@ -1,9 +1,20 @@
 # STRUKTURA BAZY DANYCH PPM-CC-Laravel
 
 **Data utworzenia:** 2025-09-29
-**Wersja:** 1.0
+**Wersja:** 1.1
 **Autor:** Claude Code - Dokumentacja systemowa
 **Baza danych:** MariaDB 10.11.13 (host379076_ppm@localhost)
+**Ostatnia aktualizacja:** 2025-10-22
+
+## 📚 POWIĄZANA DOKUMENTACJA
+
+**⚠️ ARCHITEKTURA STRON I MENU:** Zobacz [`PPM_ARCHITEKTURA_STRON_MENU.md`](PPM_ARCHITEKTURA_STRON_MENU.md) dla:
+- **21 modułów tematycznych** w `_DOCS/ARCHITEKTURA_PPM/`
+- **49 route'ów aplikacji** (kompletna tabela routingu)
+- **7-poziomowy system uprawnień** (macierz dostępów)
+- **Role-Based Dashboards** (7 wersji per rola użytkownika)
+
+**STRUKTURA PLIKÓW:** Zobacz [`Struktura_Plikow_Projektu.md`](Struktura_Plikow_Projektu.md) dla mapowania modeli do plików fizycznych.
 
 ## 📋 SPIS TREŚCI
 
@@ -729,20 +740,35 @@ Tabela zostanie rozszerzona o kolumny sync tracking z `product_sync_status`:
 
 ---
 
-### ❌ ETAP_06 - Import/Export (PLANNED)
-**Tabele planowane:**
-- ❌ `import_jobs` - Zadania importu
-- ❌ `export_jobs` - Zadania eksportu
-- ❌ `import_mappings` - Mapowania kolumn importu
-- ❌ `export_templates` - Szablony eksportu
-- ❌ `container_shipments` - Przesyłki kontenerowe
-- ❌ `import_logs` - Logi importu
+### ✅ ETAP_06 - Import/Export (COMPLETED jako Unified Import System w PRODUKTY)
 
-**Status:** Do implementacji
+**⚠️ ARCHITEKTURA v2.0:** Import/Export zintegrowany z sekcją PRODUKTY (nie osobny moduł). System używa istniejących tabel produktowych + serwisy w `app/Services/CSV/`.
+
+**Zaimplementowane:**
+- ✅ **Unified Import System** - CSV + XLSX w jednym interfejsie
+- ✅ **6 serwisów CSV** - TemplateGenerator, ImportMapper, ImportValidator, ExportFormatter, BulkOperationService, ErrorReporter
+- ✅ **9 route'ów** - Template download, product export (variants/features/compatibility), bulk export, import preview
+- ✅ **Mapowanie kolumn** - Predefiniowane szablony (POJAZDY/CZĘŚCI)
+- ✅ **Walidacja i raporty błędów** - Przed zapisem do bazy
+
+**Tabele wykorzystywane:**
+- Używa istniejących tabel: `products`, `product_variants`, `product_features`, `vehicle_compatibility`
+- Brak dedykowanych tabel import/export (logika w serwisach + temporary storage)
+
+**Tabele planowane (przyszłość):**
+- ❌ `import_jobs` - Historia zadań importu (future enhancement)
+- ❌ `export_jobs` - Historia zadań eksportu (future enhancement)
+- ❌ `container_shipments` - Przesyłki kontenerowe (ETAP_10 Dostawy)
+
+**Status:** ✅ COMPLETED (core functionality), ⏳ Enhancement features planned
 
 ---
 
-### 🛠️ ETAP_07 - PrestaShop API (IN PROGRESS - FAZA 1)
+### 🛠️ ETAP_07 - PrestaShop API (IN PROGRESS - FAZA 3 @ 75%)
+**Status:** ✅ FAZA 1+2 COMPLETED | 🔄 FAZA 3 IN PROGRESS (75% - ostatnia aktualizacja 2025-10-08)
+- **FAZA 1**: ✅ Panel konfiguracyjny + Sync PPM → PrestaShop (bez zdjęć) - **COMPLETED**
+- **FAZA 2**: ✅ Dynamic category picker + Reverse transformers - **COMPLETED**
+- **FAZA 3**: 🔄 Import PrestaShop → PPM + Real-Time Progress - **75% (3A ✅, 3B 75%, 3C ❌)**
 
 #### **shop_mappings** - Mapowania między PPM a PrestaShop
 ```sql
@@ -830,14 +856,26 @@ Ta tabela powoduje **DUPLIKACJĘ** kolumn z `product_shop_data` (sync_status, co
 
 ---
 
-**Rozszerzenia istniejących tabel:**
-- 🛠️ `prestashop_shops` - Dodanie kolumn: sync_frequency, sync_settings (JSON), webhook_url, webhook_secret, webhook_enabled, rate_limit_per_minute, api_quota_used
+**Zaimplementowane tabele (FAZA 1):**
+- ✅ `shop_mappings` - Mapowania category, attribute, feature, warehouse, price_group, tax_rule
+- ✅ `product_sync_status` - Status synchronizacji per product+shop (pending/syncing/synced/error/conflict)
+- ✅ `sync_logs` - Szczegółowe logi operacji sync (request/response/execution_time)
+- ✅ `prestashop_shops` - Rozszerzenia kolumn (sync_frequency, sync_settings, webhook_*, rate_limit_*)
 
-**Planowane (FAZA 2 - Webhooks + Conflicts):**
+**Planowane (FAZA 4+ - Future):**
 - ❌ `webhook_events` - Odbieranie webhooków z PrestaShop
-- ❌ `prestashop_conflicts` - Zarządzanie konfliktami synchronizacji
+- ❌ `prestashop_conflicts` - Zarządzanie konfliktami synchronizacji (advanced UI)
+- ❌ `product_image_sync` - Status synchronizacji zdjęć
 
-**Status:** FAZA 1 IN PROGRESS - Panel konfiguracyjny + sync produktów/kategorii (bez zdjęć)
+**Services & Jobs (15 Services + 9 Jobs):**
+- ✅ BasePrestaShopClient, PrestaShop8/9Client, PrestaShopClientFactory
+- ✅ PrestaShopSyncService (PPM → PS), PrestaShopImportService (PS → PPM)
+- ✅ ProductTransformer, CategoryTransformer (bidirectional)
+- ✅ CategoryMapper, PriceGroupMapper, WarehouseMapper
+- ✅ ProductSyncStrategy, CategorySyncStrategy
+- ✅ 9 Queue Jobs (SyncProduct, BulkSync, BulkImport, DeleteProduct, Category jobs)
+
+**Status:** ✅ FAZA 1+2 COMPLETED | 🔄 FAZA 3 @ 75%
 
 ---
 
@@ -1050,11 +1088,16 @@ php artisan migrate:status
 4. Po wdrożeniu na production → zmień status na ✅
 5. Dodaj nowe indeksy i constrainty do sekcji optymalizacji
 
-**OSTATNIA AKTUALIZACJA:** 2025-10-13 ✅ Dodano per-shop categories support (shop_id w product_categories)
-**AKTUALNY STATUS:** ETAP_07 FAZA 3A completed ✅, ETAP_08 in progress ⏳, Per-Shop Categories ⚡ NEW
+**OSTATNIA AKTUALIZACJA:** 2025-10-22
+- ✅ Dodano referencję do modułowej dokumentacji ARCHITEKTURA_PPM/ (21 modułów)
+- ✅ Zaktualizowano ETAP_06 → COMPLETED (Unified Import System w PRODUKTY)
+- ✅ Zaktualizowano ETAP_07 → FAZA 1+2 COMPLETED, FAZA 3 @ 75% (4 tabele + 15 Services + 9 Jobs)
+- ✅ Dodano szczegóły systemu CSV (6 serwisów używających istniejących tabel)
+- ✅ Zachowano informację o Per-Shop Categories support (2025-10-13)
+- ⚠️ **AKTUALNY STATUS:** ETAP_04 ✅, ETAP_05 ✅, ETAP_06 ✅, ETAP_07 @ 75% 🔄, ETAP_08 ⏳
 
 ---
 
 **AUTOR:** Claude Code System
 **PROJEKT:** PPM-CC-Laravel
-**WERSJA:** Enterprise 1.0
+**WERSJA:** Enterprise 1.1

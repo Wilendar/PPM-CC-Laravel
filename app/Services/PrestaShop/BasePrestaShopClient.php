@@ -87,7 +87,7 @@ abstract class BasePrestaShopClient
      *
      * @throws PrestaShopAPIException On API errors with detailed context
      */
-    protected function makeRequest(
+    public function makeRequest(
         string $method,
         string $endpoint,
         array $data = [],
@@ -125,14 +125,28 @@ abstract class BasePrestaShopClient
 
             // Execute request based on HTTP method
             // Note: For GET, we already built query params into URL, so don't pass additional query array
-            $response = match(strtoupper($method)) {
-                'GET' => $client->get($url),
-                'POST' => $client->post($url, $data),
-                'PUT' => $client->put($url, $data),
-                'DELETE' => $client->delete($url),
-                'PATCH' => $client->patch($url, $data),
-                default => throw new \InvalidArgumentException("Unsupported HTTP method: {$method}")
-            };
+            // SPECIAL CASE: If $options['body'] exists, send raw body (for XML/custom formats)
+            if (isset($options['body'])) {
+                $rawBody = $options['body'];
+                $contentType = $options['headers']['Content-Type'] ?? 'application/xml';
+
+                $response = match(strtoupper($method)) {
+                    'POST' => $client->withBody($rawBody, $contentType)->post($url),
+                    'PUT' => $client->withBody($rawBody, $contentType)->put($url),
+                    'PATCH' => $client->withBody($rawBody, $contentType)->patch($url),
+                    default => throw new \InvalidArgumentException("Raw body only supported for POST/PUT/PATCH, got: {$method}")
+                };
+            } else {
+                // Normal JSON handling
+                $response = match(strtoupper($method)) {
+                    'GET' => $client->get($url),
+                    'POST' => $client->post($url, $data),
+                    'PUT' => $client->put($url, $data),
+                    'DELETE' => $client->delete($url),
+                    'PATCH' => $client->patch($url, $data),
+                    default => throw new \InvalidArgumentException("Unsupported HTTP method: {$method}")
+                };
+            }
 
             $executionTime = (microtime(true) - $startTime) * 1000; // Convert to milliseconds
 

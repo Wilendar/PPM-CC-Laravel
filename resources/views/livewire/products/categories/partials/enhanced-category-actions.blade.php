@@ -6,7 +6,7 @@
     <button @click="toggleDropdown()"
             @click.away="closeDropdown()"
             class="group inline-flex items-center px-4 py-3 border-2 border-gray-200 dark:border-gray-600
-                   rounded-2xl bg-white dark:bg-gray-700 text-sm font-semibold text-gray-700 dark:text-gray-300
+                   rounded-2xl bg-gray-700 text-sm font-semibold text-gray-300
                    hover:border-blue-300 dark:hover:border-blue-500 hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50
                    dark:hover:from-blue-900/20 dark:hover:to-indigo-900/20 hover:text-blue-700 dark:hover:text-blue-300
                    transition-all duration-300 transform hover:scale-105 shadow-md hover:shadow-lg"
@@ -24,7 +24,7 @@
          x-transition:leave-end="opacity-0 scale-90"
          x-teleport="body"
          :data-category-id="{{ $category->id }}"
-         class="dropdown-fix origin-top-right right-0 mt-3 w-80 rounded-3xl shadow-2xl bg-white dark:bg-gray-800
+         class="dropdown-fix origin-top-right right-0 mt-3 w-80 rounded-3xl shadow-2xl bg-gray-800
                 ring-1 ring-black ring-opacity-5 focus:outline-none border-2 border-gray-100 dark:border-gray-700"
          style="display: none; z-index: 999999 !important; position: fixed !important;">
 
@@ -41,7 +41,7 @@
                     @endif
                 </div>
                 <div class="min-w-0 flex-1">
-                    <h4 class="text-lg font-bold text-gray-900 dark:text-white truncate">
+                    <h4 class="text-lg font-bold text-white truncate">
                         {{ $category->name }}
                     </h4>
                     <p class="text-sm text-gray-600 dark:text-gray-400">
@@ -57,7 +57,7 @@
                 {{-- Edit Action --}}
                 <button wire:click="editCategory({{ $category->id }})"
                         @click="closeDropdown()"
-                        class="group w-full flex items-center px-4 py-3 text-sm font-medium text-gray-700 dark:text-gray-300
+                        class="group w-full flex items-center px-4 py-3 text-sm font-medium text-gray-300
                                hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50 dark:hover:from-blue-900/20 dark:hover:to-indigo-900/20
                                hover:text-blue-700 dark:hover:text-blue-300 rounded-2xl transition-all duration-300 transform hover:scale-105"
                         role="menuitem">
@@ -76,7 +76,7 @@
                 @if(($category->level ?? 0) < (\App\Models\Category::MAX_LEVEL - 1))
                     <button wire:click="createCategory({{ $category->id }})"
                             @click="closeDropdown()"
-                            class="group w-full flex items-center px-4 py-3 text-sm font-medium text-gray-700 dark:text-gray-300
+                            class="group w-full flex items-center px-4 py-3 text-sm font-medium text-gray-300
                                    hover:bg-gradient-to-r hover:from-green-50 hover:to-emerald-50 dark:hover:from-green-900/20 dark:hover:to-emerald-900/20
                                    hover:text-green-700 dark:hover:text-green-300 rounded-2xl transition-all duration-300 transform hover:scale-105"
                             role="menuitem">
@@ -108,7 +108,7 @@
 
             {{-- Category Statistics --}}
             <div class="px-6 py-4 bg-gradient-to-r from-gray-50 to-blue-50 dark:from-gray-700/30 dark:to-blue-900/10 mx-2 rounded-2xl">
-                <h5 class="text-sm font-bold text-gray-700 dark:text-gray-300 mb-3 flex items-center">
+                <h5 class="text-sm font-bold text-gray-300 mb-3 flex items-center">
                     <i class="fas fa-chart-bar mr-2 text-blue-500"></i>
                     Statystyki kategorii
                 </h5>
@@ -117,7 +117,7 @@
                         <div class="w-12 h-12 bg-blue-100 dark:bg-blue-900/30 rounded-2xl flex items-center justify-center mx-auto mb-2">
                             <i class="fas fa-box text-lg text-blue-600 dark:text-blue-400"></i>
                         </div>
-                        <div class="text-2xl font-bold text-gray-900 dark:text-white">{{ $category->products_count ?? 0 }}</div>
+                        <div class="text-2xl font-bold text-white">{{ $category->products_count ?? 0 }}</div>
                         <div class="text-xs text-gray-500 dark:text-gray-400">Produktów</div>
                     </div>
                     @if(($category->primary_products_count ?? 0) > 0)
@@ -156,7 +156,7 @@
                     <button wire:click="bulkDeactivate"
                             wire:confirm="Czy na pewno chcesz dezaktywować kategorię '{{ $category->name }}'?"
                             @click="closeDropdown()"
-                            class="group w-full flex items-center px-4 py-3 text-sm font-medium text-gray-700 dark:text-gray-300
+                            class="group w-full flex items-center px-4 py-3 text-sm font-medium text-gray-300
                                    hover:bg-gradient-to-r hover:from-amber-50 hover:to-orange-50 dark:hover:from-amber-900/20 dark:hover:to-orange-900/20
                                    hover:text-amber-700 dark:hover:text-amber-300 rounded-2xl transition-all duration-300 transform hover:scale-105"
                             role="menuitem">
@@ -172,7 +172,7 @@
                 @else
                     <button wire:click="bulkActivate"
                             @click="closeDropdown()"
-                            class="group w-full flex items-center px-4 py-3 text-sm font-medium text-gray-700 dark:text-gray-300
+                            class="group w-full flex items-center px-4 py-3 text-sm font-medium text-gray-300
                                    hover:bg-gradient-to-r hover:from-green-50 hover:to-emerald-50 dark:hover:from-green-900/20 dark:hover:to-emerald-900/20
                                    hover:text-green-700 dark:hover:text-green-300 rounded-2xl transition-all duration-300 transform hover:scale-105"
                             role="menuitem">
@@ -195,7 +195,7 @@
                             setTimeout(() => copied = false, 2000);
                             closeDropdown();
                         "
-                        class="group w-full flex items-center px-4 py-3 text-sm font-medium text-gray-700 dark:text-gray-300
+                        class="group w-full flex items-center px-4 py-3 text-sm font-medium text-gray-300
                                hover:bg-gradient-to-r hover:from-gray-50 hover:to-blue-50 dark:hover:from-gray-700/50 dark:hover:to-blue-900/10
                                hover:text-gray-800 dark:hover:text-gray-200 rounded-2xl transition-all duration-300 transform hover:scale-105"
                         role="menuitem">
@@ -216,13 +216,13 @@
             {{-- Category Path (if has ancestors) --}}
             @if($category->ancestors && $category->ancestors->count() > 0)
                 <div class="mx-2 mt-3 p-4 bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-900/10 dark:to-pink-900/10 rounded-2xl">
-                    <h5 class="text-sm font-bold text-gray-700 dark:text-gray-300 mb-2 flex items-center">
+                    <h5 class="text-sm font-bold text-gray-300 mb-2 flex items-center">
                         <i class="fas fa-route mr-2 text-purple-500"></i>
                         Ścieżka kategorii
                     </h5>
                     <div class="flex items-center space-x-2 text-xs text-gray-600 dark:text-gray-400 overflow-x-auto">
                         @foreach($category->ancestors as $ancestor)
-                            <span class="inline-flex items-center px-2 py-1 bg-white dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600 whitespace-nowrap">
+                            <span class="inline-flex items-center px-2 py-1 bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600 whitespace-nowrap">
                                 {{ $ancestor->name }}
                             </span>
                             <i class="fas fa-chevron-right text-gray-400 flex-shrink-0"></i>

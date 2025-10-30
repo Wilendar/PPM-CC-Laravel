@@ -8,8 +8,8 @@
 </head>
 <body class="bg-gray-100 dark:bg-gray-900">
     <div class="min-h-screen flex items-center justify-center">
-        <div class="bg-white dark:bg-gray-800 p-8 rounded-lg shadow-lg max-w-md w-full">
-            <h1 class="text-2xl font-bold text-gray-900 dark:text-white mb-6">Aktywne sesje</h1>
+        <div class="bg-gray-800 p-8 rounded-lg shadow-lg max-w-md w-full">
+            <h1 class="text-2xl font-bold text-white mb-6">Aktywne sesje</h1>
 
             <p class="text-gray-600 dark:text-gray-400 mb-4">
                 Ta strona do zarządzania aktywnymi sesjami jest w trakcie budowy.

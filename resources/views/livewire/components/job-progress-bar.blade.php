@@ -108,7 +108,7 @@
 
             <!-- Close Button -->
             <button wire:click="hide"
-                    class="flex-shrink-0 rounded-lg p-1.5 hover:bg-white/10 transition-colors duration-200">
+                    class="flex-shrink-0 rounded-lg p-1.5 hover:bg-gray-800/10 transition-colors duration-200">
                 <svg class="w-5 h-5 text-gray-400 hover:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
                 </svg>

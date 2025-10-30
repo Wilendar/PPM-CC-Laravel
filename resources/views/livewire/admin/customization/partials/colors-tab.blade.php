@@ -1,8 +1,8 @@
 <div class="p-6">
     <div class="flex justify-between items-center mb-6">
         <div>
-            <h3 class="text-lg font-medium text-gray-900 dark:text-white">Kolory Motywu</h3>
-            <p class="text-sm text-gray-600 dark:text-gray-400">Dostosuj schemat kolorów panelu administracyjnego</p>
+            <h3 class="text-lg font-medium text-white">Kolory Motywu</h3>
+            <p class="text-sm text-gray-400">Dostosuj schemat kolorów panelu administracyjnego</p>
         </div>
         
         <button wire:click="updateColors" class="btn btn-primary">
@@ -16,7 +16,7 @@
     <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
         <!-- Primary Color -->
         <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
-            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+            <label class="block text-sm font-medium text-gray-300 mb-3">
                 Kolor Podstawowy
             </label>
             
@@ -46,7 +46,7 @@
 
         <!-- Secondary Color -->
         <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
-            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+            <label class="block text-sm font-medium text-gray-300 mb-3">
                 Kolor Drugorzędny
             </label>
             
@@ -76,7 +76,7 @@
 
         <!-- Accent Color -->
         <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
-            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+            <label class="block text-sm font-medium text-gray-300 mb-3">
                 Kolor Akcentu
             </label>
             
@@ -107,7 +107,7 @@
 
     <!-- Color Palette Presets -->
     <div class="mt-8">
-        <h4 class="text-md font-medium text-gray-900 dark:text-white mb-4">Gotowe Palety Kolorów</h4>
+        <h4 class="text-md font-medium text-white mb-4">Gotowe Palety Kolorów</h4>
         
         <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
             <!-- Blue Palette -->
@@ -187,7 +187,7 @@
     <!-- Advanced Color Options -->
     <div class="mt-8" x-data="{ showAdvanced: false }">
         <button @click="showAdvanced = !showAdvanced" 
-                class="flex items-center text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-gray-900">
+                class="flex items-center text-sm font-medium text-gray-300 hover:text-white">
             <svg class="w-4 h-4 mr-2 transform transition-transform" 
                  :class="{ 'rotate-90': showAdvanced }" 
                  fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -204,14 +204,14 @@
             
             <!-- Company Colors -->
             <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
-                <h5 class="text-sm font-medium text-gray-900 dark:text-white mb-3">Kolory Firmowe</h5>
-                <p class="text-xs text-gray-600 dark:text-gray-400 mb-4">
+                <h5 class="text-sm font-medium text-white mb-3">Kolory Firmowe</h5>
+                <p class="text-xs text-gray-400 mb-4">
                     Dodaj kolory firmowe dla spójnego brandingu
                 </p>
                 
                 <div class="flex flex-wrap gap-2 mb-3">
                     @foreach($companyColors as $index => $color)
-                        <div class="flex items-center space-x-2 bg-white dark:bg-gray-600 rounded-lg p-2">
+                        <div class="flex items-center space-x-2 bg-gray-800 dark:bg-gray-600 rounded-lg p-2">
                             <div class="w-6 h-6 rounded border" style="background-color: {{ $color }}"></div>
                             <span class="text-xs font-mono">{{ $color }}</span>
                             <button wire:click="removeCompanyColor({{ $index }})" 

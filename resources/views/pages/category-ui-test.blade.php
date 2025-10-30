@@ -6,12 +6,12 @@
 
 @section('content')
 <div class="p-8">
-    <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-8">
-        <h1 class="text-3xl font-bold mb-8 text-gray-900 dark:text-white">Test UI Naprawek - Kategorie</h1>
+    <div class="bg-gray-800 rounded-2xl shadow-lg p-8">
+        <h1 class="text-3xl font-bold mb-8 text-white">Test UI Naprawek - Kategorie</h1>
 
         {{-- Test Font Awesome Icons --}}
         <div class="mb-8">
-            <h2 class="text-xl font-semibold mb-4 text-gray-800 dark:text-gray-200">Test Font Awesome Icons</h2>
+            <h2 class="text-xl font-semibold mb-4 text-gray-200">Test Font Awesome Icons</h2>
             <div class="grid grid-cols-6 gap-4">
                 <div class="text-center p-4 bg-blue-50 dark:bg-blue-900/20 rounded-xl">
                     <i class="fas fa-folder text-3xl text-blue-600 mb-2"></i>
@@ -42,7 +42,7 @@
 
         {{-- Test Dropdown Z-Index --}}
         <div class="mb-8">
-            <h2 class="text-xl font-semibold mb-4 text-gray-800 dark:text-gray-200">Test Dropdown Z-Index</h2>
+            <h2 class="text-xl font-semibold mb-4 text-gray-200">Test Dropdown Z-Index</h2>
             <div class="relative">
 
                 {{-- Background Elements to Test Overlay --}}
@@ -52,7 +52,7 @@
                     {{-- Test Dropdown --}}
                     <div x-data="{ open: false }" class="relative inline-block">
                         <button @click="open = !open" @click.away="open = false"
-                                class="inline-flex items-center px-4 py-2 bg-white border-2 border-gray-300 rounded-xl shadow-md hover:shadow-lg transition-all duration-300">
+                                class="inline-flex items-center px-4 py-2 bg-gray-800 border-2 border-gray-300 rounded-xl shadow-md hover:shadow-lg transition-all duration-300">
                             <i class="fas fa-ellipsis-v mr-2"></i>
                             Kliknij aby otworzyć dropdown
                         </button>
@@ -64,12 +64,12 @@
                              x-transition:leave="transition ease-in duration-150"
                              x-transition:leave-start="opacity-100 scale-100"
                              x-transition:leave-end="opacity-0 scale-90"
-                             class="dropdown-fix origin-top-right right-0 mt-2 w-80 rounded-2xl shadow-2xl bg-white dark:bg-gray-800
+                             class="dropdown-fix origin-top-right right-0 mt-2 w-80 rounded-2xl shadow-2xl bg-gray-800
                                     ring-1 ring-black ring-opacity-5 border-2 border-gray-100 dark:border-gray-700"
                              style="display: none; z-index: 999999 !important; position: fixed !important;">
 
                             <div class="p-6">
-                                <h4 class="text-lg font-bold text-gray-900 dark:text-white mb-4">Test Dropdown Menu</h4>
+                                <h4 class="text-lg font-bold text-white mb-4">Test Dropdown Menu</h4>
                                 <div class="space-y-3">
                                     <div class="flex items-center space-x-3 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-xl">
                                         <i class="fas fa-edit text-blue-600"></i>
@@ -107,7 +107,7 @@
 
         {{-- Test Results --}}
         <div class="bg-gradient-to-r from-gray-50 to-blue-50 dark:from-gray-800 dark:to-blue-900/20 p-6 rounded-2xl">
-            <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-3">
+            <h3 class="text-lg font-semibold text-gray-200 mb-3">
                 <i class="fas fa-check-circle text-green-500 mr-2"></i>
                 Test Results
             </h3>

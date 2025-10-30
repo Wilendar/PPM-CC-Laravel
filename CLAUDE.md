@@ -109,15 +109,49 @@ plink ... -batch "cat domains/.../public/build/manifest.json | grep components.c
 # Jeśli pokazuje STARY hash (np. components-wc8O_2Rd.css) = manifest nie został wgrany!
 ```
 
-**DEPLOYMENT CHECKLIST:**
-1. ✅ Lokalnie: `npm run build`
-2. ✅ Upload CSS/JS files: `pscp public/build/assets/* → remote/assets/`
-3. ✅ Upload manifest do ROOT: `pscp public/build/.vite/manifest.json → remote/build/manifest.json`
-4. ✅ Clear cache: `php artisan view:clear && php artisan cache:clear && php artisan config:clear`
-5. ✅ Hard refresh przeglądarki: Ctrl+Shift+R
-6. ✅ DevTools verification: sprawdź które pliki CSS/JS się ładują
+**DEPLOYMENT CHECKLIST (UPDATED 2025-10-24):**
 
-**Data wykrycia problemu:** 2025-10-14 (Modal z-index fix deployment)
+**⚠️ KRYTYCZNA ZASADA:** Deploy **WSZYSTKIE** pliki z `public/build/assets/`, nie tylko "zmienione"!
+**Dlaczego:** Vite regeneruje hashe dla WSZYSTKICH plików przy każdym `npm run build`, nawet jeśli plik nie zmienił się ani o linię!
+
+1. ✅ Lokalnie: `npm run build`
+   - Sprawdź output: "✓ built in X.XXs"
+   - Note: Wszystkie pliki w `public/build/assets/` mają NOWE hashe!
+
+2. ✅ Upload **ALL** assets: `pscp -r public/build/assets/* → remote/assets/`
+   - ⚠️ NIE upload pojedynczych plików! (np. tylko components.css)
+   - Vite content-based hashing = każdy build = nowe hashe dla WSZYSTKICH plików
+
+3. ✅ Upload manifest do ROOT: `pscp public/build/.vite/manifest.json → remote/build/manifest.json`
+   - KRYTYCZNE: ROOT location (`public/build/manifest.json`), nie `.vite/` subdirectory!
+
+4. ✅ Clear cache: `php artisan view:clear && php artisan cache:clear && php artisan config:clear`
+
+5. ✅ **HTTP 200 Verification** (NOWY KROK - MANDATORY!):
+   ```powershell
+   # Verify ALL CSS files return HTTP 200
+   @('app-Bd75e5PJ.css', 'components-CNZASCM0.css', 'layout-CBQLZIVc.css') | ForEach-Object {
+       curl -I "https://ppm.mpptrade.pl/public/build/assets/$_"
+   }
+   # All must return "HTTP/1.1 200 OK" - if ANY returns 404 = incomplete deployment!
+   ```
+
+6. ✅ Screenshot verification: `node _TOOLS/screenshot_page.cjs 'https://ppm.mpptrade.pl/admin'`
+
+7. ✅ DevTools verification: Network tab → sprawdź które pliki CSS/JS się ładują (hashe powinny być świeże)
+
+**REAL INCIDENTS (2025-10-24):**
+- **Early incident:** Deployed tylko `components-BVjlDskM.css`, forgot `app-C7f3nhBa.css` → 30 min downtime
+- **FAZA 2.3:** Deployed tylko `components-CNZASCM0.css`, forgot `app-Bd75e5PJ.css` → caught by user alert, 0 min downtime
+
+**Lessons Learned:**
+- 🔥 "I changed X" ≠ "Only upload X" (cognitive bias!)
+- ✅ HTTP 200 verification catches incomplete deployment BEFORE user impact
+- ✅ User monitoring = essential safety net
+
+**Reference:** See `_ISSUES_FIXES/CSS_INCOMPLETE_DEPLOYMENT_ISSUE.md` for complete post-mortem
+
+**Data wykrycia problemu:** 2025-10-14 (Modal z-index fix), 2025-10-24 (Complete asset deployment issue)
 
 ### Środowisko Deployment
 - **Domena**: ppm.mpptrade.pl
@@ -466,6 +500,10 @@ Zamiast tworzyć nowe pliki CSS, dodaj swoje style do odpowiedniego istniejąceg
 - **[Debug Logging Best Practices](_ISSUES_FIXES/DEBUG_LOGGING_BEST_PRACTICES.md)** - Extensive logging podczas dev, minimal w production
 - **[Vite Manifest New CSS Files](_ISSUES_FIXES/VITE_MANIFEST_NEW_CSS_FILES_ISSUE.md)** - Problem z dodawaniem nowych plików CSS do Vite manifest na produkcji
 - **[CSS Import Missing from Layout](_ISSUES_FIXES/CSS_IMPORT_MISSING_FROM_LAYOUT.md)** - CSS file nie ładuje się, bo brak w @vite() directive
+- **[CSS Incomplete Deployment](_ISSUES_FIXES/CSS_INCOMPLETE_DEPLOYMENT_ISSUE.md)** - 🔥 CRITICAL: Niekompletny deployment CSS = cała aplikacja bez stylów
+
+#### 🚧 Integration & Testing Issues
+- **[PrestaShop E2E No API Access](_ISSUES_FIXES/PRESTASHOP_E2E_NO_API_ACCESS_BLOCKER.md)** - 🔴 BLOCKER: Brak dostępu do działającego PrestaShop API dla testów E2E
 
 #### 💡 Quick Reference - Najczęstsze problemy
 ```php
@@ -481,6 +519,7 @@ class="z-[9999] bg-gray-800" // ❌ Tailwind arbitrary values dla z-index - ZABR
 @if($condition) <div wire:poll.3s>...</div> @endif // wire:poll wewnątrz @if nie działa
 <template x-teleport="body"><div><button wire:click="method"></button></div></template> // x-teleport z wire:click nie działa
 public int $progressId; // Livewire DI conflict - non-nullable type
+pscp "components-BVjlDskM.css" host:/path/ // ❌ Partial deployment - inne pliki mają nowe hashe!
 
 // ✅ POPRAWNE ROZWIĄZANIA
 Route::get('/path', fn() => view('wrapper')); // blade wrapper
@@ -492,6 +531,7 @@ class="modal-root" /* CSS: .modal-root { z-index: 11; } */ // ✅ Style przez CS
 <div wire:poll.3s> @if($condition)...</@if> </div> // wire:poll POZA @if
 <template x-teleport="body"><div><button @click="$wire.method()"></button></div></template> // z $wire
 public ?int $progressId = null; // Nullable property dla Livewire params
+pscp -r "public/build/assets/*" host:/path/ // ✅ Complete deployment - wszystkie pliki z nowymi hashami!
 ```
 
 ### System Planowania
@@ -565,6 +605,72 @@ n### FAZA C: System Administration - COMPLETED 2025-01-09
 - Kiedy którego agenta używać
 - Agent delegation best practices
 - Raportowanie i tracking
+
+## 🎯 CLAUDE CODE SKILLS SYSTEM
+
+**STATUS:** ✅ AKTYWNY - 9 Skills + 13 agentów zintegrowanych (ostatnia aktualizacja: 2025-10-22)
+
+### Co to są Skills?
+
+**Skills** to model-invoked capabilities - funkcje które Claude autonomicznie wybiera i wykonuje gdy description pasuje do zadania. Automatyzują powtarzalne workflow eliminując potrzebę manualnego wykonywania standardowych operacji.
+
+### Dostępne Skills (9)
+
+**Lokalizacja Skills (GLOBALNY KATALOG CLAUDE):** `C:\Users\kamil\.claude\skills\`
+
+1. **hostido-deployment** - Automatic deployment to Hostido production
+2. **livewire-troubleshooting** - Known Livewire 3.x issues diagnosis (9 documented)
+3. **frontend-verification** - ⚠️ MANDATORY UI screenshot verification
+4. **agent-report-writer** - ⚠️ MANDATORY report generation in `_AGENT_REPORTS/`
+5. **project-plan-manager** - Accurate plan tracking with emoji statusy
+6. **context7-docs-lookup** - ⚠️ MANDATORY docs verification before implementation
+7. **issue-documenter** - Complex issue documentation (>2h debugging)
+8. **debug-log-cleanup** - Production log cleanup after user confirmation
+9. **ppm-architecture-compliance** - ⚠️ MANDATORY compliance check with PPM documentation (Architecture, Database, File Structure)
+
+### Skills Integration w Agentach
+
+**Wszystkie 13 agentów** mają sekcję **SKILLS INTEGRATION** z przypisanymi Skills:
+
+- **architect**: project-plan-manager (PRIMARY), ppm-architecture-compliance (MANDATORY), context7-docs-lookup, agent-report-writer
+- **laravel-expert**: ppm-architecture-compliance (MANDATORY), context7-docs-lookup, agent-report-writer
+- **livewire-specialist**: livewire-troubleshooting (PRIMARY), ppm-architecture-compliance (MANDATORY), context7-docs-lookup, agent-report-writer
+- **frontend-specialist**: frontend-verification (PRIMARY), ppm-architecture-compliance (MANDATORY), agent-report-writer
+- **deployment-specialist**: hostido-deployment (PRIMARY), ppm-architecture-compliance (RECOMMENDED), frontend-verification, agent-report-writer
+- **debugger**: livewire-troubleshooting, issue-documenter, debug-log-cleanup, agent-report-writer
+- (+ 7 more agents with ppm-architecture-compliance as MANDATORY or RECOMMENDED)
+
+### Kluczowe Zasady
+
+1. ✅ **ppm-architecture-compliance** - MANDATORY przed rozpoczęciem prac nad PPM features (czytaj dokumentację ZAWSZE!)
+2. ✅ **agent-report-writer** - MANDATORY dla wszystkich agentów po ukończeniu pracy
+3. ✅ **context7-docs-lookup** - MANDATORY przed implementacją nowych patterns
+4. ✅ **frontend-verification** - MANDATORY przed informowaniem użytkownika o UI completion
+5. ✅ Skills są autonomicznie wybierane przez Claude (nie wymuszaj manualnie)
+6. ✅ Każdy agent ma sekcję SKILLS INTEGRATION z MANDATORY vs OPTIONAL Skills
+
+### Workflow Przykład
+
+```
+Task: Deploy new Livewire component
+Agent: livewire-specialist + deployment-specialist
+
+1. ppm-architecture-compliance → Verify PPM documentation compliance ✅
+2. context7-docs-lookup → Verify Livewire 3.x patterns ✅
+3. [Implementation] → Create component with compliant structure ✅
+4. hostido-deployment → Upload + cache clear + verify ✅
+5. frontend-verification → Screenshot check ✅
+6. agent-report-writer → Generate deployment report ✅
+
+Result: Fully automated deployment with documentation compliance
+```
+
+**📖 SZCZEGÓŁOWA DOKUMENTACJA:** [`_DOCS/SKILLS_USAGE_GUIDE.md`](_DOCS/SKILLS_USAGE_GUIDE.md)
+- Complete Skills descriptions
+- Usage examples per agent type
+- Skills vs Slash Commands
+- Best practices
+- Reference files locations
 
 ## 📚 CONTEXT7 INTEGRATION SYSTEM
 

@@ -7,7 +7,7 @@
     <button @click="toggleDropdown()"
             @click.away="closeDropdown()"
             class="group inline-flex items-center px-4 py-3 border-2 border-gray-200 dark:border-gray-600
-                   rounded-2xl bg-white dark:bg-gray-700 text-sm font-semibold text-gray-700 dark:text-gray-300
+                   rounded-2xl bg-gray-700 text-sm font-semibold text-gray-300
                    hover:border-blue-300 dark:hover:border-blue-500 hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50
                    dark:hover:from-blue-900/20 dark:hover:to-indigo-900/20 hover:text-blue-700 dark:hover:text-blue-300
                    transition-all duration-300 transform hover:scale-105 shadow-md hover:shadow-lg"
@@ -27,7 +27,7 @@
                         <i class="fas fa-folder text-white text-lg"></i>
                     </div>
                     <div>
-                        <h3 class="font-bold text-gray-900 dark:text-white text-lg">{{ $category->name }}</h3>
+                        <h3 class="font-bold text-white text-lg">{{ $category->name }}</h3>
                         <div class="text-sm text-gray-500 dark:text-gray-400">
                             ID: {{ $category->id }} • Poziom: {{ $category->level ?? 1 }}
                         </div>
@@ -47,11 +47,11 @@
 
             {{-- Quick Stats --}}
             <div class="mt-4 grid grid-cols-2 gap-4 text-center">
-                <div class="bg-white dark:bg-gray-800 p-3 rounded-xl border border-gray-200 dark:border-gray-600">
+                <div class="bg-gray-800 p-3 rounded-xl border border-gray-200 dark:border-gray-600">
                     <div class="text-lg font-bold text-blue-600 dark:text-blue-400">{{ $category->children_count ?? 0 }}</div>
                     <div class="text-xs text-gray-500">Podkategorie</div>
                 </div>
-                <div class="bg-white dark:bg-gray-800 p-3 rounded-xl border border-gray-200 dark:border-gray-600">
+                <div class="bg-gray-800 p-3 rounded-xl border border-gray-200 dark:border-gray-600">
                     <div class="text-lg font-bold text-green-600 dark:text-green-400">{{ $category->products_count ?? 0 }}</div>
                     <div class="text-xs text-gray-500">Produkty</div>
                 </div>
@@ -62,7 +62,7 @@
         <div class="p-4 space-y-2">
             {{-- Edit Category --}}
             <button @click="editCategory({{ $category->id }})"
-                    class="w-full flex items-center space-x-3 px-4 py-3 text-sm text-gray-700 dark:text-gray-200
+                    class="w-full flex items-center space-x-3 px-4 py-3 text-sm text-gray-200
                            hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-xl transition-colors duration-200 group"
                     role="menuitem">
                 <div class="w-8 h-8 bg-blue-100 dark:bg-blue-900/30 rounded-lg flex items-center justify-center group-hover:bg-blue-200 dark:group-hover:bg-blue-800/50 transition-colors duration-200">
@@ -76,7 +76,7 @@
 
             {{-- Add Subcategory --}}
             <button @click="addSubcategory({{ $category->id }})"
-                    class="w-full flex items-center space-x-3 px-4 py-3 text-sm text-gray-700 dark:text-gray-200
+                    class="w-full flex items-center space-x-3 px-4 py-3 text-sm text-gray-200
                            hover:bg-green-50 dark:hover:bg-green-900/20 rounded-xl transition-colors duration-200 group"
                     role="menuitem">
                 <div class="w-8 h-8 bg-green-100 dark:bg-green-900/30 rounded-lg flex items-center justify-center group-hover:bg-green-200 dark:group-hover:bg-green-800/50 transition-colors duration-200">
@@ -91,7 +91,7 @@
             {{-- Toggle Active Status --}}
             @if($category->is_active ?? true)
                 <button @click="toggleStatus({{ $category->id }}, false)"
-                        class="w-full flex items-center space-x-3 px-4 py-3 text-sm text-gray-700 dark:text-gray-200
+                        class="w-full flex items-center space-x-3 px-4 py-3 text-sm text-gray-200
                                hover:bg-yellow-50 dark:hover:bg-yellow-900/20 rounded-xl transition-colors duration-200 group"
                         role="menuitem">
                     <div class="w-8 h-8 bg-yellow-100 dark:bg-yellow-900/30 rounded-lg flex items-center justify-center group-hover:bg-yellow-200 dark:group-hover:bg-yellow-800/50 transition-colors duration-200">
@@ -104,7 +104,7 @@
                 </button>
             @else
                 <button @click="toggleStatus({{ $category->id }}, true)"
-                        class="w-full flex items-center space-x-3 px-4 py-3 text-sm text-gray-700 dark:text-gray-200
+                        class="w-full flex items-center space-x-3 px-4 py-3 text-sm text-gray-200
                                hover:bg-green-50 dark:hover:bg-green-900/20 rounded-xl transition-colors duration-200 group"
                         role="menuitem">
                     <div class="w-8 h-8 bg-green-100 dark:bg-green-900/30 rounded-lg flex items-center justify-center group-hover:bg-green-200 dark:group-hover:bg-green-800/50 transition-colors duration-200">
@@ -120,7 +120,7 @@
             {{-- Delete Category --}}
             <hr class="my-2 border-gray-200 dark:border-gray-600">
             <button @click="deleteCategory({{ $category->id }})"
-                    class="w-full flex items-center space-x-3 px-4 py-3 text-sm text-gray-700 dark:text-gray-200
+                    class="w-full flex items-center space-x-3 px-4 py-3 text-sm text-gray-200
                            hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-colors duration-200 group"
                     role="menuitem">
                 <div class="w-8 h-8 bg-red-100 dark:bg-red-900/30 rounded-lg flex items-center justify-center group-hover:bg-red-200 dark:group-hover:bg-red-800/50 transition-colors duration-200">
@@ -191,7 +191,7 @@ function bulletproofCategoryActions(categoryId) {
 
             // Create dropdown element
             this.dropdownElement = document.createElement('div');
-            this.dropdownElement.className = 'fixed w-80 rounded-3xl shadow-2xl bg-white dark:bg-gray-800 ring-1 ring-black ring-opacity-5 border-2 border-gray-100 dark:border-gray-700';
+            this.dropdownElement.className = 'fixed w-80 rounded-3xl shadow-2xl bg-gray-800 ring-1 ring-black ring-opacity-5 border-2 border-gray-100 dark:border-gray-700';
             this.dropdownElement.style.cssText = `
                 z-index: 999999 !important;
                 top: ${buttonRect.bottom + 8}px;

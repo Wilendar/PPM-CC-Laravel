@@ -2,7 +2,7 @@
     <!-- Page Header -->
     <div class="flex items-center justify-between mb-6">
         <div>
-            <h1 class="text-2xl font-bold text-gray-900">Raporty i Analytics</h1>
+            <h1 class="text-2xl font-bold text-white">Raporty i Analytics</h1>
             <p class="text-gray-600">Zarządzaj raportami systemowymi i analizuj dane</p>
         </div>
         <button wire:click="showGenerateModal" 
@@ -14,50 +14,50 @@
 
     <!-- Statistics Cards -->
     <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
-        <div class="bg-white rounded-lg shadow p-6">
+        <div class="bg-gray-800 rounded-lg shadow p-6">
             <div class="flex items-center">
                 <div class="p-2 bg-blue-100 rounded-lg">
                     <i class="fas fa-chart-bar text-blue-600"></i>
                 </div>
                 <div class="ml-4">
                     <p class="text-sm font-medium text-gray-600">Wszystkie raporty</p>
-                    <p class="text-2xl font-bold text-gray-900">{{ $statistics['total_reports'] ?? 0 }}</p>
+                    <p class="text-2xl font-bold text-white">{{ $statistics['total_reports'] ?? 0 }}</p>
                 </div>
             </div>
         </div>
         
-        <div class="bg-white rounded-lg shadow p-6">
+        <div class="bg-gray-800 rounded-lg shadow p-6">
             <div class="flex items-center">
                 <div class="p-2 bg-green-100 rounded-lg">
                     <i class="fas fa-check-circle text-green-600"></i>
                 </div>
                 <div class="ml-4">
                     <p class="text-sm font-medium text-gray-600">Ukończone</p>
-                    <p class="text-2xl font-bold text-gray-900">{{ $statistics['completed_reports'] ?? 0 }}</p>
+                    <p class="text-2xl font-bold text-white">{{ $statistics['completed_reports'] ?? 0 }}</p>
                 </div>
             </div>
         </div>
         
-        <div class="bg-white rounded-lg shadow p-6">
+        <div class="bg-gray-800 rounded-lg shadow p-6">
             <div class="flex items-center">
                 <div class="p-2 bg-yellow-100 rounded-lg">
                     <i class="fas fa-spinner text-yellow-600"></i>
                 </div>
                 <div class="ml-4">
                     <p class="text-sm font-medium text-gray-600">Generowane</p>
-                    <p class="text-2xl font-bold text-gray-900">{{ $statistics['generating_reports'] ?? 0 }}</p>
+                    <p class="text-2xl font-bold text-white">{{ $statistics['generating_reports'] ?? 0 }}</p>
                 </div>
             </div>
         </div>
         
-        <div class="bg-white rounded-lg shadow p-6">
+        <div class="bg-gray-800 rounded-lg shadow p-6">
             <div class="flex items-center">
                 <div class="p-2 bg-red-100 rounded-lg">
                     <i class="fas fa-exclamation-triangle text-red-600"></i>
                 </div>
                 <div class="ml-4">
                     <p class="text-sm font-medium text-gray-600">Błędy</p>
-                    <p class="text-2xl font-bold text-gray-900">{{ $statistics['failed_reports'] ?? 0 }}</p>
+                    <p class="text-2xl font-bold text-white">{{ $statistics['failed_reports'] ?? 0 }}</p>
                 </div>
             </div>
         </div>
@@ -66,22 +66,22 @@
     <!-- Charts Row -->
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
         <!-- Report Trends Chart -->
-        <div class="bg-white rounded-lg shadow p-6">
-            <h3 class="text-lg font-medium text-gray-900 mb-4">Trendy generowania raportów (30 dni)</h3>
+        <div class="bg-gray-800 rounded-lg shadow p-6">
+            <h3 class="text-lg font-medium text-white mb-4">Trendy generowania raportów (30 dni)</h3>
             <canvas id="reportTrendsChart" height="200"></canvas>
         </div>
 
         <!-- Type Distribution Chart -->
-        <div class="bg-white rounded-lg shadow p-6">
-            <h3 class="text-lg font-medium text-gray-900 mb-4">Rozkład typów raportów</h3>
+        <div class="bg-gray-800 rounded-lg shadow p-6">
+            <h3 class="text-lg font-medium text-white mb-4">Rozkład typów raportów</h3>
             <canvas id="typeDistributionChart" height="200"></canvas>
         </div>
     </div>
 
     <!-- Latest Reports -->
-    <div class="bg-white rounded-lg shadow mb-6">
+    <div class="bg-gray-800 rounded-lg shadow mb-6">
         <div class="px-6 py-4 border-b border-gray-200">
-            <h3 class="text-lg font-medium text-gray-900">Najnowsze raporty</h3>
+            <h3 class="text-lg font-medium text-white">Najnowsze raporty</h3>
         </div>
         <div class="p-6">
             @if($latestReports->count() > 0)
@@ -93,7 +93,7 @@
                                     <i class="{{ $report->status_icon }} {{ $report->status_color }}"></i>
                                 </div>
                                 <div>
-                                    <h4 class="text-sm font-medium text-gray-900">{{ $report->name }}</h4>
+                                    <h4 class="text-sm font-medium text-white">{{ $report->name }}</h4>
                                     <p class="text-sm text-gray-600">
                                         {{ $report->getTypeLabel() }} • {{ $report->getPeriodLabel() }} • 
                                         {{ $report->report_date->format('d.m.Y') }}
@@ -121,7 +121,7 @@
     </div>
 
     <!-- Main Reports Section -->
-    <div class="bg-white rounded-lg shadow">
+    <div class="bg-gray-800 rounded-lg shadow">
         <!-- Tabs -->
         <div class="border-b border-gray-200">
             <nav class="flex space-x-8 px-6" aria-label="Tabs">
@@ -212,7 +212,7 @@
                                 <i class="{{ $report->status_icon }} {{ $report->status_color }} text-xl"></i>
                             </div>
                             <div class="flex-1 min-w-0">
-                                <h3 class="text-lg font-medium text-gray-900">
+                                <h3 class="text-lg font-medium text-white">
                                     {{ $report->name }}
                                 </h3>
                                 <div class="mt-1 flex items-center space-x-4 text-sm text-gray-500">
@@ -335,10 +335,10 @@
              x-transition:enter="ease-out duration-300"
              x-transition:enter-start="opacity-0"
              x-transition:enter-end="opacity-100">
-            <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+            <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-gray-800">
                 <div class="mt-3">
                     <div class="flex items-center justify-between mb-4">
-                        <h3 class="text-lg font-medium text-gray-900">Generuj nowy raport</h3>
+                        <h3 class="text-lg font-medium text-white">Generuj nowy raport</h3>
                         <button wire:click="hideGenerateModal" class="text-gray-400 hover:text-gray-600">
                             <i class="fas fa-times"></i>
                         </button>

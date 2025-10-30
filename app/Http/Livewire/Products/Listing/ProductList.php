@@ -2428,6 +2428,101 @@ class ProductList extends Component
     }
 
     /**
+     * Bulk export selected products to CSV
+     *
+     * Exports product data with SKU, name, category, status, stock, prices
+     * ETAP_05a FAZA 6: Bulk operations UI
+     */
+    public function bulkExportCsv(): void
+    {
+        if (empty($this->selectedProducts)) {
+            $this->dispatch('error', message: 'Nie zaznaczono żadnych produktów');
+            return;
+        }
+
+        try {
+            $products = Product::whereIn('id', $this->selectedProducts)
+                ->with(['categories', 'priceGroups'])
+                ->orderBy('sku')
+                ->get();
+
+            // Build CSV header
+            $csv = "SKU;Nazwa;Kategoria główna;Status;Stan magazynowy;Cena detaliczna;Cena dealer;Utworzono;Aktualizacja\n";
+
+            foreach ($products as $product) {
+                $primaryCategory = $product->categories
+                    ->where('pivot.is_primary', true)
+                    ->where('pivot.shop_id', null)
+                    ->first();
+
+                $retailPrice = $product->priceGroups
+                    ->where('code', 'detaliczna')
+                    ->first();
+
+                $dealerPrice = $product->priceGroups
+                    ->where('code', 'dealer_standard')
+                    ->first();
+
+                $csv .= sprintf(
+                    "%s;%s;%s;%s;%d;%s;%s;%s;%s\n",
+                    $this->escapeCsv($product->sku),
+                    $this->escapeCsv($product->name),
+                    $this->escapeCsv($primaryCategory?->name ?? '-'),
+                    $product->is_active ? 'Aktywny' : 'Nieaktywny',
+                    $product->stock_quantity ?? 0,
+                    $retailPrice ? number_format($retailPrice->pivot->price, 2, ',', '') : '-',
+                    $dealerPrice ? number_format($dealerPrice->pivot->price, 2, ',', '') : '-',
+                    $product->created_at->format('Y-m-d H:i'),
+                    $product->updated_at->format('Y-m-d H:i')
+                );
+            }
+
+            $filename = 'products_export_' . date('Y-m-d_His') . '.csv';
+
+            // Dispatch browser download event (Livewire 3.x pattern)
+            $this->dispatch('download-csv', [
+                'filename' => $filename,
+                'content' => $csv
+            ]);
+
+            Log::info('ProductList: Bulk export CSV completed', [
+                'count' => $products->count(),
+                'filename' => $filename,
+            ]);
+
+            $this->dispatch('success', message: "Wyeksportowano {$products->count()} produktów do CSV");
+
+        } catch (\Exception $e) {
+            Log::error('ProductList: Bulk export CSV failed', [
+                'error' => $e->getMessage(),
+                'selected_products' => $this->selectedProducts
+            ]);
+
+            $this->dispatch('error', message: 'Błąd podczas eksportu CSV: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Escape CSV field values (handle quotes and separators)
+     *
+     * @param string $value
+     * @return string
+     */
+    private function escapeCsv(string $value): string
+    {
+        // Remove any existing quotes
+        $value = str_replace('"', '""', $value);
+
+        // If value contains semicolon, comma, newline, or quotes, wrap in quotes
+        if (strpos($value, ';') !== false || strpos($value, ',') !== false ||
+            strpos($value, "\n") !== false || strpos($value, '"') !== false) {
+            $value = '"' . $value . '"';
+        }
+
+        return $value;
+    }
+
+    /**
      * Load PrestaShop products for individual selection
      * CRITICAL: Filters by $this->importSearch (name or SKU)
      */

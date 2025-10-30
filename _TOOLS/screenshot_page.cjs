@@ -6,17 +6,19 @@
  * Part of /analizuj_strone diagnostic workflow
  *
  * Usage:
- *   node _TOOLS/screenshot_page.cjs <url>
+ *   node _TOOLS/screenshot_page.cjs <url> [width] [height]
  *
- * Example:
+ * Examples:
  *   node _TOOLS/screenshot_page.cjs https://ppm.mpptrade.pl/admin/products
+ *   node _TOOLS/screenshot_page.cjs https://ppm.mpptrade.pl/admin/products 375 667
+ *   node _TOOLS/screenshot_page.cjs https://ppm.mpptrade.pl/admin/products 768 1024
  */
 
 const { chromium } = require('playwright');
 const fs = require('fs');
 const path = require('path');
 
-async function takeScreenshot(url) {
+async function takeScreenshot(url, viewportWidth = 1920, viewportHeight = 1080) {
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
     const screenshotsDir = path.join(__dirname, 'screenshots');
 
@@ -27,7 +29,7 @@ async function takeScreenshot(url) {
 
     const browser = await chromium.launch({ headless: true });
     const context = await browser.newContext({
-        viewport: { width: 1920, height: 1080 },
+        viewport: { width: viewportWidth, height: viewportHeight },
         userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
     });
 
@@ -121,7 +123,12 @@ async function takeScreenshot(url) {
 
 // Main execution
 const url = process.argv[2] || 'https://ppm.mpptrade.pl/admin/products';
-takeScreenshot(url).then(result => {
+const viewportWidth = parseInt(process.argv[3]) || 1920;
+const viewportHeight = parseInt(process.argv[4]) || 1080;
+
+console.log(`Viewport: ${viewportWidth}x${viewportHeight}`);
+
+takeScreenshot(url, viewportWidth, viewportHeight).then(result => {
     if (!result.success) {
         process.exit(1);
     }

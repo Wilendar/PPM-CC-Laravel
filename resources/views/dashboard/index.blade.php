@@ -7,7 +7,7 @@
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {{-- Welcome Message --}}
         <div class="mb-8">
-            <div class="bg-white dark:bg-gray-800 overflow-hidden shadow rounded-lg">
+            <div class="bg-gray-800 overflow-hidden shadow rounded-lg">
                 <div class="px-4 py-5 sm:p-6">
                     <div class="flex items-center">
                         <div class="flex-shrink-0">
@@ -29,7 +29,7 @@
                                     Witaj ponownie
                                 </dt>
                                 <dd class="flex items-baseline">
-                                    <div class="text-2xl font-semibold text-gray-900 dark:text-white">
+                                    <div class="text-2xl font-semibold text-white">
                                         {{ Auth::user()->first_name }} {{ Auth::user()->last_name }}
                                     </div>
                                     <div class="ml-2 flex items-baseline text-sm text-gray-500 dark:text-gray-400">
@@ -57,7 +57,7 @@
                                 <div class="text-sm text-gray-500 dark:text-gray-400">
                                     Ostatnie logowanie
                                 </div>
-                                <div class="text-sm font-medium text-gray-900 dark:text-white">
+                                <div class="text-sm font-medium text-white">
                                     {{ Auth::user()->last_login_at ? Auth::user()->last_login_at->format('d.m.Y H:i') : 'Pierwsze logowanie' }}
                                 </div>
                             </div>
@@ -72,7 +72,7 @@
             <div class="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
                 {{-- Products Count --}}
                 @can('products.read')
-                <div class="bg-white dark:bg-gray-800 overflow-hidden shadow rounded-lg">
+                <div class="bg-gray-800 overflow-hidden shadow rounded-lg">
                     <div class="p-5">
                         <div class="flex items-center">
                             <div class="flex-shrink-0">
@@ -85,7 +85,7 @@
                                     <dt class="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">
                                         Produkty w systemie
                                     </dt>
-                                    <dd class="text-lg font-medium text-gray-900 dark:text-white">
+                                    <dd class="text-lg font-medium text-white">
                                         12,547
                                     </dd>
                                 </dl>
@@ -104,7 +104,7 @@
 
                 {{-- Categories Count --}}
                 @can('categories.read')
-                <div class="bg-white dark:bg-gray-800 overflow-hidden shadow rounded-lg">
+                <div class="bg-gray-800 overflow-hidden shadow rounded-lg">
                     <div class="p-5">
                         <div class="flex items-center">
                             <div class="flex-shrink-0">
@@ -117,7 +117,7 @@
                                     <dt class="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">
                                         Kategorie aktywne
                                     </dt>
-                                    <dd class="text-lg font-medium text-gray-900 dark:text-white">
+                                    <dd class="text-lg font-medium text-white">
                                         1,247
                                     </dd>
                                 </dl>
@@ -136,7 +136,7 @@
 
                 {{-- Integrations Status --}}
                 @can('integrations.read')
-                <div class="bg-white dark:bg-gray-800 overflow-hidden shadow rounded-lg">
+                <div class="bg-gray-800 overflow-hidden shadow rounded-lg">
                     <div class="p-5">
                         <div class="flex items-center">
                             <div class="flex-shrink-0">
@@ -149,7 +149,7 @@
                                     <dt class="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">
                                         Status synchronizacji
                                     </dt>
-                                    <dd class="text-lg font-medium text-gray-900 dark:text-white">
+                                    <dd class="text-lg font-medium text-white">
                                         Aktywna
                                     </dd>
                                 </dl>
@@ -168,7 +168,7 @@
 
                 {{-- System Status --}}
                 @role('Admin')
-                <div class="bg-white dark:bg-gray-800 overflow-hidden shadow rounded-lg">
+                <div class="bg-gray-800 overflow-hidden shadow rounded-lg">
                     <div class="p-5">
                         <div class="flex items-center">
                             <div class="flex-shrink-0">
@@ -181,7 +181,7 @@
                                     <dt class="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">
                                         System PPM
                                     </dt>
-                                    <dd class="text-lg font-medium text-gray-900 dark:text-white">
+                                    <dd class="text-lg font-medium text-white">
                                         Operacyjny
                                     </dd>
                                 </dl>
@@ -202,13 +202,13 @@
 
         {{-- Quick Actions --}}
         <div class="mb-8">
-            <h3 class="text-lg leading-6 font-medium text-gray-900 dark:text-white mb-4">
+            <h3 class="text-lg leading-6 font-medium text-white mb-4">
                 Szybkie akcje
             </h3>
             <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 {{-- Product Actions --}}
                 @can('products.create')
-                <div class="relative group bg-white dark:bg-gray-800 p-6 focus-within:ring-2 focus-within:ring-inset focus-within:ring-blue-500 rounded-lg shadow hover:shadow-md transition-shadow">
+                <div class="relative group bg-gray-800 p-6 focus-within:ring-2 focus-within:ring-inset focus-within:ring-blue-500 rounded-lg shadow hover:shadow-md transition-shadow">
                     <div>
                         <span class="rounded-lg inline-flex p-3 bg-blue-50 dark:bg-blue-900 text-blue-700 dark:text-blue-300 ring-4 ring-white dark:ring-gray-800">
                             <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -217,7 +217,7 @@
                         </span>
                     </div>
                     <div class="mt-4">
-                        <h3 class="text-lg font-medium text-gray-900 dark:text-white">
+                        <h3 class="text-lg font-medium text-white">
                             <a href="{{ route('products.create') }}" class="focus:outline-none">
                                 <span class="absolute inset-0" aria-hidden="true"></span>
                                 Dodaj nowy produkt
@@ -237,7 +237,7 @@
 
                 {{-- Import Actions --}}
                 @can('products.import')
-                <div class="relative group bg-white dark:bg-gray-800 p-6 focus-within:ring-2 focus-within:ring-inset focus-within:ring-green-500 rounded-lg shadow hover:shadow-md transition-shadow">
+                <div class="relative group bg-gray-800 p-6 focus-within:ring-2 focus-within:ring-inset focus-within:ring-green-500 rounded-lg shadow hover:shadow-md transition-shadow">
                     <div>
                         <span class="rounded-lg inline-flex p-3 bg-green-50 dark:bg-green-900 text-green-700 dark:text-green-300 ring-4 ring-white dark:ring-gray-800">
                             <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -246,7 +246,7 @@
                         </span>
                     </div>
                     <div class="mt-4">
-                        <h3 class="text-lg font-medium text-gray-900 dark:text-white">
+                        <h3 class="text-lg font-medium text-white">
                             <a href="{{ route('import.index') }}" class="focus:outline-none">
                                 <span class="absolute inset-0" aria-hidden="true"></span>
                                 Import produktów
@@ -266,7 +266,7 @@
 
                 {{-- Search Products --}}
                 @can('products.read')
-                <div class="relative group bg-white dark:bg-gray-800 p-6 focus-within:ring-2 focus-within:ring-inset focus-within:ring-purple-500 rounded-lg shadow hover:shadow-md transition-shadow">
+                <div class="relative group bg-gray-800 p-6 focus-within:ring-2 focus-within:ring-inset focus-within:ring-purple-500 rounded-lg shadow hover:shadow-md transition-shadow">
                     <div>
                         <span class="rounded-lg inline-flex p-3 bg-purple-50 dark:bg-purple-900 text-purple-700 dark:text-purple-300 ring-4 ring-white dark:ring-gray-800">
                             <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -275,7 +275,7 @@
                         </span>
                     </div>
                     <div class="mt-4">
-                        <h3 class="text-lg font-medium text-gray-900 dark:text-white">
+                        <h3 class="text-lg font-medium text-white">
                             <a href="{{ route('search') }}" class="focus:outline-none">
                                 <span class="absolute inset-0" aria-hidden="true"></span>
                                 Wyszukaj produkty
@@ -299,13 +299,13 @@
         <div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
             {{-- Recent Products --}}
             @can('products.read')
-            <div class="bg-white dark:bg-gray-800 shadow rounded-lg">
+            <div class="bg-gray-800 shadow rounded-lg">
                 <div class="px-4 py-5 sm:p-6">
-                    <h3 class="text-lg leading-6 font-medium text-gray-900 dark:text-white">
+                    <h3 class="text-lg leading-6 font-medium text-white">
                         Ostatnio dodane produkty
                     </h3>
                     <div class="mt-6 flow-root">
-                        <ul role="list" class="-my-5 divide-y divide-gray-200 dark:divide-gray-700">
+                        <ul role="list" class="-my-5 divide-y divide-gray-700">
                             @for($i = 1; $i <= 5; $i++)
                             <li class="py-4">
                                 <div class="flex items-center space-x-4">
@@ -315,7 +315,7 @@
                                         </div>
                                     </div>
                                     <div class="flex-1 min-w-0">
-                                        <p class="text-sm font-medium text-gray-900 dark:text-white truncate">
+                                        <p class="text-sm font-medium text-white truncate">
                                             Przykładowy produkt {{ $i }}
                                         </p>
                                         <p class="text-sm text-gray-500 dark:text-gray-400 truncate">
@@ -331,7 +331,7 @@
                         </ul>
                     </div>
                     <div class="mt-6">
-                        <a href="{{ route('products.index') }}" class="w-full flex justify-center items-center px-4 py-2 border border-gray-300 dark:border-gray-600 shadow-sm text-sm font-medium rounded-md text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600">
+                        <a href="{{ route('products.index') }}" class="w-full flex justify-center items-center px-4 py-2 border border-gray-600 shadow-sm text-sm font-medium rounded-md text-gray-300 bg-gray-700 hover:bg-gray-600">
                             Zobacz wszystkie produkty
                         </a>
                     </div>
@@ -340,16 +340,16 @@
             @endcan
 
             {{-- System Status --}}
-            <div class="bg-white dark:bg-gray-800 shadow rounded-lg">
+            <div class="bg-gray-800 shadow rounded-lg">
                 <div class="px-4 py-5 sm:p-6">
-                    <h3 class="text-lg leading-6 font-medium text-gray-900 dark:text-white">
+                    <h3 class="text-lg leading-6 font-medium text-white">
                         Status systemu
                     </h3>
                     <div class="mt-6 space-y-4">
                         <div class="flex items-center justify-between">
                             <div class="flex items-center">
                                 <div class="h-2 w-2 bg-green-400 rounded-full mr-3"></div>
-                                <span class="text-sm text-gray-900 dark:text-white">Baza danych</span>
+                                <span class="text-sm text-white">Baza danych</span>
                             </div>
                             <span class="text-sm text-gray-500 dark:text-gray-400">Operacyjna</span>
                         </div>
@@ -357,7 +357,7 @@
                         <div class="flex items-center justify-between">
                             <div class="flex items-center">
                                 <div class="h-2 w-2 bg-green-400 rounded-full mr-3"></div>
-                                <span class="text-sm text-gray-900 dark:text-white">API Prestashop</span>
+                                <span class="text-sm text-white">API Prestashop</span>
                             </div>
                             <span class="text-sm text-gray-500 dark:text-gray-400">Połączone</span>
                         </div>
@@ -365,7 +365,7 @@
                         <div class="flex items-center justify-between">
                             <div class="flex items-center">
                                 <div class="h-2 w-2 bg-yellow-400 rounded-full mr-3"></div>
-                                <span class="text-sm text-gray-900 dark:text-white">Synchronizacja ERP</span>
+                                <span class="text-sm text-white">Synchronizacja ERP</span>
                             </div>
                             <span class="text-sm text-gray-500 dark:text-gray-400">W trakcie</span>
                         </div>
@@ -373,7 +373,7 @@
                         <div class="flex items-center justify-between">
                             <div class="flex items-center">
                                 <div class="h-2 w-2 bg-green-400 rounded-full mr-3"></div>
-                                <span class="text-sm text-gray-900 dark:text-white">Import/Export</span>
+                                <span class="text-sm text-white">Import/Export</span>
                             </div>
                             <span class="text-sm text-gray-500 dark:text-gray-400">Gotowy</span>
                         </div>
