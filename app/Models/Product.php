@@ -300,6 +300,43 @@ class Product extends Model
 
     /*
     |--------------------------------------------------------------------------
+    | TAX RATE HELPERS (FAZA 5.3 - 2025-11-14)
+    |--------------------------------------------------------------------------
+    */
+
+    /**
+     * Get effective tax rate for a shop (with override support)
+     *
+     * ETAP_07 FAZA 5.3 - Tax Rules UI Enhancement
+     *
+     * Priority:
+     * 1. ProductShopData->tax_rate_override (shop-specific)
+     * 2. Product->tax_rate (global default)
+     * 3. 23.00 (Poland standard VAT as fallback)
+     *
+     * @param int|null $shopId Shop ID for override lookup
+     * @return float Effective tax rate
+     */
+    public function getTaxRateForShop(?int $shopId = null): float
+    {
+        // No shop specified - return global default
+        if ($shopId === null) {
+            return $this->tax_rate ?? 23.00;
+        }
+
+        // Load shop data with override
+        $shopData = $this->shopData()->where('shop_id', $shopId)->first();
+
+        if ($shopData) {
+            return $shopData->getEffectiveTaxRate();
+        }
+
+        // Fallback to global default if no shop data exists
+        return $this->tax_rate ?? 23.00;
+    }
+
+    /*
+    |--------------------------------------------------------------------------
     | QUERY SCOPES - Business Logic Filters
     |--------------------------------------------------------------------------
     */

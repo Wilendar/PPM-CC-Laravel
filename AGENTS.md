@@ -1,239 +1,423 @@
-# AGENTS.md - Agent Instructions & Workflow
+# AGENTS.md
 
-### KRYTYCZNE: NATYCHMIASTOWY DEPLOY PO ZMIANACH
+- Zawsze odpowiadasz w języku Polskim
+- Twoją rolą jest analizowanie raportów agentów w folderach [_AGENT_REPORTS](_AGENT_REPORTS) oraz  [_REPORTS](_REPORTS) a następnie weryfikować porpawnosć kodu który został wspomniany w raportach. Po wykonanym audycie raportu, przepakujesz użytkownikowi swoje zalecenia co i gdzie należy poprawić, z dokładnym wskazaniem miejsca wystąpienia problemu oraz krótkim wyjaśnieniem i możliwych przyczynach.
+- Pilnujesz porządku w projekcie i aktualizujesz w razie potrzeby pliki, schematy architektury na bazie rzeczywistej struktury plików i tabel bazy dany w plikach  [ARCHITEKTURA_PPM](_DOCS\ARCHITEKTURA_PPM)   [Struktura_Plikow_Projektu.md](_DOCS\Struktura_Plikow_Projektu.md) oraz  [Struktura_Bazy_Danych.md](_DOCS\Struktura_Bazy_Danych.md) 
 
-- Po każdej zmianie w repo wykonuj natychmiastowy deploy na Hostido (prod) – bez czekania na osobne potwierdzenie.
-- Procedura minimalna (domyślna):
-  - Upload: `_TOOLS/hostido_deploy.ps1 -SourcePath "." -TargetPath "/domains/ppm.mpptrade.pl/public_html/"`
-  - Komendy: `_TOOLS/hostido_deploy.ps1 -Command "cd domains/ppm.mpptrade.pl/public_html && composer install --no-dev && php artisan migrate --force && php artisan view:clear && php artisan config:clear && php artisan cache:clear"`
-  - Health-check: odwiedź `/up`, smoke-test `/admin` (403/200 oraz widżety dashboardu)
-  - DryRun:  `_TOOLS/hostido_deploy.ps1 -DryRun -Verbose` (bez uploadu i bez komend) 
-  - Uwaga: skrypt deploy wyklucza  `vendor/*` z synchronizacji (remote vendor nie jest usuwany) 
-- Backup (zalecany przy migracjach/ryzyku):
-  - `_TOOLS/hostido_deploy.ps1 -CreateBackup -BackupName "auto_YYYYMMDD_HHMM"`
-- Awaria/Brak dostępu:
-  - Jeśli deploy nie jest możliwy (np. brak sieci/SSH), dodaj wpis do `_REPORTS` (⚠️ DEPLOY PENDING) z powodem i następnie wznowisz deployment przy pierwszej możliwości.
-- Bezpieczeństwo:
-  - Nie wykonuj destrukcyjnych operacji (rm -rf, reset danych) bez wyraźnego polecenia. Zawsze korzystaj ze skryptów w `_TOOLS` i preferuj backup + bezpieczne komendy Laravela.
+## Projekt: PPM-CC-Laravel (Prestashop Product Manager)
 
-### ZASADY AKTUALIZACJI PLANU (Plan_Projektu/*)
+Aplikacja klasy enterprise do zarządzania produktami na wielu sklepach Prestashop jednocześnie, będąca centralnym hubem produktów dla organizacji MPP TRADE.
 
-- Aktualizuj istniejące punkty: edytuj linie bezpośrednio w pliku planu. Nie dopisuj osobnych sekcji typu „AKTUALIZACJA PLANU” na końcu pliku.
-- Statusy kroków: stosuj sekwencję: ❌ (nie rozpoczęte) → 🛠️ (w trakcie) → ✅ (ukończone); używaj ⚠️ dla blokerów z krótkim opisem przyczyny i odnośnikiem do blokującego podpunktu.
-- Reguła PLIK: dodawaj „└──📁 PLIK: …” WYŁĄCZNIE przy statusie ✅. Wcięcie musi być wyrównane pod linią z ✅. Podawaj klikalne ścieżki względne (np. `app/...`, `resources/...`, `routes/...`).
-- Granularność: oznaczaj status na najniższym poziomie (np. 1.1.2.1.4), nie tylko na poziomie nagłówka rodzica. Rodzic może pozostać 🛠️, jeśli część zadań dzieci nadal trwa.
-- Spójność numeracji: nie zmieniaj numerów istniejących zadań i nie twórz nowych „ad-hoc” bez decyzji. Pracuj w obrębie wskazanej FAZY/podsekcji.
-- Weryfikacja przed ✅: przed zmianą na ✅ upewnij się, że kod istnieje i przechodzi podstawowy smoke-check (np. komponent się renderuje, trasa odpowiada, logika działa).
-- Zakres PLIK: wpisuj tylko najważniejsze 3–5 plików dla danego podpunktu – unikaj nadmiernie długich list.
-- Raport po zmianie: po istotnej aktualizacji planu dodaj raport do `_REPORTS` zgodnie z szablonem (`[Punkt_Planu]_REPORT.md`) z listą plików i krótkim opisem zmian.
+## Środowisko Techniczne
 
-Przykład poprawnej zmiany punktu:
+### Stack Technologiczny
+- **Backend**: PHP 8.3 + Laravel 12.x
+- **UI**: Blade + Livewire 3.x + Alpine.js
+- **Build**: Vite 5.4.20 (**TYLKO lokalnie** - nie istnieje na produkcji!)
+- **DB**: MySQL SQL
+- **Cache/Kolejki**: Redis (lub driver database jako fallback)
+- **Import XLSX**: Laravel-Excel (PhpSpreadsheet)
+- **Autoryzacja**: Laravel Socialite (Google Workspace + Microsoft Entra ID) - implementacja na końcu
 
+### 🏗️ Build & Deployment Architecture
+
+**⚠️ KRYTYCZNA ZASADA:** Vite działa TYLKO lokalnie! Produkcja otrzymuje gotowe zbudowane pliki.
+
+**WORKFLOW:**
 ```
-- ❌ 1.1.2.1.4 Recent Activity count (last 24h)
-+ ✅ 1.1.2.1.4 Recent Activity count (last 24h)
-      └──📁 PLIK: app/Http/Livewire/Dashboard/AdminDashboard.php
+[Local Windows]                     [Production Hostido]
+npm run build                       Laravel vite() directive
+  ↓                                   ↓
+public/build/ (hashed assets)       Reads manifest.json
+  ↓                                   ↓
+pscp upload →                       Serves static files
 ```
 
-**UWAGA**: Szczegółowa dokumentacja projektu (Stack, Architektura, Encje) → Zobacz [CLAUDE.md](CLAUDE.md)
+**LOKALNE:** Node.js + Vite 5.4.20 → `npm run build` → Output: `public/build/` (hashed + manifest)
+**PRODUKCJA:** Brak Node.js/Vite/npm → TYLKO zbudowane pliki z lokalnej maszyny
+
+### 🚨 KRYTYCZNE: Vite Manifest - Dwie Lokalizacje!
+
+**PROBLEM:** Laravel wymaga manifestu w `public/build/manifest.json` (ROOT), ale Vite tworzy w `.vite/manifest.json` (subdirectory)
+
+**Lokalizacje:**
+```
+public/build/
+├── .vite/manifest.json          ❌ IGNOROWANE przez Laravel
+└── manifest.json                ✅ WYMAGANE przez Laravel
+```
+
+**OBJAWY nieprawidłowego deployment:**
+- Build lokalnie działa, upload zakończony, cache wyczyszczony
+- Przeglądarka ładuje STARE pliki CSS/JS
+- Manifest wskazuje na nieistniejące pliki
+
+**ROZWIĄZANIE:**
+
+```powershell
+# ✅ Upload ROOT manifest (MANDATORY)
+pscp -i $HostidoKey -P 64321 "public/build/.vite/manifest.json" host379076@...:public/build/manifest.json
+```
+
+**WERYFIKACJA:**
+```powershell
+plink ... -batch "cat domains/.../public/build/manifest.json | grep components.css"
+# Musi pokazać AKTUALNY hash
+```
+
+**DEPLOYMENT CHECKLIST:**
+
+**⚠️ KRYTYCZNA ZASADA:** Deploy **WSZYSTKIE** `public/build/assets/*` (Vite regeneruje hashe dla WSZYSTKICH plików przy każdym build)
+
+1. ✅ `npm run build` (sprawdź "✓ built in X.XXs")
+2. ✅ Upload ALL assets: `pscp -r public/build/assets/* → remote/assets/`
+3. ✅ Upload manifest do ROOT: `pscp public/build/.vite/manifest.json → remote/build/manifest.json`
+4. ✅ Clear cache: `php artisan view:clear && cache:clear && config:clear`
+5. ✅ HTTP 200 verification (MANDATORY):
+   ```powershell
+   @('app-X.css', 'components-Y.css') | % { curl -I "https://ppm.mpptrade.pl/public/build/assets/$_" }
+   # All must return HTTP 200 - jeśli 404 = incomplete deployment
+   ```
+6. ✅ Screenshot: `node _TOOLS/screenshot_page.cjs 'https://ppm.mpptrade.pl/admin'`
+7. ✅ DevTools Network → verify fresh hashes
+
+**Reference:** `_ISSUES_FIXES/CSS_INCOMPLETE_DEPLOYMENT_ISSUE.md`
+
+### Środowisko Deployment
+- **Domena**: ppm.mpptrade.pl
+- **Hosting**: Hostido.net.pl (shared hosting - **brak Node.js/npm/Vite**)
+- **SSH**: `host379076@host379076.hostido.net.pl:64321` (klucz SSH wymagany)
+- **SSH Key Path**: `D:\OneDrive - MPP TRADE\SSH\Hostido\HostidoSSHNoPass.ppk`
+- **Laravel Root Path**: `domains/ppm.mpptrade.pl/public_html/` (bezpośrednio w public_html, bez podfolderu)
+- **Baza**: `host379076_ppm@localhost` (MariaDB 10.11.13)
+- **PHP**: 8.3.23 (natywnie dostępny)
+- **Composer**: 2.8.5 (preinstalowany)
+- **Node.js/npm**: ❌ NIE DOSTĘPNE (build tylko lokalnie!)
+
+## Architektura Aplikacji
+
+### 🔑 KRYTYCZNA ZASADA: SKU jako Główny Klucz Produktu
+
+**SKU (Stock Keeping Unit) = UNIWERSALNY IDENTYFIKATOR** (zawsze ten sam dla produktu fizycznego, w przeciwieństwie do zmiennych ID w różnych sklepach/ERP)
+
+**ZASADA SKU FIRST:**
+- PRIMARY: Wyszukiwanie, conflict detection, import/export, multi-store sync → SKU
+- SECONDARY/FALLBACK: External IDs
+
+**📖 PRZEWODNIK:** [`_DOCS/SKU_ARCHITECTURE_GUIDE.md`](_DOCS/SKU_ARCHITECTURE_GUIDE.md) - patterns, schema, scenariusze, checklist
+
+---
+
+### System Użytkowników (Hierarchia uprawnień)
+1. **Admin** - pełny dostęp + zarządzanie użytkownikami/sklepami/ERP
+2. **Menadżer** - zarządzanie produktami + eksport + import CSV/ERP
+3. **Redaktor** - edycja opisów/zdjęć + eksport (bez usuwania produktów)
+4. **Magazynier** - panel dostaw (bez rezerwacji z kontenera)
+5. **Handlowiec** - rezerwacje z kontenera (bez widoczności cen zakupu)
+6. **Reklamacje** - panel reklamacji
+7. **Użytkownik** - odczyt + wyszukiwarka
+
+### Kluczowe Encje
+- **Produkty**: SKU (klucz główny), nazwa, kategorie wielopoziomowe, opisy HTML, ceny grupowe, stany magazynowe, warianty
+- **Kategorie**: 5 poziomów zagnieżdżenia (Kategoria→Kategoria4)
+- **Grupy Cenowe**: Detaliczna, Dealer Standard/Premium, Warsztat/Premium, Szkółka-Komis-Drop, Pracownik
+- **Magazyny**: MPPTRADE, Pitbike.pl, Cameraman, Otopit, INFMS, Reklamacje + custom
+- **Sklepy Prestashop**: Multi-store support z dedykowanymi opisami/kategoriami per sklep
+- **Integracje ERP**: Baselinker, Subiekt GT, Microsoft Dynamics
+
+### System Importu/Eksportu
+- **Import XLSX**: Mapowanie kolumn z predefiniowanymi szablonami (POJAZDY/CZĘŚCI)
+- **Kluczowe kolumny**: ORDER, Parts Name, U8 Code, MRF CODE, Qty, Ctn no., Size, Weight, Model, VIN, Engine No.
+- **System kontenerów**: id_kontener + dokumenty odprawy (.zip, .xlsx, .pdf, .xml)
+- **Weryfikacja**: Sprawdzanie poprawności przed eksportem na Prestashop
 
 ## Komendy i Workflow
 
-### Development Workflow
+### Quick Reference
+
+**Development:**
 ```bash
-# Lokalne środowisko development
-php artisan serve
-php artisan migrate
-php artisan db:seed
-
-# Build assets
-npm install
-npm run dev       # Development
-npm run build     # Production
-
-# Testy
-php artisan test
-./vendor/bin/phpunit
+php artisan serve           # Local dev server
+php artisan migrate         # Run migrations
+npm run build              # Build assets
+php artisan test           # Run tests
 ```
 
-### Deployment na Hostido
+**Deployment (Hostido):**
 ```powershell
-# SSH z kluczem PuTTY (ścieżka do klucza)
 $HostidoKey = "D:\OneDrive - MPP TRADE\SSH\Hostido\HostidoSSHNoPass.ppk"
 
-# Test połączenia
-plink -ssh host379076@host379076.hostido.net.pl -P 64321 -i $HostidoKey -batch "php -v"
+# Upload file
+pscp -i $HostidoKey -P 64321 "local/file" host379076@host379076.hostido.net.pl:remote/path
 
-# Deployment commands
-plink -ssh host379076@host379076.hostido.net.pl -P 64321 -i $HostidoKey -batch "cd domains/ppm.mpptrade.pl/public_html && composer install --no-dev"
-
-# Migracje i cache
-plink -ssh host379076@host379076.hostido.net.pl -P 64321 -i $HostidoKey -batch "cd domains/ppm.mpptrade.pl/public_html && php artisan migrate --force && php artisan config:cache"
+# Clear cache
+plink -ssh host379076@host379076.hostido.net.pl -P 64321 -i $HostidoKey -batch `
+  "cd domains/ppm.mpptrade.pl/public_html && php artisan cache:clear"
 ```
 
-### Szybki upload pojedynczych plików (Quick Push)
+**📖 PEŁNY PRZEWODNIK DEPLOYMENT:** [`_DOCS/DEPLOYMENT_GUIDE.md`](_DOCS/DEPLOYMENT_GUIDE.md)
+- Wszystkie komendy SSH/pscp/plink
+- Deployment patterns (single file, multiple files, migrations, assets)
+- Maintenance commands (cache, queue, database)
+- Troubleshooting deployment issues
+- Deployment checklist
 
-- Narzędzie: `_TOOLS/hostido_quick_push.ps1`
-- Zastosowanie: gdy zmieniasz tylko kilka plików (np. Blade/JS/CSS/PHP) i nie potrzebujesz pełnej synchronizacji ani composera.
-- Przykłady:
-  - Pojedynczy widok + odświeżenie cache widoków:
-    `_TOOLS/hostido_quick_push.ps1 -Files @('resources/views/layouts/admin.blade.php') -PostCommand "cd domains/ppm.mpptrade.pl/public_html && php artisan view:clear"`
-  - Kilka plików:
-    `_TOOLS/hostido_quick_push.ps1 -Files @('resources/views/livewire/dashboard/admin-dashboard.blade.php','resources/views/layouts/admin.blade.php') -PostCommand "cd domains/ppm.mpptrade.pl/public_html && php artisan view:clear"`
-  - Klasa PHP (bez komend po stronie serwera):
-    `_TOOLS/hostido_quick_push.ps1 -Files @('app/Http/Controllers/Admin/DashboardController.php')`
+## Kluczowe Funkcjonalności
 
-Uwaga: pełny skrypt deploy (`_TOOLS/hostido_deploy.ps1`) używa przyrostowego `synchronize remote` (wysyła tylko zmienione pliki) i wyklucza `vendor/*`. Opcjonalny `-Command` (np. `composer install`) uruchamiany jest przed końcowym cache, a następnie post-deploy wykonuje się ponownie, aby domknąć cache po instalacji paczek.
+### System Dopasowań Pojazdów
+- **Cechy**: Model, Oryginał, Zamiennik
+- **Format eksportu**: Osobne wpisy dla każdego modelu (Model: X, Model: Y, etc.)
+- **Filtrowanie**: Per sklep Prestashop (globalne modele z możliwością "banowania" na wybranych sklepach)
 
-### Kiedy używać którego trybu (When to use)
+### System Wyszukiwania
+- **Inteligentna wyszukiwarka**: Podpowiedzi, obsługa błędów, literówek
+- **Filtry**: "Wyszukaj dokładnie" vs. przybliżone wyszukiwanie
+- **Domyślny widok**: Statystyki zamiast listy produktów (dopóki nie wyszuka)
 
-- Quick Push: pojedyncze/kilka plików (Blade/JS/CSS/PHP) bez zmian zależności i migracji.
-  - Przykład: `_TOOLS/hostido_quick_push.ps1 -Files @('resources/views/layouts/admin.blade.php') -PostCommand "cd domains/ppm.mpptrade.pl/public_html && php artisan view:clear"`
-- UploadOnly + NoDelete: wiele plików w różnych folderach, bez composer/migracji, bezpieczny (nic nie usuwa po stronie serwera).
-  - Przykład: `_TOOLS/hostido_deploy.ps1 -UploadOnly -NoDelete -Verbose`
-- Pełny deploy + -Command: tylko gdy zmienia się `composer.lock`, są migracje lub istotne zmiany konfiguracji/cache.
-  - Przykład: `_TOOLS/hostido_deploy.ps1 -Verbose -Command "cd domains/ppm.mpptrade.pl/public_html && composer install --no-dev && php artisan migrate --force && php artisan optimize:clear && php artisan config:cache && php artisan route:cache && php artisan view:cache"`
-- Dokumentacja/markdown: Quick Push bez `-PostCommand`.
-- ZAWSZE: unikać pełnego build/deploy jeśli nie jest konieczny; preferować Quick Push lub UploadOnly+NoDelete.
+### Synchronizacja Multi-Store
+- **Status synchronizacji**: Monitoring rozbieżności między aplikacją a Prestashop/ERP
+- **Dedykowane dane per sklep**: Różne opisy, kategorie, cechy
+- **Mapowanie**: Grupy cenowe, magazyny, kategorie między systemami
 
-### Ręczne połączenie SSH
+## Struktura Folderów Projektu
+
+```
+PPM-CC-Laravel/
+├── _init.md                    # Dokumentacja projektu
+├── AGENTS.md                   # Instrukcje dla agentów
+├── dane_hostingu.md           # Dane hostingu i SSH
+├── References/                # Mockupy UI i pliki źródłowe
+│   ├── Dashboard_admin.png
+│   ├── Lista_produktów.png
+│   ├── Produkt_part1.png
+│   ├── ERP_Dashboard.png
+│   └── JK25154D*.xlsx         # Przykładowe pliki importu
+└── [Laravel structure when created]
+```
+
+## Integracje
+
+### Prestashop API
+- Multi-store support
+- Zachowanie struktur katalogów dla zdjęć
+- Weryfikacja zgodności z bazą danych Prestashop 8.x/9.x
+- **KRYTYCZNE**: Sprawdzanie struktury DB: https://github.com/PrestaShop/PrestaShop/blob/8.3.x/install-dev/data/db_structure.sql
+
+### ERP Systems
+- **Baselinker**: Priorytet #1 dla integracji
+- **Subiekt GT**: Import/eksport + mapowanie magazynów
+- **Microsoft Dynamics**: Zaawansowana integracja business
+
+## Zasady Development
+
+### Jakość Kodu
+- **Klasa Enterprise**: Bez skrótów i uproszczeń
+- **Bez hardcode'u**: Wszystko konfigurowane przez admin
+- **Best Practices**: Laravel + Prestashop oficjalna dokumentacja
+- **Bezpieczeństwo**: Walidacja, sanitization, error handling
+
+### 🎨 OBOWIĄZKOWA WERYFIKACJA FRONTEND
+
+**⚠️ KRYTYCZNA ZASADA:** Weryfikuj layout/styles PRZED informowaniem użytkownika!
+
+**WORKFLOW:** Zmiany → Build → Deploy → **PPM Verification Tool** → (jeśli OK) informuj użytkownika
+
+**NARZĘDZIE:** `_TOOLS/full_console_test.cjs` - Console monitoring + screenshots + Livewire check + tab interactions
+
 ```bash
-# Wymaga klucza SSH (HostidoSSHNoPass.ppk)
-ssh -p 64321 host379076@host379076.hostido.net.pl
+# Basic (default: headless, Warianty tab)
+node _TOOLS/full_console_test.cjs
+
+# Custom
+node _TOOLS/full_console_test.cjs "URL" --show --tab=Cechy --no-click
 ```
 
-### Baza Danych
-```bash
-# Migracje
-php artisan migrate
-php artisan migrate:rollback
-php artisan migrate:status
+**MANDATORY dla agentów:**
+- Po deployment CSS/JS/Blade
+- Po Livewire updates
+- PRZED informowaniem o completion
 
-# Seeders
-php artisan db:seed
-php artisan db:seed --class=ProductSeeder
+**📖 PRZEWODNIK:** [`_DOCS/FRONTEND_VERIFICATION_GUIDE.md`](_DOCS/FRONTEND_VERIFICATION_GUIDE.md)
+
+### 🔍 DEBUG LOGGING
+
+**ZASADA:** Development = Extensive logging (`Log::debug()`) → Production = Minimal logging (`Log::info/warning/error`)
+
+**WORKFLOW:** Development + `Log::debug()` → User potwierdza "działa idealnie" → Usuń `Log::debug()` → Final deploy
+
+**📖 PRZEWODNIK:** [`_DOCS/DEBUG_LOGGING_GUIDE.md`](_DOCS/DEBUG_LOGGING_GUIDE.md)
+
+### 🚫 KRYTYCZNE ZASADY CSS
+
+#### ⛔ KATEGORYCZNY ZAKAZ INLINE STYLES
+
+**❌ ZABRONIONE:** `style="..."`, `class="z-[9999]"` (Tailwind arbitrary dla z-index)
+**✅ WYMAGANE:** CSS classes w dedykowanych plikach
+
+```css
+/* resources/css/components/my-component.css */
+.my-component-modal { z-index: 11; background: var(--color-bg-primary); }
 ```
 
-**Funkcjonalności, Integracje, Kolejność Implementacji** → Zobacz [CLAUDE.md](CLAUDE.md)
-**Super Admin Account (testing)** → Zobacz [CLAUDE.md](CLAUDE.md) sekcja "Super Admin Account"
-
-### PODSTAWOWE ZASADY
-
-- **Język**: Polski we wszystkich odpowiedziach
-- **Dokumentacja**: Aktualizuj AGENTS.md przy milestone/fix błędów + plan projektu przy ukończonych etapach
-- **Start sesji**: Odczytaj AGENTS.md projektu + Plan_Projektu.md (utwórz jeśli brak)
-- **Git repo**: "wilendar@gmail.com" / "[GITHUB_PASSWORD]" / Token: "[GITHUB_TOKEN]"
-- **Środowisko:** Pracujesz w środowisku Windows z Powershell 7, używasz komendy "pwsh", możesz stosować wszystkie funkcje powershell7 jak kolory, animacje, emojii, pamietaj o kodowaniu UTF-8.
-- **NIGDY** nie hardcodujesz na sztywno wpisanych wartości w kodzie, chyba, że użytkownik Cię o to wyraźnie poprosi.
-- **ZAWSZE** Twórz i aktualizuj listę TODO i pokazuj ją użytkownikowi podczas wykonywania swoich prac.
-
-### ZACHOWAJ PORZĄDEK W PROJEKCIE
-
-- **ZAKAZ** tworzenia plików niezwiązanych z projektem w folderze **root** projektu
-- Każdy typ plików powinien mieć swój wyszczególniony folder, np. pliki .txt, .pdf, .md w folderze "_DOCS"
-- Wszystkie Raporty Agentów powinny się znajdować w Folderze "_AGENT_REPORTS"
-- Wszystkie narzędzia stworzone na potrzeby projektu powinny się znajdować w folderze "_TOOLS"
-- Wszystkie pliki/skrypty testowe powinny znajdować się w folderze "_TEST"
-- Jeżeli występują pliki niesklasyfikowane, lub nie pasujące do powyższych zasad umieść je w Folderze "_OTHER"
-
-### SYSTEM DOKUMENTACJI PRAC AGENTÓW
-
-- **OBOWIĄZKOWY PLIK .md**: Twórz plik `[Nazwa_planu_punkt_planu]_REPORT.md` z podsumowaniem swoich prac
-- **LOKALIZACJA**: Pliki reportów w folderze "_REPORTS"
-- **FORMAT RAPORTU AGENTA**:
-```
-# RAPORT PRACY AGENTA: [punkt_planu_nazwa_punktu]
-**Data**: [YYYY-MM-DD HH:MM]
-**Zadanie**: [krótki opis zadania]
-
-## ✅ WYKONANE PRACE
-- Lista wykonanych zadań
-- Ścieżki do utworzonych/zmodyfikowanych plików
-- Krótkie opisy zmian
-
-## ⚠️ PROBLEMY/BLOKERY
-- Lista napotkanych problemów
-- Nierozwiązane kwestie wymagające uwagi
-
-## 📋 NASTĘPNE KROKI
-- Co należy zrobić dalej
-- Zalecenia dla kolejnych agentów
-
-## 📁 PLIKI
-- [nazwa_pliku.ext] - [opis zmian]
-- [folder/nazwa_pliku.ext] - [opis zmian]
+```html
+<div class="my-component-modal">...</div>
 ```
 
-- **PLAN**: Zawsze twórz plan wg. następującego szablonu:
+#### 🚨 VITE MANIFEST - NOWE PLIKI CSS
 
-  **KRYTYCZNE** twórz odnośnik do pliku z kodem do podpunktu WYŁĄCZNIE PO UKOŃCZENIU ZADANIA ✅ - NIGDY PRZED: 
-          └──📁 PLIK: adres/do/pliku.cs
+**PROBLEM:** Laravel Vite helper ma problemy z caching manifestu przy NOWYCH plikach CSS → `ViteException: Unable to locate file`
 
-```
-# ❌ 1. ETAP 1
-## 	❌ 1.1 Zadanie Etapu 1
-### 	❌ 1.1.1 Podzadanie do zadania etapu 1
-			❌ 1.1.1.1 Podzadanie do podzadania do zadania etapu
-				❌ 1.1.1.1.1 Głębokie podzadanie
-```
+**ROZWIĄZANIE:** Dodawaj style do ISTNIEJĄCYCH plików CSS zamiast tworzyć nowe
 
-**UWAAGA!** Plan Tworzysz w Folderze "Plan_Projektu", w tym folderze Każdy ETAP będzie oddzielnym plikiem w którym będą się znajdować szczegółowe i głęboko zagnieżdżone podzadania tego ETAPu. Przekaż agentom jak aktualizować i odczytywać tą strukturę planu.
+**ISTNIEJĄCE PLIKI (bezpieczne):**
+- `resources/css/admin/components.css` - Admin UI
+- `resources/css/admin/layout.css` - Layout/grid
+- `resources/css/products/category-form.css` - Product forms
+- `resources/css/components/category-picker.css` - Pickers
 
-Korzystaj z następujących oznaczeń statusu planu:
-    ❌ Zadanie nie rozpoczęte
-    🛠️ Zadanie rozpoczęte, aktualnie trwają nad nim prace
-    ✅ Zadanie ukończone - DOPIERO TERAZ dodaj └──📁 PLIK: ścieżka/do/utworzonego/pliku (z wcięciem wyrównanym pod ✅)
-    ⚠️ Zadanie z blokerem, odłożone na później, należy do niego wrócić po rozwiązaniu blokera, należy opisać blokera w zadaniu, ze wskazaniem podpunktu w planie który blokuje wykonania tego zadania.
+**PROCES:**
+1. Znajdź odpowiedni istniejący plik
+2. Dodaj sekcję z komentarzem
+3. Zdefiniuj CSS classes (NIGDY inline!)
+4. Build + deploy + clear cache
 
-### NARZĘDZIA AI
+**NOWY PLIK:** Tylko dla dużych modułów (>200 linii) + po konsultacji + test na produkcji
 
-- **Lokalizacja**: `D:\OneDrive - MPP TRADE\Skrypty\Narzędzia_AI\`
-- **Struktura**: `nazwa_narzędzia/` + `nazwa_narzędzia.py` + `README.md`
-- **Nazwy**: `explore_*`, `create_*`, `analyze_*`, `migrate_*`, `backup_*`, `test_*`
-- **Bezpieczeństwo**: Try-catch + timeout + hash passwords + walidacja
-- **Po reorganizacji**: Test imports + requirements.txt + dokumentacja + test uruchomienia
+**SPÓJNOŚĆ:** Używaj `var(--color-primary)`, `.enterprise-card`, `.tabs-enterprise`, `.btn-enterprise-*`
 
-### POWERSHELL - POLSKIE ZNAKI
+**📖 PRZEWODNIK:** [`_DOCS/CSS_STYLING_GUIDE.md`](_DOCS/CSS_STYLING_GUIDE.md)
 
-- **BŁĄD**: PowerShell błędy z ąęćńóśźż → "Missing argument", "Unexpected token"  
-- **ROZWIĄZANIE**: NIGDY polskie znaki → ASCII (ą→a, ę→e, ć→c, ń→n, ó→o, ś→s, ź/ż→z)
-- **Kodowanie**: UTF-8 bez BOM dla .ps1, testuj składnię
+### Issues & Fixes
 
-### PLIKI & WERSJE
+**📁 LOKALIZACJA**: `_ISSUES_FIXES/` - Raporty znanych problemów i rozwiązań
 
-- **NIE TWÓRZ** wielu wersji tego samego pliku! (build_v1.ps1, build_v2.ps1, etc.)
-- **Jeden plik** na funkcjonalność
+**🔥 Krytyczne:**
+- [wire:snapshot](_ISSUES_FIXES/LIVEWIRE_WIRE_SNAPSHOT_ISSUE.md) - Surowy kod zamiast UI
+- [wire:poll + conditional rendering](_ISSUES_FIXES/LIVEWIRE_WIRE_POLL_CONDITIONAL_RENDERING_ISSUE.md) - Nie działa w conditional
+- [x-teleport + wire:id](_ISSUES_FIXES/LIVEWIRE_X_TELEPORT_WIRE_ID_ISSUE.md) - wire:click wymaga wire:id
+- [DI Conflict](_ISSUES_FIXES/LIVEWIRE_DEPENDENCY_INJECTION_ISSUE.md) - Non-nullable properties w Livewire 3.x
+- [Livewire Events](_ISSUES_FIXES/LIVEWIRE_EMIT_DISPATCH_ISSUE.md) - emit() → dispatch()
+- [CSS Incomplete Deploy](_ISSUES_FIXES/CSS_INCOMPLETE_DEPLOYMENT_ISSUE.md) - Partial upload = brak stylów
 
-### KODOWANIE UTF-8
+**🎨 UI/UX:**
+- [CSS Stacking](_ISSUES_FIXES/CSS_STACKING_CONTEXT_ISSUE.md) - z-index conflicts
+- [Category Picker](_ISSUES_FIXES/CATEGORY_PICKER_CROSS_CONTAMINATION_ISSUE.md) - Cross-contamination
+- [Sidebar Layout](_ISSUES_FIXES/SIDEBAR_GRID_LAYOUT_FIX.md) - Grid solution
 
-- **PowerShell z polskimi**: UTF-8 z BOM, `$PSDefaultParameterValues['Out-File:Encoding'] = 'utf8BOM'`
-- **Python**: `# -*- coding: utf-8 -*-`
+**🔧 Development:**
+- [Debug Logging](_ISSUES_FIXES/DEBUG_LOGGING_BEST_PRACTICES.md) - Dev vs production
+- [Vite Manifest](_ISSUES_FIXES/VITE_MANIFEST_NEW_CSS_FILES_ISSUE.md) - Nowe pliki CSS
+- [CSS Import](_ISSUES_FIXES/CSS_IMPORT_MISSING_FROM_LAYOUT.md) - Brak w `@vite()`
 
-### KRYTYCZNE ZASADY RAPORTOWANIA AGENTÓW
+**💡 Quick Reference:**
 
-- **DOKŁADNOŚĆ POSTĘPU**: Agents MUSZĄ raportować dokładnie które podpunkty ukończone vs nieukończone
-- **ZAKAZ**: NIE MOŻESZ raportować ukończenia całego etapu jeśli jakiekolwiek sekcje mają status ❌
-- **STATUS ✅**: TYLKO dla faktycznie zrealizowanych zadań z działającym kodem/testami
-- **PLIKI**: Dodawanie `└──📁 PLIK: ścieżka/do/pliku` TYLKO po rzeczywistym ukończeniu (z wcięciem wyrównanym pod ✅)
-- **PLAN**: W planie aktualizuj ❌→🛠️ gdy rozpoczynasz, 🛠️→✅ gdy faktycznie ukończysz
-
-**PRZYKŁAD PRAWIDŁOWEGO RAPORTOWANIA:**
-
-```
-**Status ETAPU:** 🛠️ W TRAKCIE - ukończone 2.1.1, 2.1.2 z 7 głównych sekcji (29% complete)
-```
-
-**PRZYKŁAD BŁĘDNEGO RAPORTOWANIA (NIEDOZWOLONE):**
-
-```
-**Status ETAP_02**: ✅ **UKOŃCZONY** ← 🚫 BŁĄD! Większość sekcji ma status ❌
+```php
+// ❌ BŁĘDY
+Route::get('/path', Component::class); // → Use: fn() => view('wrapper')
+$this->emit('event'); // → Use: $this->dispatch('event')
+style="z-index: 9999;" // → Use: CSS classes
+class="z-[9999]" // → Use: CSS classes
+// @if conditional inside wire:poll // → Put wire:poll OUTSIDE conditionals
+<template x-teleport><button wire:click>... // → Use Alpine click with $wire
+public int $progressId; // → Use: public ?int $progressId = null;
+pscp "components-X.css" // → Use: pscp -r "public/build/assets/*"
 ```
 
-### INNE
+### System Planowania
+- Plan w folderze `Plan_Projektu/` - każdy etap osobny plik
+- Statusy: ❌ (nie rozpoczęte), 🛠️ (w trakcie), ✅ (ukończone), ⚠️ (zablokowane)
+- Raporty agentów w `_AGENT_REPORTS/`
 
-- **Autor**: Kamil Wiliński (nie Claude AI)
-- **Środowisko**: Windows + PowerShell 7 (nie WSL/Linux)
+### Kolejność Implementacji
+1. ✅ Backend fundament + modele - COMPLETED
+2. ✅ Dashboard + Panel produktów - COMPLETED
+3. ✅ Panel admina (FAZA A, B, C) - COMPLETED
+4. ⏳ Integracja Baselinker - IN PROGRESS
+5. API Prestashop
+6. Frontend z prawdziwymi danymi
+7. System dostaw (przyszłość)
+8. System reklamacji (przyszłość)
+n### FAZA C: System Administration - COMPLETED 2025-01-09
+- ✅ SystemSettings - Centralized application configuration
+- ✅ BackupManager - Automated backup system z monitoring
+- ✅ DatabaseMaintenance - Maintenance tools i health monitoring
+- ✅ Enterprise Security - Encrypted settings i audit trail
+- 📍 **Routes**: /admin/system-settings, /admin/backup, /admin/maintenance
 
+## Uwagi Specjalne
+- **Hosting data**: [dane_hostingu.md](dane_hostingu.md)
+- **Laravel path**: `/domains/ppm.mpptrade.pl/public_html/` (bezpośrednio w public_html)
+- **Workflow**: Lokalne dev → deploy SSH → test https://ppm.mpptrade.pl
+- **Environment**: Windows + PowerShell 7 (unikać polskich znaków)
+- **Zakazy**: Wersje plików (_v1, _v2), hardcoded values, mock data
+- **OAuth**: Ostatni krok implementacji
 
+## 🤖 SYSTEM AGENTÓW CLAUDE CODE
 
+**STATUS:** ✅ 13 agentów aktywnych (`.claude/agents/`, raporty: `_AGENT_REPORTS/`)
 
+**Core (5):** architect, ask, debugger, coding-style-agent, documentation-reader
+**Domain (8):** laravel-expert, livewire-specialist, prestashop-api-expert, erp-integration-expert, import-export-specialist, deployment-specialist, frontend-specialist
+
+**Workflow:**
+- New Feature: architect → docs → specialist → coding-style → deploy
+- Bug Fix: debugger → specialist → coding-style
+- ETAP: architect → specialists → deployment → status update
+
+**ZASADY:**
+1. Agents dla non-trivial tasks
+2. JEDEN agent in_progress
+3. MANDATORY reports w `_AGENT_REPORTS/`
+4. coding-style-agent PRZED completion
+5. Context7 integration MANDATORY
+
+**📖 PRZEWODNIK:** [`_DOCS/AGENT_USAGE_GUIDE.md`](_DOCS/AGENT_USAGE_GUIDE.md)
+
+## 🎯 CLAUDE CODE SKILLS
+
+**STATUS:** ✅ 9 Skills aktywnych (`C:\Users\kamil\.claude\skills\`)
+
+**Skills (model-invoked capabilities):**
+1. **hostido-deployment** - Auto deploy to production
+2. **livewire-troubleshooting** - Known issues diagnosis (9 patterns)
+3. **frontend-verification** - ⚠️ MANDATORY UI screenshots
+4. **agent-report-writer** - ⚠️ MANDATORY reports in `_AGENT_REPORTS/`
+5. **project-plan-manager** - Plan tracking z emoji statusy
+6. **context7-docs-lookup** - ⚠️ MANDATORY docs verification
+7. **issue-documenter** - Complex issues (>2h debug)
+8. **debug-log-cleanup** - Production cleanup po confirmation
+9. **ppm-architecture-compliance** - ⚠️ MANDATORY PPM docs check
+
+**ZASADY:**
+- ppm-architecture-compliance MANDATORY przed PPM features
+- agent-report-writer MANDATORY po completion
+- context7-docs-lookup MANDATORY przed new patterns
+- frontend-verification MANDATORY przed UI completion
+
+**📖 PRZEWODNIK:** [`_DOCS/SKILLS_USAGE_GUIDE.md`](_DOCS/SKILLS_USAGE_GUIDE.md)
+
+## 📚 CONTEXT7 INTEGRATION
+
+**STATUS:** ✅ Connected - API: `ctx7sk-dea6...675c3` - Coverage: 100% agentów
+
+**Biblioteki:**
+
+- Laravel 12.x: `/websites/laravel_12_x` (4927 snippets, trust 7.5)
+- Livewire 3.x: `/livewire/livewire` (867 snippets, trust 7.4)
+- Alpine.js: `/alpinejs/alpine` (364 snippets, trust 6.6)
+- PrestaShop: `/prestashop/docs` (3289 snippets, trust 8.2)
+
+**ZASADY:**
+1. PRZED implementacją: `mcp__context7__get-library-docs`
+2. ZAWSZE weryfikuj patterns
+3. Używaj właściwych library IDs
+
+**📖 PRZEWODNIK:** [`_DOCS/CONTEXT7_INTEGRATION_GUIDE.md`](_DOCS/CONTEXT7_INTEGRATION_GUIDE.md)
+
+## Super Admin Account
+
+**Testing Account:** `admin@mpptrade.pl / Admin123!MPP` (User ID: 8, wszystkie 47 permissions)
+
+**Admin Routes:** /admin (dashboard), /admin/shops, /admin/integrations, /admin/system-settings, /admin/backup, /admin/maintenance, /admin/notifications, /admin/reports, /admin/api, /admin/customization
+
+**Last Verified:** 2025-09-09 - All operational

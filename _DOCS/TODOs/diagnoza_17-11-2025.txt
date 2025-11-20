@@ -1,0 +1,97 @@
+• Diagnoza jest dość jasna: przyciski z sidepanel zamykają ProductForm dlatego, że są traktowane jak przyciski submit głównego formularza
+  i w efekcie wywoływany jest save() → saveAndClose() → redirect.
+
+  1. Główny powód – domyślny type="submit"
+
+  - Główny formularz ma wire:submit.prevent="save"
+    resources/views/livewire/products/management/product-form.blade.php:96:
+
+    <form wire:submit.prevent="save">
+  - W sidepanelu przyciski nie mają typu, więc w HTML ich domyślny typ to submit:
+    resources/views/.../product-form.blade.php:1793-1833:
+
+    <button
+        wire:click="bulkUpdateShops"
+        class="btn-enterprise-secondary w-full py-3"
+        x-data="jobCountdown(...">
+        ...
+    </button>
+    oraz 1837-1877 dla bulkPullFromShops.
+  - save() w komponencie Livewire (app/Http/Livewire/Products/Management/ProductForm.php:2915) robi tylko:
+
+    public function save(): void
+    {
+        $this->saveAndClose();
+    }
+  - A saveAndClose() (3896+) po saveAllPendingChanges() robi redirect:
+
+    if (empty($this->getErrorBag()->all())) {
+        return redirect('/admin/products');
+    }
+  - Efekt: kliknięcie „Aktualizuj sklepy” / „Wczytaj ze sklepów”:
+      1. wywołuje wire:submit.prevent="save" → saveAndClose() → redirect do listy produktów,
+      2. równolegle próbuje wywołać bulkUpdateShops() / bulkPullFromShops(), ale komponent jest już w trakcie zmiany strony, więc
+         użytkownik widzi tylko zamknięcie panelu, bez animacji i odliczania.
+
+  2. Dodatkowe kwestie z odliczaniem / pollingiem
+
+  - Wrapper komponentu ma:
+    resources/views/.../product-form.blade.php:1-7
+
+    <div
+        class="category-form-container"
+        wire:poll.5s="checkJobStatus"
+        @if($activeJobId === null) wire:poll.stop @endif>
+  - Dla bulkPullFromShops() ustawiany jest $activeJobId (batch ID z BulkPullProducts), więc wire:poll działa.
+  - Dla bulkUpdateShops() nie ma $activeJobId (tylko jobCreatedAt, activeJobStatus), więc wire:poll.stop zostaje, a checkJobStatus() od
+    razu robi if (!$this->activeJobId) return;. To nie tłumaczy zamykania panelu, ale oznacza, że nawet po naprawie przycisków polling dla
+    push będzie wyłączony (odliczanie będzie czysto po stronie Alpine).
+
+  ———
+
+  ### Rekomendacje dla agentów
+
+  Frontend-specialist (priorytet: krytyczny dla UI)
+
+  1. W resources/views/livewire/products/management/product-form.blade.php dodać type="button" do obu przycisków sidepanelu:
+      - Aktualizuj sklepy (1793-1833):
+
+        <button
+            type="button"
+            wire:click="bulkUpdateShops"
+            class="btn-enterprise-secondary w-full py-3"
+            x-data="jobCountdown(...">
+      - Wczytaj ze sklepów (1837-1877):
+
+        <button
+            type="button"
+            wire:click="bulkPullFromShops"
+            class="btn-enterprise-secondary w-full py-3"
+            x-data="jobCountdown(...">
+     Dzięki temu kliknięcie nie wywoła wire:submit="save" i nie zamknie panelu.
+     Dzięki temu kliknięcie nie wywoła wire:submit="save" i nie zamknie panelu.
+  2. (Rekomendacja porządkowa) Dla wszystkich przycisków wewnątrz <form wire:submit.prevent="save">, które nie mają być submitami, również
+     ustawić type="button" (np. „Anuluj”, „Przywróć domyślne”, „Aktualizuj aktualny sklep”, „Wczytaj z aktualnego sklepu”), aby uniknąć
+     podobnych efektów ubocznych.
+
+  Livewire-specialist (usprawnienie architektury, nie blokujące)
+
+  3. Rozważyć rozdzielenie:
+      - save() → tylko saveAllPendingChanges() (bez redirectu),
+      - saveAndClose() → saveAllPendingChanges() + redirect.
+        Wtedy nawet jeśli kiedyś jakiś przycisk przez przypadek wywoła submit, nie zamknie natychmiast ProductForm.
+  4. Dla trybu push (bulkUpdateShops()) zdecydować, czy:
+      - usuwamy wire:poll.stop zależne od $activeJobId (polling może działać, ale checkJobStatus() i tak zrobi return przy null),
+      - czy wprowadzamy inne źródło ID / statusu dla monitorowania (np. własna tabela/ID batcha dla push).
+
+  Deployment-specialist / QA
+
+  5. Po wdrożeniu zmiany type="button":
+      - przetestować na produkcji:
+          - klik „Aktualizuj sklepy” i „Wczytaj ze sklepów” nie powinien przełączać na /admin/products,
+          - powinien pojawić się toast („Rozpoczęto…”),
+          - powinien wystartować Alpine countdown (tekst (...Xs) + tło .btn-job-running),
+      - potwierdzić w _TOOLS/full_console_test.cjs brak dodatkowych redirectów oraz poprawne działanie przycisków.
+
+  Po wdrożeniu powyższych poprawek panel ProductForm powinien pozostać otwarty, a animacje/odliczanie dla „Aktualizuj sklepy” i „Wczytaj
+  ze sklepów” zaczną działać zgodnie z założeniami ETAP_13.

@@ -1,5 +1,21 @@
 # ❌ ETAP 09: SYSTEM WYSZUKIWANIA
 
+## PLAN RAMOWY ETAPU
+
+- ❌ 9.1 Analiza i architektura wyszukiwania
+- ❌ 9.2 Modele i migracje wyszukiwania
+- ❌ 9.3 Search Service Layer
+- ❌ 9.4 Search Strategies
+- ❌ 9.5 Query Parser i Search Analyzer
+- ❌ 9.6 Livewire Search Components
+- ❌ 9.7 Search jobs i indeksowanie
+- ❌ 9.8 API search endpoints
+- ❌ 9.9 Testy i dokumentacja
+- ❌ 9.10 Commands i maintenance
+
+---
+
+
 ## 🔍 INSTRUKCJE PRZED ROZPOCZĘCIEM ETAPU
 
 **OBOWIĄZKOWE CZYNNOŚCI:**

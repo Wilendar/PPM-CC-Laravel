@@ -1,5 +1,20 @@
 # ❌ ETAP 10: SYSTEM DOSTAW I KONTENERÓW
 
+## PLAN RAMOWY ETAPU
+
+- ❌ 10.1 Analiza i architektura systemu dostaw
+- ❌ 10.2 Modele i migracje dostaw
+- ❌ 10.3 Shipment Service Layer
+- ❌ 10.4 Location Optimization Service
+- ❌ 10.5 Tracking Service i Courier API
+- ❌ 10.6 Warehouse Mobile API
+- ❌ 10.7 Livewire components dostaw
+- ❌ 10.8 Jobs i automatyzacja
+- ❌ 10.9 Testy i dokumentacja
+
+---
+
+
 ## 🔍 INSTRUKCJE PRZED ROZPOCZĘCIEM ETAPU
 
 **OBOWIĄZKOWE CZYNNOŚCI:**

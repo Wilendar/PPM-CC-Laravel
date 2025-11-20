@@ -1,0 +1,12 @@
+MAILTO=""
+PATH=/usr/local/php74/bin:/home/host379076/.local/bin:/home/host379076/bin:/usr/share/Modules/bin:/usr/local/bin:/usr/bin:/usr/local/sbin:/usr/sbin
+
+# Laravel Queue Worker (fixed - with database driver)
+* * * * * cd /home/host379076/domains/ppm.mpptrade.pl/public_html && /usr/bin/php artisan queue:work database --stop-when-empty --tries=3 --timeout=300 >> storage/logs/queue-worker.log 2>&1
+
+# PrestaShop B2B Filter Indexing
+*/15 * * * * curl -L https://b2b.mpptrade.pl/module/amazzingfilter/cron?token=3e60077824f291f14684612dfda54c1f\&id_shop=1\&action=index-missing
+1 0 * * 5 curl -L https://b2b.mpptrade.pl/module/amazzingfilter/cron?token=3e60077824f291f14684612dfda54c1f\&id_shop=1\&action=index-all
+
+# Laravel Scheduler
+* * * * * cd /home/host379076/domains/ppm.mpptrade.pl/public_html && /usr/bin/php artisan schedule:run >> /dev/null 2>&1

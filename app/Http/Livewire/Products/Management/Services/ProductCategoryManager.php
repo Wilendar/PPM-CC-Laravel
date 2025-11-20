@@ -3,6 +3,7 @@
 namespace App\Http\Livewire\Products\Management\Services;
 
 use App\Models\Product;
+use App\Models\ProductShopData;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\DB;
 
@@ -84,7 +85,7 @@ class ProductCategoryManager
 
     /**
      * Load shop-specific categories from database
-     * UPDATED 2025-10-13: Uses new shop_id column in product_categories pivot
+     * FIX 2025-11-20: Read from product_shop_data.category_mappings (Option A) instead of pivot table
      */
     private function loadShopCategories(): void
     {
@@ -92,42 +93,37 @@ class ProductCategoryManager
             return;
         }
 
-        // Get all per-shop categories using new architecture (shop_id in pivot)
-        $allShopCategories = $this->component->product->allCategoriesGroupedByShop();
+        // FIX 2025-11-20: Load from product_shop_data.category_mappings (NEW Option A architecture)
+        // Get all ProductShopData records for this product
+        $shopDataRecords = ProductShopData::where('product_id', $this->component->product->id)
+            ->whereNotNull('shop_id')
+            ->get();
 
-        Log::debug('loadShopCategories: Raw data from allCategoriesGroupedByShop()', [
-            'product_id' => $this->component->product->id,
-            'default_count' => $allShopCategories['default']->count(),
-            'shops_keys' => array_keys($allShopCategories['shops']),
-            'full_data' => $allShopCategories,
-        ]);
+        foreach ($shopDataRecords as $shopData) {
+            if (!empty($shopData->category_mappings)) {
+                // CategoryMappingsCast auto-deserializes JSON to Option A structure
+                $categoryMappings = $shopData->category_mappings;
 
-        foreach ($allShopCategories['shops'] as $shopId => $categories) {
-            $selectedIds = $categories->pluck('id')->toArray();
+                $this->component->shopCategories[$shopData->shop_id] = [
+                    'selected' => $categoryMappings['ui']['selected'] ?? [],
+                    'primary' => $categoryMappings['ui']['primary'] ?? null,
+                    'mappings' => $categoryMappings['mappings'] ?? [], // ETAP_07b: PPM ID → PrestaShop ID mappings
+                ];
 
-            // Find primary category for this shop
-            $primaryCategory = $categories->first(function ($category) {
-                return $category->pivot->is_primary === 1 || $category->pivot->is_primary === true;
-            });
-
-            $this->component->shopCategories[$shopId] = [
-                'selected' => $selectedIds,
-                'primary' => $primaryCategory?->id,
-            ];
-
-            Log::debug('loadShopCategories: Shop data loaded', [
-                'product_id' => $this->component->product->id,
-                'shop_id' => $shopId,
-                'selected_ids' => $selectedIds,
-                'primary_id' => $primaryCategory?->id,
-                'component_shopCategories_after' => $this->component->shopCategories[$shopId],
-            ]);
+                Log::debug('loadShopCategories: Loaded from product_shop_data.category_mappings', [
+                    'product_id' => $this->component->product->id,
+                    'shop_id' => $shopData->shop_id,
+                    'selected' => $this->component->shopCategories[$shopData->shop_id]['selected'],
+                    'primary' => $this->component->shopCategories[$shopData->shop_id]['primary'],
+                    'mappings_count' => count($this->component->shopCategories[$shopData->shop_id]['mappings']),
+                ]);
+            }
         }
 
-        Log::info('Shop categories loaded (NEW ARCHITECTURE)', [
+        Log::info('Shop categories loaded (Option A Architecture)', [
             'product_id' => $this->component->product->id,
             'shops_with_categories' => array_keys($this->component->shopCategories),
-            'architecture' => 'shop_id in product_categories pivot',
+            'architecture' => 'product_shop_data.category_mappings JSON',
             'final_shopCategories' => $this->component->shopCategories,
         ]);
     }
@@ -408,6 +404,18 @@ class ProductCategoryManager
      */
     private function syncShopCategories(): void
     {
+        // FIX 2025-11-20 (ETAP_07b): DISABLED - Shop categories now stored in product_shop_data.category_mappings
+        // OLD ARCHITECTURE: product_categories table with shop_id column (DEPRECATED)
+        // NEW ARCHITECTURE: product_shop_data.category_mappings JSON (Option A canonical format)
+        // Shop categories are saved by ProductForm::savePendingChangesToShop() using CategoryMappingsConverter
+        Log::debug('[ETAP_07b] syncShopCategories() SKIPPED - using category_mappings JSON', [
+            'product_id' => $this->component->product->id ?? 'NO_PRODUCT',
+            'shop_count' => count($this->component->shopCategories),
+            'reason' => 'ETAP_07b new architecture',
+        ]);
+        return;
+
+        // OLD CODE BELOW (DISABLED 2025-11-20)
         foreach ($this->component->shopCategories as $shopId => $shopCategoryData) {
             $selectedCategories = $shopCategoryData['selected'] ?? [];
             $primaryCategoryId = $shopCategoryData['primary'] ?? null;

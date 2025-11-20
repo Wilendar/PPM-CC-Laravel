@@ -8,16 +8,26 @@ use App\Models\ProductType;
 use App\Models\Category;
 use App\Models\PrestaShopShop;
 use App\Models\ProductAttribute;
+use App\Models\PriceGroup;
+use App\Models\Warehouse;
+use App\Models\ProductPrice;
+use App\Models\ProductStock;
+use App\Models\ProductShopData;  // ETAP_13: Bulk sync status tracking
 use App\Services\PrestaShop\PrestaShopClientFactory;
+use App\Services\CategoryMappingsConverter;  // FIX #12: Category mappings Option A
 use App\Http\Livewire\Products\Management\Traits\ProductFormValidation;
 use App\Http\Livewire\Products\Management\Traits\ProductFormUpdates;
 use App\Http\Livewire\Products\Management\Traits\ProductFormComputed;
+use App\Http\Livewire\Products\Management\Traits\ProductFormShopTabs;
 use App\Http\Livewire\Products\Management\Services\ProductMultiStoreManager;
 use App\Http\Livewire\Products\Management\Services\ProductCategoryManager;
 use App\Http\Livewire\Products\Management\Services\ProductFormSaver;
 use App\Jobs\PrestaShop\SyncProductToPrestaShop;
+use App\Jobs\PrestaShop\BulkSyncProducts; // ETAP_13 - Bulk sync operations
+use App\Jobs\PrestaShop\BulkPullProducts; // ETAP_13 - Bulk pull operations
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 /**
@@ -40,6 +50,22 @@ class ProductForm extends Component
     use ProductFormValidation;
     use ProductFormUpdates;
     use ProductFormComputed;
+    use ProductFormShopTabs;
+
+    /*
+    |--------------------------------------------------------------------------
+    | LIVEWIRE EVENT LISTENERS (FIX #12)
+    |--------------------------------------------------------------------------
+    */
+
+    /**
+     * Livewire event listeners
+     *
+     * @var array
+     */
+    protected $listeners = [
+        'shop-categories-reloaded' => 'handleCategoriesReloaded',
+    ];
 
     /*
     |--------------------------------------------------------------------------
@@ -80,6 +106,56 @@ class ProductForm extends Component
     public ?float $length = null;
     public float $tax_rate = 23.00;
 
+    // === TAX RATE PROPERTIES (FAZA 5.2 - 2025-11-14) ===
+
+    /**
+     * Tax rate overrides per shop (indexed by shop_id)
+     *
+     * Format: [shop_id => float|null]
+     * NULL value = use product default (no override)
+     *
+     * @var array<int, float|null>
+     */
+    public array $shopTaxRateOverrides = [];
+
+    /**
+     * Selected tax rate option (dropdown state)
+     *
+     * Values:
+     * - 'use_default' - Use PPM product default
+     * - 'prestashop_23' - Use PrestaShop 23% mapping
+     * - 'prestashop_8' - Use PrestaShop 8% mapping
+     * - 'prestashop_5' - Use PrestaShop 5% mapping
+     * - 'prestashop_0' - Use PrestaShop 0% mapping
+     * - 'custom' - Use custom value (customTaxRate property)
+     *
+     * @var string
+     */
+    public string $selectedTaxRateOption = 'use_default';
+
+    /**
+     * Custom tax rate value (when selectedTaxRateOption === 'custom')
+     *
+     * @var float|null
+     */
+    public ?float $customTaxRate = null;
+
+    /**
+     * Available tax rule groups per shop (cached from PrestaShop)
+     *
+     * Format: [shop_id => [['rate' => float, 'label' => string, 'prestashop_group_id' => int]]]
+     *
+     * @var array
+     */
+    public array $availableTaxRuleGroups = [];
+
+    /**
+     * Tax rule groups cache timestamp (prevent excessive API calls)
+     *
+     * @var array<int, int> [shop_id => timestamp]
+     */
+    public array $taxRuleGroupsCacheTimestamp = [];
+
     // === PUBLISHING SCHEDULE ===
     public ?string $available_from = null;
     public ?string $available_to = null;
@@ -100,6 +176,12 @@ class ProductForm extends Component
     public array $defaultData = [];     // Original product data
     public bool $showShopSelector = false;
     public array $selectedShopsToAdd = [];
+
+    // === PRICES & STOCK (2025-11-07 PROBLEM #4) ===
+    public array $prices = [];  // [price_group_id => ['net' => float, 'gross' => float, 'margin' => float, 'is_active' => bool]]
+    public array $stock = [];   // [warehouse_id => ['quantity' => int, 'reserved' => int, 'minimum' => int]]
+    public array $priceGroups = [];  // Cache of PriceGroup models
+    public array $warehouses = [];   // Cache of Warehouse models
 
     // === UI STATE ===
     public bool $isSaving = false;
@@ -125,6 +207,57 @@ class ProductForm extends Component
     // === PRESTASHOP LAZY LOADING (ETAP_07 FIX) ===
     public array $loadedShopData = []; // Cache loaded shop data from PrestaShop [shopId => {...data}]
     public bool $isLoadingShopData = false; // Loading state indicator
+
+    // === JOB MONITORING (ETAP_13 - 2025-11-17) ===
+    /**
+     * Active job ID for real-time monitoring via wire:poll
+     * NULL when no job is active
+     *
+     * @var int|null
+     */
+    public ?int $activeJobId = null;
+
+    /**
+     * Current status of active job
+     * Values: 'pending'|'processing'|'completed'|'failed'|null
+     *
+     * @var string|null
+     */
+    public ?string $activeJobStatus = null;
+
+    /**
+     * Type of active job (direction indicator)
+     * Values: 'sync' (PPM → PS) | 'pull' (PS → PPM) | null
+     *
+     * @var string|null
+     */
+    public ?string $activeJobType = null;
+
+    /**
+     * ISO8601 timestamp when job was created
+     * Used by Alpine.js for countdown animation (0-60s)
+     *
+     * @var string|null
+     */
+    public ?string $jobCreatedAt = null;
+
+    /**
+     * Final result of job after completion
+     * Values: 'success'|'error'|null
+     *
+     * @var string|null
+     */
+    public ?string $jobResult = null;
+
+    // === CATEGORY VALIDATION (ETAP_07b FAZA 2) ===
+    /**
+     * Category validation status per shop
+     *
+     * Format: [shopId => ['status' => string, 'diff' => array, 'badge' => array, 'tooltip' => string]]
+     *
+     * @var array
+     */
+    public array $categoryValidationStatus = [];
 
     /*
     |--------------------------------------------------------------------------
@@ -157,17 +290,32 @@ class ProductForm extends Component
                 $this->categoryManager = null;
             }
 
+            // PROBLEM #4 (2025-11-07): Load PriceGroups & Warehouses FIRST (before loadProductData)
+            // This MUST be done before loadProductData() because loadProductData() calls
+            // loadProductPrices() and loadProductStock() which need these arrays populated!
+            $this->loadPriceGroupsAndWarehouses();
+
             // Initialize basic mode and product
             if ($product && $product->exists) {
                 $this->product = $product;
                 $this->isEditMode = true;
                 $this->loadProductData();
                 Log::info('Edit mode activated');
+
+                // FAZA 5.2: Load shop tax rate overrides in edit mode
+                $this->loadShopTaxRateOverrides();
             } else {
                 $this->isEditMode = false;
                 $this->setDefaults();
                 Log::info('Create mode activated');
             }
+
+            // FAZA 5.2: Initialize tax rate properties
+            $this->selectedTaxRateOption = $this->selectedTaxRateOption ?? 'use_default';
+            $this->customTaxRate = $this->customTaxRate ?? null;
+            $this->shopTaxRateOverrides = $this->shopTaxRateOverrides ?? [];
+            $this->availableTaxRuleGroups = $this->availableTaxRuleGroups ?? [];
+            $this->taxRuleGroupsCacheTimestamp = $this->taxRuleGroupsCacheTimestamp ?? [];
 
             // Initialize all required arrays for computed properties
             $this->defaultCategories = $this->defaultCategories ?? ['selected' => [], 'primary' => null];
@@ -231,6 +379,446 @@ class ProductForm extends Component
 
     /*
     |--------------------------------------------------------------------------
+    | TAX RATE MANAGEMENT (FAZA 5.2 - 2025-11-14)
+    |--------------------------------------------------------------------------
+    */
+
+    /**
+     * Load tax rate overrides from product_shop_data for all shops
+     *
+     * Called during mount() in edit mode
+     *
+     * @return void
+     */
+    protected function loadShopTaxRateOverrides(): void
+    {
+        if (!$this->product) {
+            return;
+        }
+
+        foreach ($this->product->shopData as $shopData) {
+            $shopId = $shopData->shop_id;
+
+            // Load tax rate override
+            $this->shopTaxRateOverrides[$shopId] = $shopData->tax_rate_override;
+
+            // ✅ FIX: Load PrestaShop tax rules for this shop
+            $this->loadTaxRuleGroupsForShop($shopId);
+
+            // [FAZA 5.2 DEBUG 2025-11-14] Check if loadTaxRuleGroupsForShop is called
+            Log::debug('[FAZA 5.2 DEBUG] loadShopTaxRateOverrides - shop iteration', [
+                'shop_id' => $shopId,
+                'tax_rate_override' => $shopData->tax_rate_override,
+                'availableTaxRuleGroups_isset' => isset($this->availableTaxRuleGroups[$shopId]),
+                'availableTaxRuleGroups_count' => count($this->availableTaxRuleGroups[$shopId] ?? []),
+            ]);
+        }
+
+        Log::debug('[ProductForm FAZA 5.2] Loaded shop tax rate overrides', [
+            'product_id' => $this->product->id,
+            'overrides' => $this->shopTaxRateOverrides,
+            'availableTaxRuleGroups_keys' => array_keys($this->availableTaxRuleGroups),
+        ]);
+    }
+
+    /**
+     * Determine selected tax rate option based on override value
+     *
+     * Matches override value against PrestaShop tax rule groups
+     *
+     * @param int $shopId
+     * @param float $override
+     * @return string 'prestashop_XX' or 'custom'
+     */
+    protected function determineTaxRateOption(int $shopId, float $override): string
+    {
+        $shop = collect($this->availableShops)->firstWhere('id', $shopId);
+
+        if (!$shop) {
+            return 'custom';
+        }
+
+        // Match against PrestaShop tax rule mappings
+        if ($override === 23.00 && ($shop['tax_rules_group_id_23'] ?? null)) {
+            return 'prestashop_23';
+        }
+
+        if ($override === 8.00 && ($shop['tax_rules_group_id_8'] ?? null)) {
+            return 'prestashop_8';
+        }
+
+        if ($override === 5.00 && ($shop['tax_rules_group_id_5'] ?? null)) {
+            return 'prestashop_5';
+        }
+
+        if ($override === 0.00 && ($shop['tax_rules_group_id_0'] ?? null)) {
+            return 'prestashop_0';
+        }
+
+        return 'custom';
+    }
+
+    /**
+     * Load available tax rule groups for shop from PrestaShop
+     *
+     * Uses TaxRateService with 15min cache
+     *
+     * @param int $shopId
+     * @return void
+     */
+    public function loadTaxRuleGroupsForShop(int $shopId): void
+    {
+        // [FAZA 5.2 DEBUG 2025-11-14] Track method calls
+        Log::debug('[FAZA 5.2 DEBUG] loadTaxRuleGroupsForShop CALLED', [
+            'shop_id' => $shopId,
+            'caller' => debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 2)[1]['function'] ?? 'unknown',
+        ]);
+
+        // Check cache timestamp (15min = 900 seconds)
+        $now = time();
+        $cacheValid = isset($this->taxRuleGroupsCacheTimestamp[$shopId])
+            && ($now - $this->taxRuleGroupsCacheTimestamp[$shopId]) < 900;
+
+        if ($cacheValid && isset($this->availableTaxRuleGroups[$shopId])) {
+            Log::debug('[ProductForm FAZA 5.2] Using cached tax rule groups', ['shop_id' => $shopId]);
+            return;
+        }
+
+        try {
+            $shop = collect($this->availableShops)->firstWhere('id', $shopId);
+
+            if (!$shop) {
+                Log::warning('[ProductForm FAZA 5.2] Shop not found for tax rule groups', ['shop_id' => $shopId]);
+                return;
+            }
+
+            // Get PrestaShopShop model instance
+            $shopModel = \App\Models\PrestaShopShop::find($shopId);
+
+            if (!$shopModel) {
+                Log::warning('[ProductForm FAZA 5.2] PrestaShopShop model not found', ['shop_id' => $shopId]);
+                return;
+            }
+
+            // Use TaxRateService
+            $taxRateService = app(\App\Services\TaxRateService::class);
+            $this->availableTaxRuleGroups[$shopId] = $taxRateService->getAvailableTaxRatesForShop($shopModel);
+            $this->taxRuleGroupsCacheTimestamp[$shopId] = $now;
+
+            Log::info('[ProductForm FAZA 5.2] Loaded tax rule groups from PrestaShop', [
+                'shop_id' => $shopId,
+                'groups_count' => count($this->availableTaxRuleGroups[$shopId]),
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('[ProductForm FAZA 5.2] Failed to load tax rule groups', [
+                'shop_id' => $shopId,
+                'error' => $e->getMessage(),
+            ]);
+
+            // Fallback: Empty array
+            $this->availableTaxRuleGroups[$shopId] = [];
+        }
+    }
+
+    /**
+     * Livewire reactive update: selectedTaxRateOption changed
+     *
+     * When user selects dropdown option, update tax_rate or shopTaxRateOverrides
+     *
+     * @param string $value
+     * @return void
+     */
+    public function updatedSelectedTaxRateOption(string $value): void
+    {
+        // [FAZA 5.2 DEBUG SAVE 2025-11-14] Layer 1: UI Binding Successful
+        Log::debug('[FAZA 5.2 DEBUG SAVE] Tax rate option changed', [
+            'new_value' => $value,
+            'active_shop_id' => $this->activeShopId,
+            'current_shopTaxRateOverrides' => $this->shopTaxRateOverrides,
+        ]);
+
+        if ($this->activeShopId === null) {
+            // Default mode - update products.tax_rate
+            Log::debug('[FAZA 5.2 DEBUG SAVE] Entering DEFAULT mode branch', [
+                'activeShopId' => $this->activeShopId,
+            ]);
+            $this->updateDefaultTaxRate($value);
+        } else {
+            // Shop mode - update shopTaxRateOverrides
+            Log::debug('[FAZA 5.2 DEBUG SAVE] Entering SHOP mode branch', [
+                'activeShopId' => $this->activeShopId,
+            ]);
+            $this->updateShopTaxRateOverride($this->activeShopId, $value);
+        }
+
+        // FAZA 5.2 FIX: Force Livewire to re-render tax rate indicator & field class
+        // getTaxRateIndicator() and getTaxRateFieldClass() are NOT Livewire computed properties
+        // so they don't auto-update when $shopTaxRateOverrides changes
+        $this->dispatch('$refresh');
+
+        Log::debug('[FAZA 5.2 REACTIVITY] Dispatched $refresh after tax rate change', [
+            'active_shop_id' => $this->activeShopId,
+            'new_value' => $value,
+        ]);
+    }
+
+    /**
+     * Update default tax rate (products.tax_rate)
+     *
+     * @param string $option Selected option ('prestashop_XX' or 'custom')
+     * @return void
+     */
+    protected function updateDefaultTaxRate(string $option): void
+    {
+        switch ($option) {
+            case 'custom':
+                // Keep current tax_rate or customTaxRate
+                $this->customTaxRate = $this->tax_rate;
+                break;
+
+            default:
+                // Numeric tax rate value (e.g., "0", "5.00", "8.00", "23.00")
+                // Blade sends: <option value="{{ $taxRule['rate'] }}">
+                if (is_numeric($option)) {
+                    $this->tax_rate = (float) $option;
+                    $this->customTaxRate = null;
+                } else {
+                    Log::warning('[ProductForm FAZA 5.2] Invalid tax rate option', ['option' => $option]);
+                }
+        }
+
+        Log::debug('[ProductForm FAZA 5.2] Updated default tax rate', [
+            'option' => $option,
+            'tax_rate' => $this->tax_rate,
+        ]);
+    }
+
+    /**
+     * Update shop-specific tax rate override
+     *
+     * @param int $shopId
+     * @param string $option Selected option ('use_default', 'prestashop_XX', 'custom')
+     * @return void
+     */
+    protected function updateShopTaxRateOverride(int $shopId, string $option): void
+    {
+        // [FAZA 5.2 DEBUG SAVE 2025-11-14] Layer 2: Reactive Hook Triggered
+        Log::debug('[FAZA 5.2 DEBUG SAVE] BEFORE updateShopTaxRateOverride', [
+            'shop_id' => $shopId,
+            'option' => $option,
+            'current_override' => $this->shopTaxRateOverrides[$shopId] ?? 'NOT SET',
+            'all_overrides' => $this->shopTaxRateOverrides,
+        ]);
+
+        switch ($option) {
+            case 'use_default':
+                // Clear override - use product default
+                $this->shopTaxRateOverrides[$shopId] = null;
+                $this->customTaxRate = null;
+                break;
+
+            case 'custom':
+                // Keep current customTaxRate or shopTaxRateOverrides value
+                if (!isset($this->shopTaxRateOverrides[$shopId])) {
+                    $this->shopTaxRateOverrides[$shopId] = $this->tax_rate; // Fallback to default
+                }
+                $this->customTaxRate = $this->shopTaxRateOverrides[$shopId];
+                break;
+
+            default:
+                // Numeric tax rate value (e.g., "0", "5.00", "8.00", "23.00")
+                // Blade sends: <option value="{{ $taxRule['rate'] }}">
+                if (is_numeric($option)) {
+                    $this->shopTaxRateOverrides[$shopId] = (float) $option;
+                    $this->customTaxRate = null;
+                } else {
+                    Log::warning('[ProductForm FAZA 5.2] Invalid shop tax rate option', ['option' => $option, 'shop_id' => $shopId]);
+                }
+        }
+
+        // [FAZA 5.2 DEBUG SAVE 2025-11-14] Layer 3: Property Updated
+        Log::debug('[FAZA 5.2 DEBUG SAVE] AFTER updateShopTaxRateOverride', [
+            'shop_id' => $shopId,
+            'option' => $option,
+            'new_override' => $this->shopTaxRateOverrides[$shopId] ?? 'NULL',
+            'all_overrides' => $this->shopTaxRateOverrides,
+        ]);
+    }
+
+    /**
+     * Livewire reactive update: customTaxRate changed
+     *
+     * When user enters custom value, update tax_rate or shopTaxRateOverrides
+     *
+     * @param float|null $value
+     * @return void
+     */
+    public function updatedCustomTaxRate(?float $value): void
+    {
+        if ($value === null) {
+            return;
+        }
+
+        if ($this->activeShopId === null) {
+            // Default mode
+            $this->tax_rate = $value;
+        } else {
+            // Shop mode
+            $this->shopTaxRateOverrides[$this->activeShopId] = $value;
+        }
+
+        Log::debug('[ProductForm FAZA 5.2] Custom tax rate updated', [
+            'value' => $value,
+            'active_shop_id' => $this->activeShopId,
+        ]);
+    }
+
+    /**
+     * Get tax rate indicator for shop (green/yellow/red badge)
+     *
+     * Integrates with existing getFieldStatusIndicator() system
+     *
+     * @param int|null $shopId
+     * @return array ['show' => bool, 'class' => string, 'text' => string]
+     */
+    public function getTaxRateIndicator(?int $shopId = null): array
+    {
+        if ($shopId === null) {
+            // Default mode - no indicator
+            return ['show' => false, 'class' => '', 'text' => ''];
+        }
+
+        // Check if shop data has pending sync
+        $shopData = $this->product?->shopData?->where('shop_id', $shopId)->first();
+
+        if ($shopData && $shopData->sync_status === 'pending') {
+            // Pending sync - use standard .pending-sync-badge class (consistent with getFieldStatusIndicator)
+            return [
+                'show' => true,
+                'class' => 'pending-sync-badge',
+                'text' => 'OCZEKUJE NA SYNCHRONIZACJĘ',
+            ];
+        }
+
+        // FAZA 5.2 FIX: Use current form state ($shopTaxRateOverrides), NOT database ($shopData)
+        // This allows real-time indicator updates when user changes dropdown (before save)
+        // CRITICAL: Cast to float for strict type comparison (int 23 !== float 23.0 in in_array!)
+        $effectiveTaxRate = (float) ($this->shopTaxRateOverrides[$shopId] ?? $this->tax_rate);
+
+        // Check if using default (inherited)
+        $isInherited = !isset($this->shopTaxRateOverrides[$shopId]) || $this->shopTaxRateOverrides[$shopId] === null;
+
+        if ($isInherited) {
+            // Using default tax rate from PPM - show green indicator (matches .status-label-inherited)
+            return [
+                'show' => true,
+                'class' => 'status-label-inherited',
+                'text' => 'DZIEDZICZONE',
+            ];
+        }
+
+        // Shop-specific override (not inherited) - check if mapped to PrestaShop
+        $shop = \App\Models\PrestaShopShop::find($shopId);
+        if (!$shop) {
+            return ['show' => false, 'class' => '', 'text' => ''];
+        }
+
+        // Get available tax rules for this shop
+        $availableRates = [];
+        if ($shop->tax_rules_group_id_23) $availableRates[] = 23.00;
+        if ($shop->tax_rules_group_id_8) $availableRates[] = 8.00;
+        if ($shop->tax_rules_group_id_5) $availableRates[] = 5.00;
+        if ($shop->tax_rules_group_id_0) $availableRates[] = 0.00;
+
+        // FAZA 5.2 FIX: Custom override (not "use_default")
+        // Check if rate is mapped to PrestaShop
+        if (in_array($effectiveTaxRate, $availableRates, true)) {
+            // Custom rate that exists in PrestaShop → WŁASNE (orange, matches .status-label-different)
+            Log::debug('[FAZA 5.2 INDICATOR] Custom override mapped to PrestaShop', [
+                'shop_id' => $shopId,
+                'effective_rate' => $effectiveTaxRate,
+                'available_rates' => $availableRates,
+            ]);
+
+            return [
+                'show' => true,
+                'class' => 'status-label-different',
+                'text' => 'WŁASNE',
+            ];
+        }
+
+        // Custom rate NOT mapped to PrestaShop → NIE ZMAPOWANE (use standard class)
+        Log::warning('[FAZA 5.2 INDICATOR] Custom override NOT mapped to PrestaShop', [
+            'shop_id' => $shopId,
+            'effective_rate' => $effectiveTaxRate,
+            'available_rates' => $availableRates,
+        ]);
+
+        return [
+            'show' => true,
+            'class' => 'status-label-unmapped',
+            'text' => 'NIE ZMAPOWANE W PRESTASHOP',
+        ];
+    }
+
+    /**
+     * Get dynamic CSS class for tax rate field based on validation indicator
+     *
+     * Returns color-coded border class:
+     * - Green: tax rate matches PrestaShop mapping (zgodne z default)
+     * - Yellow: tax rate unmapped or override (custom rate)
+     * - Empty: default mode (no dynamic color)
+     *
+     * FAZA 5.2 UI Fix - Dynamic Dropdown Color (2025-11-14)
+     *
+     * @return string CSS class string for <select> element
+     */
+    public function getTaxRateFieldClass(): string
+    {
+        // Base classes consistent with getFieldClasses()
+        $baseClasses = 'block w-full rounded-md shadow-sm focus:ring-orange-500 sm:text-sm transition-all duration-200';
+
+        // Default mode - standard styling (no shop selected)
+        if (!$this->activeShopId) {
+            return $baseClasses . ' border-gray-600 bg-gray-700 text-white focus:border-orange-500';
+        }
+
+        $indicator = $this->getTaxRateIndicator($this->activeShopId);
+
+        // No indicator - standard styling
+        if (!$indicator['show']) {
+            return $baseClasses . ' border-gray-600 bg-gray-700 text-white focus:border-orange-500';
+        }
+
+        // Map indicator badge class to field CSS class (consistent with other form fields)
+        // This ensures label color matches input field color!
+        if (str_contains($indicator['class'], 'pending-sync-badge')) {
+            // Pending sync - orange border (defined in product-form.css)
+            return $baseClasses . ' field-pending-sync';
+        }
+
+        if (str_contains($indicator['class'], 'status-label-inherited')) {
+            // Inherited - green border (defined in product-form.css)
+            return $baseClasses . ' field-status-inherited';
+        }
+
+        if (str_contains($indicator['class'], 'status-label-same')) {
+            // Same as default - green border (defined in product-form.css)
+            return $baseClasses . ' field-status-same';
+        }
+
+        if (str_contains($indicator['class'], 'status-label-different')) {
+            // Custom override - orange border (defined in product-form.css)
+            return $baseClasses . ' field-status-different';
+        }
+
+        // Fallback - standard styling
+        return $baseClasses . ' border-gray-600 bg-gray-700 text-white focus:border-orange-500';
+    }
+
+    /*
+    |--------------------------------------------------------------------------
     | DATA INITIALIZATION
     |--------------------------------------------------------------------------
     */
@@ -285,6 +873,177 @@ class ProductForm extends Component
     }
 
     /**
+     * Load PriceGroups & Warehouses for Prices/Stock tabs
+     *
+     * PROBLEM #4 (2025-11-07): Initialize price groups and warehouses
+     * for the Prices and Stock tabs UI
+     */
+    private function loadPriceGroupsAndWarehouses(): void
+    {
+        try {
+            // Load all active price groups (8 groups)
+            $priceGroupsCollection = PriceGroup::where('is_active', true)
+                                              ->orderBy('sort_order', 'asc')
+                                              ->get();
+
+            $this->priceGroups = $priceGroupsCollection->keyBy('id')->toArray();
+
+            // Load all active warehouses (6 warehouses)
+            $warehousesCollection = Warehouse::where('is_active', true)
+                                            ->orderBy('sort_order', 'asc')
+                                            ->get();
+
+            $this->warehouses = $warehousesCollection->keyBy('id')->toArray();
+
+            // Initialize prices array structure
+            foreach ($this->priceGroups as $groupId => $group) {
+                $this->prices[$groupId] = [
+                    'net' => null,
+                    'gross' => null,
+                    'margin' => null,
+                    'is_active' => true,
+                ];
+            }
+
+            // Initialize stock array structure
+            foreach ($this->warehouses as $warehouseId => $warehouse) {
+                $this->stock[$warehouseId] = [
+                    'quantity' => 0,
+                    'reserved' => 0,
+                    'minimum' => 0,
+                ];
+            }
+
+            Log::info('Price groups and warehouses loaded', [
+                'price_groups_count' => count($this->priceGroups),
+                'warehouses_count' => count($this->warehouses),
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Failed to load price groups and warehouses', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            // Initialize empty arrays on error
+            $this->priceGroups = [];
+            $this->warehouses = [];
+            $this->prices = [];
+            $this->stock = [];
+        }
+    }
+
+    /**
+     * Load product prices from database
+     *
+     * PROBLEM #4 (2025-11-07): Task 6 - Load existing prices for this product
+     */
+    private function loadProductPrices(): void
+    {
+        try {
+            if (!$this->product || !$this->product->exists) {
+                Log::debug('loadProductPrices: No product to load prices for (new product)');
+                return;
+            }
+
+            // Load all prices for this product (no variant filter - master product prices)
+            $existingPrices = $this->product->prices()
+                                          ->whereNull('product_variant_id')
+                                          ->where('is_active', true)
+                                          ->get()
+                                          ->keyBy('price_group_id');
+
+            // Populate $this->prices array with existing data
+            foreach ($this->priceGroups as $groupId => $group) {
+                if (isset($existingPrices[$groupId])) {
+                    $price = $existingPrices[$groupId];
+                    $this->prices[$groupId] = [
+                        'net' => $price->price_net,
+                        'gross' => $price->price_gross,
+                        'margin' => $price->margin_percentage,
+                        'is_active' => $price->is_active,
+                    ];
+                } else {
+                    // Keep initialized null values for price groups without data
+                    $this->prices[$groupId] = [
+                        'net' => null,
+                        'gross' => null,
+                        'margin' => null,
+                        'is_active' => true,
+                    ];
+                }
+            }
+
+            Log::info('Product prices loaded', [
+                'product_id' => $this->product->id,
+                'loaded_prices_count' => $existingPrices->count(),
+                'total_price_groups' => count($this->priceGroups),
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Failed to load product prices', [
+                'product_id' => $this->product?->id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+        }
+    }
+
+    /**
+     * Load product stock from database
+     *
+     * PROBLEM #4 (2025-11-07): Task 7 - Load existing stock for this product
+     */
+    private function loadProductStock(): void
+    {
+        try {
+            if (!$this->product || !$this->product->exists) {
+                Log::debug('loadProductStock: No product to load stock for (new product)');
+                return;
+            }
+
+            // Load all stock for this product (no variant filter - master product stock)
+            $existingStock = $this->product->stock()
+                                         ->whereNull('product_variant_id')
+                                         ->where('is_active', true)
+                                         ->get()
+                                         ->keyBy('warehouse_id');
+
+            // Populate $this->stock array with existing data
+            foreach ($this->warehouses as $warehouseId => $warehouse) {
+                if (isset($existingStock[$warehouseId])) {
+                    $stock = $existingStock[$warehouseId];
+                    $this->stock[$warehouseId] = [
+                        'quantity' => $stock->quantity,
+                        'reserved' => $stock->reserved_quantity,
+                        'minimum' => $stock->minimum_stock_level,
+                    ];
+                } else {
+                    // Keep initialized zero values for warehouses without data
+                    $this->stock[$warehouseId] = [
+                        'quantity' => 0,
+                        'reserved' => 0,
+                        'minimum' => 0,
+                    ];
+                }
+            }
+
+            Log::info('Product stock loaded', [
+                'product_id' => $this->product->id,
+                'loaded_stock_count' => $existingStock->count(),
+                'total_warehouses' => count($this->warehouses),
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Failed to load product stock', [
+                'product_id' => $this->product?->id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+        }
+    }
+
+    /**
      * Load existing product data into form
      */
     private function loadProductData(): void
@@ -335,6 +1094,12 @@ class ProductForm extends Component
                 'shopCategories_after' => $this->shopCategories,
             ]);
         }
+
+        // PROBLEM #4 (2025-11-07): Load prices from database
+        $this->loadProductPrices();
+
+        // PROBLEM #4 (2025-11-07): Load stock from database
+        $this->loadProductStock();
 
         // Store default data
         $this->storeDefaultData();
@@ -675,6 +1440,9 @@ class ProductForm extends Component
             $this->shopCategories[$this->activeShopId] = $categories;
         }
 
+        // Invalidate category validation cache for current shop
+        $this->invalidateCategoryValidationCache();
+
         // Force Livewire component refresh for real-time updates
         $this->dispatch('categories-updated', [
             'shop_id' => $this->activeShopId,
@@ -789,6 +1557,90 @@ class ProductForm extends Component
     }
 
     /**
+     * ETAP_07b FAZA 1: Get PrestaShop category IDs for shop context
+     *
+     * Converts PPM category IDs to PrestaShop IDs using mappings object.
+     * This is critical for rendering checkboxes in shop TAB - we need to compare
+     * PrestaShop IDs (from API tree) with PrestaShop IDs (from mappings).
+     *
+     * For default context, returns PPM IDs as-is.
+     *
+     * @param int|null $contextShopId Shop ID or null for default
+     * @return array PrestaShop category IDs for shop context, PPM IDs for default
+     */
+    public function getPrestaShopCategoryIdsForContext(?int $contextShopId = null): array
+    {
+        if ($contextShopId === null) {
+            // Default context - return PPM IDs as-is
+            return $this->defaultCategories['selected'] ?? [];
+        }
+
+        // Shop-specific context - convert PPM IDs to PrestaShop IDs
+        $ppmIds = $this->shopCategories[$contextShopId]['selected'] ?? [];
+        $mappings = $this->shopCategories[$contextShopId]['mappings'] ?? [];
+
+        // ETAP_07b FIX: Lazy load mappings if missing (Livewire hydration issue)
+        // When Livewire hydrates old state, 'mappings' key doesn't exist
+        // We need to reload it from database
+        if (empty($mappings) && !empty($ppmIds)) {
+            Log::info('[ETAP_07b] Lazy loading mappings (hydration issue)', [
+                'shop_id' => $contextShopId,
+                'ppm_ids' => $ppmIds,
+            ]);
+
+            // Reload category_mappings from database
+            $productShopData = \App\Models\ProductShopData::where('product_id', $this->product->id)
+                ->where('shop_id', $contextShopId)
+                ->first();
+
+            if ($productShopData && !empty($productShopData->category_mappings)) {
+                $categoryMappings = $productShopData->category_mappings;
+                $mappings = $categoryMappings['mappings'] ?? [];
+
+                // Update shopCategories with loaded mappings
+                $this->shopCategories[$contextShopId]['mappings'] = $mappings;
+
+                Log::info('[ETAP_07b] Mappings lazy loaded successfully', [
+                    'shop_id' => $contextShopId,
+                    'mappings_count' => count($mappings),
+                ]);
+            }
+        }
+
+        if (empty($mappings)) {
+            Log::warning('[ETAP_07b] No mappings available after lazy load', [
+                'shop_id' => $contextShopId,
+                'ppm_ids' => $ppmIds,
+            ]);
+            return []; // No mappings = can't show any checkboxes
+        }
+
+        $prestashopIds = [];
+        foreach ($ppmIds as $ppmId) {
+            // Mappings format: {"2": 2, "3": 12, "4": 23}
+            // Keys are PPM IDs (as strings), values are PrestaShop IDs
+            $mappingKey = (string) $ppmId;
+            if (isset($mappings[$mappingKey])) {
+                $prestashopIds[] = (int) $mappings[$mappingKey];
+            } else {
+                Log::debug('[ETAP_07b] PPM category has no PrestaShop mapping', [
+                    'shop_id' => $contextShopId,
+                    'ppm_id' => $ppmId,
+                ]);
+            }
+        }
+
+        Log::debug('[ETAP_07b] Converted PPM IDs to PrestaShop IDs', [
+            'shop_id' => $contextShopId,
+            'ppm_ids' => $ppmIds,
+            'prestashop_ids' => $prestashopIds,
+            'mappings_used' => $mappings,
+        ]);
+
+        return $prestashopIds;
+    }
+
+    /**
      * CONTEXT-AWARE: Get primary category for specific context (shop or default)
      * This method prevents cross-tab contamination in multi-store UI
      */
@@ -801,6 +1653,50 @@ class ProductForm extends Component
 
         // Shop-specific context
         return $this->shopCategories[$contextShopId]['primary'] ?? null;
+    }
+
+    /**
+     * ETAP_07b FAZA 1: Get primary PrestaShop category ID for shop context
+     *
+     * Converts PPM primary category ID to PrestaShop ID.
+     * For default context, returns PPM ID as-is.
+     *
+     * @param int|null $contextShopId Shop ID or null for default
+     * @return int|null PrestaShop category ID for shop context, PPM ID for default
+     */
+    public function getPrimaryPrestaShopCategoryIdForContext(?int $contextShopId = null): ?int
+    {
+        if ($contextShopId === null) {
+            // Default context - return PPM ID
+            return $this->defaultCategories['primary'] ?? null;
+        }
+
+        // Shop-specific context - convert PPM ID to PrestaShop ID
+        $ppmPrimaryId = $this->shopCategories[$contextShopId]['primary'] ?? null;
+
+        if ($ppmPrimaryId === null) {
+            return null;
+        }
+
+        // Get mappings (with lazy loading if needed)
+        $mappings = $this->shopCategories[$contextShopId]['mappings'] ?? [];
+
+        // Lazy load mappings if missing (same logic as getPrestaShopCategoryIdsForContext)
+        if (empty($mappings)) {
+            $productShopData = \App\Models\ProductShopData::where('product_id', $this->product->id)
+                ->where('shop_id', $contextShopId)
+                ->first();
+
+            if ($productShopData && !empty($productShopData->category_mappings)) {
+                $categoryMappings = $productShopData->category_mappings;
+                $mappings = $categoryMappings['mappings'] ?? [];
+                $this->shopCategories[$contextShopId]['mappings'] = $mappings;
+            }
+        }
+
+        // Convert PPM ID to PrestaShop ID
+        $mappingKey = (string) $ppmPrimaryId;
+        return isset($mappings[$mappingKey]) ? (int) $mappings[$mappingKey] : null;
     }
 
     /**
@@ -1153,6 +2049,9 @@ class ProductForm extends Component
             // Switch active shop context
             $this->activeShopId = $shopId;
 
+            // Invalidate category validation cache for new shop context
+            $this->invalidateCategoryValidationCache($shopId);
+
             // Check if target context has pending changes first
             if ($this->hasPendingChangesForCurrent()) {
                 // Load pending changes for this context
@@ -1163,6 +2062,10 @@ class ProductForm extends Component
                     // Switch to default data
                     $this->loadDefaultDataToForm();
                 } else {
+                    // FAZA 5.2 FIX: Load tax rules BEFORE loading form data
+                    // Ensures $availableTaxRuleGroups[$shopId] is populated for dropdown options
+                    $this->loadTaxRuleGroupsForShop($shopId);
+
                     // Switch to shop-specific data with inheritance
                     $this->loadShopDataToForm($shopId);
                 }
@@ -1170,7 +2073,8 @@ class ProductForm extends Component
 
             $this->updateCharacterCounts();
 
-            // ETAP_07 FIX: Auto-load PrestaShop data when switching to shop (if not already loaded)
+            // ROLLBACK 2025-11-20: Removed auto-pull on tab switch (caused issues)
+            // ORIGINAL CODE: Auto-load PrestaShop data when switching to shop (if not already loaded)
             // This fixes the issue where updatedActiveShopId() hook doesn't trigger on PHP-side changes
             if ($shopId !== null && !isset($this->loadedShopData[$shopId]) && $this->isEditMode) {
                 Log::info('Auto-loading PrestaShop data in switchToShop()', [
@@ -1272,6 +2176,43 @@ class ProductForm extends Component
         $this->length = $this->getShopValue($shopId, 'length') ?: $this->length;
         $this->tax_rate = $this->getShopValue($shopId, 'tax_rate') ?: $this->tax_rate;
 
+        // === FAZA 5.2: RELOAD TAX RATE OVERRIDE FROM DATABASE ===
+        // After save, reload from database to show correct value in dropdown
+        $shopData = $this->product?->shopData?->where('shop_id', $shopId)->first();
+
+        Log::debug('[FAZA 5.2 UI RELOAD] loadShopDataToForm called', [
+            'shop_id' => $shopId,
+            'shopData_exists' => $shopData !== null,
+            'tax_rate_override_from_db' => $shopData?->tax_rate_override,
+            'current_selectedTaxRateOption' => $this->selectedTaxRateOption,
+        ]);
+
+        if ($shopData) {
+            $this->shopTaxRateOverrides[$shopId] = $shopData->tax_rate_override;
+
+            // Update dropdown selection to match saved value
+            if ($shopData->tax_rate_override !== null) {
+                // Shop has override - set dropdown to that rate
+                // CRITICAL: Use number_format to match Blade template format (5.00, not 5)
+                $this->selectedTaxRateOption = number_format($shopData->tax_rate_override, 2, '.', '');
+
+                Log::debug('[FAZA 5.2 UI RELOAD] Set dropdown to override value', [
+                    'override' => $shopData->tax_rate_override,
+                    'selectedTaxRateOption' => $this->selectedTaxRateOption,
+                ]);
+            } else {
+                // No override - use default
+                $this->selectedTaxRateOption = 'use_default';
+
+                Log::debug('[FAZA 5.2 UI RELOAD] Set dropdown to use_default', [
+                    'tax_rate_override' => 'NULL',
+                ]);
+            }
+
+            // Force Livewire to sync property changes to UI
+            $this->dispatch('$refresh');
+        }
+
         // === STATUS & SETTINGS ===
         $this->is_active = $this->getShopValue($shopId, 'is_active') ?? $this->is_active;
         $this->is_variant_master = $this->getShopValue($shopId, 'is_variant_master') ?? $this->is_variant_master;
@@ -1279,9 +2220,19 @@ class ProductForm extends Component
         $this->sort_order = $this->getShopValue($shopId, 'sort_order') ?: $this->sort_order;
 
         // === CATEGORIES ===
-        // REMOVED 2025-10-13: loadShopCategories() uses OLD architecture (ProductShopCategory table)
-        // Categories are now loaded by ProductCategoryManager during mount() using NEW architecture (shop_id in pivot)
-        // $this->loadShopCategories($shopId);
+        // BUG FIX 2025-11-19: Reload categories from database after save
+        // CRITICAL: When user saves changes and switches shops, categories MUST be reloaded
+        // Otherwise UI shows stale in-memory data instead of saved database state
+        if ($this->product && $this->product->exists && $this->categoryManager) {
+            // Reload ALL shop categories from database (including current shop)
+            $this->categoryManager->loadCategories();
+
+            Log::debug('[BUG FIX] Categories reloaded after loadShopDataToForm', [
+                'shop_id' => $shopId,
+                'product_id' => $this->product->id,
+                'shopCategories_after_reload' => $this->shopCategories[$shopId] ?? 'NOT_SET',
+            ]);
+        }
 
         // Force update of computed properties for UI reactivity
         $this->updateCategoryColorCoding();
@@ -1300,29 +2251,40 @@ class ProductForm extends Component
             return;
         }
 
-        // Load categories from database for this shop
-        $shopCategories = \App\Models\ProductShopCategory::getCategoriesForProductShop(
-            $this->product->id,
-            $shopId
-        );
+        // FIX 2025-11-20: Load categories from product_shop_data.category_mappings (NEW Option A architecture)
+        // instead of product_categories pivot table (OLD architecture)
+        $productShopData = \App\Models\ProductShopData::where('product_id', $this->product->id)
+            ->where('shop_id', $shopId)
+            ->first();
 
-        $primaryCategory = \App\Models\ProductShopCategory::getPrimaryCategoryForProductShop(
-            $this->product->id,
-            $shopId
-        );
+        if ($productShopData && !empty($productShopData->category_mappings)) {
+            // CategoryMappingsCast automatically deserializes JSON to Option A structure:
+            // ['ui' => ['selected' => [1, 36, 2], 'primary' => 1], 'mappings' => [...]]
+            $categoryMappings = $productShopData->category_mappings;
 
-        if (!empty($shopCategories)) {
-            // Shop has specific categories - store in per-shop structure
             $this->shopCategories[$shopId] = [
-                'selected' => $shopCategories,
-                'primary' => $primaryCategory
+                'selected' => $categoryMappings['ui']['selected'] ?? [],
+                'primary' => $categoryMappings['ui']['primary'] ?? null
             ];
+
+            Log::debug('loadShopCategories: Loaded from product_shop_data.category_mappings', [
+                'product_id' => $this->product->id,
+                'shop_id' => $shopId,
+                'selected' => $this->shopCategories[$shopId]['selected'],
+                'primary' => $this->shopCategories[$shopId]['primary'],
+            ]);
         } else {
             // No shop-specific categories - inherit from default
             $this->shopCategories[$shopId] = [
                 'selected' => $this->defaultCategories['selected'] ?? [],
                 'primary' => $this->defaultCategories['primary'] ?? null
             ];
+
+            Log::debug('loadShopCategories: No shop data found, using defaults', [
+                'product_id' => $this->product->id,
+                'shop_id' => $shopId,
+                'has_defaults' => !empty($this->defaultCategories['selected']),
+            ]);
         }
 
         Log::info('Shop categories loaded from database', [
@@ -1330,7 +2292,7 @@ class ProductForm extends Component
             'shop_id' => $shopId,
             'categories_count' => count($this->shopCategories[$shopId]['selected'] ?? []),
             'primary_category' => $this->shopCategories[$shopId]['primary'] ?? null,
-            'source' => empty($shopCategories) ? 'inherited_from_default' : 'shop_specific'
+            'source' => ($productShopData && !empty($productShopData->category_mappings)) ? 'shop_specific' : 'inherited_from_default'
         ]);
 
         // Force UI update for loaded categories if this is the current active shop
@@ -1479,7 +2441,16 @@ class ProductForm extends Component
             'height' => $this->height,
             'width' => $this->width,
             'length' => $this->length,
-            'tax_rate' => $this->tax_rate,
+
+            // === FAZA 5.2 CRITICAL FIX: TAX RATE ===
+            // In DEFAULT mode: save tax_rate (global default)
+            // In SHOP mode: DON'T save tax_rate (it's global!), save tax_rate_override instead
+            'tax_rate' => $this->activeShopId === null ? $this->tax_rate : null,
+
+            // === FAZA 5.2: TAX RATE OVERRIDE (SHOP MODE ONLY) ===
+            'tax_rate_override' => $this->activeShopId !== null
+                ? ($this->shopTaxRateOverrides[$this->activeShopId] ?? null)
+                : null,
 
             // === STATUS & SETTINGS ===
             'is_active' => $this->is_active,
@@ -1661,6 +2632,24 @@ class ProductForm extends Component
             return 'default';
         }
 
+        // SPECIAL CASE: tax_rate - check if override exists (not just value)
+        if ($field === 'tax_rate') {
+            // If no override set for this shop → inherited (uses default PPM tax_rate)
+            if (!isset($this->shopTaxRateOverrides[$this->activeShopId])) {
+                return 'inherited';
+            }
+
+            // Override exists - check if it matches default
+            $overrideValue = $this->shopTaxRateOverrides[$this->activeShopId];
+            $defaultValue = $this->defaultData['tax_rate'] ?? $this->tax_rate;
+
+            if ((float) $overrideValue === (float) $defaultValue) {
+                return 'same';
+            }
+
+            return 'different';
+        }
+
         // Get current form value (what user is typing) - REACTIVE!
         $currentValue = $this->getCurrentFieldValue($field);
 
@@ -1712,7 +2701,9 @@ class ProductForm extends Component
             'height' => $this->height,
             'width' => $this->width,
             'length' => $this->length,
-            'tax_rate' => $this->tax_rate,
+            'tax_rate' => $this->activeShopId !== null
+                ? ($this->shopTaxRateOverrides[$this->activeShopId] ?? $this->tax_rate)
+                : $this->tax_rate,
             'is_active' => $this->is_active,
             'is_variant_master' => $this->is_variant_master,
             'is_featured' => $this->is_featured,
@@ -1725,27 +2716,58 @@ class ProductForm extends Component
 
     /**
      * Normalize values for comparison (handle different data types)
+     *
+     * FIX 2025-11-18: Enhanced to prevent false positives in pending_fields tracking
+     *
+     * Handles:
+     * - NULL vs empty string ("" vs null)
+     * - Numeric vs string ("23" vs 23)
+     * - Decimal precision (23.00 vs 23.0)
+     * - Boolean vs numeric (1 vs true)
+     * - Carbon dates to ISO string
+     * - Arrays to sorted string representation
+     *
+     * @param mixed $value Value to normalize
+     * @return mixed Normalized value for strict comparison
      */
-    private function normalizeValueForComparison(mixed $value): string
+    private function normalizeValueForComparison(mixed $value): mixed
     {
-        if ($value === null) {
-            return '';
+        // Carbon dates → ISO string
+        if ($value instanceof \Carbon\Carbon) {
+            return $value->toIso8601String();
         }
+
+        // NULL and empty string → NULL (treat as same)
+        if ($value === '' || $value === null) {
+            return null;
+        }
+
+        // Boolean → string representation (consistent)
         if (is_bool($value)) {
             return $value ? '1' : '0';
         }
+
+        // Arrays → sorted string representation (for categories)
         if (is_array($value)) {
-            // For categories: sort array and create string representation
             if (empty($value)) {
-                return '';
+                return null; // Empty array = null
             }
             sort($value);
             return implode(',', $value);
         }
+
+        // Numeric strings → numeric (for proper comparison)
         if (is_numeric($value)) {
-            return (string) $value;
+            // If contains decimal point, use float
+            if (strpos((string)$value, '.') !== false) {
+                return (float)$value;
+            }
+            // Otherwise use int
+            return (int)$value;
         }
-        return (string) $value;
+
+        // Return as-is for other types (strings, objects, etc.)
+        return $value;
     }
 
     /**
@@ -1774,30 +2796,52 @@ class ProductForm extends Component
             $currentShopCategories = $this->getCategoriesForContext($this->activeShopId);
             $defaultCategories = $this->getCategoriesForContext(null); // null = default context
 
-            // Sort arrays for proper comparison
-            sort($currentShopCategories);
-            sort($defaultCategories);
+            // Sort arrays for proper comparison (numeric sort)
+            sort($currentShopCategories, SORT_NUMERIC);
+            sort($defaultCategories, SORT_NUMERIC);
 
             // Empty in shop context => dziedziczenie
             if (empty($currentShopCategories)) {
                 return 'inherited';
             }
 
-            return ($currentShopCategories === $defaultCategories) ? 'same' : 'different';
+            // Compare arrays
+            $isIdentical = $currentShopCategories === $defaultCategories;
+
+            Log::debug('CATEGORY STATUS COMPARISON (in-memory)', [
+                'shop_id' => $this->activeShopId,
+                'current_shop_categories' => $currentShopCategories,
+                'default_categories' => $defaultCategories,
+                'are_identical' => $isIdentical,
+                'result' => $isIdentical ? 'same' : 'different',
+            ]);
+
+            return $isIdentical ? 'same' : 'different';
         }
 
         // Fallback: when no in-memory data available (e.g., first load), consult DB
         // UPDATED 2025-10-13: Use new architecture (shop_id in product_categories)
         if ($this->product && $this->product->exists) {
             try {
-                $shopCategories = $this->product->categoriesForShop($this->activeShopId, false)->pluck('id')->sort()->values()->toArray();
-                $defaultCategories = $this->product->categories()->pluck('id')->sort()->values()->toArray();
+                $shopCategories = $this->product->categoriesForShop($this->activeShopId, false)->pluck('id')->sort(SORT_NUMERIC)->values()->toArray();
+                $defaultCategories = $this->product->categories()->pluck('id')->sort(SORT_NUMERIC)->values()->toArray();
 
                 if (empty($shopCategories)) {
                     return 'inherited'; // No per-shop categories, inherits from default
                 }
 
-                return ($shopCategories === $defaultCategories) ? 'same' : 'different';
+                $isIdentical = $shopCategories === $defaultCategories;
+
+                Log::debug('CATEGORY STATUS COMPARISON (DB)', [
+                    'shop_id' => $this->activeShopId,
+                    'product_id' => $this->product->id,
+                    'shop_categories' => $shopCategories,
+                    'default_categories' => $defaultCategories,
+                    'are_identical' => $isIdentical,
+                    'result' => $isIdentical ? 'same' : 'different',
+                ]);
+
+                return $isIdentical ? 'same' : 'different';
             } catch (\Throwable $e) {
                 Log::warning('Failed to get category status from DB', [
                     'error' => $e->getMessage(),
@@ -1811,12 +2855,22 @@ class ProductForm extends Component
         // Final fallback: compare arrays (handles create mode gracefully)
         $currentShopCategories = $this->getCategoriesForContext($this->activeShopId);
         $defaultCategories = $this->getCategoriesForContext(null);
-        sort($currentShopCategories);
-        sort($defaultCategories);
+        sort($currentShopCategories, SORT_NUMERIC);
+        sort($defaultCategories, SORT_NUMERIC);
         if (empty($currentShopCategories)) {
             return 'inherited';
         }
-        return ($currentShopCategories === $defaultCategories) ? 'same' : 'different';
+        $isIdentical = $currentShopCategories === $defaultCategories;
+
+        Log::debug('CATEGORY STATUS COMPARISON (final fallback)', [
+            'shop_id' => $this->activeShopId,
+            'current_shop_categories' => $currentShopCategories,
+            'default_categories' => $defaultCategories,
+            'are_identical' => $isIdentical,
+            'result' => $isIdentical ? 'same' : 'different',
+        ]);
+
+        return $isIdentical ? 'same' : 'different';
     }
 
     /**
@@ -1847,9 +2901,25 @@ class ProductForm extends Component
 
     /**
      * Get category status indicator for UI
+     * FIX 2025-11-19 BUG #1: Add pending sync check (PRIORITY 1 before status check)
      */
     public function getCategoryStatusIndicator(): array
     {
+        // PRIORITY 1: Check if categories have pending sync (highest priority)
+        if ($this->activeShopId !== null) {
+            $pendingChanges = $this->getPendingChangesForShop($this->activeShopId);
+
+            // Check if 'Kategorie' is in pending changes list
+            if (in_array('Kategorie', $pendingChanges)) {
+                return [
+                    'show' => true,
+                    'text' => 'Oczekuje na synchronizację',
+                    'class' => 'pending-sync-badge'
+                ];
+            }
+        }
+
+        // PRIORITY 2: Check category status (inherited, same, different)
         $status = $this->getCategoryStatus();
         switch ($status) {
             case 'default':
@@ -1911,12 +2981,18 @@ class ProductForm extends Component
     }
 
     /**
-     * Get CSS classes for field based on 3-level status system
+     * Get CSS classes for field based on 3-level status system + pending sync
      */
     public function getFieldClasses(string $field): string
     {
         $baseClasses = 'block w-full rounded-md shadow-sm focus:ring-orange-500 sm:text-sm transition-all duration-200';
 
+        // PRIORITY 1: Check if field has pending sync (highest priority visual indicator)
+        if ($this->activeShopId !== null && $this->isPendingSyncForShop($this->activeShopId, $field)) {
+            return $baseClasses . ' field-pending-sync';
+        }
+
+        // PRIORITY 2: Field status (inherited, same, different)
         $status = $this->getFieldStatus($field);
 
         switch ($status) {
@@ -1925,15 +3001,15 @@ class ProductForm extends Component
                 return $baseClasses . ' border-gray-600 bg-gray-700 text-white focus:border-orange-500';
 
             case 'inherited':
-                // Inherited - CSS class defined in components.css
+                // Inherited - CSS class defined in product-form.css
                 return $baseClasses . ' field-status-inherited';
 
             case 'same':
-                // Same as default - CSS class defined in components.css
+                // Same as default - CSS class defined in product-form.css
                 return $baseClasses . ' field-status-same';
 
             case 'different':
-                // Different from default - CSS class defined in components.css
+                // Different from default - CSS class defined in product-form.css
                 return $baseClasses . ' field-status-different';
 
             default:
@@ -1942,10 +3018,20 @@ class ProductForm extends Component
     }
 
     /**
-     * Get status indicator for field (visual badge)
+     * Get status indicator for field (visual badge) + pending sync
      */
     public function getFieldStatusIndicator(string $field): array
     {
+        // PRIORITY 1: Check if field has pending sync (highest priority)
+        if ($this->activeShopId !== null && $this->isPendingSyncForShop($this->activeShopId, $field)) {
+            return [
+                'show' => true,
+                'text' => 'Oczekuje na synchronizację',
+                'class' => 'pending-sync-badge'
+            ];
+        }
+
+        // PRIORITY 2: Field status (inherited, same, different)
         $status = $this->getFieldStatus($field);
 
         switch ($status) {
@@ -1983,6 +3069,42 @@ class ProductForm extends Component
                     'text' => '',
                     'class' => ''
                 ];
+        }
+    }
+
+    /**
+     * Check if field has pending sync for specific shop
+     *
+     * @param int $shopId Shop ID to check
+     * @param string $fieldName Field name to check (e.g., 'name', 'short_description')
+     * @return bool True if field has pending sync status
+     */
+    public function isPendingSyncForShop(int $shopId, string $fieldName): bool
+    {
+        if (!$this->product || !$this->product->exists) {
+            return false;
+        }
+
+        try {
+            $shopData = $this->product->shopData()
+                ->where('shop_id', $shopId)
+                ->first();
+
+            if (!$shopData) {
+                return false;
+            }
+
+            // Check if sync_status is 'pending'
+            return $shopData->sync_status === \App\Models\ProductShopData::STATUS_PENDING;
+
+        } catch (\Throwable $e) {
+            Log::warning('Failed to check pending sync status', [
+                'product_id' => $this->product->id,
+                'shop_id' => $shopId,
+                'field_name' => $fieldName,
+                'error' => $e->getMessage(),
+            ]);
+            return false;
         }
     }
 
@@ -2055,6 +3177,7 @@ class ProductForm extends Component
      */
     public function save(): void
     {
+        // Use existing pending-changes flow (handles default/shop + job dispatch)
         $this->saveAndClose();
     }
 
@@ -2253,7 +3376,19 @@ class ProductForm extends Component
      */
     private function saveShopSpecificData(): void
     {
+        // [FAZA 5.2 DEBUG SAVE 2025-11-14] Layer 4: Save Method Entry
+        Log::debug('[FAZA 5.2 DEBUG SAVE] saveShopSpecificData CALLED', [
+            'product_id' => $this->product?->id,
+            'active_shop_id' => $this->activeShopId,
+            'shopTaxRateOverrides_array' => $this->shopTaxRateOverrides,
+            'override_for_this_shop' => $this->shopTaxRateOverrides[$this->activeShopId] ?? 'NOT SET',
+        ]);
+
         if (!$this->product || $this->activeShopId === null) {
+            Log::warning('[FAZA 5.2 DEBUG SAVE] saveShopSpecificData ABORTED - missing product or activeShopId', [
+                'product_exists' => $this->product !== null,
+                'activeShopId' => $this->activeShopId,
+            ]);
             return;
         }
 
@@ -2261,6 +3396,13 @@ class ProductForm extends Component
         $productShopData = \App\Models\ProductShopData::firstOrNew([
             'product_id' => $this->product->id,
             'shop_id' => $this->activeShopId,
+        ]);
+
+        // [FAZA 5.2 DEBUG SAVE 2025-11-14] Before fill()
+        Log::debug('[FAZA 5.2 DEBUG SAVE] BEFORE $productShopData->fill()', [
+            'shop_id' => $this->activeShopId,
+            'existing_tax_rate_override' => $productShopData->tax_rate_override,
+            'new_tax_rate_override_from_property' => $this->shopTaxRateOverrides[$this->activeShopId] ?? 'NOT SET',
         ]);
 
         // Save current form data as shop-specific data - ALL FIELDS SUPPORTED
@@ -2285,7 +3427,10 @@ class ProductForm extends Component
             'height' => $this->height,
             'width' => $this->width,
             'length' => $this->length,
-            'tax_rate' => $this->tax_rate,
+
+            // === TAX RATE OVERRIDE (FAZA 5.2 - 2025-11-14) ===
+            // Save shop-specific tax rate override (NULL = use product default)
+            'tax_rate_override' => $this->shopTaxRateOverrides[$this->activeShopId] ?? null,
 
             // === STATUS & SETTINGS ===
             'is_active' => $this->is_active,
@@ -2303,18 +3448,69 @@ class ProductForm extends Component
                 'short_description' => $this->short_description,
                 'long_description' => $this->long_description,
                 'weight' => $this->weight,
-                'tax_rate' => $this->tax_rate,
+                'tax_rate_override' => $this->shopTaxRateOverrides[$this->activeShopId] ?? null, // FAZA 5.2
             ])),
+        ]);
+
+        // [FAZA 5.2 DEBUG SAVE 2025-11-14] Layer 5: Before Database Write
+        Log::debug('[FAZA 5.2 DEBUG SAVE] BEFORE $productShopData->save()', [
+            'shop_id' => $this->activeShopId,
+            'old_tax_rate_override' => $productShopData->getOriginal('tax_rate_override'),
+            'new_tax_rate_override' => $productShopData->tax_rate_override,
+            'is_dirty' => $productShopData->isDirty('tax_rate_override'),
+            'all_dirty_fields' => $productShopData->getDirty(),
         ]);
 
         $productShopData->save();
 
-        Log::info('Shop-specific data saved', [
+        // [FAZA 5.2 DEBUG SAVE 2025-11-14] After Database Write
+        Log::debug('[FAZA 5.2 DEBUG SAVE] AFTER $productShopData->save()', [
+            'shop_id' => $this->activeShopId,
+            'saved_tax_rate_override' => $productShopData->fresh()->tax_rate_override,
+            'product_shop_data_id' => $productShopData->id,
+        ]);
+
+        Log::info('[FAZA 5.2] Shop-specific data saved', [
             'product_id' => $this->product->id,
             'shop_id' => $this->activeShopId,
             'shop_data_id' => $productShopData->id,
+            'tax_rate_override' => $this->shopTaxRateOverrides[$this->activeShopId] ?? 'NULL (use default)',
             'user_id' => auth()->id(),
         ]);
+
+        // FIX CRITICAL BUG (2025-11-06): Auto-dispatch sync job after shop data save
+        // Problem: User saves changes in shop tab -> data saved to ProductShopData with 'pending'
+        //          BUT sync job was never created -> changes never reach PrestaShop!
+        // Solution: Automatically dispatch sync job when shop data is saved
+        // USER_ID FIX (2025-11-07): Pass auth()->id() to capture user who triggered sync
+        try {
+            $shop = \App\Models\PrestaShopShop::find($this->activeShopId);
+
+            if ($shop && $shop->connection_status === 'connected' && $shop->is_active) {
+                SyncProductToPrestaShop::dispatch($this->product, $shop, auth()->id());
+
+                Log::info('Auto-dispatched sync job after shop data save', [
+                    'product_id' => $this->product->id,
+                    'shop_id' => $this->activeShopId,
+                    'shop_name' => $shop->name,
+                    'trigger' => 'saveShopSpecificData',
+                ]);
+            } else {
+                Log::warning('Sync job NOT dispatched - shop not connected or inactive', [
+                    'product_id' => $this->product->id,
+                    'shop_id' => $this->activeShopId,
+                    'shop_status' => $shop?->connection_status ?? 'not_found',
+                    'shop_active' => $shop?->is_active ?? false,
+                ]);
+            }
+        } catch (\Exception $e) {
+            // Non-blocking error - data is saved, but sync will need manual trigger
+            Log::error('Failed to auto-dispatch sync job after shop data save', [
+                'product_id' => $this->product->id,
+                'shop_id' => $this->activeShopId,
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 
     /*
@@ -2413,7 +3609,8 @@ class ProductForm extends Component
                     ]);
 
                     // DISPATCH SYNC JOB - ETAP_07 PrestaShop Integration
-                    SyncProductToPrestaShop::dispatch($this->product, $shop);
+                    // USER_ID FIX (2025-11-07): Pass auth()->id() to capture user who triggered sync
+                    SyncProductToPrestaShop::dispatch($this->product, $shop, auth()->id());
 
                     $syncResults['success']++;
                     $syncResults['shops'][] = $shop->name;
@@ -2493,7 +3690,8 @@ class ProductForm extends Component
             ]);
 
             // DISPATCH SYNC JOB - ETAP_07 PrestaShop Integration
-            SyncProductToPrestaShop::dispatch($this->product, $shop);
+            // USER_ID FIX (2025-11-07): Pass auth()->id() to capture user who triggered sync
+            SyncProductToPrestaShop::dispatch($this->product, $shop, auth()->id());
 
             $this->dispatch('success', message: "Zaplanowano synchronizację produktu ze sklepem: {$shop->name}");
 
@@ -2513,6 +3711,966 @@ class ProductForm extends Component
 
             $this->dispatch('error', message: 'Błąd podczas planowania synchronizacji ze sklepem');
         }
+    }
+
+    /**
+     * Check status of active background job (ETAP_13 - 2025-11-17)
+     *
+     * Called by wire:poll.5s from Blade for real-time JOB monitoring
+     *
+     * Queries jobs table → checks failed_jobs if completed → updates reactive properties
+     * Dispatches Livewire events for UI feedback (Alpine.js integration)
+     *
+     * @return void
+     */
+    public function checkJobStatus(): void
+    {
+        // ETAP_13 FIX (2025-11-18): Support job tracking WITHOUT activeJobId
+        // (Bulk jobs dispatch multiple jobs → no single job ID to track)
+
+        // No active job - skip monitoring
+        if (!$this->activeJobStatus || $this->activeJobStatus === 'completed' || $this->activeJobStatus === 'failed') {
+            return;
+        }
+
+        // FOR BULK SYNC JOBS (multiple jobs, no single ID to track)
+        if ($this->activeJobType === 'sync' && !$this->activeJobId) {
+            $this->checkBulkSyncJobStatus();
+            return;
+        }
+
+        // FOR PULL JOBS (multiple jobs, no single ID to track)
+        if ($this->activeJobType === 'pull' && !$this->activeJobId) {
+            $this->checkBulkPullJobStatus();
+            return;
+        }
+
+        // FOR SINGLE JOBS (with job ID tracking)
+        if (!$this->activeJobId) {
+            return; // No job ID, can't track via jobs table
+        }
+
+        try {
+            // Query jobs table for active job
+            $job = \Illuminate\Support\Facades\DB::table('jobs')
+                ->where('id', $this->activeJobId)
+                ->first();
+
+            if (!$job) {
+                // Job not in queue - either completed successfully or failed
+                $failed = \Illuminate\Support\Facades\DB::table('failed_jobs')
+                    ->where('id', $this->activeJobId)
+                    ->first();
+
+                if ($failed) {
+                    // Job failed permanently
+                    $this->activeJobStatus = 'failed';
+                    $this->jobResult = 'error';
+
+                    // Extract first 200 chars of exception for user feedback
+                    $errorMessage = Str::limit($failed->exception ?? 'Unknown error', 200);
+                    $this->dispatch('job-failed', message: $errorMessage);
+
+                    Log::warning('Background job failed', [
+                        'job_id' => $this->activeJobId,
+                        'job_type' => $this->activeJobType,
+                        'product_id' => $this->product?->id,
+                        'error_excerpt' => $errorMessage,
+                    ]);
+                } else {
+                    // Job completed successfully (not in jobs table, not in failed_jobs)
+                    $this->activeJobStatus = 'completed';
+                    $this->jobResult = 'success';
+
+                    $this->dispatch('job-completed');
+
+                    Log::info('Background job completed successfully', [
+                        'job_id' => $this->activeJobId,
+                        'job_type' => $this->activeJobType,
+                        'product_id' => $this->product?->id,
+                    ]);
+
+                    // FIX 2025-11-20: Auto-refresh categories after job completion
+                    // User Request: "Po wykonaniu JOB autorefresh, ponowne pobranie kategorii"
+                    if ($this->activeJobType === 'pull' && $this->activeShopId) {
+                        // Pull job completed - reload fresh data including categories
+                        $this->pullShopData($this->activeShopId);
+                    }
+
+                    if ($this->activeJobType === 'sync' && $this->activeShopId) {
+                        // Sync job completed - pull fresh data from PrestaShop to verify sync
+                        $this->pullShopData($this->activeShopId);
+                    }
+                }
+
+                // Auto-clear job status after 5s (dispatch to Alpine.js)
+                $this->dispatch('auto-clear-job-status', delay: 5000);
+                return;
+            }
+
+            // Job still in queue - mark as processing
+            $this->activeJobStatus = 'processing';
+
+        } catch (\Exception $e) {
+            Log::error('Error checking job status', [
+                'job_id' => $this->activeJobId,
+                'error' => $e->getMessage(),
+                'trace' => $e->getFile() . ':' . $e->getLine(),
+            ]);
+
+            // Mark as failed on exception
+            $this->activeJobStatus = 'failed';
+            $this->jobResult = 'error';
+            $this->dispatch('job-failed', message: 'Error checking job status');
+        }
+    }
+
+    /**
+     * Check bulk sync job status by monitoring shop data sync status
+     * (Used when activeJobId not set - multi-job dispatch scenario)
+     *
+     * @return void
+     */
+    protected function checkBulkSyncJobStatus(): void
+    {
+        if (!$this->product) {
+            return;
+        }
+
+        try {
+            // Refresh shop data to get latest sync statuses
+            $this->product->load('shopData.shop');
+
+            // Get all connected shops
+            $connectedShops = $this->product->shopData->filter(function ($shopData) {
+                return $shopData->shop && $shopData->shop->is_active && $shopData->shop->connection_status === 'connected';
+            });
+
+            if ($connectedShops->isEmpty()) {
+                // No shops to sync - mark as completed
+                $this->activeJobStatus = 'completed';
+                $this->jobResult = 'success';
+
+                Log::info('[ETAP_13 BULK SYNC] No connected shops found', [
+                    'product_id' => $this->product->id,
+                ]);
+                return;
+            }
+
+            // Check if ALL connected shops are synchronized
+            // FIX 2025-11-18: Use ProductShopData::STATUS_SYNCED constant (was 'synchronized' - TYPO!)
+            $allSynchronized = $connectedShops->every(function ($shopData) {
+                return $shopData->sync_status === ProductShopData::STATUS_SYNCED;
+            });
+
+            if ($allSynchronized) {
+                // All shops synced - mark as completed
+                $this->activeJobStatus = 'completed';
+                $this->jobResult = 'success';
+
+                // FIX 2025-11-18 (#9.1): Clear loadedShopData cache after sync
+                // (getPendingChangesForShop() compares DB vs loadedShopData - stale cache = false "Oczekujące zmiany")
+                foreach ($connectedShops as $shopData) {
+                    unset($this->loadedShopData[$shopData->shop_id]);
+                }
+
+                // FIX 2025-11-20: Auto-refresh categories after bulk sync completion
+                // User Request: "Po wykonaniu JOB autorefresh, ponowne pobranie kategorii"
+                if ($this->activeShopId) {
+                    // Pull fresh data from PrestaShop to verify sync and update categories
+                    $this->pullShopData($this->activeShopId);
+                }
+
+                Log::info('[ETAP_13 BULK SYNC] All shops synchronized with auto-refresh', [
+                    'product_id' => $this->product->id,
+                    'shops_count' => $connectedShops->count(),
+                    'elapsed_seconds' => $this->jobCreatedAt ? now()->diffInSeconds($this->jobCreatedAt) : null,
+                    'cleared_cache_shops' => $connectedShops->pluck('shop_id')->all(),
+                    'auto_refreshed_shop' => $this->activeShopId,
+                ]);
+            } else {
+                // Still syncing - log current status
+                $syncedCount = $connectedShops->filter(fn($sd) => $sd->sync_status === ProductShopData::STATUS_SYNCED)->count();
+
+                Log::debug('[ETAP_13 BULK SYNC] Still syncing', [
+                    'product_id' => $this->product->id,
+                    'synced' => $syncedCount,
+                    'total' => $connectedShops->count(),
+                    'statuses' => $connectedShops->pluck('sync_status', 'shop_id')->toArray(),
+                ]);
+            }
+
+        } catch (\Exception $e) {
+            Log::error('[ETAP_13 BULK SYNC] Error checking bulk sync status', [
+                'product_id' => $this->product?->id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getFile() . ':' . $e->getLine(),
+            ]);
+
+            // Don't mark as failed - might be temporary DB issue
+        }
+    }
+
+    /**
+     * Check bulk pull job status by monitoring shop data sync status
+     * (Used when activeJobId not set - multi-job dispatch scenario)
+     *
+     * @return void
+     */
+    protected function checkBulkPullJobStatus(): void
+    {
+        if (!$this->product) {
+            return;
+        }
+
+        try {
+            // Refresh shop data to get latest sync statuses
+            $this->product->load('shopData.shop');
+
+            // Get all connected shops
+            $connectedShops = $this->product->shopData->filter(function ($shopData) {
+                return $shopData->shop && $shopData->shop->is_active && $shopData->shop->connection_status === 'connected';
+            });
+
+            if ($connectedShops->isEmpty()) {
+                // No shops to pull from - mark as completed
+                $this->activeJobStatus = 'completed';
+                $this->jobResult = 'success';
+
+                Log::info('[ETAP_13 BULK PULL] No connected shops found', [
+                    'product_id' => $this->product->id,
+                ]);
+                return;
+            }
+
+            // Check if ALL connected shops have been pulled (sync_status updated recently)
+            // For pull jobs, we consider it complete when all shops have fresh data
+            // FIX 2025-11-18: Use ProductShopData::STATUS_PENDING constant for consistency
+            $allPulled = $connectedShops->every(function ($shopData) {
+                // Consider "pulled" if sync_status is NOT 'pending' (it's been updated)
+                return $shopData->sync_status !== ProductShopData::STATUS_PENDING;
+            });
+
+            if ($allPulled) {
+                // All shops pulled - mark as completed
+                $this->activeJobStatus = 'completed';
+                $this->jobResult = 'success';
+
+                Log::info('[ETAP_13 BULK PULL] All shops pulled', [
+                    'product_id' => $this->product->id,
+                    'shops_count' => $connectedShops->count(),
+                    'elapsed_seconds' => $this->jobCreatedAt ? now()->diffInSeconds($this->jobCreatedAt) : null,
+                ]);
+            } else {
+                // Still pulling - log current status
+                $pulledCount = $connectedShops->filter(fn($sd) => $sd->sync_status !== ProductShopData::STATUS_PENDING)->count();
+
+                Log::debug('[ETAP_13 BULK PULL] Still pulling', [
+                    'product_id' => $this->product->id,
+                    'pulled' => $pulledCount,
+                    'total' => $connectedShops->count(),
+                    'statuses' => $connectedShops->pluck('sync_status', 'shop_id')->toArray(),
+                ]);
+            }
+
+        } catch (\Exception $e) {
+            Log::error('[ETAP_13 BULK PULL] Error checking bulk pull status', [
+                'product_id' => $this->product?->id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getFile() . ':' . $e->getLine(),
+            ]);
+
+            // Don't mark as failed - might be temporary DB issue
+        }
+    }
+
+    /**
+     * Sync product to SINGLE shop (PPM → PrestaShop) - ETAP_13
+     *
+     * Sidepanel "Aktualizuj aktualny sklep" button (per-shop)
+     * Dispatches SyncProductToPrestaShop for single shop + job tracking
+     *
+     * FIX 2025-11-18: Metoda nie istniała - buttons wywoływały undefined method
+     *
+     * @param int $shopId
+     * @return void
+     */
+    public function syncShop(int $shopId): void
+    {
+        if (!$this->product) {
+            $this->dispatch('error', message: 'Produkt nie istnieje');
+            return;
+        }
+
+        // ETAP_13: Check for active job (anti-duplicate)
+        if ($this->hasActiveSyncJob()) {
+            $this->dispatch('warning', message: 'Synchronizacja już w trakcie. Poczekaj na zakończenie.');
+            return;
+        }
+
+        // FIX 2025-11-18 (#4): TARGETED save - only current context, DON'T mark all shops
+        // (Prevents "Dodaj do sklepu" from marking ALL shops as pending)
+        try {
+            // 1. Capture current form state to pendingChanges
+            $this->savePendingChanges();
+
+            // 2. Save ONLY current context (default OR shop) - DON'T save all contexts
+            if ($this->activeShopId === null) {
+                // User is in "Dane domyślne" tab - save to Product WITHOUT marking all shops
+                if (isset($this->pendingChanges['default'])) {
+                    $this->savePendingChangesToProduct($this->pendingChanges['default'], $markShopsAsPending = false);
+                    unset($this->pendingChanges['default']);
+                }
+            } else {
+                // User is in specific shop tab - save to ProductShopData (doesn't affect other shops)
+                if (isset($this->pendingChanges[$this->activeShopId])) {
+                    $this->savePendingChangesToShop($this->activeShopId, $this->pendingChanges[$this->activeShopId]);
+                    unset($this->pendingChanges[$this->activeShopId]);
+                }
+            }
+
+            $this->dispatch('$commit');
+
+            Log::info('[ETAP_13 AUTO-SAVE] Targeted save completed (single shop sync)', [
+                'product_id' => $this->product->id,
+                'shop_id' => $shopId,
+                'active_shop_id' => $this->activeShopId,
+                'context' => $this->activeShopId === null ? 'default' : "shop:{$this->activeShopId}",
+            ]);
+        } catch (\Exception $e) {
+            Log::error('[ETAP_13 AUTO-SAVE] Failed to save pending changes', [
+                'product_id' => $this->product->id,
+                'shop_id' => $shopId,
+                'error' => $e->getMessage(),
+            ]);
+
+            $this->dispatch('error', message: 'Nie udało się zapisać zmian przed synchronizacją: ' . $e->getMessage());
+            return;
+        }
+
+        // Get shop
+        $shop = \App\Models\PrestaShopShop::find($shopId);
+
+        if (!$shop || !$shop->is_active || $shop->connection_status !== 'connected') {
+            $this->dispatch('warning', message: 'Sklep nie jest aktywny lub nie jest połączony');
+            return;
+        }
+
+        try {
+            // Dispatch sync job for single shop
+            SyncProductToPrestaShop::dispatch($this->product, $shop, auth()->id());
+
+            // Set job tracking variables
+            $this->activeJobType = 'sync';
+            $this->jobCreatedAt = now()->toIso8601String();
+            $this->activeJobStatus = 'pending';
+
+            $this->dispatch('success', message: "Rozpoczęto aktualizację produktu na sklepie {$shop->name}");
+
+            Log::info('[ETAP_13 SINGLE SHOP SYNC] Sync job dispatched', [
+                'product_id' => $this->product->id,
+                'product_sku' => $this->product->sku,
+                'shop_id' => $shopId,
+                'shop_name' => $shop->name,
+                'user_id' => auth()->id(),
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('[ETAP_13 SINGLE SHOP SYNC] Error dispatching sync job', [
+                'product_id' => $this->product->id,
+                'shop_id' => $shopId,
+                'error' => $e->getMessage(),
+                'trace' => $e->getFile() . ':' . $e->getLine(),
+            ]);
+
+            $this->dispatch('error', message: 'Błąd podczas aktualizacji sklepu: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Pull product data from SINGLE shop (PrestaShop → PPM) - ETAP_13
+     *
+     * Sidepanel "Wczytaj z aktualnego sklepu" button (per-shop)
+     * Fetches product data from PrestaShop and reloads form
+     *
+     * FIX 2025-11-18: Metoda nie istniała - buttons wywoływały undefined method
+     *
+     * @param int $shopId
+     * @return void
+     */
+    public function pullShopData(int $shopId): void
+    {
+        if (!$this->product) {
+            $this->dispatch('error', message: 'Produkt nie istnieje');
+            return;
+        }
+
+        // FIX 2025-11-18 (#4): TARGETED save - only current context, DON'T mark all shops
+        // (Same fix as syncShop() - prevents marking ALL shops as pending)
+        try {
+            // 1. Capture current form state to pendingChanges
+            $this->savePendingChanges();
+
+            // 2. Save ONLY current context (default OR shop) - DON'T save all contexts
+            if ($this->activeShopId === null) {
+                // User is in "Dane domyślne" tab - save to Product WITHOUT marking all shops
+                if (isset($this->pendingChanges['default'])) {
+                    $this->savePendingChangesToProduct($this->pendingChanges['default'], $markShopsAsPending = false);
+                    unset($this->pendingChanges['default']);
+                }
+            } else {
+                // User is in specific shop tab - save to ProductShopData (doesn't affect other shops)
+                if (isset($this->pendingChanges[$this->activeShopId])) {
+                    $this->savePendingChangesToShop($this->activeShopId, $this->pendingChanges[$this->activeShopId]);
+                    unset($this->pendingChanges[$this->activeShopId]);
+                }
+            }
+
+            $this->dispatch('$commit');
+
+            Log::info('[ETAP_13 AUTO-SAVE] Targeted save completed (single shop pull)', [
+                'product_id' => $this->product->id,
+                'shop_id' => $shopId,
+                'active_shop_id' => $this->activeShopId,
+                'context' => $this->activeShopId === null ? 'default' : "shop:{$this->activeShopId}",
+            ]);
+        } catch (\Exception $e) {
+            Log::error('[ETAP_13 AUTO-SAVE] Failed to save pending changes', [
+                'product_id' => $this->product->id,
+                'shop_id' => $shopId,
+                'error' => $e->getMessage(),
+            ]);
+
+            $this->dispatch('error', message: 'Nie udało się zapisać zmian przed wczytaniem danych: ' . $e->getMessage());
+            return;
+        }
+
+        // Get shop
+        $shop = \App\Models\PrestaShopShop::find($shopId);
+
+        if (!$shop || !$shop->is_active || $shop->connection_status !== 'connected') {
+            $this->dispatch('warning', message: 'Sklep nie jest aktywny lub nie jest połączony');
+            return;
+        }
+
+        try {
+            // FIX 2025-11-18 (#8.1): Removed job tracking properties
+            // (pullShopData is SYNCHRONOUS - job tracking only for async bulk operations)
+            // OLD: $this->activeJobType = 'pull'; $this->activeJobStatus = 'pending'; etc.
+
+            // FIX 2025-11-20: Block pulling data from PrestaShop when pending sync exists
+            // (Same logic as loadProductDataFromPrestaShop - prevents overwriting user changes)
+            $productShopData = \App\Models\ProductShopData::where('product_id', $this->product->id)
+                ->where('shop_id', $shopId)
+                ->first();
+
+            if ($productShopData && $productShopData->sync_status === 'pending') {
+                $this->dispatch('warning', message: 'Dane nie zostały pobrane z PrestaShop - oczekuje synchronizacja zapisanych zmian. Kliknij "Aktualizuj sklep" aby wykonać synchronizację.');
+
+                Log::warning('[PULL SHOP DATA] Blocked due to pending sync', [
+                    'shop_id' => $shopId,
+                    'product_id' => $this->product->id,
+                    'sync_status' => $productShopData->sync_status,
+                    'last_sync_at' => $productShopData->last_sync_at,
+                    'reason' => 'User has pending changes that would be overwritten',
+                ]);
+
+                return;
+            }
+
+            // FIX 2025-11-18 (#6): Use PrestaShopClientFactory instead of PrestaShopService
+            // (PrestaShopService doesn't have getProduct() method)
+            $client = \App\Services\PrestaShop\PrestaShopClientFactory::create($shop);
+
+            // Try to fetch product from PrestaShop
+            $prestashopData = null;
+
+            if ($productShopData && $productShopData->prestashop_product_id) {
+                // Product already synced - fetch by ID
+                try {
+                    $prestashopData = $client->getProduct($productShopData->prestashop_product_id);
+                } catch (\Exception $e) {
+                    // Product not found by ID - try search by SKU
+                    Log::warning('[PULL SHOP DATA] Product not found by ID, trying SKU search', [
+                        'prestashop_id' => $productShopData->prestashop_product_id,
+                        'sku' => $this->product->sku,
+                    ]);
+                }
+            }
+
+            // If not found by ID, search by SKU (reference)
+            if (!$prestashopData) {
+                $products = $client->getProducts(['filter[reference]' => $this->product->sku]);
+
+                if (empty($products)) {
+                    // FIX 2025-11-18 (#8.1): No job tracking for sync operation
+                    $this->dispatch('error', message: 'Nie znaleziono produktu w sklepie PrestaShop (SKU: ' . $this->product->sku . ')');
+                    return;
+                }
+
+                // Get full product data for first match
+                $prestashopData = $client->getProduct($products[0]['id']);
+            }
+
+            // Unwrap nested response (PrestaShop API wraps in 'product' key)
+            if (isset($prestashopData['product'])) {
+                $prestashopData = $prestashopData['product'];
+            }
+
+            // Extract essential data
+            $productData = [
+                'id' => $prestashopData['id'] ?? null,
+                'name' => data_get($prestashopData, 'name.0.value') ?? data_get($prestashopData, 'name'),
+                'description_short' => data_get($prestashopData, 'description_short.0.value') ?? data_get($prestashopData, 'description_short'),
+                'description' => data_get($prestashopData, 'description.0.value') ?? data_get($prestashopData, 'description'),
+                'price' => $prestashopData['price'] ?? null,
+                'active' => $prestashopData['active'] ?? null,
+                // FIX 2025-11-18 (#10.2): Extract categories from PrestaShop API response
+                'categories' => data_get($prestashopData, 'associations.categories') ?? [],
+            ];
+
+            if (!$productData['id']) {
+                // FIX 2025-11-18 (#8.1): No job tracking for sync operation
+                $this->dispatch('error', message: 'Błąd parsowania danych produktu z PrestaShop');
+                return;
+            }
+
+            // FIX #12: Build Option A structure from PrestaShop API
+            $categoryMappings = null;
+            if (!empty($productData['categories'])) {
+                $psIds = array_column($productData['categories'], 'id');
+                $shop = PrestaShopShop::find($shopId);
+
+                if ($shop) {
+                    $converter = app(CategoryMappingsConverter::class);
+                    $categoryMappings = $converter->fromPrestaShopFormat($psIds, $shop);
+
+                    Log::debug('[FIX #12] ProductForm::pullShopData: Converted PrestaShop to Option A', [
+                        'shop_id' => $shop->id,
+                        'prestashop_ids' => $psIds,
+                        'canonical_format' => $categoryMappings,
+                    ]);
+                }
+            }
+
+            // Update ProductShopData with fetched data
+            $productShopData = \App\Models\ProductShopData::firstOrNew([
+                'product_id' => $this->product->id,
+                'shop_id' => $shopId,
+            ]);
+
+            $productShopData->fill([
+                'prestashop_product_id' => $productData['id'],
+                'name' => $productData['name'] ?? $productShopData->name,
+                'short_description' => $productData['description_short'] ?? $productShopData->short_description,
+                'long_description' => $productData['description'] ?? $productShopData->long_description,
+                'sync_status' => 'synced',
+                'last_success_sync_at' => now(),
+                // FIX 2025-11-18 (#8.2): Set last_pulled_at for "Szczegóły synchronizacji"
+                'last_pulled_at' => now(),
+                // FIX 2025-11-18 (#10.2): Save category_mappings (only update if categories were returned)
+                'category_mappings' => !empty($categoryMappings) ? $categoryMappings : $productShopData->category_mappings,
+            ]);
+
+            $productShopData->save();
+
+            // FIX 2025-11-18 (#7): Update $this->shopData to reflect saved changes
+            // (loadShopDataToForm() reads from $this->shopData, not from DB!)
+            $this->shopData[$shopId] = array_merge(
+                $this->shopData[$shopId] ?? [],
+                [
+                    'id' => $productShopData->id,
+                    'name' => $productShopData->name,
+                    'short_description' => $productShopData->short_description,
+                    'long_description' => $productShopData->long_description,
+                    'sync_status' => $productShopData->sync_status,
+                    'last_success_sync_at' => $productShopData->last_success_sync_at,
+                    'prestashop_product_id' => $productShopData->prestashop_product_id,
+                    // FIX 2025-11-18 (#10.2): Include category_mappings in cache (for UI reactivity)
+                    'category_mappings' => $productShopData->category_mappings,
+                ]
+            );
+
+            // FIX #12: After save, reload UI state from ProductShopData
+            if ($productShopData->wasRecentlyCreated || $productShopData->wasChanged()) {
+                $this->reloadCleanShopCategories($shopId);
+            }
+
+            // Reload shop data to form (if currently viewing this shop)
+            if ($this->activeShopId === $shopId) {
+                $this->loadShopDataToForm($shopId);
+            }
+
+            // Update cached shop data
+            $this->loadedShopData[$shopId] = $productData;
+
+            // FIX 2025-11-18 (#8.3): Refresh product->shopData relation
+            // (Blade "Szczegóły synchronizacji" uses $product->shopData, not $this->shopData)
+            $this->product->load('shopData.shop');
+
+            // FIX 2025-11-18 (#8.1): No job tracking for sync operation
+            // (UI feedback via wire:loading + success event only)
+
+            $this->dispatch('success', message: "Wczytano dane ze sklepu {$shop->name}");
+
+            Log::info('[ETAP_13 SINGLE SHOP PULL] Product data pulled successfully', [
+                'product_id' => $this->product->id,
+                'product_sku' => $this->product->sku,
+                'shop_id' => $shopId,
+                'shop_name' => $shop->name,
+                'prestashop_id' => $productData['id'],
+            ]);
+
+        } catch (\Exception $e) {
+            // FIX 2025-11-18 (#9.2): No job tracking for sync operation (consistent with success path)
+
+            Log::error('[ETAP_13 SINGLE SHOP PULL] Error pulling product data', [
+                'product_id' => $this->product->id,
+                'shop_id' => $shopId,
+                'error' => $e->getMessage(),
+                'trace' => $e->getFile() . ':' . $e->getLine(),
+            ]);
+
+            $this->dispatch('error', message: 'Błąd podczas wczytywania danych: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Bulk update product to ALL shops (PPM → PrestaShop) - ETAP_13
+     *
+     * Sidepanel "Aktualizuj sklepy" button
+     * Dispatches SyncProductToPrestaShop per shop + captures job ID for monitoring
+     *
+     * @return void
+     */
+    public function bulkUpdateShops(): void
+    {
+        if (!$this->product) {
+            $this->dispatch('error', message: 'Produkt nie istnieje');
+            return;
+        }
+
+        // ETAP_13: Check for active job (anti-duplicate)
+        if ($this->hasActiveSyncJob()) {
+            $this->dispatch('warning', message: 'Synchronizacja już w trakcie. Poczekaj na zakończenie.');
+            return;
+        }
+
+        // CRITICAL FIX (2025-11-18): Auto-save pending changes BEFORE dispatch
+        // Without this, checksum is based on OLD data → "No changes - sync skipped"
+        try {
+            $this->saveAllPendingChanges();
+
+            // Reset Livewire dirty tracking (prevents browser "unsaved changes" warning)
+            $this->dispatch('$commit');
+
+            Log::info('[ETAP_13 AUTO-SAVE] Pending changes saved before bulk update', [
+                'product_id' => $this->product->id,
+                'active_shop_id' => $this->activeShopId,
+            ]);
+        } catch (\Exception $e) {
+            Log::error('[ETAP_13 AUTO-SAVE] Failed to save pending changes', [
+                'product_id' => $this->product->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            $this->dispatch('error', message: 'Nie udało się zapisać zmian przed synchronizacją: ' . $e->getMessage());
+            return;
+        }
+
+        // Get connected shops
+        $shops = $this->product->shopData->pluck('shop')->filter(function ($shop) {
+            return $shop && $shop->is_active && $shop->connection_status === 'connected';
+        });
+
+        if ($shops->isEmpty()) {
+            $this->dispatch('warning', message: 'Produkt nie jest przypisany do żadnego aktywnego sklepu');
+            return;
+        }
+
+        try {
+            // Dispatch sync job per shop (NOTE: BulkSyncProducts is for MULTIPLE products to ONE shop)
+            // We need SINGLE product to MULTIPLE shops, so dispatch per-shop
+            foreach ($shops as $shop) {
+                SyncProductToPrestaShop::dispatch($this->product, $shop, auth()->id());
+            }
+
+            // Capture first dispatched job ID for monitoring (approximation)
+            // NOTE: Laravel doesn't return job ID from dispatch() directly - we'll use batch ID workaround
+            // For MVP, capture timestamp and mark as pending
+            $this->activeJobType = 'sync';
+            $this->jobCreatedAt = now()->toIso8601String();
+            $this->activeJobStatus = 'pending';
+            // NOTE: activeJobId would require batch tracking - deferred to future enhancement
+
+            $this->dispatch('success', message: "Rozpoczęto aktualizację produktu na {$shops->count()} sklepach");
+
+            Log::info('Bulk update shops initiated', [
+                'product_id' => $this->product->id,
+                'product_sku' => $this->product->sku,
+                'shops_count' => $shops->count(),
+                'user_id' => auth()->id(),
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Error during bulk update shops', [
+                'product_id' => $this->product->id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getFile() . ':' . $e->getLine(),
+            ]);
+
+            $this->dispatch('error', message: 'Błąd podczas aktualizacji sklepów: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Pull product data from ALL shops (PrestaShop → PPM) - ETAP_13
+     *
+     * Sidepanel "Wczytaj ze sklepów" button
+     * Dispatches BulkPullProducts JOB (created by laravel-expert)
+     *
+     * @return void
+     */
+    public function bulkPullFromShops(): void
+    {
+        if (!$this->product) {
+            $this->dispatch('error', message: 'Produkt nie istnieje');
+            return;
+        }
+
+        // CRITICAL FIX (2025-11-18): Auto-save pending changes BEFORE pull
+        // Prevents data loss when user has unsaved changes
+        try {
+            $this->saveAllPendingChanges();
+
+            // Reset Livewire dirty tracking (prevents browser "unsaved changes" warning)
+            $this->dispatch('$commit');
+
+            Log::info('[ETAP_13 AUTO-SAVE] Pending changes saved before bulk pull', [
+                'product_id' => $this->product->id,
+                'active_shop_id' => $this->activeShopId,
+            ]);
+        } catch (\Exception $e) {
+            Log::error('[ETAP_13 AUTO-SAVE] Failed to save pending changes', [
+                'product_id' => $this->product->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            $this->dispatch('error', message: 'Nie udało się zapisać zmian przed wczytaniem danych: ' . $e->getMessage());
+            return;
+        }
+
+        // Get connected shops
+        $shops = $this->product->shopData->pluck('shop')->filter(function ($shop) {
+            return $shop && $shop->is_active && $shop->connection_status === 'connected';
+        });
+
+        if ($shops->isEmpty()) {
+            $this->dispatch('warning', message: 'Produkt nie jest przypisany do żadnego aktywnego sklepu');
+            return;
+        }
+
+        try {
+            // FIX 2025-11-18 (#8.4): Mark shops as PENDING before dispatching job
+            // (checkBulkPullJobStatus() requires this to avoid instant "SUCCESS" before job executes)
+            \App\Models\ProductShopData::where('product_id', $this->product->id)
+                ->whereIn('shop_id', $shops->pluck('id')->all())
+                ->update([
+                    'sync_status' => \App\Models\ProductShopData::STATUS_PENDING,
+                    'sync_direction' => \App\Models\ProductShopData::DIRECTION_PS_TO_PPM,
+                ]);
+
+            // Dispatch BulkPullProducts JOB (NEW from laravel-expert ETAP_13)
+            // Constructor: Product $product, Collection $shops, ?int $userId
+            $batch = BulkPullProducts::dispatch(
+                $this->product,
+                $shops,
+                auth()->id()
+            );
+
+            // Capture job ID for monitoring
+            // NOTE: BulkPullProducts uses Laravel Bus::batch() - batch ID available
+            $this->activeJobId = $batch->id ?? null;
+            $this->activeJobType = 'pull';
+            $this->jobCreatedAt = now()->toIso8601String();
+            $this->activeJobStatus = 'pending';
+
+            $this->dispatch('success', message: "Rozpoczęto wczytywanie danych ze {$shops->count()} sklepów");
+
+            Log::info('Bulk pull from shops initiated', [
+                'product_id' => $this->product->id,
+                'product_sku' => $this->product->sku,
+                'shops_count' => $shops->count(),
+                'batch_id' => $this->activeJobId,
+                'user_id' => auth()->id(),
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Error during bulk pull from shops', [
+                'product_id' => $this->product->id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getFile() . ':' . $e->getLine(),
+            ]);
+
+            $this->dispatch('error', message: 'Błąd podczas wczytywania danych ze sklepów: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Reload shop categories from ProductShopData to UI state (FIX #12)
+     *
+     * Call after pullShopData() or external updates to sync UI with database
+     * Converts canonical Option A format → UI format for Livewire
+     *
+     * @param int $shopId Shop ID
+     * @return void
+     */
+    protected function reloadCleanShopCategories(?int $shopId = null): void
+    {
+        $shopData = ProductShopData::where('product_id', $this->product->id)
+            ->where('shop_id', $shopId)
+            ->first();
+
+        if ($shopData && $shopData->hasCategoryMappings()) {
+            $converter = app(CategoryMappingsConverter::class);
+            $this->shopCategories[$shopId] = $converter->toUiFormat(
+                $shopData->category_mappings
+            );
+
+            Log::debug('[FIX #12] Reloaded shop categories to UI', [
+                'shop_id' => $shopId,
+                'ui_categories' => $this->shopCategories[$shopId],
+            ]);
+
+            // Trigger Livewire re-render
+            $this->dispatch('shop-categories-reloaded', shopId: $shopId);
+        }
+    }
+
+    /**
+     * Handle shop-categories-reloaded event (FIX #12)
+     *
+     * Triggered after reloadCleanShopCategories() to refresh Alpine.js category tree picker
+     *
+     * @param int $shopId Shop ID
+     * @return void
+     */
+    public function handleCategoriesReloaded(int $shopId): void
+    {
+        // Trigger UI update in Alpine.js category tree picker
+        $this->dispatch('category-tree-refresh', shopId: $shopId);
+
+        Log::debug('[FIX #12] Category tree refresh dispatched', [
+            'shop_id' => $shopId,
+        ]);
+    }
+
+    /**
+     * Detect pending changes for specific shop (ETAP_13.3 - 2025-11-17)
+     *
+     * Compare ProductShopData fields vs cached PrestaShop data ($this->loadedShopData)
+     * Return array of user-friendly labels for changed fields
+     *
+     * Used in "Szczegóły synchronizacji" panel to show DYNAMIC pending changes
+     * (instead of hardcoded "stawka VAT")
+     *
+     * @param int $shopId Shop ID to check
+     * @return array User-friendly labels (e.g., ["Nazwa produktu", "Cena", "Stawka VAT"])
+     */
+    public function getPendingChangesForShop(int $shopId): array
+    {
+        if (!$this->product) {
+            return [];
+        }
+
+        // Get ProductShopData for shop
+        $shopData = \App\Models\ProductShopData::where('product_id', $this->product->id)
+            ->where('shop_id', $shopId)
+            ->first();
+
+        if (!$shopData) {
+            return [];
+        }
+
+        // Check if PrestaShop data is loaded for this shop
+        if (!isset($this->loadedShopData[$shopId])) {
+            // No cached data - cannot detect changes
+            return [];
+        }
+
+        $cached = $this->loadedShopData[$shopId];
+        $changes = [];
+
+        // Field mapping: database field => user-friendly Polish label
+        // FIX 2025-11-18 (#5): Removed invalid fields that don't exist in ProductShopData
+        // - 'price' (ceny w ProductPrice relation, nie w ProductShopData)
+        // - 'quantity' (stany w ProductWarehouseStock relation, nie w ProductShopData)
+        // - 'description' (ProductShopData ma 'long_description', nie 'description')
+        $fieldsToCheck = [
+            'name' => 'Nazwa produktu',
+            'tax_rate' => 'Stawka VAT',
+            'short_description' => 'Krótki opis',
+            'meta_title' => 'Meta tytuł',
+            'meta_description' => 'Meta opis',
+            // FIX 2025-11-18 (#10.3): Add category_mappings detection
+            'category_mappings' => 'Kategorie',
+        ];
+
+        foreach ($fieldsToCheck as $field => $label) {
+            // FIX #12: Compare using Option A canonical format
+            if ($field === 'category_mappings') {
+                if ($shopData->hasCategoryMappings()) {
+                    $converter = app(CategoryMappingsConverter::class);
+
+                    // Get current canonical format from database
+                    $savedCanonical = $shopData->category_mappings;
+
+                    // Compare mappings (PrestaShop IDs only) - use converter helper
+                    $savedPsIds = $converter->toPrestaShopIdsList($savedCanonical);
+
+                    // PrestaShop cached data format: [{"id": 2}, {"id": 15}] → extract IDs
+                    $cachedPsIds = array_column($cached['categories'] ?? [], 'id');
+
+                    // Sort both arrays for consistent comparison
+                    sort($savedPsIds);
+                    sort($cachedPsIds);
+
+                    if ($savedPsIds !== $cachedPsIds) {
+                        $changes[] = $label;
+
+                        Log::debug('[FIX #12] Detected category changes', [
+                            'product_id' => $this->product->id,
+                            'shop_id' => $shopId,
+                            'saved_ps_ids' => $savedPsIds,
+                            'cached_ps_ids' => $cachedPsIds,
+                        ]);
+                    }
+                }
+
+                continue; // Skip standard comparison
+            }
+
+            // Check if field exists in cached data
+            if (!isset($cached[$field])) {
+                continue;
+            }
+
+            // Get values (handle NULL gracefully)
+            $shopValue = $shopData->$field ?? null;
+            $psValue = $cached[$field] ?? null;
+
+            // FIX 2025-11-18: Use strict normalization to prevent false positives
+            // (e.g., null vs "", "23" vs 23, 23.00 vs 23.0)
+            $shopValueNormalized = $this->normalizeValueForComparison($shopValue);
+            $psValueNormalized = $this->normalizeValueForComparison($psValue);
+
+            // Compare (strict comparison after normalization)
+            if ($shopValueNormalized !== $psValueNormalized) {
+                $changes[] = $label;
+            }
+        }
+
+        return $changes;
     }
 
     /*
@@ -2574,7 +4732,10 @@ class ProductForm extends Component
                 'status' => 'pending',
                 'icon' => '⏳',
                 'class' => 'text-yellow-600 dark:text-yellow-400',
-                'text' => 'Oczekuje',
+                // FEATURE (2025-11-07): Field-Level Pending Tracking - show specific fields
+                'text' => !empty($syncStatus->pending_fields)
+                    ? 'Oczekuje: ' . implode(', ', $syncStatus->pending_fields)
+                    : 'Oczekuje',
                 'prestashop_id' => $syncStatus->prestashop_product_id,
             ],
             'syncing' => [
@@ -2643,7 +4804,8 @@ class ProductForm extends Component
 
         $shop = PrestaShopShop::find($shopId);
         if ($shop) {
-            SyncProductToPrestaShop::dispatch($this->product, $shop);
+            // USER_ID FIX (2025-11-07): Pass auth()->id() to capture user who triggered sync
+            SyncProductToPrestaShop::dispatch($this->product, $shop, auth()->id());
 
             Log::info('Sync retry dispatched', [
                 'product_id' => $this->product->id,
@@ -2687,7 +4849,15 @@ class ProductForm extends Component
         $this->saveAllPendingChanges();
 
         if (empty($this->getErrorBag()->all())) {
-            return redirect('/admin/products');
+            // FIX 2025-11-20 (ETAP_07b Fix #7): Use event-based JavaScript redirect instead of Livewire redirect
+            // Livewire $this->redirect() was being canceled by property updates from saveAllPendingChanges()
+            // Event-based redirect happens on frontend and survives Livewire request cycles
+            // FIX 2025-11-20 (Fix #8): Use kebab-case event name to match Alpine listener @redirect-to-product-list.window
+            $this->dispatch('redirect-to-product-list');
+
+            Log::info('saveAndClose dispatched redirect-to-product-list event', [
+                'product_id' => $this->product?->id,
+            ]);
         }
     }
 
@@ -2701,6 +4871,13 @@ class ProductForm extends Component
         $this->successMessage = '';
 
         try {
+            // ETAP_13: Check for active sync job before proceeding
+            if ($this->hasActiveSyncJob()) {
+                $this->dispatch('warning', message: 'Synchronizacja już w trakcie. Poczekaj na zakończenie.');
+                $this->isSaving = false;
+                return;
+            }
+
             // First, save current form state to pending changes
             $this->savePendingChanges();
 
@@ -2764,7 +4941,16 @@ class ProductForm extends Component
     /**
      * Save pending changes to main products table (default data)
      */
-    private function savePendingChangesToProduct(array $changes): void
+    /**
+     * Save pending changes to product (default data)
+     *
+     * FIX 2025-11-18 (#4): Added $markShopsAsPending parameter to prevent
+     * marking ALL shops as pending when syncing single shop
+     *
+     * @param array $changes Pending changes to save
+     * @param bool $markShopsAsPending If true, marks all shops as 'pending' after update (default behavior)
+     */
+    private function savePendingChangesToProduct(array $changes, bool $markShopsAsPending = true): void
     {
         // Basic validation
         $this->validate([
@@ -2805,16 +4991,25 @@ class ProductForm extends Component
                 'sort_order' => $changes['sort_order'] ?? $this->product->sort_order,
             ]);
 
-            // CRITICAL FIX (Bug 2): Mark all associated shops as 'pending' after updating default data
-            // When user edits "Dane domyślne", shops need to be re-synced to reflect new default data
-            $shopsMarkedPending = \App\Models\ProductShopData::where('product_id', $this->product->id)
-                ->where('sync_status', '!=', 'disabled') // Don't change disabled shops
-                ->update(['sync_status' => 'pending']);
+            // FIX 2025-11-18 (#4): Conditionally mark shops as pending (ONLY when explicitly requested)
+            // Default behavior: Mark all shops as 'pending' when default data changes (normal edit mode)
+            // Targeted save: DON'T mark all shops when syncing single shop (prevents "all shops" bug)
+            if ($markShopsAsPending) {
+                // CRITICAL FIX (Bug 2): Mark all associated shops as 'pending' after updating default data
+                // When user edits "Dane domyślne", shops need to be re-synced to reflect new default data
+                $shopsMarkedPending = \App\Models\ProductShopData::where('product_id', $this->product->id)
+                    ->where('sync_status', '!=', 'disabled') // Don't change disabled shops
+                    ->update(['sync_status' => 'pending']);
 
-            if ($shopsMarkedPending > 0) {
-                Log::info('Marked shops as pending after default data update (pending changes)', [
+                if ($shopsMarkedPending > 0) {
+                    Log::info('Marked shops as pending after default data update (pending changes)', [
+                        'product_id' => $this->product->id,
+                        'shops_marked' => $shopsMarkedPending,
+                    ]);
+                }
+            } else {
+                Log::info('Skipped marking all shops as pending (targeted save for single shop)', [
                     'product_id' => $this->product->id,
-                    'shops_marked' => $shopsMarkedPending,
                 ]);
             }
 
@@ -2973,12 +5168,32 @@ class ProductForm extends Component
             $this->shopsToRemove = [];
         }
 
+        // PROBLEM #4 (2025-11-07): Save prices and stock after product save
+        if ($this->product && $this->product->exists) {
+            try {
+                $this->savePricesInternal();
+                $this->saveStockInternal();
+
+                // BUG FIX (2025-11-12): Auto-dispatch sync jobs for all connected shops after price/stock change
+                // User expects jobs to appear automatically when changing prices
+                $this->dispatchSyncJobsForAllShops();
+
+            } catch (\Exception $e) {
+                Log::error('Failed to save prices/stock in savePendingChangesToProduct', [
+                    'product_id' => $this->product->id,
+                    'error' => $e->getMessage(),
+                ]);
+                // Don't throw - allow product save to complete even if prices/stock fail
+            }
+        }
+
         // CRITICAL FIX: Clear removed shops cache after save (no longer needed)
         $this->removedShopsCache = [];
     }
 
     /**
      * Save pending changes to specific shop data
+     * CRITICAL FIX (2025-11-07): Added sync_status='pending' + auto-dispatch
      */
     private function savePendingChangesToShop(int $shopId, array $changes): void
     {
@@ -2992,6 +5207,102 @@ class ProductForm extends Component
             'product_id' => $this->product->id,
             'shop_id' => $shopId,
         ]);
+
+        // FEATURE: Field-Level Pending Tracking (2025-11-07)
+        // Track WHICH specific fields changed (not just "pending" status)
+        $fieldNameMapping = [
+            'sku' => 'SKU',
+            'name' => 'nazwa',
+            'slug' => 'slug',
+            'short_description' => 'krótki opis',
+            'long_description' => 'pełny opis',
+            'meta_title' => 'tytuł meta',
+            'meta_description' => 'opis meta',
+            'weight' => 'waga',
+            'height' => 'wysokość',
+            'width' => 'szerokość',
+            'length' => 'długość',
+            'ean' => 'EAN',
+            'tax_rate' => 'stawka VAT',
+            'tax_rate_override' => 'stawka VAT (sklep)', // FAZA 5.2
+            'manufacturer' => 'producent',
+            'supplier_code' => 'kod dostawcy',
+            'product_type_id' => 'typ produktu',
+            'is_active' => 'aktywny',
+            'is_variant_master' => 'główny wariant',
+            'is_featured' => 'wyróżniony',
+            'sort_order' => 'kolejność',
+            'available_from' => 'dostępny od',
+            'available_to' => 'dostępny do',
+            'contextCategories' => 'kategorie', // FIX 2025-11-19: Track category changes for UI label
+        ];
+
+        $changedFields = [];
+
+        // Compare old vs new values and collect changed field names
+        foreach ($changes as $fieldKey => $newValue) {
+            // FIX 2025-11-19: Special handling for contextCategories (not a DB column)
+            if ($fieldKey === 'contextCategories') {
+                // Categories changed - always add to changedFields (stored in separate table)
+                if (!empty($newValue)) {
+                    $changedFields[] = $fieldNameMapping[$fieldKey];
+                }
+                continue; // Skip normal comparison
+            }
+
+            // Skip non-field keys
+            if (!array_key_exists($fieldKey, $fieldNameMapping)) {
+                continue;
+            }
+
+            $oldValue = $productShopData->getOriginal($fieldKey) ?? $productShopData->{$fieldKey};
+
+            // FIX 2025-11-18: Strict normalization to prevent false positives
+            // (e.g., null vs "", "23" vs 23, 23.00 vs 23)
+            $oldValueNormalized = $this->normalizeValueForComparison($oldValue);
+            $newValueNormalized = $this->normalizeValueForComparison($newValue);
+
+            // Check if values are TRULY different (strict comparison after normalization)
+            if ($oldValueNormalized !== $newValueNormalized) {
+                $changedFields[] = $fieldNameMapping[$fieldKey];
+            }
+        }
+
+        // FIX 2025-11-20 (ETAP_07b): Handle category_mappings BEFORE save
+        // Convert PrestaShop IDs → canonical format (Option A) if categories changed
+        $categoryMappings = $productShopData->category_mappings; // Keep existing if no changes
+
+        if (isset($changes['contextCategories'])) {
+            $shop = \App\Models\PrestaShopShop::find($shopId);
+
+            if ($shop) {
+                $converter = app(CategoryMappingsConverter::class);
+                $shopCategoryData = $changes['contextCategories'];
+                $selectedCategories = $shopCategoryData['selected'] ?? [];
+
+                // Auto-inject PrestaShop roots (1 "Baza", 2 "Wszystko")
+                $requiredRoots = [1, 2];
+                foreach ($requiredRoots as $rootId) {
+                    if (!in_array($rootId, $selectedCategories)) {
+                        $selectedCategories[] = $rootId;
+                        Log::debug('[ETAP_07b] savePendingChangesToShop: Auto-injected PrestaShop root', [
+                            'shop_id' => $shopId,
+                            'root_id' => $rootId,
+                        ]);
+                    }
+                }
+
+                // Convert PrestaShop IDs → PPM IDs + mappings (Option A canonical format)
+                $categoryMappings = $converter->fromPrestaShopFormat($selectedCategories, $shop);
+
+                Log::debug('[ETAP_07b] savePendingChangesToShop: Converted PrestaShop IDs to Option A', [
+                    'shop_id' => $shopId,
+                    'product_id' => $this->product->id,
+                    'prestashop_ids' => $selectedCategories,
+                    'canonical_format' => $categoryMappings,
+                ]);
+            }
+        }
 
         // Save changes to shop-specific data
         $productShopData->fill([
@@ -3011,6 +5322,10 @@ class ProductForm extends Component
             'width' => $changes['width'] ?? $productShopData->width,
             'length' => $changes['length'] ?? $productShopData->length,
             'tax_rate' => $changes['tax_rate'] ?? $productShopData->tax_rate,
+            // FAZA 5.2: Shop-specific tax rate override (NULL = use default)
+            'tax_rate_override' => array_key_exists('tax_rate_override', $changes)
+                ? $changes['tax_rate_override']
+                : $productShopData->tax_rate_override,
             'available_from' => isset($changes['available_from']) && $changes['available_from']
                 ? \Carbon\Carbon::parse($changes['available_from'])
                 : $productShopData->available_from,
@@ -3021,32 +5336,19 @@ class ProductForm extends Component
             'is_variant_master' => $changes['is_variant_master'] ?? $productShopData->is_variant_master,
             'is_featured' => $changes['is_featured'] ?? $productShopData->is_featured,
             'sort_order' => $changes['sort_order'] ?? $productShopData->sort_order,
+            // CRITICAL FIX (2025-11-07): Mark as pending sync after changes
+            'sync_status' => 'pending',
+            'pending_fields' => !empty($changedFields) ? $changedFields : null, // FEATURE: Field-level tracking
+            'is_published' => $productShopData->is_published ?? false,
+            // FIX 2025-11-20 (ETAP_07b): Save category_mappings JSON (Option A)
+            'category_mappings' => $categoryMappings,
         ]);
 
         $productShopData->save();
 
-        // Save shop-specific categories if they were changed
-        // FIXED: Use contextCategories instead of shopCategories (which doesn't exist in pending changes)
-        if (isset($changes['contextCategories'])) {
-            $shopCategoryData = $changes['contextCategories'];
-            $selectedCategories = $shopCategoryData['selected'] ?? [];
-            $primaryCategoryId = $shopCategoryData['primary'] ?? null;
-
-            \App\Models\ProductShopCategory::setCategoriesForProductShop(
-                $this->product->id,
-                $shopId,
-                $selectedCategories,
-                $primaryCategoryId
-            );
-
-            Log::info('Shop-specific categories saved to database', [
-                'product_id' => $this->product->id,
-                'shop_id' => $shopId,
-                'categories_count' => count($selectedCategories),
-                'primary_category' => $primaryCategoryId,
-                'source' => 'contextCategories',
-            ]);
-        }
+        // FIX 2025-11-20 (ETAP_07b): Old product_categories table logic REMOVED
+        // Categories are now saved to category_mappings JSON column (Option A canonical format)
+        // See lines 5092-5126 above for conversion logic
 
         Log::info('Shop-specific data updated from pending changes', [
             'product_id' => $this->product->id,
@@ -3054,6 +5356,39 @@ class ProductForm extends Component
             'shop_data_id' => $productShopData->id,
             'changes_applied' => count($changes),
         ]);
+
+        // CRITICAL FIX (2025-11-07): Auto-dispatch sync job after shop data save
+        // BUG: User saves changes in shop tab -> data saved with 'pending' BUT sync job was never created
+        // FIX: Automatically dispatch sync job when shop data is saved (same as saveShopSpecificData)
+        // USER_ID FIX (2025-11-07): Pass auth()->id() to capture user who triggered sync
+        try {
+            $shop = \App\Models\PrestaShopShop::find($shopId);
+
+            if ($shop && $shop->connection_status === 'connected' && $shop->is_active) {
+                \App\Jobs\PrestaShop\SyncProductToPrestaShop::dispatch($this->product, $shop, auth()->id());
+
+                Log::info('Auto-dispatched sync job after shop data save (from pending changes)', [
+                    'product_id' => $this->product->id,
+                    'shop_id' => $shopId,
+                    'shop_name' => $shop->name,
+                    'trigger' => 'savePendingChangesToShop',
+                ]);
+            } else {
+                Log::warning('Sync job NOT dispatched - shop not connected or inactive', [
+                    'product_id' => $this->product->id,
+                    'shop_id' => $shopId,
+                    'shop_status' => $shop?->connection_status ?? 'not_found',
+                    'shop_active' => $shop?->is_active ?? false,
+                ]);
+            }
+        } catch (\Exception $e) {
+            // Non-blocking error - data is saved, but sync will need manual trigger
+            Log::error('Failed to auto-dispatch sync job after shop data save (from pending changes)', [
+                'product_id' => $this->product->id,
+                'shop_id' => $shopId,
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 
 
@@ -3084,6 +5419,38 @@ class ProductForm extends Component
                 'last_sync_at' => $shopData->last_sync_at,
             ];
         }
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | ETAP_13: ANTI-DUPLICATE JOB LOGIC (2025-11-17)
+    |--------------------------------------------------------------------------
+    */
+
+    /**
+     * Check if product has active sync job in queue
+     *
+     * ETAP_13: Backend Foundation - Anti-Duplicate Logic
+     *
+     * Prevents dispatching duplicate sync jobs when user clicks "Save" multiple times
+     *
+     * @return bool True if active job exists
+     */
+    protected function hasActiveSyncJob(): bool
+    {
+        if (!$this->product || !$this->product->id) {
+            return false;
+        }
+
+        $productId = $this->product->id;
+
+        // Check pending jobs in queue
+        $hasJob = \Illuminate\Support\Facades\DB::table('jobs')
+            ->where('queue', 'prestashop_sync')
+            ->where('payload', 'like', '%"product_id":' . $productId . '%')
+            ->exists();
+
+        return $hasJob;
     }
 
     /*
@@ -3198,6 +5565,253 @@ class ProductForm extends Component
     }
 
     /**
+     * Refresh categories from active shop (ETAP_07b FAZA 1)
+     *
+     * Clears category cache and forces fresh API call.
+     * Used by "Odśwież kategorie" button in ProductForm.
+     *
+     * @return void
+     */
+    public function refreshCategoriesFromShop(): void
+    {
+        if (!$this->activeShopId) {
+            Log::warning('refreshCategoriesFromShop called without active shop');
+            return;
+        }
+
+        try {
+            $shop = PrestaShopShop::find($this->activeShopId);
+
+            if (!$shop) {
+                throw new \Exception("Shop not found: {$this->activeShopId}");
+            }
+
+            // Get category service
+            $categoryService = app(\App\Services\PrestaShop\PrestaShopCategoryService::class);
+
+            // Clear cache - forces fresh API call on next getShopCategories() call
+            $categoryService->clearCache($shop);
+
+            Log::info('Category cache cleared for shop', [
+                'shop_id' => $shop->id,
+                'shop_name' => $shop->name,
+            ]);
+
+            // ETAP_07b FAZA 1 FIX: Trigger Livewire re-render to fetch fresh categories
+            // This will cause Blade to call getShopCategories() again, which fetches from cleared cache
+            $this->dispatch('$refresh');
+
+            session()->flash('success', 'Kategorie odświeżone z PrestaShop');
+
+        } catch (\Exception $e) {
+            Log::error('Failed to refresh categories from shop', [
+                'shop_id' => $this->activeShopId,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            session()->flash('error', "Błąd podczas odświeżania kategorii: {$e->getMessage()}");
+        }
+    }
+
+    /**
+     * Get shop categories (ETAP_07b FAZA 1)
+     *
+     * Returns hierarchical category tree for active shop from PrestaShop.
+     * If no shop active, returns PPM default categories.
+     *
+     * @return array Category tree
+     */
+    public function getShopCategories(): array
+    {
+        if (!$this->activeShopId) {
+            // Default TAB - return PPM categories
+            return $this->getDefaultCategories();
+        }
+
+        try {
+            $shop = PrestaShopShop::find($this->activeShopId);
+
+            if (!$shop) {
+                Log::warning('Shop not found in getShopCategories()', [
+                    'shop_id' => $this->activeShopId,
+                ]);
+                return $this->getDefaultCategories();
+            }
+
+            // Get category service
+            $categoryService = app(\App\Services\PrestaShop\PrestaShopCategoryService::class);
+
+            // Get cached category tree (15min TTL)
+            $tree = $categoryService->getCachedCategoryTree($shop);
+
+            // ETAP_07b FAZA 1 FIX: Convert arrays to objects for Blade compatibility
+            // Blade partial expects objects with ->children property, not arrays
+            return array_map([$this, 'convertCategoryArrayToObject'], $tree);
+
+        } catch (\Exception $e) {
+            Log::error('Failed to get shop categories', [
+                'shop_id' => $this->activeShopId,
+                'error' => $e->getMessage(),
+            ]);
+
+            // Fallback to PPM categories
+            return $this->getDefaultCategories();
+        }
+    }
+
+    /**
+     * Get default PPM categories (fallback)
+     *
+     * @return array Category tree
+     */
+    protected function getDefaultCategories(): array
+    {
+        // Load PPM categories from database
+        $categories = Category::whereNull('parent_id')
+            ->with('children')
+            ->orderBy('sort_order')
+            ->get();
+
+        $categoryArray = $categories->map(function ($category) {
+            return [
+                'id' => $category->id,
+                'name' => $category->name,
+                'level' => 1,
+                'children' => $this->mapCategoryChildren($category->children),
+            ];
+        })->toArray();
+
+        // ETAP_07b FAZA 1 FIX: Convert arrays to objects for Blade compatibility
+        return array_map([$this, 'convertCategoryArrayToObject'], $categoryArray);
+    }
+
+    /**
+     * Get category validation status for active shop (ETAP_07b FAZA 2)
+     *
+     * Compares shop categories with default categories and returns status badge data.
+     *
+     * Business Logic:
+     * - "zgodne" (green) = shop categories identical to default
+     * - "własne" (blue) = shop has custom categories
+     * - "dziedziczone" (gray) = inherits from default (no shop-specific)
+     *
+     * Performance: Cached per shop to avoid repeated validation
+     *
+     * @return array|null ['status' => string, 'badge' => array, 'tooltip' => string|null] or null if default tab
+     */
+    public function getCategoryValidationStatus(): ?array
+    {
+        // Default TAB - no validation needed
+        if (!$this->activeShopId || !$this->product) {
+            return null;
+        }
+
+        // Check cache first
+        if (isset($this->categoryValidationStatus[$this->activeShopId])) {
+            return $this->categoryValidationStatus[$this->activeShopId];
+        }
+
+        try {
+            // Get category validator service
+            $validator = app(\App\Services\CategoryValidatorService::class);
+
+            // Compare shop categories with default
+            $comparison = $validator->compareWithDefault($this->product, $this->activeShopId);
+
+            // Get badge configuration
+            $badge = $validator->getStatusBadge($comparison['status']);
+
+            // Get tooltip text
+            $tooltip = $validator->getDiffTooltip($comparison['diff'], $this->product);
+
+            // Cache result
+            $this->categoryValidationStatus[$this->activeShopId] = [
+                'status' => $comparison['status'],
+                'badge' => $badge,
+                'tooltip' => $tooltip,
+                'diff' => $comparison['diff'],
+                'metadata' => $comparison['metadata'],
+            ];
+
+            return $this->categoryValidationStatus[$this->activeShopId];
+
+        } catch (\Exception $e) {
+            Log::error('Failed to get category validation status', [
+                'shop_id' => $this->activeShopId,
+                'product_id' => $this->product->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return null;
+        }
+    }
+
+    /**
+     * Invalidate category validation cache
+     *
+     * Called when categories are modified to force re-evaluation of validation status
+     */
+    private function invalidateCategoryValidationCache(?int $shopId = null): void
+    {
+        if ($shopId === null) {
+            $shopId = $this->activeShopId;
+        }
+
+        // Clear cache for specific shop
+        if ($shopId !== null && isset($this->categoryValidationStatus[$shopId])) {
+            unset($this->categoryValidationStatus[$shopId]);
+        }
+
+        // Also clear default context cache if categories changed
+        if (isset($this->categoryValidationStatus[0])) {
+            unset($this->categoryValidationStatus[0]);
+        }
+    }
+
+    /**
+     * Recursively map category children
+     *
+     * @param \Illuminate\Database\Eloquent\Collection $children
+     * @return array
+     */
+    protected function mapCategoryChildren($children): array
+    {
+        return $children->map(function ($child) {
+            return [
+                'id' => $child->id,
+                'name' => $child->name,
+                'level' => ($child->parent?->level ?? 0) + 1,
+                'children' => $this->mapCategoryChildren($child->children ?? collect()),
+            ];
+        })->toArray();
+    }
+
+    /**
+     * Convert category array to object for Blade compatibility
+     *
+     * ETAP_07b FAZA 1 FIX: Blade partial expects objects with ->children property,
+     * but PrestaShopCategoryService returns arrays with ['children'] key
+     *
+     * @param array $category Category data as array
+     * @return \stdClass Category data as object
+     */
+    protected function convertCategoryArrayToObject(array $category): \stdClass
+    {
+        $obj = new \stdClass();
+        $obj->id = $category['id'];
+        $obj->name = $category['name'];
+        $obj->level = $category['level'] ?? 1;
+
+        // Recursively convert children
+        $obj->children = collect($category['children'] ?? [])->map(function($child) {
+            return $this->convertCategoryArrayToObject($child);
+        });
+
+        return $obj;
+    }
+
+    /**
      * Get category name by ID (for selected categories display)
      *
      * @param int $shopId
@@ -3259,8 +5873,36 @@ class ProductForm extends Component
                 ->where('shop_id', $shopId)
                 ->first();
 
-            if (!$shopData || !$shopData->prestashop_product_id) {
-                throw new \Exception('Produkt nie jest polaczony z PrestaShop (brak prestashop_product_id)');
+            // ETAP_07 FIX (2025-11-13): Better error message when product not linked to shop
+            if (!$shopData) {
+                throw new \Exception("Produkt nie jest podłączony do tego sklepu. Użyj przycisku '+ Dodaj sklep' aby połączyć produkt ze sklepem PrestaShop.");
+            }
+
+            if (!$shopData->prestashop_product_id) {
+                throw new \Exception("Produkt nie ma ID w PrestaShop. Wykonaj najpierw synchronizację (przycisk 'Aktualizuj sklep') aby utworzyć produkt w PrestaShop.");
+            }
+
+            // FIX 2025-11-20: ALLOW loading categories even during pending sync
+            // User Request: "celowo zmieniam kategorie w prestashop aby weryfikowac czy PPM wykryje"
+            //
+            // CHANGED LOGIC:
+            // - Categories are READ-ONLY data - always safe to fetch from PrestaShop
+            // - During pending sync: Load categories only (no overwrite of other fields)
+            // - Other fields (name, description, price) stay as pending changes
+            //
+            // Benefits:
+            // - User sees CURRENT PrestaShop categories even with pending changes in other fields
+            // - No data loss (pending changes stay in pendingChanges array)
+            // - Categories auto-refresh on every tab switch
+            $loadCategoriesOnly = ($shopData->sync_status === 'pending');
+
+            if ($loadCategoriesOnly) {
+                Log::info('[LOAD CATEGORIES ONLY] Loading categories from PrestaShop (pending sync - other fields unchanged)', [
+                    'shop_id' => $shopId,
+                    'product_id' => $this->product?->id,
+                    'sync_status' => $shopData->sync_status,
+                    'reason' => 'Categories are READ-ONLY data - safe to load even during pending sync',
+                ]);
             }
 
             // 3. Fetch from PrestaShop API
@@ -3273,28 +5915,161 @@ class ProductForm extends Component
             }
 
             // 4. Extract essential data for UI
+            // FIX 2025-11-20: Conditional loading based on sync status
+
+            // ALWAYS load categories (READ-ONLY data)
             $this->loadedShopData[$shopId] = [
                 'prestashop_id' => $shopData->prestashop_product_id,
-                'link_rewrite' => data_get($prestashopData, 'link_rewrite.0.value') ?? data_get($prestashopData, 'link_rewrite'),
-                'name' => data_get($prestashopData, 'name.0.value') ?? data_get($prestashopData, 'name'),
-                'description_short' => data_get($prestashopData, 'description_short.0.value') ?? data_get($prestashopData, 'description_short'),
-                'description' => data_get($prestashopData, 'description.0.value') ?? data_get($prestashopData, 'description'),
                 'categories' => $prestashopData['associations']['categories'] ?? [],
                 'id_category_default' => $prestashopData['id_category_default'] ?? null,
-                'weight' => $prestashopData['weight'] ?? null,
-                'ean13' => $prestashopData['ean13'] ?? null,
-                'reference' => $prestashopData['reference'] ?? null,
-                'price' => $prestashopData['price'] ?? null,
-                'active' => $prestashopData['active'] ?? null,
             ];
 
-            session()->flash('message', 'Dane produktu wczytane z PrestaShop');
+            // Load other fields ONLY if not pending sync
+            if (!$loadCategoriesOnly) {
+                $this->loadedShopData[$shopId] = array_merge($this->loadedShopData[$shopId], [
+                    'link_rewrite' => data_get($prestashopData, 'link_rewrite.0.value') ?? data_get($prestashopData, 'link_rewrite'),
+                    'name' => data_get($prestashopData, 'name.0.value') ?? data_get($prestashopData, 'name'),
+                    'description_short' => data_get($prestashopData, 'description_short.0.value') ?? data_get($prestashopData, 'description_short'),
+                    'description' => data_get($prestashopData, 'description.0.value') ?? data_get($prestashopData, 'description'),
+                    'weight' => $prestashopData['weight'] ?? null,
+                    'ean13' => $prestashopData['ean13'] ?? null,
+                    'reference' => $prestashopData['reference'] ?? null,
+                    'price' => $prestashopData['price'] ?? null,
+                    'active' => $prestashopData['active'] ?? null,
+                ]);
+            }
+
+            // Flash message based on what was loaded
+            if ($loadCategoriesOnly) {
+                session()->flash('message', 'Kategorie pobrane z PrestaShop (inne dane pozostają niezapisane)');
+            } else {
+                session()->flash('message', 'Dane produktu wczytane z PrestaShop');
+            }
+
+            // FIX 2025-11-20: Convert PrestaShop category IDs → PPM category IDs and update UI
+            // User Request: "celowo zmieniam kategorie w prestashop aby weryfikowac czy PPM wykryje"
+            //
+            // CRITICAL: Always update UI categories after fetch from PrestaShop API
+            // - Even during pending sync (categories are READ-ONLY)
+            // - User wants to see CURRENT PrestaShop categories in UI
+            $prestashopCategories = $this->loadedShopData[$shopId]['categories'] ?? [];
+            $prestashopDefaultCategory = $this->loadedShopData[$shopId]['id_category_default'] ?? null;
+
+            if (!empty($prestashopCategories)) {
+                $categoryMapper = app(\App\Services\PrestaShop\CategoryMapper::class);
+                $ppmCategoryIds = [];
+
+                // Convert PrestaShop IDs → PPM IDs (auto-create if missing)
+                // FIX 2025-11-20: Use mapOrCreateFromPrestaShop() to automatically create
+                // categories that exist in PrestaShop but not in PPM
+                foreach ($prestashopCategories as $psCategory) {
+                    $psCategoryId = is_array($psCategory) ? ($psCategory['id'] ?? null) : $psCategory;
+
+                    if ($psCategoryId) {
+                        try {
+                            // NEW: Auto-create missing categories
+                            $ppmId = $categoryMapper->mapOrCreateFromPrestaShop((int) $psCategoryId, $shop);
+                            $ppmCategoryIds[] = $ppmId;
+                        } catch (\Exception $e) {
+                            Log::error('[AUTO-CREATE CATEGORY] Failed to map/create category', [
+                                'prestashop_id' => $psCategoryId,
+                                'shop_id' => $shop->id,
+                                'error' => $e->getMessage(),
+                            ]);
+                            // Skip this category on error (don't break the whole process)
+                        }
+                    }
+                }
+
+                // Convert default category (auto-create if missing)
+                $ppmPrimaryId = null;
+                if ($prestashopDefaultCategory) {
+                    try {
+                        $ppmPrimaryId = $categoryMapper->mapOrCreateFromPrestaShop((int) $prestashopDefaultCategory, $shop);
+                    } catch (\Exception $e) {
+                        Log::error('[AUTO-CREATE CATEGORY] Failed to map/create default category', [
+                            'prestashop_id' => $prestashopDefaultCategory,
+                            'shop_id' => $shop->id,
+                            'error' => $e->getMessage(),
+                        ]);
+                    }
+                }
+
+                // Update UI categories (show current PrestaShop state)
+                $this->shopCategories[$shopId] = [
+                    'selected' => $ppmCategoryIds,
+                    'primary' => $ppmPrimaryId
+                ];
+
+                // CRITICAL FIX 2025-11-20: Save to database to prevent sync from using stale data
+                // Problem: Sync reads from DB (ProductShopData.category_mappings), not from UI
+                // Solution: Update DB immediately after fetch from PrestaShop API
+                //
+                // Build mappings for Option A format (use SAME ppmCategoryIds from above)
+                // FIX 2025-11-20: Mappings should match selected categories exactly
+                // No need to call mapOrCreateFromPrestaShop() again - we already have ppmCategoryIds
+                $mappings = [];
+                foreach ($prestashopCategories as $index => $psCategory) {
+                    $psCategoryId = is_array($psCategory) ? ($psCategory['id'] ?? null) : $psCategory;
+                    if ($psCategoryId && isset($ppmCategoryIds[$index])) {
+                        // Use PPM ID from first loop (already created if needed)
+                        $mappings[(string) $ppmCategoryIds[$index]] = (int) $psCategoryId;
+                    }
+                }
+
+                // Create Option A format (manual construction - we already have mappings)
+                $optionAData = [
+                    'ui' => [
+                        'selected' => $ppmCategoryIds,
+                        'primary' => $ppmPrimaryId,
+                    ],
+                    'mappings' => $mappings,
+                    'metadata' => [
+                        'last_updated' => now()->toIso8601String(),
+                        'source' => 'pull', // Pulled from PrestaShop API
+                    ],
+                ];
+
+                // Validate Option A format
+                $validator = app(\App\Services\CategoryMappingsValidator::class);
+                $optionAData = $validator->validate($optionAData);
+
+                // Save to database (update ONLY categories, preserve other fields)
+                $shopData->category_mappings = $optionAData;
+                $shopData->save();
+
+                // CRITICAL FIX 2025-11-20: Force reload categories from DB to UI
+                // Problem: loadShopDataToForm() already loaded STALE categories before we saved
+                // Solution: Reload THIS shop's categories from DB (fresh data)
+                $this->loadShopCategories($shopId);
+
+                Log::info('[CATEGORY SYNC] Reloaded shop categories from DB to UI after save', [
+                    'shop_id' => $shopId,
+                    'ui_categories_after_reload' => $this->shopCategories[$shopId] ?? 'NOT_SET',
+                ]);
+
+                // Dispatch event to update Alpine.js category tree
+                $this->dispatch('category-tree-refresh', shopId: $shopId);
+
+                Log::info('[CATEGORY SYNC] Converted PrestaShop categories to PPM IDs and saved to DB', [
+                    'shop_id' => $shopId,
+                    'prestashop_ids' => array_map(fn($c) => is_array($c) ? ($c['id'] ?? 'unknown') : $c, $prestashopCategories),
+                    'ppm_ids' => $ppmCategoryIds,
+                    'prestashop_default' => $prestashopDefaultCategory,
+                    'ppm_primary' => $ppmPrimaryId,
+                    'categories_only_mode' => $loadCategoriesOnly,
+                    'saved_to_db' => true,
+                    'mappings_count' => count($mappings),
+                ]);
+            }
 
             Log::info('Shop data loaded from PrestaShop', [
                 'shop_id' => $shopId,
                 'product_id' => $this->product?->id,
                 'prestashop_id' => $shopData->prestashop_product_id,
-                'link_rewrite' => $this->loadedShopData[$shopId]['link_rewrite'],
+                'categories_only' => $loadCategoriesOnly,
+                'categories_count' => count($this->loadedShopData[$shopId]['categories']),
+                'link_rewrite' => $this->loadedShopData[$shopId]['link_rewrite'] ?? 'N/A',
             ]);
 
         } catch (\Exception $e) {
@@ -3395,7 +6170,8 @@ class ProductForm extends Component
      */
     public function cancel()
     {
-        return redirect('/admin/products');
+        // FIX 2025-11-20 (ETAP_07b Fix #7): Use event-based JavaScript redirect
+        $this->dispatch('redirectToProductList');
     }
 
     /*
@@ -3458,39 +6234,193 @@ class ProductForm extends Component
         }
     }
 
+
+    /*
+    |--------------------------------------------------------------------------
+    | PRICES & STOCK SAVE METHODS (PROBLEM #4 - 2025-11-07)
+    |--------------------------------------------------------------------------
+    */
+
     /**
-     * Reload clean shop categories from database to prevent cross-contamination
-     * This is used before save to ensure CategoryManager gets clean data
+     * Save product prices to database
+     * Called from savePendingChangesToProduct()
      */
-    private function reloadCleanShopCategories(): void
+    private function savePricesInternal(): void
+    {
+        if (!$this->product || !$this->product->exists) {
+            Log::debug('savePricesInternal: No product to save prices for');
+            return;
+        }
+
+        $savedCount = 0;
+        $deletedCount = 0;
+
+        try {
+            Log::debug('BEFORE savePricesInternal', [
+                'prices_array' => $this->prices,
+                'prices_count' => count($this->prices),
+            ]);
+
+            foreach ($this->prices as $priceGroupId => $priceData) {
+                // If price is NULL or empty, delete existing record
+                if (empty($priceData['net']) && empty($priceData['gross'])) {
+                    \App\Models\ProductPrice::where('product_id', $this->product->id)
+                        ->where('price_group_id', $priceGroupId)
+                        ->whereNull('product_variant_id')
+                        ->delete();
+                    $deletedCount++;
+                    continue;
+                }
+
+                // Create or update price record
+                \App\Models\ProductPrice::updateOrCreate(
+                    [
+                        'product_id' => $this->product->id,
+                        'product_variant_id' => null,
+                        'price_group_id' => $priceGroupId,
+                    ],
+                    [
+                        'price_net' => $priceData['net'] ?? 0.00,
+                        'price_gross' => $priceData['gross'] ?? 0.00,
+                        'margin_percentage' => $priceData['margin'] ?? null,
+                        'is_active' => $priceData['is_active'] ?? true,
+                        'auto_calculate_gross' => false,
+                        'auto_calculate_margin' => false,
+                    ]
+                );
+
+                $savedCount++;
+            }
+
+            Log::info('Product prices saved', [
+                'product_id' => $this->product->id,
+                'saved_count' => $savedCount,
+                'deleted_count' => $deletedCount,
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Failed to save product prices', [
+                'product_id' => $this->product->id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+            throw $e;
+        }
+    }
+
+    /**
+     * Save product stock to database
+     * Called from savePendingChangesToProduct()
+     */
+    private function saveStockInternal(): void
+    {
+        if (!$this->product || !$this->product->exists) {
+            Log::debug('saveStockInternal: No product to save stock for');
+            return;
+        }
+
+        $savedCount = 0;
+
+        try {
+            Log::debug('BEFORE saveStockInternal', [
+                'stock_array' => $this->stock,
+                'stock_count' => count($this->stock),
+            ]);
+
+            foreach ($this->stock as $warehouseId => $stockData) {
+                \App\Models\ProductStock::updateOrCreate(
+                    [
+                        'product_id' => $this->product->id,
+                        'product_variant_id' => null,
+                        'warehouse_id' => $warehouseId,
+                    ],
+                    [
+                        'quantity' => $stockData['quantity'] ?? 0,
+                        'reserved_quantity' => $stockData['reserved'] ?? 0,
+                        'minimum_stock_level' => $stockData['minimum'] ?? 0,
+                        'is_active' => true,
+                        'track_stock' => true,
+                    ]
+                );
+
+                $savedCount++;
+            }
+
+            Log::info('Product stock saved', [
+                'product_id' => $this->product->id,
+                'saved_count' => $savedCount,
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Failed to save product stock', [
+                'product_id' => $this->product->id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+            throw $e;
+        }
+    }
+
+    /**
+     * Dispatch sync jobs for all connected shops (2025-11-12)
+     *
+     * Called automatically after price/stock changes to trigger PrestaShop sync
+     * Only dispatches for shops that are:
+     * - Connected and active
+     * - Already have ProductShopData for this product
+     *
+     * @return void
+     */
+    private function dispatchSyncJobsForAllShops(): void
     {
         if (!$this->product || !$this->product->exists) {
             return;
         }
 
-        // Clear potentially contaminated shopCategories
-        $this->shopCategories = [];
+        try {
+            // Get all shops this product is exported to
+            $exportedShops = \App\Models\ProductShopData::where('product_id', $this->product->id)
+                ->pluck('shop_id')
+                ->toArray();
 
-        // Load clean shop categories from database
-        $shopCategories = \App\Models\ProductShopCategory::forProduct($this->product->id)
-            ->with('shop')
-            ->get()
-            ->groupBy('shop_id');
+            if (empty($exportedShops)) {
+                Log::debug('No shops to sync - product not exported anywhere', [
+                    'product_id' => $this->product->id,
+                ]);
+                return;
+            }
 
-        foreach ($shopCategories as $shopId => $categories) {
-            $selectedIds = $categories->pluck('category_id')->toArray();
-            $primaryCategory = $categories->where('is_primary', true)->first();
+            // Get connected and active shops only
+            $shops = \App\Models\PrestaShopShop::whereIn('id', $exportedShops)
+                ->where('connection_status', 'connected')
+                ->where('is_active', true)
+                ->get();
 
-            $this->shopCategories[$shopId] = [
-                'selected' => $selectedIds,
-                'primary' => $primaryCategory?->category_id,
-            ];
+            $dispatchedCount = 0;
+            foreach ($shops as $shop) {
+                \App\Jobs\PrestaShop\SyncProductToPrestaShop::dispatch(
+                    $this->product,
+                    $shop,
+                    auth()->id()
+                );
+                $dispatchedCount++;
+            }
+
+            if ($dispatchedCount > 0) {
+                Log::info('Auto-dispatched sync jobs after price/stock change', [
+                    'product_id' => $this->product->id,
+                    'product_sku' => $this->product->sku,
+                    'shops_count' => $dispatchedCount,
+                    'user_id' => auth()->id(),
+                ]);
+            }
+
+        } catch (\Exception $e) {
+            // Non-blocking error - data is saved, sync can be triggered manually
+            Log::error('Failed to auto-dispatch sync jobs after price/stock change', [
+                'product_id' => $this->product->id,
+                'error' => $e->getMessage(),
+            ]);
         }
-
-        Log::info('Clean shop categories reloaded before save', [
-            'product_id' => $this->product->id,
-            'shop_categories_count' => count($this->shopCategories),
-            'shop_ids' => array_keys($this->shopCategories),
-        ]);
     }
 }

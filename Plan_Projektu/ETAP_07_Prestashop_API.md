@@ -1,10 +1,24 @@
 # ⏳ ETAP 07: INTEGRACJA PRESTASHOP API
 
-**Status Ogólny:** 🛠️ FAZA 1+2 COMPLETED | FAZA 3 IN PROGRESS (2025-10-08) 75%
+## PLAN RAMOWY ETAPU
+
+- ✅ FAZA 1: Panel konfiguracji PrestaShop + synchronizacja PPM → PrestaShop (bez zdjęć)
+- ✅ FAZA 2: Dynamiczny category picker + reverse transformers
+- ✅ FAZA 3: Import PrestaShop → PPM + real-time progress + queue worker
+- 🛠️ FAZA 9: Changed fields tracking + SYNC NOW optymalizacja + integracja stanów (w trakcie)
+
+---
+
+
+**Status Ogólny:** 🛠️ FAZA 1+2+3 COMPLETED | FAZA 5 IN PROGRESS (2025-11-14) | FAZA 9 40%
 **Cel FAZA 1:** Panel konfiguracyjny + Synchronizacja PPM → PrestaShop (bez zdjęć) ✅
 **Cel FAZA 2:** Dynamic category picker + Reverse transformers ✅
-**Cel FAZA 3:** Import PrestaShop → PPM + Real-Time Progress + Queue worker
-**Progress FAZA 3:** ✅ Import working | ✅ Real-Time Progress FIXED | ⏳ Queue Worker (pending test)
+**Cel FAZA 3:** Import PrestaShop → PPM + Real-Time Progress + Queue worker ✅
+**Cel FAZA 5:** Tax Rules UI Enhancement System (2025-11-14) - **NEW**
+**Cel FAZA 9:** Changed Fields Tracking + SYNC NOW Optimization + Stock Integration
+**Progress FAZA 5:** 🛠️ 35% (5.1 COMPLETED ✅ | 5.2 PLANNING ✅ | 5.2 IMPLEMENTATION PENDING)
+**Progress FAZA 9:** ✅ Price tracking | ✅ SYNC NOW fix | 🔴 Stock tracking BLOCKED
+**Maintenance:** ✅ FIX #12 Category Mappings Refactor (2025-11-18) - See ETAP_07a
 
 ---
 
@@ -38,6 +52,17 @@
 - ✅ Reverse transformers (PrestaShop → PPM data) → **DEPLOYED 2025-10-03**
 - ✅ Import Service implementation → **DEPLOYED 2025-10-03**
 - ✅ Category API endpoints → **DEPLOYED 2025-10-03**
+
+### 🔧 MAINTENANCE & REFACTORING (2025-11-18)
+
+#### ✅ FIX #12: Category Mappings Architecture Refactor
+**Status:** ✅ COMPLETED (2025-11-18)
+**Impact:** FAZA 2 (Category Picker) & FAZA 3 (Sync Logic)
+**Description:** Krytyczna aktualizacja architektury mapowania kategorii (`category_mappings`).
+- **Problem:** Niespójność formatów JSON (UI vs PrestaShop vs PPM) powodująca błędy sync.
+- **Rozwiązanie:** Wdrożenie "Option A - Canonical Format" (ujednolicony format danych).
+- **Szczegóły:** Pełna dokumentacja techniczna znajduje się w **[Plan_Projektu/ETAP_07a_FAZA_3D_CATEGORY_PREVIEW.md](ETAP_07a_FAZA_3D_CATEGORY_PREVIEW.md)** (v1.1).
+- **Komponenty:** Zaktualizowano `ProductShopData` (Casts), `ProductTransformer`, `ProductForm` (Livewire).
 
 **🛠️ FAZA 3 (IN PROGRESS - 2025-10-08):**
 **Overall Progress:** 🔄 75% (3A Complete ✅, 3B Progress Fixed ✅ 75%, 3C Not Started ❌)
@@ -157,6 +182,119 @@
 - ❌ Advanced conflict resolution UI
 - ❌ Real-time monitoring dashboard
 - ❌ Bulk import produktów z kategorii PrestaShop
+
+---
+
+### 🎯 FAZA 5: TAX RULES UI ENHANCEMENT SYSTEM (2025-11-14)
+**Status:** 🛠️ IN PROGRESS | **Progress:** 40% (5.1 COMPLETED ✅, 5.2.X BUG FIXES ✅, 5.2 FULL IMPLEMENTATION ❌)
+**Priority:** HIGH (critical for multi-country support)
+**Estimated Time:** 12-18h (1.5-2.5 days) | **Remaining:** 6-8h
+**Architectural Reports:**
+- [architect_tax_rules_ui_enhancement_2025-11-14_REPORT.md](../_AGENT_REPORTS/architect_tax_rules_ui_enhancement_2025-11-14_REPORT.md) - FAZA 5.1 Plan
+- [architect_faza_5_2_tax_rate_productform_2025-11-14_REPORT.md](../_AGENT_REPORTS/architect_faza_5_2_tax_rate_productform_2025-11-14_REPORT.md) - FAZA 5.2 Plan ✅
+- [tax_rate_dropdown_fixes_2025-11-17_REPORT.md](../_AGENT_REPORTS/tax_rate_dropdown_fixes_2025-11-17_REPORT.md) - FAZA 5.2.X Bug Fixes ✅ **NEW**
+
+**📖 Zobacz szczegółowe raporty architektoniczne dla pełnych planów implementacji, agent assignments, risk assessment i testing strategy.**
+
+#### 🎯 QUICK SUMMARY
+
+**Backend Fixed (2025-11-14):** ✅ COMPLETE
+- Migration: `prestashop_shops.tax_rules_group_id_23/8/5/0` columns
+- Migration: `product_shop_data.tax_rate_override` column
+- `ProductTransformer::mapTaxRate()` - 3-tier strategy working
+- `getTaxRuleGroups()` API method implemented (PS8/PS9)
+
+**UI Requirements:**
+1. ✅ /admin/shops (Add/Edit) - Tax Rules Configuration (PRIORITY A) - **COMPLETED 2025-11-14**
+2. 🛠️ ProductForm - Tax Rate Enhancement (Basic Tab) (PRIORITY B) - **PLANNING ✅ + BUG FIXES ✅ (2025-11-17)**
+
+#### ✅ FAZA 5.1: /admin/shops Enhancement (8-12h) - **COMPLETED 2025-11-14**
+- ✅ 5.1.1 PrestaShop Tax Rules API Integration (prestashop-api-expert, 2-3h)
+  └── 📁 PLIK: `app/Services/PrestaShop/BasePrestaShopClient.php` (abstract method)
+  └── 📁 PLIK: `app/Services/PrestaShop/PrestaShop8Client.php:564-644`
+  └── 📁 PLIK: `app/Services/PrestaShop/PrestaShop9Client.php` (similar implementation)
+- ✅ 5.1.2 AddShop Livewire Component Update (livewire-specialist, 2-3h)
+  └── 📁 PLIK: `app/Http/Livewire/Admin/Shops/AddShop.php`
+- ✅ 5.1.3 AddShop Blade Template + CSS (frontend-specialist, 1-2h)
+  └── 📁 PLIK: `resources/views/livewire/admin/shops/add-shop.blade.php`
+- ✅ 5.1.4 AddShop Save Logic Update (laravel-expert, 1h)
+  └── 📁 PLIK: `app/Http/Livewire/Admin/Shops/AddShop.php` (save method)
+- ✅ 5.1.5 EditShop Enhancement (livewire-specialist, 2h)
+  └── 📁 PLIK: `app/Http/Livewire/Admin/Shops/EditShop.php`
+
+#### 🛠️ FAZA 5.2: ProductForm Enhancement (12-16h) - **ARCHITECTURAL PLANNING COMPLETED 2025-11-14**
+**Status:** ✅ PLANNING DONE | 🛠️ BUG FIXES IN PROGRESS | ❌ FULL IMPLEMENTATION PENDING
+**Architectural Report:** [architect_faza_5_2_tax_rate_productform_2025-11-14_REPORT.md](../_AGENT_REPORTS/architect_faza_5_2_tax_rate_productform_2025-11-14_REPORT.md)
+
+**SCOPE:**
+- ✅ Tax Rate field relocation: Physical tab → Basic tab (proper categorization)
+- ✅ Default mode: Smart dropdown [23%, 8%, 5%, 0%, Custom]
+- ✅ Shop-specific mode: Intelligent dropdown with PrestaShop tax rules integration
+- ✅ Per-shop overrides: `product_shop_data.tax_rate_override` (NULL = inherit default)
+- ✅ Indicator system: Green/Yellow/Red badges (synced, pending, conflict)
+- ✅ Edge cases: No mappings, API failures, validation warnings
+
+**IMPLEMENTATION PHASES:**
+- ❌ 5.2.1 Backend Foundation (laravel-expert, 4h)
+  - New properties: selectedTaxRateOption, customTaxRate, shopTaxRateOverrides, availableTaxRuleGroups
+  - Methods: loadTaxRuleGroupsForShop(), getAvailableTaxRulesForShop(), saveTaxRate(), getEffectiveTaxRate()
+  - Validation rules + error handling
+- ❌ 5.2.2 Livewire Integration (livewire-specialist, 4h)
+  - wire:model.live bindings for dropdown
+  - updatedSelectedTaxRateOption() listener
+  - Conditional rendering for custom input
+  - Save flow integration
+- ❌ 5.2.3 Frontend/UI (frontend-specialist, 4h)
+  - Relocate tax_rate field (physical → basic tab)
+  - Design dropdown with proper styling
+  - Add conditional custom input
+  - Integrate indicator system (reuse existing classes)
+- ❌ 5.2.4 Indicator System (livewire-specialist, 2h)
+  - Extend getFieldStatusIndicator() for tax_rate
+  - Implement getTaxRateIndicator() method
+  - Validation warning detection
+- ❌ 5.2.5 Testing & Deployment (all specialists, 2h)
+  - Manual testing: Default + Shop modes
+  - Edge cases testing (API down, no mappings, conflicts)
+  - Production deployment
+
+##### ✅ 5.2.X Tax Rate Dropdown Bug Fixes (2025-11-17) - **COMPLETED**
+**Bug Report:** [tax_rate_dropdown_fixes_2025-11-17_REPORT.md](../_AGENT_REPORTS/tax_rate_dropdown_fixes_2025-11-17_REPORT.md)
+**User Confirmation:** *"doskonale teraz działą poprawnie"* ✅
+
+- ✅ Fix #1: Type Mismatch w getTaxRateOptions() (Float Casting)
+  └── 📁 PLIK: `app/Http/Livewire/Products/Management/ProductForm.php:544` (float casting for strict comparison)
+- ✅ Fix #2: Duplicate 23% Values w Dropdown (Deduplikacja)
+  └── 📁 PLIK: `app/Http/Livewire/Products/Management/ProductForm.php:538-550` (getTaxRateOptions logic)
+- ✅ Fix #3: CSS Duplicate Definitions (GREEN overriding PURPLE)
+  └── 📁 PLIK: `resources/css/products/product-form.css:63-85` (DELETED duplicates, added warning comment)
+  └── 📁 PLIK: `public/build/assets/product-form-CMDcw4nL.css` (11.33 KB - rebuilt)
+- ✅ Fix #4: Inline Tailwind Classes (Project Rule Violation)
+  └── 📁 PLIK: `app/Http/Livewire/Products/Management/ProductForm.php:628` (pending-sync-badge)
+  └── 📁 PLIK: `app/Http/Livewire/Products/Management/ProductForm.php:689` (status-label-unmapped)
+  └── 📁 PLIK: `resources/css/products/product-form.css:63-72` (new .status-label-unmapped class)
+- ✅ Fix #5: Logic Error w getFieldStatus() (CRITICAL)
+  └── 📁 PLIK: `app/Http/Livewire/Products/Management/ProductForm.php:2408-2424` (isset check instead of value comparison)
+
+**Wyeliminowane Anti-Patterns:**
+- ❌ Inline Tailwind classes → ✅ CSS classes
+- ❌ CSS duplicates → ✅ Single source of truth (components.css)
+- ❌ Value comparison dla override detection → ✅ isset() check
+- ❌ Implicit type casting → ✅ Explicit float casting
+
+**Deployment:** Build + Upload ALL assets + ROOT manifest + Clear cache + HTTP 200 verification ✅
+
+**FILES TO MODIFY:**
+1. `resources/views/livewire/products/management/product-form.blade.php` (remove lines 1210-1234, add to lines 280-700)
+2. `app/Http/Livewire/Products/Management/ProductForm.php` (add 5 properties, 8 methods, validation)
+3. `resources/css/products/product-form.css` (optional, reuse existing)
+
+#### ❌ FAZA 5.3: Backend Integration (45min)
+- ❌ 5.3.1 ProductTransformer Update (prestashop-api-expert, 30min)
+- ❌ 5.3.2 Checksum Recalculation (laravel-expert, 15min)
+
+**Total:** 12-18h (1.5-2.5 days) | **Completed:** 10-14h (FAZA 5.1 ✅ + 5.2.X Bug Fixes ✅) | **Remaining:** 6-8h (FAZA 5.2 Full + 5.3)
+**Agent Coordination:** Parallel + Sequential work (see reports)
 
 ---
 
@@ -2123,5 +2261,506 @@ Etap zostanie uznany za ukończony gdy:
 - Cross-references do ETAP_02, ETAP_04, ETAP_05
 - PrestaShop API references (Context7 verified)
 - Laravel 12.x patterns (Context7 verified)
+
+---
+
+## 🔧 FAZA 9: SYNC IMPROVEMENTS & BUG FIXES (LISTOPAD 2025)
+
+**Status:** 🛠️ IN PROGRESS | **Started:** 2025-11-12
+**Focus:** Changed Fields Tracking, SYNC NOW Optimization, Stock Integration
+
+### ✅ 9.1 CHANGED FIELDS TRACKING IMPLEMENTATION (2025-11-12)
+
+**Status:** ✅ COMPLETED - Price tracking working, Stock tracking blocked
+
+#### ✅ 9.1.1 BUG #13: Track BRUTTO Price in Changed Fields
+**Status:** ✅ FIXED (2025-11-12)
+- ✅ **Problem**: Changed Fields pokazywały tylko price (netto), user chciał widzieć BRUTTO
+- ✅ **Solution**: Extract `price (brutto)` z PPM ProductPrice (price_group_id=1) w extractTrackableFields()
+- ✅ **Result**: Changed Fields teraz pokazują zarówno price (netto) jak i price (brutto)
+- ✅ **Deployed**: ProductSyncStrategy.php (lines 441-449)
+└──📁 PLIK: `app/Services/PrestaShop/Sync/ProductSyncStrategy.php`
+
+#### ✅ 9.1.2 BUG #14: SYNC NOW Duplicate Execution
+**Status:** ✅ FIXED (2025-11-12)
+- ✅ **Problem**: Po kliknięciu SYNC NOW, stary job pozostawał w queue i wykonywał się oddzielnie → duplicate sync
+- ✅ **Root Cause**: FALLBACK logic dispatch'ował nowe jobs z `dispatchSync()`, ale nie usuwał starych z Laravel `jobs` table
+- ✅ **Solution**: Przed dispatch nowych jobs, znajdź i usuń wszystkie pending jobs dla tego shop_id z queue
+- ✅ **Implementation**:
+  - Query `QueueJobsService->getActiveJobs()` dla pending jobs tego shopu
+  - Cancel przez `QueueJobsService->cancelPendingJob()`
+  - Dispatch nowe jobs z `dispatchSync()` (immediate)
+  - Notification pokazuje ile jobs zostało anulowanych
+- ✅ **Result**: SYNC NOW wykonuje się TYLKO RAZ, bez duplicate
+- ✅ **Deployed**: SyncController.php (lines 907-965)
+└──📁 PLIK: `app/Http/Livewire/Admin/Shops/SyncController.php`
+
+#### 🔴 9.1.3 BUG #15: Quantity/Stock Changes Not in Changed Fields
+**Status:** ⚠️ ATTEMPTED - **BLOCKED BY WAREHOUSE SYSTEM**
+- ⚠️ **Problem**: Zmiany stanów magazynowych nie pojawiają się w Changed Fields
+- ⚠️ **Root Cause #1**: Checksum nie zawierał prices + stock → sync skipped → brak change detection
+  - ✅ **FIXED**: Dodano prices (net/gross) i stock_quantity do checksum calculation
+  - ✅ **Deployed**: ProductSyncStrategy.php calculateChecksum() (lines 244-268)
+- 🔴 **Root Cause #2**: Quantity ekstraktowane z **PrestaShop response** (0/stale), nie z **PPM warehouse**
+  - ✅ **ATTEMPTED FIX**: Extract quantity z PPM przez `WarehouseMapper->calculateStockForShop()`
+  - ✅ **Deployed**: ProductSyncStrategy.php extractTrackableFields() (lines 450-469)
+- 🔴 **Root Cause #3**: **STANY MAGAZYNOWE NIE SĄ PRZESYŁANE DO PRESTASHOP!**
+  - ❌ **BLOCKER**: Wymaga przeprojektowania całego warehouse system
+  - ❌ **Status**: Quantity pokazuje 0 bo faktycznie nic nie jest wysyłane
+  - ⏳ **Solution**: WAREHOUSE REDESIGN (zadanie na jutro)
+  - 📋 **Reference**: `_AGENT_REPORTS/architect_warehouse_system_redesign_2025-11-07_REPORT.md`
+└──📁 PLIKI:
+  - `app/Services/PrestaShop/Sync/ProductSyncStrategy.php` (checksum + extract)
+  - `app/Services/PrestaShop/Mappers/WarehouseMapper.php` (stock calculation)
+
+**WNIOSKI:**
+- ✅ Price tracking WORKS (netto + brutto)
+- ✅ SYNC NOW duplicate FIXED
+- 🔴 Stock tracking BLOCKED - wymaga WAREHOUSE REDESIGN
+- ⏳ Task przeniesiony do jutrzejszego workflow
+
+---
+
+### ✅ 9.2 SYNC CONFIGURATION INTEGRATION (2025-11-13)
+
+**Status:** ✅ COMPLETED
+**Priority:** 🔴 CRITICAL - Panel nie jest źródłem prawdy
+**Effort:** 4h
+**Completed By:** laravel_expert
+**Reference:** `_AGENT_REPORTS/laravel_expert_sync_config_integration_2025-11-13_REPORT.md`
+
+#### 🎯 Problem:
+Panel konfiguracji synchronizacji (`admin/shops/sync`) zapisuje 46 ustawień do `system_settings`, ale scheduler IGNORUJE wszystkie i używa hardcoded values:
+- Częstotliwość: hardcoded `everySixHours()` zamiast `sync.schedule.frequency`
+- Batch size: hardcoded `50` zamiast `sync.batch_size`
+- Timeout: hardcoded `600` zamiast `sync.timeout`
+
+#### 🎯 Scope:
+1. ✅ **Dynamic Scheduler Frequency** - zamień `everySixHours()` na dynamiczny cron
+   - Use `sync.schedule.frequency` (hourly/daily/weekly)
+   - Use `sync.schedule.hour` (0-23)
+   - Use `sync.schedule.days_of_week` (array)
+   - Build cron expression dynamically
+   └──📁 PLIK: routes/console.php (lines 73-130)
+
+2. ✅ **Respect Panel Settings** - scheduler musi używać SystemSetting
+   - Check `sync.schedule.enabled` before execution
+   - Apply `sync.schedule.only_connected` filter
+   - Respect `sync.schedule.skip_maintenance`
+   └──📁 PLIK: routes/console.php (lines 99-127)
+
+3. ✅ **Connect Batch Size** - jobs muszą używać setting
+   - Replace `SyncProductsJob::$batchSize = 50` → `SystemSetting::get('sync.batch_size', 10)`
+   - Apply to `PullProductsFromPrestaShop` as well
+   └──📁 PLIK: app/Jobs/PrestaShop/SyncProductsJob.php (lines 42, 70)
+   └──📁 PLIK: app/Jobs/PullProductsFromPrestaShop.php (lines 54-60, 83)
+
+4. ✅ **Connect Timeout** - jobs muszą używać setting
+   - Replace hardcoded `$timeout` → `SystemSetting::get('sync.timeout', 300)`
+   - Apply to all sync jobs
+   └──📁 PLIK: app/Jobs/PrestaShop/SyncProductsJob.php (lines 59, 71)
+   └──📁 PLIK: app/Jobs/PrestaShop/SyncProductToPrestaShop.php (lines 67, 97)
+   └──📁 PLIK: app/Jobs/PullProductsFromPrestaShop.php (lines 71, 84)
+
+#### 📁 Files Modified:
+- `routes/console.php` - Dynamic scheduler frequency + conditions + fallback
+- `app/Jobs/PrestaShop/SyncProductsJob.php` - Dynamic batch_size + timeout
+- `app/Jobs/PullProductsFromPrestaShop.php` - Dynamic batch_size + timeout
+- `app/Jobs/PrestaShop/SyncProductToPrestaShop.php` - Dynamic timeout
+
+#### ✅ Success Criteria:
+- [x] User changes frequency in UI → scheduler respects it
+- [x] User changes batch size → jobs use new value
+- [x] User disables auto-sync → scheduler stops
+- [x] Timeouts respect panel settings
+- [x] Graceful fallback when system_settings table doesn't exist
+- [x] All hardcoded values removed
+
+---
+
+### ❌ 9.3 CONFLICT RESOLUTION SYSTEM (2025-11-13)
+
+**Status:** ❌ NOT STARTED
+**Priority:** 🔴 HIGH - Currently PrestaShop always wins
+**Effort:** 6h
+**Reference:** Audit Report (ask agent 2025-11-13)
+
+#### 🎯 Problem:
+Setting `sync.conflict_resolution` jest zapisywane ale NIGDY nie używane. During pull, PrestaShop data ZAWSZE nadpisuje PPM data (no comparison, no conflict detection).
+
+#### 🎯 Scope:
+1. ❌ **Create ConflictResolver Service**
+   - Class: `app/Services/PrestaShop/ConflictResolver.php`
+   - Strategies: `ppm_wins`, `prestashop_wins`, `newest_wins`, `manual`
+   - Methods: `resolve()`, `detectConflicts()`, `applyStrategy()`
+
+2. ❌ **Integrate with PullProductsFromPrestaShop**
+   - BEFORE update: call `ConflictResolver->resolve()`
+   - Compare PPM vs PrestaShop timestamps
+   - Apply selected strategy from `sync.conflict_resolution`
+   - Log conflicts to `product_shop_data.conflict_log` (JSON)
+
+3. ❌ **Manual Resolution UI** (if strategy = 'manual')
+   - Flag products with conflicts: `product_shop_data.has_conflicts = true`
+   - Show conflicts in validation tab (see 9.5)
+   - Allow user to choose: Keep PPM / Keep PrestaShop / Merge
+
+4. ❌ **Testing**
+   - Scenario 1: PPM price changed, PS price changed → conflict detected
+   - Scenario 2: PPM wins strategy → PS data ignored
+   - Scenario 3: Newest wins → timestamp comparison works
+   - Scenario 4: Manual → conflict flagged for user review
+
+#### 📁 Files to Create:
+- `app/Services/PrestaShop/ConflictResolver.php` (NEW)
+- `database/migrations/*_add_conflict_fields_to_product_shop_data.php` (NEW)
+
+#### 📁 Files to Modify:
+- `app/Jobs/PullProductsFromPrestaShop.php` (integrate resolver)
+- `app/Models/ProductShopData.php` (add conflict_log, has_conflicts columns)
+
+#### ✅ Success Criteria:
+- [ ] UI setting respected during pull
+- [ ] PPM wins strategy prevents overwrite
+- [ ] Conflicts logged to database
+- [ ] Manual conflicts flagged for review
+
+---
+
+### ❌ 9.4 SHOP TAB ON PRODUCT CARD (2025-11-13)
+
+**Status:** ❌ NOT STARTED
+**Priority:** 🔴 HIGH - Required for validation system
+**Effort:** 8h
+**Reference:** Audit Report (ask agent 2025-11-13)
+
+#### 🎯 Problem:
+User nie widzi linked shop data per product. Brak visualization validation warnings. Scheduler aktualizuje dane w `product_shop_data` ale nie ma UI do wyświetlenia.
+
+#### 🎯 Scope:
+1. ❌ **Create Shop Tab Component**
+   - Trait: `app/Http/Livewire/Products/Management/Traits/ProductFormShopTabs.php`
+   - Partial: `resources/views/livewire/products/management/partials/product-shop-tab.blade.php`
+   - Show linked shops: `Product->shopData` relation
+
+2. ❌ **Display Linked Shop Data**
+   - Shop name + logo
+   - External ID (prestashop_product_id)
+   - Sync status (synced/pending/error)
+   - Last pulled at timestamp
+   - Last synced at timestamp
+   - Changed fields (if any)
+
+3. ❌ **Display Validation Warnings** (integration with 9.5)
+   - Show `validation_warnings` JSON from database
+   - Visual indicators: ⚠️ warning, ❌ error, ℹ️ info
+   - Compare PPM vs PrestaShop values side-by-side
+   - Action buttons: "Accept PPM", "Accept PrestaShop", "Sync Now"
+
+4. ❌ **Shop-Specific Actions**
+   - Button: "Sync This Shop" (dispatch single-shop job)
+   - Button: "Pull Latest Data" (refresh from PrestaShop)
+   - Button: "View on PrestaShop" (open external link)
+   - Button: "Unlink Shop" (remove ProductShopData)
+
+5. ❌ **Responsive Design**
+   - Dark theme consistency
+   - Mobile-friendly layout
+   - Loading states (wire:loading)
+
+#### 📁 Files to Create:
+- `app/Http/Livewire/Products/Management/Traits/ProductFormShopTabs.php` (NEW)
+- `resources/views/livewire/products/management/partials/product-shop-tab.blade.php` (NEW)
+- `resources/css/products/shop-tab.css` (NEW - use existing file if possible!)
+
+#### 📁 Files to Modify:
+- `app/Http/Livewire/Products/Management/ProductForm.php` (use trait)
+- `resources/views/livewire/products/management/product-form.blade.php` (add tab)
+
+#### ✅ Success Criteria:
+- [ ] Tab visible on product edit page
+- [ ] Shows all linked shops with data
+- [ ] Validation warnings displayed
+- [ ] Actions work (sync, pull, unlink)
+- [ ] No inline styles (use CSS classes!)
+
+---
+
+### ❌ 9.5 VALIDATION SYSTEM (2025-11-13)
+
+**Status:** ❌ NOT STARTED
+**Priority:** 🔴 HIGH - Core requirement from user
+**Effort:** 10h
+**Reference:** Audit Report (ask agent 2025-11-13)
+
+#### 🎯 Problem:
+Scheduler aktualizuje `product_shop_data` ale NIE porównuje PPM vs PrestaShop values. User nie widzi inconsistencies między systemami. Brak validation alertów.
+
+#### 🎯 Scope:
+1. ❌ **Create ValidationService**
+   - Class: `app/Services/PrestaShop/ValidationService.php`
+   - Method: `validateProductData(ProductShopData $ppm, array $psData): array`
+   - Compare fields: name, descriptions, price, stock, categories, attributes
+   - Return warnings array with severity (info/warning/error)
+
+2. ❌ **Integration with PullProductsFromPrestaShop**
+   - AFTER fetching PrestaShop data: call ValidationService
+   - BEFORE update: store validation warnings
+   - Update `product_shop_data.validation_warnings` (JSON column)
+   - Set `product_shop_data.has_validation_warnings = true` if any
+
+3. ❌ **Database Schema**
+   - Add column: `validation_warnings` (JSON, nullable)
+   - Add column: `has_validation_warnings` (boolean, default false)
+   - Add column: `validation_checked_at` (timestamp, nullable)
+   - Migration: `*_add_validation_to_product_shop_data.php`
+
+4. ❌ **Validation Rules**
+   - **Name mismatch**: severity = warning (common, can be intentional)
+   - **Price difference > 10%**: severity = error (likely mistake)
+   - **Stock mismatch**: severity = info (frequent changes)
+   - **Missing categories**: severity = warning (product not visible on PS)
+   - **Missing images**: severity = warning (product needs media)
+   - **Inactive on PrestaShop**: severity = info (product hidden)
+
+5. ❌ **UI Indicators** (displayed in 9.4 Shop Tab)
+   - Badge count: "3 warnings" on tab header
+   - List warnings with icons
+   - Show PPM value vs PrestaShop value side-by-side
+   - Suggest actions: "Sync to PrestaShop", "Update from PrestaShop"
+
+6. ❌ **Dashboard Widget** (optional)
+   - Admin dashboard: "Products with Validation Warnings"
+   - Count products by severity
+   - Quick links to products needing attention
+
+#### 📁 Files to Create:
+- `app/Services/PrestaShop/ValidationService.php` (NEW)
+- `database/migrations/*_add_validation_to_product_shop_data.php` (NEW)
+
+#### 📁 Files to Modify:
+- `app/Jobs/PullProductsFromPrestaShop.php` (integrate validation)
+- `app/Models/ProductShopData.php` (add validation columns to $fillable)
+
+#### ✅ Success Criteria:
+- [ ] Validation runs during every pull
+- [ ] Warnings stored in database
+- [ ] UI shows warnings (in 9.4 tab)
+- [ ] Severity levels respected (info/warning/error)
+- [ ] User can take action on warnings
+
+---
+
+### ❌ 9.6 IMPORT NEW PRODUCTS FEATURE (CANCELLED)
+
+**Status:** ❌ CANCELLED - User already has working import system
+**Original Priority:** 🔴 HIGH
+**Effort Planned:** 6h
+**Reference:** Audit Report (ask agent 2025-11-13)
+
+#### 📋 Reason for Cancellation:
+**User Feedback (2025-11-13):**
+> "ŹLE mnie zrozumiałeś, mamy już działający system importu w panelu https://ppm.mpptrade.pl/admin/products
+> nie potrzebny jest dodatkowy panel! Skreśl te zadanie 9.6 z Planu"
+
+**Analysis:**
+- System importu produktów już istnieje w `/admin/products` i działa prawidłowo
+- Dodatkowy import modal w `/admin/shops/sync` powielał funkcjonalność
+- User triggered "← Import" button w SyncController używa `PullProductsFromPrestaShop` (updates existing linked products)
+- To jest EXPECTED behavior - import NOWYCH produktów odbywa się w dedykowanym panelu `/admin/products`
+- Nie ma potrzeby duplikowania tej funkcjonalności w SyncController
+
+#### 🗄️ Archived Files:
+**Location:** `_ARCHIVE/task_9_6_import_feature/`
+
+Następujące pliki zostały zarchiwizowane (mogą być wykorzystane w przyszłości dla innych scenariuszy importu):
+- `ImportAllProductsJob.php` (18085 bytes) - Job do importu wszystkich produktów z PrestaShop
+- `ProductMatcher.php` (8234 bytes) - SKU matching logic
+
+#### 🔄 Reverted Changes (2025-11-13):
+**SyncController.php:**
+- Usunięto: properties (`showImportModal`, `importShopId`, `importOnlyNew`, `importCategoryId`)
+- Usunięto: methods (`openImportModal()`, `closeImportModal()`, `importNewProducts()`)
+- Przywrócono: original `importFromShop()` method (dispatches `PullProductsFromPrestaShop`)
+- Usunięto: `use App\Jobs\PrestaShop\ImportAllProductsJob;` import
+
+**sync-controller.blade.php:**
+- Usunięto: Import modal HTML (całość)
+- Przywrócono: Oryginalny button "← Import" behavior (kieruje do `/admin/products`)
+
+**Production Deployment:**
+- Zrevertowane pliki wdrożone na produkcję
+- Cache wyczyszczony
+- UI zweryfikowany - brak błędów
+
+#### 💡 Note for Future:
+Funkcjonalność może być wykorzystana w przyszłości dla:
+- Bulk import z wielu sklepów jednocześnie
+- Scheduled auto-import nowych produktów
+- Import from external sources (nie PrestaShop)
+
+---
+
+### ❌ 9.7 WAREHOUSE SYSTEM REDESIGN (2025-11-13)
+
+**Status:** ⏳ ZAPLANOWANE (renumbered from 9.2)
+**Priority:** 🔴 CRITICAL BLOCKER - blokuje stock sync do PrestaShop
+
+#### 🎯 Scope Warehouse Redesign:
+1. ❌ **Analiza obecnego WarehouseMapper** - dlaczego quantity nie jest wysyłane
+2. ❌ **Integracja z ProductTransformer** - upewnić się że stock jest w payload
+3. ❌ **Sync stock values** - calculateStockForShop() integration
+4. ❌ **Testing** - verify stock jest faktycznie wysyłany do PrestaShop API
+5. ❌ **Changed Fields** - verify quantity tracking works po fix
+
+📋 **Detailed Plan**: `_AGENT_REPORTS/architect_warehouse_system_redesign_2025-11-07_REPORT.md`
+📋 **Reference**: `_AGENT_REPORTS/architect_warehouse_system_redesign_UPDATED_2025-11-12_REPORT.md`
+
+---
+
+### ❌ 9.8 IMAGE SYNC STRATEGY (2025-11-13+)
+
+**Status:** ⏳ ZAPLANOWANE (renumbered from 9.3)
+**Priority:** 🟡 HIGH - następny feature po warehouse fix
+**Reference:** Punkt 7.4.3 w tym planie
+
+#### 🎯 Scope ImageSyncStrategy:
+Patrz: **❌ 7.4.3 ImageSyncStrategy** (line 834-863 w tym pliku)
+
+**Zadania:**
+1. ❌ Implementacja ImageSyncStrategy class
+2. ❌ Upload images do PrestaShop API
+3. ❌ Handle image resizing, optimization
+4. ❌ Update image references w PrestaShop
+5. ❌ Integration z ProductSyncStrategy
+6. ❌ Testing z real product images
+
+🔗 **Powiązanie**: ETAP_05 punkt 6.2.1.1 (media sync w module produktowym)
+
+---
+
+### ❌ 9.9 MEDIUM PRIORITY IMPROVEMENTS (2025-11-14+)
+
+**Status:** ⏳ ZAPLANOWANE (after HIGH priority tasks)
+**Priority:** 🟢 MEDIUM - Improvements and optimizations
+**Total Effort:** 35h
+**Reference:** Audit Report (ask agent 2025-11-13)
+
+#### 🎯 Scope:
+
+##### 1. ❌ Connect Retry Settings to Jobs (3h)
+- Replace hardcoded `public int $tries = 3` with `SystemSetting::get('sync.retry.max_attempts')`
+- Replace hardcoded `backoff()` with dynamic calculation using:
+  - `sync.retry.delay_minutes`
+  - `sync.retry.backoff_multiplier`
+- Apply to all jobs:
+  - `SyncProductsJob.php`
+  - `SyncProductToPrestaShop.php`
+  - `PullProductsFromPrestaShop.php`
+  - `ImportAllProductsJob.php` (when created)
+
+##### 2. ❌ Connect Performance Settings to Jobs (2h)
+- Memory limit: Use `SystemSetting::get('sync.performance.memory_limit')` with `ini_set('memory_limit')`
+- Concurrent jobs: Implement queue worker concurrency control
+- Job delay: Use shop-specific OR global `sync.performance.job_processing_delay`
+- Performance mode: Apply settings based on economy/balanced/performance
+
+##### 3. ❌ Implement Notification System (8h)
+- Create notifications:
+  - `app/Notifications/SyncCompletedNotification.php`
+  - `app/Notifications/SyncFailedNotification.php`
+  - `app/Notifications/SyncRetryExhaustedNotification.php`
+- Check `sync.notifications.enabled` before dispatching
+- Respect `sync.notifications.notify_on_*` settings
+- Support channels:
+  - Email (use `sync.notifications.recipients`)
+  - Slack (configure webhook in settings)
+- Dispatch from jobs:
+  - On success: SyncCompletedNotification
+  - On failure: SyncFailedNotification
+  - On retry exhausted: SyncRetryExhaustedNotification
+
+##### 4. ❌ Implement Backup System (10h)
+- Create service: `app/Services/BackupService.php`
+- Methods:
+  - `createBackup(array $tables)` - backup specified tables
+  - `shouldBackup(array $changes)` - check if backup needed
+  - `compressBackup(string $path)` - compress if enabled
+  - `cleanupOldBackups()` - remove backups older than retention
+- Integration with jobs:
+  - BEFORE sync: check `sync.backup.enabled`
+  - If enabled: create backup of `products`, `product_shop_data`, `product_prices`, `product_stocks`
+  - If `sync.backup.only_major_changes`: analyze change magnitude
+  - If `sync.backup.compression`: compress backup file
+- Scheduled cleanup:
+  - Daily job: remove backups older than `sync.backup.retention_days`
+- Store backups: `storage/backups/sync_YYYYMMDD_HHMMSS.sql(.gz)`
+
+##### 5. ❌ Advanced Rate Limiting (3h)
+- Per-shop rate limiting based on `prestashop_shops.rate_limit_per_minute`
+- Global rate limiting from `sync.performance.job_processing_delay`
+- Token bucket algorithm for burst handling
+- Respect PrestaShop server limits dynamically
+
+##### 6. ❌ Performance Monitoring Dashboard (9h)
+- Widget: "Sync Performance Metrics"
+- Show:
+  - Average sync time per shop
+  - Success/failure rate
+  - Queue depth (pending jobs)
+  - Memory usage trends
+  - API response times
+- Charts: Last 7 days trends
+- Alerts: Performance degradation warnings
+
+#### 📁 Files to Create:
+- `app/Notifications/SyncCompletedNotification.php` (NEW)
+- `app/Notifications/SyncFailedNotification.php` (NEW)
+- `app/Notifications/SyncRetryExhaustedNotification.php` (NEW)
+- `app/Services/BackupService.php` (NEW)
+- `app/Http/Livewire/Admin/Performance/SyncMetricsDashboard.php` (NEW)
+
+#### 📁 Files to Modify:
+- All job files (retry, performance, notifications, backup integration)
+- `routes/console.php` (add backup cleanup schedule)
+
+#### ✅ Success Criteria:
+- [ ] Retry settings from panel work
+- [ ] Notifications dispatched correctly
+- [ ] Backups created before major syncs
+- [ ] Old backups cleaned up automatically
+- [ ] Performance dashboard shows metrics
+
+---
+
+### 📊 FAZA 9 PROGRESS SUMMARY
+
+**Completed:** 2/10 tasks (20%)
+- ✅ BUG #13: BRUTTO price tracking
+- ✅ BUG #14: SYNC NOW duplicate fix
+
+**HIGH Priority (In Progress):**
+- ❌ 9.2: Sync Configuration Integration (4h)
+- ❌ 9.3: Conflict Resolution System (6h)
+- ❌ 9.4: Shop Tab on Product Card (8h)
+- ❌ 9.5: Validation System (10h)
+- ~~❌ 9.6: Import New Products Feature~~ → **CANCELLED** (existing import system in `/admin/products`)
+- **Total HIGH:** 28h (~3.5 days) - reduced from 34h (9.6 cancelled)
+
+**BLOCKED Tasks:**
+- 🔴 BUG #15: Stock tracking (blocked by 9.7 warehouse)
+- ⏳ 9.7: WAREHOUSE REDESIGN (after HIGH tasks)
+- ⏳ 9.8: IMAGE SYNC (after warehouse)
+
+**MEDIUM Priority (Future):**
+- ⏳ 9.9: Retry/Notifications/Backup/Performance (35h)
+
+**Next Steps:**
+1. **2025-11-13 TODAY**: Implement HIGH priority tasks (9.2-9.5) - parallel execution with agents
+2. **2025-11-13+**: WAREHOUSE REDESIGN (9.7) - critical blocker
+3. **2025-11-14+**: ImageSyncStrategy (9.8) + MEDIUM priority (9.9)
+4. **Future**: Real-time webhooks, conflict resolution UI enhancements
+
+**Total Remaining Effort:** 63h (HIGH + MEDIUM) + Warehouse (20h) = **83h (~10.5 days)** - reduced from 89h (9.6 cancelled)
 
 ---

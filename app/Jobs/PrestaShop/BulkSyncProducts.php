@@ -52,6 +52,12 @@ class BulkSyncProducts implements ShouldQueue
     public string $batchName;
 
     /**
+     * User ID who triggered the sync (2025-11-07)
+     * NULL = SYSTEM (scheduled/automated sync)
+     */
+    public ?int $userId = null;
+
+    /**
      * Number of times job may be attempted
      */
     public int $tries = 1; // No retry - individual jobs handle retries
@@ -63,12 +69,18 @@ class BulkSyncProducts implements ShouldQueue
 
     /**
      * Create new job instance
+     *
+     * @param Collection $products Products to sync
+     * @param PrestaShopShop $shop Target shop
+     * @param string|null $batchName Batch name for tracking
+     * @param int|null $userId User who triggered sync (NULL = SYSTEM)
      */
-    public function __construct(Collection $products, PrestaShopShop $shop, ?string $batchName = null)
+    public function __construct(Collection $products, PrestaShopShop $shop, ?string $batchName = null, ?int $userId = null)
     {
         $this->products = $products;
         $this->shop = $shop;
         $this->batchName = $batchName ?? "Bulk Sync to {$shop->name}";
+        $this->userId = $userId;
         // Use default queue for CRON compatibility
         // $this->onQueue('prestashop_sync');
     }
@@ -114,21 +126,21 @@ class BulkSyncProducts implements ShouldQueue
             // High priority first (priority <= 3)
             if (isset($productsByPriority['high'])) {
                 foreach ($productsByPriority['high'] as $product) {
-                    $jobs[] = new SyncProductToPrestaShop($product, $this->shop);
+                    $jobs[] = new SyncProductToPrestaShop($product, $this->shop, $this->userId);
                 }
             }
 
             // Normal priority (priority = 5)
             if (isset($productsByPriority['normal'])) {
                 foreach ($productsByPriority['normal'] as $product) {
-                    $jobs[] = new SyncProductToPrestaShop($product, $this->shop);
+                    $jobs[] = new SyncProductToPrestaShop($product, $this->shop, $this->userId);
                 }
             }
 
             // Low priority (priority >= 7)
             if (isset($productsByPriority['low'])) {
                 foreach ($productsByPriority['low'] as $product) {
-                    $jobs[] = new SyncProductToPrestaShop($product, $this->shop);
+                    $jobs[] = new SyncProductToPrestaShop($product, $this->shop, $this->userId);
                 }
             }
 

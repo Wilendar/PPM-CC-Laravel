@@ -1,7 +1,14 @@
 {{-- ProductForm Component - Advanced Product Create/Edit Form --}}
 {{-- CSS loaded via admin layout --}}
 
-<div class="category-form-container">
+{{-- ETAP_13.6: Wire:poll Integration for JOB Monitoring --}}
+{{-- FIX 2025-11-18: Poll based on activeJobStatus (not activeJobId) to support bulk jobs --}}
+{{-- FIX 2025-11-20 (ETAP_07b Fix #7): Event listener for JavaScript redirect after save --}}
+<div
+    class="category-form-container"
+    wire:poll.5s="checkJobStatus"
+    @if(!$activeJobStatus || $activeJobStatus === 'completed' || $activeJobStatus === 'failed') wire:poll.stop @endif
+    @redirect-to-product-list.window="window.location.href = '/admin/products'">
 <div class="w-full py-4">
     {{-- Header Section --}}
     <div class="mb-6 px-4 xl:px-8">
@@ -123,6 +130,21 @@
                             <i class="fas fa-tags icon"></i>
                             <span>Atrybuty</span>
                         </button>
+
+                        <button class="tab-enterprise {{ $activeTab === 'prices' ? 'active' : '' }}"
+                                type="button"
+                                wire:click="switchTab('prices')">
+                            <i class="fas fa-dollar-sign icon"></i>
+                            <span>Ceny</span>
+                        </button>
+
+                        <button class="tab-enterprise {{ $activeTab === 'stock' ? 'active' : '' }}"
+                                type="button"
+                                wire:click="switchTab('stock')">
+                            <i class="fas fa-warehouse icon"></i>
+                            <span>Stany magazynowe</span>
+                        </button>
+
                     </div>
 
                 {{-- MULTI-STORE MANAGEMENT (Second Line) --}}
@@ -367,6 +389,18 @@
                                                 🔗 PrestaShop (admin)
                                             </a>
                                         @endif
+                                    @else
+                                        {{-- FIX 2025-11-18: Przycisk "Dodaj do sklepu" dla nie-zsynchronizowanych produktów --}}
+                                        <button type="button"
+                                                wire:click="syncShop({{ $activeShopId }})"
+                                                class="btn-enterprise-primary text-sm inline-flex items-center"
+                                                :disabled="$wire.activeJobStatus === 'pending' || $wire.activeJobStatus === 'processing'"
+                                                title="Dodaj produkt do tego sklepu">
+                                            <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                                            </svg>
+                                            Dodaj do sklepu
+                                        </button>
                                     @endif
                                 </div>
                             </div>
@@ -382,6 +416,113 @@
                                             Liczba prób: {{ $syncDisplay['retry_count'] }} / 3
                                         </p>
                                     @endif
+                                </div>
+                            @endif
+
+                            {{-- COLLAPSIBLE: Szczegóły synchronizacji (FAZA 9.4 Refactor) --}}
+                            @php
+                                $shopData = $product->shopData->where('shop_id', $activeShopId)->first();
+                            @endphp
+
+                            @if($shopData)
+                                <div class="shop-details-collapsible" x-data="{ expanded: false }">
+                                    <button
+                                        @click="expanded = !expanded"
+                                        class="collapsible-header"
+                                        type="button"
+                                    >
+                                        <span class="text-sm font-medium text-gray-300">Szczegóły synchronizacji</span>
+                                        <svg x-show="!expanded" class="w-4 h-4 text-gray-400 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                                        </svg>
+                                        <svg x-show="expanded" class="w-4 h-4 text-gray-400 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"></path>
+                                        </svg>
+                                    </button>
+
+                                    <div x-show="expanded" x-collapse class="collapsible-content">
+                                        {{-- Shop Info - kompaktowa --}}
+                                        <div class="shop-info-compact">
+                                            <p class="text-sm text-gray-400">
+                                                <strong class="text-gray-300">Sklep:</strong>
+                                                {{ $shopData->shop->name }}
+                                            </p>
+                                            <p class="text-sm text-gray-400">
+                                                <strong class="text-gray-300">External ID:</strong>
+                                                {{ $shopData->prestashop_product_id ?? 'Nie zsynchronizowane' }}
+                                            </p>
+                                            {{-- ETAP_13.3: Updated Timestamps (pull/push) --}}
+                                            <p class="text-sm text-gray-400">
+                                                <strong class="text-gray-300">Ostatnie wczytanie danych:</strong>
+                                                {{ $shopData->getTimeSinceLastPull() }}
+                                            </p>
+                                            <p class="text-sm text-gray-400">
+                                                <strong class="text-gray-300">Ostatnia aktualizacja sklepu:</strong>
+                                                {{ $shopData->getTimeSinceLastPush() }}
+                                            </p>
+                                        </div>
+
+                                        {{-- ETAP_13.3: Oczekujące zmiany - DYNAMIC (getPendingChangesForShop) --}}
+                                        @php
+                                            $pendingChanges = $this->getPendingChangesForShop($shopData->shop_id);
+                                        @endphp
+
+                                        @if(!empty($pendingChanges))
+                                            <div class="pending-changes-compact mt-3 p-3 bg-yellow-900 bg-opacity-20 rounded border border-yellow-700">
+                                                <h5 class="text-sm font-semibold text-yellow-300 mb-2 flex items-center">
+                                                    <svg class="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                                                        <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
+                                                    </svg>
+                                                    Oczekujące zmiany ({{ count($pendingChanges) }})
+                                                </h5>
+                                                <ul class="compact-list space-y-1">
+                                                    @foreach($pendingChanges as $fieldLabel)
+                                                        <li class="text-sm text-yellow-200 flex items-center">
+                                                            <i class="fas fa-circle text-yellow-400 mr-2" style="font-size: 0.4rem;"></i>
+                                                            {{ $fieldLabel }}
+                                                        </li>
+                                                    @endforeach
+                                                </ul>
+                                            </div>
+                                        @else
+                                            <p class="text-sm text-green-400 mt-3">
+                                                <i class="fas fa-check-circle mr-2"></i>
+                                                Wszystkie dane zsynchronizowane
+                                            </p>
+                                        @endif
+
+                                        {{-- Validation Warnings (jeśli są) --}}
+                                        @if($shopData->has_validation_warnings && !empty($shopData->validation_warnings))
+                                            <div class="validation-warnings-compact">
+                                                <h5 class="text-sm font-semibold text-gray-300 mb-2 flex items-center">
+                                                    <svg class="w-4 h-4 mr-1 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                                                    </svg>
+                                                    Ostrzeżenia walidacji ({{ count($shopData->validation_warnings) }})
+                                                </h5>
+                                                @foreach($shopData->validation_warnings as $warning)
+                                                    <div class="warning-compact severity-{{ $warning['severity'] ?? 'info' }}">
+                                                        <p class="text-sm">{{ $warning['message'] ?? 'Nieznane ostrzeżenie' }}</p>
+                                                        @if(isset($warning['ppm_value']) || isset($warning['prestashop_value']))
+                                                            <div class="text-xs text-gray-500 mt-1">
+                                                                PPM: {{ $warning['ppm_value'] ?? 'N/A' }} → PrestaShop: {{ $warning['prestashop_value'] ?? 'N/A' }}
+                                                            </div>
+                                                        @endif
+                                                    </div>
+                                                @endforeach
+                                            </div>
+                                        @endif
+
+                                        {{-- Actions - Per-Shop Buttons (ETAP_13) --}}
+                                        <div class="shop-actions-compact">
+                                            @include('livewire.products.management.partials.actions.shop-sync-button', [
+                                                'shopId' => $shopData->shop_id
+                                            ])
+                                            @include('livewire.products.management.partials.actions.shop-pull-button', [
+                                                'shopId' => $shopData->shop_id
+                                            ])
+                                        </div>
+                                    </div>
                                 </div>
                             @endif
                         </div>
@@ -588,6 +729,106 @@
                             @enderror
                         </div>
 
+                        {{-- Tax Rate Field - RELOCATED FROM PHYSICAL TAB (FAZA 5.2 - 2025-11-14) --}}
+                        <div class="md:col-span-1">
+                            <label for="tax_rate" class="form-label-enterprise">
+                                <svg class="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path>
+                                </svg>
+                                @if($activeShopId === null)
+                                    Stawka VAT
+                                @else
+                                    @php
+                                        $currentShop = collect($availableShops)->firstWhere('id', $activeShopId);
+                                    @endphp
+                                    Stawka VAT dla {{ $currentShop['name'] ?? 'sklepu' }}
+                                @endif
+                                <span class="text-red-400">*</span>
+
+                                {{-- STATUS INDICATOR --}}
+                                @php
+                                    $indicator = $this->getTaxRateIndicator($activeShopId);
+                                @endphp
+                                @if($indicator['show'])
+                                    <span class="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium {{ $indicator['class'] }}">
+                                        {{ $indicator['text'] }}
+                                    </span>
+                                @endif
+                            </label>
+
+                            {{-- DROPDOWN: Tax Rate Selection --}}
+                            <select wire:model.live="selectedTaxRateOption"
+                                    wire:key="tax-rate-{{ $activeShopId ?? 'default' }}"
+                                    id="tax_rate"
+                                    class="{{ $this->getFieldClasses('tax_rate') }} @error('tax_rate') !border-red-500 @enderror">
+
+                                @if($activeShopId === null)
+                                    {{-- DEFAULT MODE: Standard rates + Custom --}}
+                                    <option value="23.00">VAT 23% (Standard)</option>
+                                    <option value="8.00">VAT 8% (Obniżony)</option>
+                                    <option value="5.00">VAT 5% (Obniżony)</option>
+                                    <option value="0.00">VAT 0% (Zwolniony)</option>
+                                    <option value="custom" class="tax-option-custom">Własna stawka...</option>
+                                @else
+                                    {{-- SHOP MODE: Inherit + PrestaShop rules + Custom --}}
+                                    @php
+                                        $defaultRate = $this->tax_rate ?? 23.00;
+                                    @endphp
+                                    <option value="use_default" class="tax-option-default">✓ Użyj domyślnej PPM ({{ number_format($defaultRate, 2) }}%)</option>
+
+                                    {{-- PrestaShop Tax Rules (if mapped) --}}
+                                    @if(isset($availableTaxRuleGroups[$activeShopId]))
+                                        @foreach($availableTaxRuleGroups[$activeShopId] as $taxRule)
+                                            {{-- Skip rates that match default to avoid duplicates (e.g., 23% shown twice) --}}
+                                            @if(number_format($taxRule['rate'], 2, '.', '') != number_format($defaultRate, 2, '.', ''))
+                                                <option value="{{ number_format($taxRule['rate'], 2, '.', '') }}" class="tax-option-mapped">
+                                                    VAT {{ number_format($taxRule['rate'], 2) }}%
+                                                    (PrestaShop: {{ $taxRule['label'] }})
+                                                </option>
+                                            @endif
+                                        @endforeach
+                                    @endif
+
+                                    <option value="custom" class="tax-option-custom">Własna stawka...</option>
+                                @endif
+                            </select>
+
+                            {{-- CONDITIONAL: Custom Tax Rate Input --}}
+                            @if($selectedTaxRateOption === 'custom')
+                                <input wire:model.live="customTaxRate"
+                                       type="number"
+                                       step="0.01"
+                                       min="0"
+                                       max="100"
+                                       placeholder="Wpisz stawkę VAT (np. 23.00)"
+                                       class="mt-2 {{ $this->getFieldClasses('tax_rate') }} @error('customTaxRate') !border-red-500 @enderror">
+                                @error('customTaxRate')
+                                    <p class="mt-1 text-sm text-red-600 dark:text-red-400">{{ $message }}</p>
+                                @enderror
+                            @endif
+
+                            {{-- HELP TEXT (Shop Mode) --}}
+                            @if($activeShopId !== null)
+                                <p class="mt-2 text-xs text-gray-400">
+                                    <svg class="w-4 h-4 inline mr-1 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                    </svg>
+                                    Wybierz zmapowaną regułę podatkową PrestaShop lub własną stawkę dla tego sklepu.
+                                </p>
+                            @endif
+
+                            @error('tax_rate')
+                                <p class="mt-1 text-sm text-red-600 dark:text-red-400">{{ $message }}</p>
+                            @enderror
+
+                            {{-- VALIDATION WARNING (if rate not mapped) --}}
+                            @if($activeShopId !== null && $indicator['show'] && isset($indicator['type']) && $indicator['type'] === 'different')
+                                <p class="text-yellow-400 text-xs mt-1">
+                                    ⚠️ Ta stawka nie jest zmapowana w konfiguracji sklepu. Synchronizacja może się nie powieść.
+                                </p>
+                            @endif
+                        </div>
+
                         {{-- Status Checkboxes --}}
                         <div class="md:col-span-2">
                             <fieldset class="space-y-3">
@@ -705,18 +946,110 @@
 
                         {{-- Categories Section --}}
                         <div class="md:col-span-2">
-                            <label class="block text-sm font-medium text-gray-300 mb-3">
-                                Kategorie produktu
-                                {{-- Category Status Indicator --}}
-                                @php
-                                            $categoryIndicator = $this->getCategoryStatusIndicator();
+                            {{-- Header with Refresh Button (ETAP_07b FAZA 1) + Status Badge (FAZA 2) --}}
+                            @if($activeShopId)
+                                <div class="flex items-center justify-between mb-3">
+                                    <div class="flex items-center gap-3">
+                                        <label class="block text-sm font-medium text-gray-300">
+                                            Kategorie produktu ({{ collect($availableShops)->firstWhere('id', $activeShopId)['name'] ?? 'PrestaShop' }})
+                                        </label>
+
+                                        {{-- Category Validation Status Badge (ETAP_07b FAZA 2) --}}
+                                        @php
+                                            $validationStatus = $this->getCategoryValidationStatus();
                                         @endphp
-                                @if($categoryIndicator['show'])
-                                    <span class="ml-2 {{ $categoryIndicator['class'] }}">
-                                        {{ $categoryIndicator['text'] }}
-                                    </span>
-                                @endif
-                            </label>
+                                        @if($validationStatus && $isEditMode)
+                                            @php
+                                                $badge = $validationStatus['badge'];
+                                                $tooltip = $validationStatus['tooltip'];
+                                                $status = $validationStatus['status'];
+                                                // Map status to existing CSS classes (NO INLINE STYLES!)
+                                                $badgeClass = match($status) {
+                                                    'zgodne' => 'status-label-same',      // Green
+                                                    'własne' => 'status-label-different', // Orange
+                                                    'dziedziczone' => 'status-label-inherited', // Purple
+                                                    default => 'status-label-inherited',
+                                                };
+                                            @endphp
+                                            <span
+                                                class="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-md {{ $badgeClass }}"
+                                                @if($tooltip)
+                                                    x-data="{ showTooltip: false }"
+                                                    @mouseenter="showTooltip = true"
+                                                    @mouseleave="showTooltip = false"
+                                                @endif
+                                            >
+                                                <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
+                                                    @if($badge['icon'] === 'check-circle')
+                                                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                                                    @elseif($badge['icon'] === 'adjustments')
+                                                        <path d="M5 4a1 1 0 00-2 0v7.268a2 2 0 000 3.464V16a1 1 0 102 0v-1.268a2 2 0 000-3.464V4zM11 4a1 1 0 10-2 0v1.268a2 2 0 000 3.464V16a1 1 0 102 0V8.732a2 2 0 000-3.464V4zM16 3a1 1 0 011 1v7.268a2 2 0 010 3.464V16a1 1 0 11-2 0v-1.268a2 2 0 010-3.464V4a1 1 0 011-1z"/>
+                                                    @elseif($badge['icon'] === 'arrow-down')
+                                                        <path fill-rule="evenodd" d="M16.707 10.293a1 1 0 010 1.414l-6 6a1 1 0 01-1.414 0l-6-6a1 1 0 111.414-1.414L9 14.586V3a1 1 0 012 0v11.586l4.293-4.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+                                                    @else
+                                                        <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-3a1 1 0 00-.867.5 1 1 0 11-1.731-1A3 3 0 0113 8a3.001 3.001 0 01-2 2.83V11a1 1 0 11-2 0v-1a1 1 0 011-1 1 1 0 100-2zm0 8a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd"/>
+                                                    @endif
+                                                </svg>
+                                                {{ $badge['text'] }}
+
+                                                {{-- Tooltip --}}
+                                                @if($tooltip)
+                                                    <div
+                                                        x-show="showTooltip"
+                                                        x-transition:enter="transition ease-out duration-200"
+                                                        x-transition:enter-start="opacity-0 transform scale-95"
+                                                        x-transition:enter-end="opacity-100 transform scale-100"
+                                                        x-transition:leave="transition ease-in duration-150"
+                                                        x-transition:leave-start="opacity-100 transform scale-100"
+                                                        x-transition:leave-end="opacity-0 transform scale-95"
+                                                        class="absolute z-50 px-3 py-2 text-xs font-normal text-white bg-gray-900 rounded-lg shadow-xl border border-gray-700 max-w-sm"
+                                                        style="position: fixed; margin-top: -60px;"
+                                                        x-cloak
+                                                    >
+                                                        {{ $tooltip }}
+                                                        <div class="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-full">
+                                                            <div class="w-2 h-2 rotate-45 bg-gray-900 border-r border-b border-gray-700"></div>
+                                                        </div>
+                                                    </div>
+                                                @endif
+                                            </span>
+                                        @endif
+                                    </div>
+
+                                    <button
+                                        type="button"
+                                        wire:click="refreshCategoriesFromShop"
+                                        wire:loading.attr="disabled"
+                                        class="btn-enterprise-secondary text-sm inline-flex items-center">
+                                        <span wire:loading.remove wire:target="refreshCategoriesFromShop">
+                                            <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                                            </svg>
+                                            Odśwież kategorie
+                                        </span>
+                                        <span wire:loading wire:target="refreshCategoriesFromShop" class="inline-flex items-center">
+                                            <svg class="w-4 h-4 mr-1 animate-spin" fill="none" viewBox="0 0 24 24">
+                                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                            </svg>
+                                            Odświeżanie...
+                                        </span>
+                                    </button>
+                                </div>
+                            @else
+                                <label class="block text-sm font-medium text-gray-300 mb-3">
+                                    Kategorie produktu
+                                    {{-- Category Status Indicator --}}
+                                    @php
+                                        $categoryIndicator = $this->getCategoryStatusIndicator();
+                                    @endphp
+                                    @if($categoryIndicator['show'])
+                                        <span class="ml-2 {{ $categoryIndicator['class'] }}">
+                                            {{ $categoryIndicator['text'] }}
+                                        </span>
+                                    @endif
+                                </label>
+                            @endif
 
                             {{-- Category Conflict Warning Banner - ADDED 2025-10-13 --}}
                             @if($this->hasCategoryConflict)
@@ -744,9 +1077,10 @@
                             @endif
 
                             @php
-                                            $availableCategories = $this->getAvailableCategories();
+                                            // ETAP_07b FAZA 1 FIX: Use getShopCategories() to show PrestaShop categories when shop is active
+                                            $availableCategories = $this->getShopCategories();
                                         @endphp
-                            @if($availableCategories && $availableCategories->count() > 0)
+                            @if($availableCategories && count($availableCategories) > 0)
                                 <div class="{{ $this->getCategoryClasses() }} max-h-64 overflow-y-auto" wire:key="categories-ctx-{{ $activeShopId ?? 'default' }}">
                                     @foreach($availableCategories as $rootCategory)
                                         @include('livewire.products.management.partials.category-tree-item', [
@@ -761,7 +1095,7 @@
                                     <p class="mt-2 text-sm text-gray-400">
                                         Wybrano {{ count($this->getCategoriesForContext($activeShopId)) }} {{ count($this->getCategoriesForContext($activeShopId)) == 1 ? 'kategorię' : 'kategori' }}.
                                         @if($this->getPrimaryCategoryForContext($activeShopId))
-                                            Główna: <strong>{{ $availableCategories->find($this->getPrimaryCategoryForContext($activeShopId))?->name }}</strong>
+                                            Główna: <strong>{{ collect($availableCategories)->firstWhere('id', $this->getPrimaryCategoryForContext($activeShopId))?->name }}</strong>
                                         @endif
                                         @if($activeShopId !== null)
                                             <span class="inline-flex items-center px-2 py-1 text-xs font-medium rounded-full bg-orange-900/30 text-orange-200 border border-orange-700/50 ml-2">
@@ -781,6 +1115,41 @@
                                 <p class="mt-1 text-sm text-red-600 dark:text-red-400">{{ $message }}</p>
                             @enderror
                         </div>
+                    </div>
+
+                    {{-- Inline Action Bar (duplicates key quick actions for current scope) --}}
+                    <div class="mt-6 mb-8">
+                        @if($activeShopId === null)
+                            <div class="flex flex-col lg:flex-row gap-4">
+                                @include('livewire.products.management.partials.actions.save-and-close-button', [
+                                    'classes' => 'lg:flex-1'
+                                ])
+                                @include('livewire.products.management.partials.actions.cancel-link', [
+                                    'classes' => 'lg:flex-1'
+                                ])
+                            </div>
+                        @else
+                            <div class="space-y-4">
+                                <div class="flex flex-col lg:flex-row gap-4">
+                                    @include('livewire.products.management.partials.actions.save-and-close-button', [
+                                        'classes' => 'lg:flex-1'
+                                    ])
+                                    @include('livewire.products.management.partials.actions.cancel-link', [
+                                        'classes' => 'lg:flex-1'
+                                    ])
+                                </div>
+                                <div class="flex flex-col lg:flex-row gap-4">
+                                    @include('livewire.products.management.partials.actions.shop-sync-button', [
+                                        'shopId' => $activeShopId,
+                                        'classes' => 'w-full lg:flex-1'
+                                    ])
+                                    @include('livewire.products.management.partials.actions.shop-pull-button', [
+                                        'shopId' => $activeShopId,
+                                        'classes' => 'w-full lg:flex-1'
+                                    ])
+                                </div>
+                            </div>
+                        @endif
                     </div>
                 </div>
 
@@ -1063,31 +1432,7 @@
                             @enderror
                         </div>
 
-                        {{-- Tax Rate --}}
-                        <div>
-                            <label for="tax_rate" class="block text-sm font-medium text-gray-300 mb-2">
-                                Stawka VAT (%) <span class="text-red-500">*</span>
-                                @php
-                                            $taxRateIndicator = $this->getFieldStatusIndicator('tax_rate');
-                                        @endphp
-                                @if($taxRateIndicator['show'])
-                                    <span class="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium {{ $taxRateIndicator['class'] }}">
-                                        {{ $taxRateIndicator['text'] }}
-                                    </span>
-                                @endif
-                            </label>
-                            <input wire:model.live="tax_rate"
-                                   type="number"
-                                   id="tax_rate"
-                                   step="0.01"
-                                   min="0"
-                                   max="100"
-                                   placeholder="23.00"
-                                   class="{{ $this->getFieldClasses('tax_rate') }} @error('tax_rate') !border-red-500 @enderror">
-                            @error('tax_rate')
-                                <p class="mt-1 text-sm text-red-600 dark:text-red-400">{{ $message }}</p>
-                            @enderror
-                        </div>
+                        {{-- Tax Rate REMOVED - RELOCATED TO BASIC TAB (FAZA 5.2 - 2025-11-14) --}}
 
                         {{-- Physical Properties Info --}}
                         <div class="md:col-span-2 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-lg p-4">
@@ -1166,115 +1511,270 @@
                         </div>
                     </div>
                 </div>
+
+                {{-- PRICES TAB CONTENT - 2025-11-07 --}}
+                <div class="{{ $activeTab === 'prices' ? '' : 'hidden' }}">
+                    <div class="flex items-center justify-between mb-6">
+                        <h3 class="text-lg font-medium text-white">
+                            <svg class="w-6 h-6 inline mr-2 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            Ceny produktu
+                        </h3>
+
+                        {{-- Active Shop Indicator --}}
+                        @if($activeShopId !== null && isset($availableShops))
+                            @php
+                                $currentShop = collect($availableShops)->firstWhere('id', $activeShopId);
+                            @endphp
+                            <div class="flex items-center">
+                                <span class="inline-flex items-center px-2.5 py-1 text-xs font-medium rounded-full bg-orange-900/30 text-orange-200 border border-orange-700/50">
+                                    <svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                                    </svg>
+                                    Edytujesz: {{ $currentShop['name'] ?? 'Nieznany sklep' }}
+                                </span>
+                            </div>
+                        @endif
+                    </div>
+
+                    <div class="grid grid-cols-1 gap-6">
+                        {{-- Prices Grid - 8 Price Groups --}}
+                        <div class="bg-gray-800 rounded-lg p-4"
+                             x-data="{
+                                 taxRate: {{ $tax_rate }},
+                                 calculateGross(netValue, groupId) {
+                                     if (!netValue || netValue === '') return;
+                                     const gross = parseFloat(netValue) * (1 + this.taxRate / 100);
+                                     $wire.set('prices.' + groupId + '.gross', gross.toFixed(2));
+                                 },
+                                 calculateNet(grossValue, groupId) {
+                                     if (!grossValue || grossValue === '') return;
+                                     const net = parseFloat(grossValue) / (1 + this.taxRate / 100);
+                                     $wire.set('prices.' + groupId + '.net', net.toFixed(2));
+                                 }
+                             }">
+                            <div class="flex items-center justify-between mb-4">
+                                <h4 class="text-md font-medium text-white flex items-center">
+                                    <svg class="w-5 h-5 mr-2 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                    Grupy cenowe (8)
+                                </h4>
+                                <div class="text-xs text-gray-400">
+                                    Zarządzaj cenami dla wszystkich grup cenowych
+                                </div>
+                            </div>
+
+                            {{-- Prices Table --}}
+                            <div class="overflow-x-auto">
+                                <table class="w-full text-sm text-left">
+                                    <thead class="text-xs text-gray-400 uppercase bg-gray-900">
+                                        <tr>
+                                            <th scope="col" class="px-4 py-3">Grupa cenowa</th>
+                                            <th scope="col" class="px-4 py-3 text-right">Cena netto (PLN)</th>
+                                            <th scope="col" class="px-4 py-3 text-right">Cena brutto (PLN)</th>
+                                            <th scope="col" class="px-4 py-3 text-right">Marża (%)</th>
+                                            <th scope="col" class="px-4 py-3 text-center">Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @forelse($priceGroups as $groupId => $group)
+                                            <tr class="border-b border-gray-700 hover:bg-gray-750">
+                                                {{-- Price Group Name --}}
+                                                <td class="px-4 py-3">
+                                                    <span class="font-medium text-white">{{ $group['name'] }}</span>
+                                                    @if(!empty($group['code']))
+                                                        <span class="text-xs text-gray-500 ml-2">({{ $group['code'] }})</span>
+                                                    @endif
+                                                </td>
+
+                                                {{-- Price Net --}}
+                                                <td class="px-4 py-3">
+                                                    <input type="number"
+                                                           step="0.01"
+                                                           min="0"
+                                                           wire:model.defer="prices.{{ $groupId }}.net"
+                                                           @input="calculateGross($event.target.value, {{ $groupId }})"
+                                                           class="w-full bg-gray-700 border border-gray-600 text-white text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 p-2"
+                                                           placeholder="0.00">
+                                                </td>
+
+                                                {{-- Price Gross --}}
+                                                <td class="px-4 py-3">
+                                                    <input type="number"
+                                                           step="0.01"
+                                                           min="0"
+                                                           wire:model.defer="prices.{{ $groupId }}.gross"
+                                                           @input="calculateNet($event.target.value, {{ $groupId }})"
+                                                           class="w-full bg-gray-700 border border-gray-600 text-white text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 p-2"
+                                                           placeholder="0.00">
+                                                </td>
+
+                                                {{-- Margin (readonly for now) --}}
+                                                <td class="px-4 py-3 text-right">
+                                                    @if(isset($prices[$groupId]['margin']) && $prices[$groupId]['margin'] !== null)
+                                                        <span class="text-green-400 font-mono">{{ number_format($prices[$groupId]['margin'], 2, ',', ' ') }}%</span>
+                                                    @else
+                                                        <span class="text-gray-600 text-xs">—</span>
+                                                    @endif
+                                                </td>
+
+                                                {{-- Status (checkbox) --}}
+                                                <td class="px-4 py-3 text-center">
+                                                    <input type="checkbox"
+                                                           wire:model.defer="prices.{{ $groupId }}.is_active"
+                                                           class="w-4 h-4 text-blue-600 bg-gray-700 border-gray-600 rounded focus:ring-blue-500 focus:ring-2">
+                                                </td>
+                                            </tr>
+                                        @empty
+                                            <tr class="border-b border-gray-700">
+                                                <td colspan="5" class="px-4 py-8 text-center text-gray-500">
+                                                    <p class="text-sm">Brak grup cenowych w systemie.</p>
+                                                </td>
+                                            </tr>
+                                        @endforelse
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {{-- STOCK TAB CONTENT - 2025-11-07 --}}
+                <div class="{{ $activeTab === 'stock' ? '' : 'hidden' }}">
+                    <div class="flex items-center justify-between mb-6">
+                        <h3 class="text-lg font-medium text-white">
+                            <svg class="w-6 h-6 inline mr-2 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                            </svg>
+                            Stany magazynowe
+                        </h3>
+
+                        {{-- Active Shop Indicator --}}
+                        @if($activeShopId !== null && isset($availableShops))
+                            @php
+                                $currentShop = collect($availableShops)->firstWhere('id', $activeShopId);
+                            @endphp
+                            <div class="flex items-center">
+                                <span class="inline-flex items-center px-2.5 py-1 text-xs font-medium rounded-full bg-orange-900/30 text-orange-200 border border-orange-700/50">
+                                    <svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                                    </svg>
+                                    Edytujesz: {{ $currentShop['name'] ?? 'Nieznany sklep' }}
+                                </span>
+                            </div>
+                        @endif
+                    </div>
+
+                    <div class="grid grid-cols-1 gap-6">
+                        {{-- Stock Grid - 6 Warehouses --}}
+                        <div class="bg-gray-800 rounded-lg p-4">
+                            <div class="flex items-center justify-between mb-4">
+                                <h4 class="text-md font-medium text-white flex items-center">
+                                    <svg class="w-5 h-5 mr-2 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                                    </svg>
+                                    Magazyny (6)
+                                </h4>
+                                <div class="text-xs text-gray-400">
+                                    Zarządzaj stanami dla wszystkich magazynów
+                                </div>
+                            </div>
+
+                            {{-- Stock Table --}}
+                            <div class="overflow-x-auto">
+                                <table class="w-full text-sm text-left">
+                                    <thead class="text-xs text-gray-400 uppercase bg-gray-900">
+                                        <tr>
+                                            <th scope="col" class="px-4 py-3">Magazyn</th>
+                                            <th scope="col" class="px-4 py-3 text-right">Stan dostępny</th>
+                                            <th scope="col" class="px-4 py-3 text-right">Zarezerwowane</th>
+                                            <th scope="col" class="px-4 py-3 text-right">Minimum</th>
+                                            <th scope="col" class="px-4 py-3 text-center">Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @forelse($warehouses as $warehouseId => $warehouse)
+                                            @php
+                                                $available = isset($stock[$warehouseId]['quantity']) ? $stock[$warehouseId]['quantity'] : 0;
+                                                $reserved = isset($stock[$warehouseId]['reserved']) ? $stock[$warehouseId]['reserved'] : 0;
+                                                $minimum = isset($stock[$warehouseId]['minimum']) ? $stock[$warehouseId]['minimum'] : 0;
+                                                $actualAvailable = $available - $reserved;
+
+                                                // Stock status logic
+                                                if ($actualAvailable <= 0) {
+                                                    $statusClass = 'bg-red-900/30 text-red-400 border-red-700/50';
+                                                    $statusText = 'Brak';
+                                                } elseif ($actualAvailable <= $minimum) {
+                                                    $statusClass = 'bg-yellow-900/30 text-yellow-400 border-yellow-700/50';
+                                                    $statusText = 'Niski';
+                                                } else {
+                                                    $statusClass = 'bg-green-900/30 text-green-400 border-green-700/50';
+                                                    $statusText = 'OK';
+                                                }
+                                            @endphp
+                                            <tr class="border-b border-gray-700 hover:bg-gray-750">
+                                                {{-- Warehouse Name --}}
+                                                <td class="px-4 py-3">
+                                                    <span class="font-medium text-white">{{ $warehouse['name'] }}</span>
+                                                    @if(!empty($warehouse['code']))
+                                                        <span class="text-xs text-gray-500 ml-2">({{ $warehouse['code'] }})</span>
+                                                    @endif
+                                                </td>
+
+                                                {{-- Total Quantity (editable) --}}
+                                                <td class="px-4 py-3">
+                                                    <input type="number"
+                                                           min="0"
+                                                           wire:model.defer="stock.{{ $warehouseId }}.quantity"
+                                                           class="w-full bg-gray-700 border border-gray-600 text-white text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 p-2"
+                                                           placeholder="0">
+                                                    @if($actualAvailable != $available)
+                                                        <span class="text-xs text-gray-500 mt-1 block">Dostępne: {{ $actualAvailable }}</span>
+                                                    @endif
+                                                </td>
+
+                                                {{-- Reserved Quantity (editable) --}}
+                                                <td class="px-4 py-3">
+                                                    <input type="number"
+                                                           min="0"
+                                                           wire:model.defer="stock.{{ $warehouseId }}.reserved"
+                                                           class="w-full bg-gray-700 border border-gray-600 text-orange-400 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 p-2"
+                                                           placeholder="0">
+                                                </td>
+
+                                                {{-- Minimum Stock Level (editable) --}}
+                                                <td class="px-4 py-3">
+                                                    <input type="number"
+                                                           min="0"
+                                                           wire:model.defer="stock.{{ $warehouseId }}.minimum"
+                                                           class="w-full bg-gray-700 border border-gray-600 text-white text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 p-2"
+                                                           placeholder="0">
+                                                </td>
+
+                                                {{-- Stock Status (readonly, auto-calculated) --}}
+                                                <td class="px-4 py-3 text-center">
+                                                    <span class="inline-flex items-center px-2 py-1 text-xs font-medium rounded-full {{ $statusClass }}">
+                                                        {{ $statusText }}
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                        @empty
+                                            <tr class="border-b border-gray-700">
+                                                <td colspan="5" class="px-4 py-8 text-center text-gray-500">
+                                                    <p class="text-sm">Brak magazynów w systemie.</p>
+                                                </td>
+                                            </tr>
+                                        @endforelse
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
 
-                {{-- Form Footer - ALL ACTION BUTTONS MOVED HERE --}}
-                <div class="px-6 py-4 bg-gray-900 border-t border-gray-700 rounded-b-lg">
-                    <div class="flex items-center justify-between">
-                        {{-- Validation Info --}}
-                        <div class="flex items-center text-sm text-gray-500 dark:text-gray-400">
-                            @if($hasChanges)
-                                <svg class="w-4 h-4 text-orange-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                </svg>
-                                Formularz zawiera niezapisane zmiany
-                            @else
-                                <svg class="w-4 h-4 text-green-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-                                </svg>
-                                Wszystkie pola są poprawne
-                            @endif
-                        </div>
-
-                        {{-- Action Buttons --}}
-                        <div class="flex items-center space-x-3">
-                            <button wire:click="cancel"
-                                    class="px-4 py-2 border border-gray-600 text-sm font-medium rounded-lg text-gray-300 bg-gray-800 hover:bg-gray-700 transition-colors">
-                                Anuluj
-                            </button>
-
-
-                            {{-- Reset to Defaults Button - Only show when there are unsaved changes --}}
-                            @if($hasUnsavedChanges)
-                                <button wire:click="resetToDefaults"
-                                        wire:loading.attr="disabled"
-                                        wire:target="resetToDefaults"
-                                        class="px-4 py-2 text-sm font-medium rounded-lg btn-reset-defaults transition-colors duration-200">
-                                    <div wire:loading.remove wire:target="resetToDefaults">
-                                        <svg class="w-4 h-4 mr-2 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                                        </svg>
-                                        Przywróć domyślne
-                                    </div>
-                                    <div wire:loading wire:target="resetToDefaults">
-                                        <span class="inline-block w-4 h-4 mr-2 border-2 border-current border-t-transparent rounded-full animate-spin"></span>
-                                        Przywracanie...
-                                    </div>
-                                </button>
-                            @endif
-
-                            {{-- Enhanced Sync Button - Context-aware name and functionality --}}
-                            <button wire:click="syncToShops"
-                                    wire:loading.attr="disabled"
-                                    wire:target="syncToShops"
-                                    class="px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-purple-400 text-white text-sm font-medium rounded-lg transition-colors duration-200">
-                                <div wire:loading.remove wire:target="syncToShops">
-                                    <svg class="w-4 h-4 mr-2 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                                    </svg>
-                                    @if($activeShopId === null)
-                                        Aktualizuj na wszystkich sklepach
-                                    @else
-                                        Zaktualizuj na sklepie
-                                    @endif
-                                </div>
-                                <div wire:loading wire:target="syncToShops">
-                                    <span class="inline-block w-4 h-4 mr-2 border-2 border-current border-t-transparent rounded-full animate-spin"></span>
-                                    @if($activeShopId === null)
-                                        Aktualizowanie wszystkich sklepów...
-                                    @else
-                                        Aktualizowanie sklepu...
-                                    @endif
-                                </div>
-                            </button>
-
-                            {{-- Save All Changes Button - Only show when there are pending changes --}}
-                            @if($hasUnsavedChanges)
-                                <button wire:click="saveAllPendingChanges"
-                                        wire:loading.attr="disabled"
-                                        wire:target="saveAllPendingChanges"
-                                        class="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white text-sm font-medium rounded-lg transition-colors duration-200">
-                                    <div wire:loading.remove wire:target="saveAllPendingChanges">
-                                        <svg class="w-4 h-4 mr-2 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
-                                        </svg>
-                                        Zapisz wszystkie zmiany
-                                    </div>
-                                    <div wire:loading wire:target="saveAllPendingChanges">
-                                        <span class="inline-block w-4 h-4 mr-2 border-2 border-current border-t-transparent rounded-full animate-spin"></span>
-                                        Zapisywanie wszystkich zmian...
-                                    </div>
-                                </button>
-                            @endif
-
-                            <button wire:click="saveAndClose"
-                                    wire:loading.attr="disabled"
-                                    wire:target="saveAndClose"
-                                    class="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-green-400 text-white text-sm font-medium rounded-lg transition-colors duration-200">
-                                <div wire:loading.remove wire:target="saveAndClose">
-                                    <svg class="w-4 h-4 mr-2 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-                                    </svg>
-                                    {{ $isEditMode ? 'Zapisz i Zamknij' : 'Zapisz' }}
-                                </div>
-                                <div wire:loading wire:target="saveAndClose">
-                                    <span class="inline-block w-4 h-4 mr-2 border-2 border-current border-t-transparent rounded-full animate-spin"></span>
-                                    Zapisywanie...
-                                </div>
-                            </button>
-                        </div> {{-- Close action buttons flex --}}
-                    </div> {{-- Close form footer flex wrapper --}}
-                </div> {{-- Close form footer bg-gray-50 --}}
             </div> {{-- Close category-form-left-column --}}
 
             {{-- Right Column - Quick Actions & Info --}}
@@ -1286,44 +1786,105 @@
                         Szybkie akcje
                     </h4>
                     <div class="space-y-4">
-                        {{-- Save Button --}}
-                        <button wire:click="saveAndClose"
-                                class="btn-enterprise-primary w-full py-3 text-lg"
-                                wire:loading.attr="disabled"
-                                wire:target="saveAndClose">
-                            <span wire:loading.remove wire:target="saveAndClose">
-                                <i class="fas fa-save mr-3"></i>
-                                {{ $isEditMode ? 'Zapisz zmiany' : 'Utwórz produkt' }}
-                            </span>
-                            <span wire:loading wire:target="saveAndClose">
-                                <i class="fas fa-spinner fa-spin mr-3"></i>
-                                Zapisywanie...
-                            </span>
-                        </button>
+                        {{-- Save Button - Smart mode: "Wróć do Listy" when job pending/processing --}}
+                        @include('livewire.products.management.partials.actions.save-and-close-button')
 
-                        {{-- Sync to Shops Button (Edit Mode) --}}
+                        {{-- ETAP_13.2: Aktualizuj sklepy (ALL shops export) - NEW --}}
                         @if($isEditMode && !empty($exportedShops))
-                            <button wire:click="syncToShops"
-                                    class="btn-enterprise-secondary w-full py-3"
-                                    wire:loading.attr="disabled"
-                                    wire:target="syncToShops">
-                                <span wire:loading.remove wire:target="syncToShops">
-                                    <i class="fas fa-sync-alt mr-2"></i>
-                                    Synchronizuj sklepy
-                                </span>
-                                <span wire:loading wire:target="syncToShops">
-                                    <i class="fas fa-spinner fa-spin mr-2"></i>
-                                    Synchronizacja...
-                                </span>
+                            <button
+                                type="button"
+                                wire:click="bulkUpdateShops"
+                                class="btn-enterprise-secondary w-full py-3"
+                                x-data="jobCountdown(@entangle('jobCreatedAt'), @entangle('activeJobStatus'), @entangle('jobResult'), @entangle('activeJobType'))"
+                                :disabled="$wire.activeJobStatus === 'pending' || $wire.activeJobStatus === 'processing'"
+                                :class="{
+                                    'btn-job-running': ($wire.activeJobStatus === 'pending' || $wire.activeJobStatus === 'processing') && $wire.activeJobType === 'sync',
+                                    'btn-job-success': $wire.jobResult === 'success' && $wire.activeJobType === 'sync',
+                                    'btn-job-error': $wire.jobResult === 'error' && $wire.activeJobType === 'sync'
+                                }"
+                                :style="($wire.activeJobStatus === 'pending' || $wire.activeJobStatus === 'processing') && $wire.activeJobType === 'sync' ? `--progress-percent: ${progress}%` : ''">
+
+                                {{-- Show animation for BOTH pending AND processing (FIX 2025-11-18) --}}
+                                <template x-if="($wire.activeJobStatus === 'pending' || $wire.activeJobStatus === 'processing') && $wire.activeJobType === 'sync'">
+                                    <span>
+                                        <i class="fas fa-spinner fa-spin mr-2"></i>
+                                        Aktualizowanie... (<span x-text="remainingSeconds"></span>s)
+                                    </span>
+                                </template>
+
+                                <template x-if="$wire.jobResult === 'success' && $wire.activeJobType === 'sync'">
+                                    <span>
+                                        <i class="fas fa-check mr-2"></i>
+                                        SUKCES
+                                    </span>
+                                </template>
+
+                                <template x-if="$wire.jobResult === 'error' && $wire.activeJobType === 'sync'">
+                                    <span>
+                                        <i class="fas fa-exclamation-triangle mr-2"></i>
+                                        BŁĄD
+                                    </span>
+                                </template>
+
+                                {{-- Default state: Show when NO active job AND (no result OR result cleared) --}}
+                                <template x-if="(!$wire.activeJobStatus || $wire.activeJobStatus === 'completed' || $wire.activeJobStatus === 'failed') && !$wire.jobResult">
+                                    <span>
+                                        <i class="fas fa-cloud-upload-alt mr-2"></i>
+                                        Aktualizuj sklepy
+                                    </span>
+                                </template>
+                            </button>
+                        @endif
+
+                        {{-- ETAP_13.2: Wczytaj ze sklepów (ALL shops import) - NEW --}}
+                        @if($isEditMode && !empty($exportedShops))
+                            <button
+                                type="button"
+                                wire:click="bulkPullFromShops"
+                                class="btn-enterprise-secondary w-full py-3"
+                                x-data="jobCountdown(@entangle('jobCreatedAt'), @entangle('activeJobStatus'), @entangle('jobResult'), @entangle('activeJobType'))"
+                                :disabled="$wire.activeJobStatus === 'pending' || $wire.activeJobStatus === 'processing'"
+                                :class="{
+                                    'btn-job-running': ($wire.activeJobStatus === 'pending' || $wire.activeJobStatus === 'processing') && $wire.activeJobType === 'pull',
+                                    'btn-job-success': $wire.jobResult === 'success' && $wire.activeJobType === 'pull',
+                                    'btn-job-error': $wire.jobResult === 'error' && $wire.activeJobType === 'pull'
+                                }"
+                                :style="($wire.activeJobStatus === 'pending' || $wire.activeJobStatus === 'processing') && $wire.activeJobType === 'pull' ? `--progress-percent: ${progress}%` : ''">
+
+                                {{-- Show animation for BOTH pending AND processing (FIX 2025-11-18) --}}
+                                <template x-if="($wire.activeJobStatus === 'pending' || $wire.activeJobStatus === 'processing') && $wire.activeJobType === 'pull'">
+                                    <span>
+                                        <i class="fas fa-spinner fa-spin mr-2"></i>
+                                        Wczytywanie... (<span x-text="remainingSeconds"></span>s)
+                                    </span>
+                                </template>
+
+                                <template x-if="$wire.jobResult === 'success' && $wire.activeJobType === 'pull'">
+                                    <span>
+                                        <i class="fas fa-check mr-2"></i>
+                                        SUKCES
+                                    </span>
+                                </template>
+
+                                <template x-if="$wire.jobResult === 'error' && $wire.activeJobType === 'pull'">
+                                    <span>
+                                        <i class="fas fa-exclamation-triangle mr-2"></i>
+                                        BŁĄD
+                                    </span>
+                                </template>
+
+                                {{-- Default state: Show when NO active job AND (no result OR result cleared) --}}
+                                <template x-if="(!$wire.activeJobStatus || $wire.activeJobStatus === 'completed' || $wire.activeJobStatus === 'failed') && !$wire.jobResult">
+                                    <span>
+                                        <i class="fas fa-cloud-download-alt mr-2"></i>
+                                        Wczytaj ze sklepów
+                                    </span>
+                                </template>
                             </button>
                         @endif
 
                         {{-- Cancel Button --}}
-                        <a href="{{ route('admin.products.index') }}"
-                           class="btn-enterprise-secondary w-full py-3">
-                            <i class="fas fa-times mr-2"></i>
-                            Anuluj i wróć
-                        </a>
+                        @include('livewire.products.management.partials.actions.cancel-link')
                     </div>
                 </div>
 
@@ -1378,7 +1939,8 @@
                             <h3 class="text-lg font-medium text-white">
                                 Wybierz sklepy
                             </h3>
-                            <button wire:click="closeShopSelector"
+                            <button type="button"
+                                    wire:click="closeShopSelector"
                                     class="text-gray-400 hover:text-gray-500 dark:hover:text-gray-300 transition-colors duration-200">
                                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
@@ -1532,5 +2094,107 @@ document.addEventListener('livewire:init', () => {
         }
     });
 });
+
+/**
+ * ETAP_13: Job Countdown Animation (0-60s)
+ * Alpine.js component for real-time countdown during background job execution
+ *
+ * Usage: x-data="jobCountdown(@entangle('jobCreatedAt'), @entangle('activeJobStatus'), @entangle('jobResult'), @entangle('activeJobType'))"
+ */
+function jobCountdown(jobCreatedAt, activeJobStatus, jobResult, activeJobType) {
+    return {
+        jobCreatedAt: jobCreatedAt,
+        activeJobStatus: activeJobStatus,
+        jobResult: jobResult,
+        activeJobType: activeJobType,
+        currentTime: Date.now(),
+        remainingSeconds: 60,
+        progress: 0,
+        interval: null,
+
+        init() {
+            // FIX 2025-11-18: Start countdown for BOTH pending AND processing
+            // (Backend sets 'pending', not 'processing' - queue worker may be delayed)
+            if (this.activeJobStatus === 'pending' || this.activeJobStatus === 'processing') {
+                this.startCountdown();
+            }
+
+            // Watch for status changes
+            this.$watch('activeJobStatus', (value) => {
+                if (value === 'pending' || value === 'processing') {
+                    this.startCountdown();
+                } else {
+                    // Stop countdown when status → null/completed/failed
+                    this.stopCountdown();
+                }
+            });
+
+            // Auto-clear on success/error after 5s
+            this.$watch('jobResult', (value) => {
+                if (value) {
+                    setTimeout(() => {
+                        this.clearJob();
+                    }, 5000);
+                }
+            });
+        },
+
+        startCountdown() {
+            if (!this.jobCreatedAt) return;
+
+            this.interval = setInterval(() => {
+                this.currentTime = Date.now();
+                const createdAtTime = new Date(this.jobCreatedAt).getTime();
+                const elapsed = (this.currentTime - createdAtTime) / 1000;
+
+                this.remainingSeconds = Math.max(0, 60 - Math.floor(elapsed));
+                this.progress = Math.min(100, (elapsed / 60) * 100);
+
+                // FIX 2025-11-18: Auto-clear job status when countdown reaches 0
+                // (Job completed or timeout - either way, clear UI state)
+                if (this.remainingSeconds <= 0) {
+                    this.stopCountdown();
+
+                    // Auto-clear job status after 2s delay (allow user to see completion)
+                    setTimeout(() => {
+                        this.clearJob();
+                    }, 2000);
+                }
+            }, 1000);
+        },
+
+        stopCountdown() {
+            if (this.interval) {
+                clearInterval(this.interval);
+                this.interval = null;
+            }
+        },
+
+        clearJob() {
+            // Reset all properties
+            this.activeJobStatus = null;
+            this.jobResult = null;
+            this.progress = 0;
+            this.remainingSeconds = 60;
+
+            // Notify Livewire to clear job properties
+            this.$wire.set('activeJobId', null);
+            this.$wire.set('activeJobStatus', null);
+            this.$wire.set('jobResult', null);
+            this.$wire.set('activeJobType', null);
+        },
+
+        destroy() {
+            this.stopCountdown();
+        }
+    }
+}
 </script>
 @endpush
+
+
+
+
+
+
+

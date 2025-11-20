@@ -122,6 +122,12 @@ class PrestaShopShop extends Model
         'notification_settings',
         'notify_on_errors',
         'notify_on_sync_complete',
+        // Tax Rules Mapping (2025-11-14)
+        'tax_rules_group_id_23',
+        'tax_rules_group_id_8',
+        'tax_rules_group_id_5',
+        'tax_rules_group_id_0',
+        'tax_rules_last_fetched_at',
     ];
 
     /**
@@ -191,6 +197,33 @@ class PrestaShopShop extends Model
         return $this->morphMany(IntegrationMapping::class, 'mappable')
             ->where('integration_type', 'prestashop')
             ->where('integration_identifier', $this->id);
+    }
+
+    /**
+     * Get price group mappings for this shop.
+     *
+     * BUG FIX #13 (2025-11-13): Liczniki mapowań na liście sklepów
+     * Provides Eloquent relation to price mappings table instead of JSON column
+     *
+     * @return \Illuminate\Database\Eloquent\Relations\HasMany
+     */
+    public function priceGroupMappings(): HasMany
+    {
+        return $this->hasMany(PrestaShopShopPriceMapping::class, 'prestashop_shop_id');
+    }
+
+    /**
+     * Get warehouse mappings for this shop.
+     *
+     * BUG FIX #13 (2025-11-13): Liczniki mapowań na liście sklepów
+     * Returns warehouses linked to this shop (type: 'shop_linked')
+     *
+     * @return \Illuminate\Database\Eloquent\Relations\HasMany
+     */
+    public function warehouseMappings(): HasMany
+    {
+        return $this->hasMany(Warehouse::class, 'shop_id')
+                    ->where('type', 'shop_linked');
     }
 
     /**
@@ -510,5 +543,121 @@ class PrestaShopShop extends Model
     {
         return $query->where('connection_status', '!=', self::CONNECTION_CONNECTED)
                     ->orWhere('consecutive_failures', '>', 0);
+    }
+
+    // ==========================================
+    // COMPUTED PROPERTIES (Real-time from sync_jobs)
+    // 2025-11-07: Fix outdated statistics columns
+    // ==========================================
+
+    /**
+     * Get last successful sync time (from sync_jobs)
+     * Overrides outdated last_sync_at column with real-time data
+     */
+    public function getLastSyncAtComputedAttribute(): ?Carbon
+    {
+        $lastSync = $this->syncJobs()
+            ->where('status', SyncJob::STATUS_COMPLETED)
+            ->latest('completed_at')
+            ->first();
+
+        return $lastSync ? $lastSync->completed_at : null;
+    }
+
+    /**
+     * Get successful syncs count (from sync_jobs)
+     * Overrides outdated sync_success_count column with real-time data
+     */
+    public function getSyncSuccessCountComputedAttribute(): int
+    {
+        return $this->syncJobs()
+            ->where('status', SyncJob::STATUS_COMPLETED)
+            ->count();
+    }
+
+    /**
+     * Get failed syncs count (from sync_jobs)
+     * Overrides outdated sync_error_count column with real-time data
+     */
+    public function getSyncErrorCountComputedAttribute(): int
+    {
+        return $this->syncJobs()
+            ->whereIn('status', [SyncJob::STATUS_FAILED, SyncJob::STATUS_TIMEOUT, SyncJob::STATUS_CANCELLED])
+            ->count();
+    }
+
+    /**
+     * Get unique products synced count (from sync_jobs)
+     * Overrides outdated products_synced column with real-time data
+     */
+    public function getProductsSyncedComputedAttribute(): int
+    {
+        return $this->syncJobs()
+            ->where('job_type', SyncJob::JOB_PRODUCT_SYNC)
+            ->where('status', SyncJob::STATUS_COMPLETED)
+            ->distinct('source_id')
+            ->count('source_id');
+    }
+
+    /**
+     * Check if shop has pending or running sync jobs (2025-11-12)
+     *
+     * Used for SYNC NOW button state:
+     * - true = button ENABLED (can execute pending job immediately)
+     * - false = button DISABLED (no pending jobs to execute)
+     *
+     * BUG FIX #12 (2025-11-12): Check BOTH sync_jobs AND Laravel jobs table
+     *
+     * PROBLEM: Jobs are added to Laravel 'jobs' table IMMEDIATELY when dispatch() is called,
+     * but sync_jobs records are created LATER in handle() method when queue worker executes.
+     * This timing gap caused button to be disabled even when jobs were queued.
+     *
+     * SOLUTION: Check sync_jobs first (jobs being processed), then fallback to Laravel queue
+     * (jobs waiting to be processed) using QueueJobsService.
+     *
+     * @return bool
+     */
+    public function hasPendingSyncJob(): bool
+    {
+        // Check sync_jobs table (jobs being processed)
+        $hasSyncJob = $this->syncJobs()
+            ->whereIn('status', [SyncJob::STATUS_PENDING, SyncJob::STATUS_RUNNING])
+            ->exists();
+
+        if ($hasSyncJob) {
+            return true;
+        }
+
+        // Check Laravel queue (jobs waiting to be processed)
+        try {
+            $queueService = app(\App\Services\QueueJobsService::class);
+            $activeJobs = $queueService->getActiveJobs();
+
+            // Filter for jobs targeting this shop
+            $hasQueueJob = $activeJobs->contains(function($job) {
+                return isset($job['data']['shop_id']) && $job['data']['shop_id'] == $this->id;
+            });
+
+            return $hasQueueJob;
+        } catch (\Exception $e) {
+            // If queue service fails, fallback to sync_jobs only (conservative approach)
+            \Log::warning("hasPendingSyncJob() queue check failed: {$e->getMessage()}");
+            return false;
+        }
+    }
+
+    /**
+     * Get pending sync job for this shop (2025-11-12)
+     *
+     * Returns the most recent pending or running job
+     *
+     * @return SyncJob|null
+     */
+    public function getPendingSyncJob(): ?SyncJob
+    {
+        return $this->syncJobs()
+            ->whereIn('status', [SyncJob::STATUS_PENDING, SyncJob::STATUS_RUNNING])
+            ->orderBy('created_at', 'desc')
+            ->first();
     }
 }

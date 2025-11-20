@@ -1,0 +1,228 @@
+
+/* ========================================
+   TAX RULES MAPPING (FAZA 5.1 - 2025-11-14)
+   ======================================== */
+
+/* Tax Rules Mapping Section Container */
+.tax-rules-mapping-section {
+    background: linear-gradient(135deg, rgba(31, 41, 55, 0.6), rgba(17, 24, 39, 0.6));
+    border: 1px solid rgba(224, 172, 126, 0.2);
+    border-radius: 12px;
+    padding: 24px;
+    margin-top: 24px;
+}
+
+.tax-rules-mapping-section .section-header {
+    margin-bottom: 20px;
+}
+
+.tax-rules-mapping-section .section-header h4 {
+    display: flex;
+    align-items: center;
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: var(--color-text-primary, #f8fafc);
+    margin-bottom: 8px;
+}
+
+.tax-rules-mapping-section .section-header p {
+    font-size: 0.875rem;
+    color: rgba(203, 213, 225, 0.8);
+    line-height: 1.5;
+}
+
+/* Tax Rules Grid Layout */
+.tax-rules-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 20px;
+    margin-top: 20px;
+}
+
+/* Individual Tax Rule Item */
+.tax-rule-item {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.tax-rule-item.required .form-label {
+    font-weight: 600;
+    color: var(--primary-gold, #e0ac7e);
+}
+
+/* Required Asterisk */
+.required-asterisk {
+    color: var(--color-danger, #ef4444);
+    margin-left: 4px;
+    font-weight: 700;
+}
+
+/* Form Labels */
+.tax-rule-item .form-label {
+    display: block;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--color-text-primary, #f8fafc);
+    margin-bottom: 8px;
+}
+
+/* Form Selects */
+.tax-rule-item .form-select {
+    width: 100%;
+    padding: 12px 16px;
+    background: rgba(31, 41, 55, 0.6);
+    border: 1px solid rgba(75, 85, 99, 0.5);
+    color: var(--color-text-primary, #f8fafc);
+    border-radius: 8px;
+    font-size: 0.875rem;
+    transition: all 0.2s ease;
+}
+
+.tax-rule-item .form-select:hover {
+    border-color: rgba(224, 172, 126, 0.5);
+}
+
+.tax-rule-item .form-select:focus {
+    outline: none;
+    border-color: var(--primary-gold, #e0ac7e);
+    box-shadow: 0 0 0 3px rgba(224, 172, 126, 0.1);
+}
+
+.tax-rule-item .form-select.border-red-500 {
+    border-color: rgba(239, 68, 68, 0.5);
+}
+
+/* Selected Indicator (Green Checkmark) */
+.selected-indicator {
+    display: flex;
+    align-items: center;
+    color: var(--color-success, #10b981);
+    font-size: 0.875rem;
+    font-weight: 500;
+    margin-top: 4px;
+}
+
+.selected-indicator svg {
+    width: 16px;
+    height: 16px;
+    margin-right: 4px;
+}
+
+/* Invalid Feedback (Error Messages) */
+.invalid-feedback {
+    display: block;
+    color: rgba(248, 113, 113, 0.9);
+    font-size: 0.875rem;
+    margin-top: 4px;
+}
+
+/* Tax Rules Loading State */
+.tax-rules-loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 32px 0;
+    background: rgba(31, 41, 55, 0.4);
+    border-radius: 8px;
+    margin: 16px 0;
+}
+
+.tax-rules-loading svg {
+    width: 20px;
+    height: 20px;
+    color: var(--primary-gold, #e0ac7e);
+    margin-right: 12px;
+}
+
+.tax-rules-loading span {
+    color: rgba(203, 213, 225, 0.8);
+    font-size: 0.875rem;
+}
+
+/* Tax Rules Info Card */
+.tax-rules-info {
+    background: linear-gradient(135deg, rgba(37, 99, 235, 0.15), rgba(29, 78, 216, 0.1));
+    border: 1px solid rgba(96, 165, 250, 0.3);
+    border-radius: 8px;
+    padding: 16px;
+    display: flex;
+    align-items: flex-start;
+    margin-top: 16px;
+}
+
+.tax-rules-info svg {
+    width: 20px;
+    height: 20px;
+    color: rgba(96, 165, 250, 0.9);
+    margin-right: 12px;
+    flex-shrink: 0;
+    margin-top: 2px;
+}
+
+.tax-rules-info span {
+    color: rgba(191, 219, 254, 0.9);
+    font-size: 0.875rem;
+    line-height: 1.5;
+}
+
+/* Error Alert (Tax Rules Fetch Error) */
+.alert.alert-warning {
+    background: linear-gradient(135deg, rgba(220, 38, 38, 0.15), rgba(185, 28, 28, 0.1));
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    border-radius: 8px;
+    padding: 16px;
+    display: flex;
+    align-items: flex-start;
+    margin-bottom: 16px;
+}
+
+.alert.alert-warning svg {
+    width: 20px;
+    height: 20px;
+    color: rgba(248, 113, 113, 0.9);
+    margin-right: 12px;
+    flex-shrink: 0;
+    margin-top: 2px;
+}
+
+.alert.alert-warning .flex-1 {
+    flex: 1;
+}
+
+.alert.alert-warning p {
+    color: rgba(252, 165, 165, 0.9);
+    font-size: 0.875rem;
+    margin: 0;
+}
+
+.alert.alert-warning button {
+    margin-top: 8px;
+    font-size: 0.875rem;
+    color: rgba(254, 202, 202, 0.9);
+    text-decoration: underline;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    transition: color 0.2s ease;
+}
+
+.alert.alert-warning button:hover {
+    color: rgba(254, 226, 226, 1);
+}
+
+/* Responsive Adjustments */
+@media (max-width: 768px) {
+    .tax-rules-grid {
+        grid-template-columns: 1fr;
+        gap: 16px;
+    }
+
+    .tax-rules-mapping-section {
+        padding: 16px;
+    }
+
+    .tax-rule-item .form-select {
+        padding: 10px 14px;
+    }
+}

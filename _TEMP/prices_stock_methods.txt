@@ -1,0 +1,127 @@
+
+    /*
+    |--------------------------------------------------------------------------
+    | PRICES & STOCK SAVE METHODS (PROBLEM #4 - 2025-11-07)
+    |--------------------------------------------------------------------------
+    */
+
+    /**
+     * Save product prices to database
+     * Called from savePendingChangesToProduct()
+     */
+    private function savePricesInternal(): void
+    {
+        if (!$this->product || !$this->product->exists) {
+            Log::debug('savePricesInternal: No product to save prices for');
+            return;
+        }
+
+        $savedCount = 0;
+        $deletedCount = 0;
+
+        try {
+            Log::debug('BEFORE savePricesInternal', [
+                'prices_array' => $this->prices,
+                'prices_count' => count($this->prices),
+            ]);
+
+            foreach ($this->prices as $priceGroupId => $priceData) {
+                // If price is NULL or empty, delete existing record
+                if (empty($priceData['net']) && empty($priceData['gross'])) {
+                    \App\Models\ProductPrice::where('product_id', $this->product->id)
+                        ->where('price_group_id', $priceGroupId)
+                        ->whereNull('product_variant_id')
+                        ->delete();
+                    $deletedCount++;
+                    continue;
+                }
+
+                // Create or update price record
+                \App\Models\ProductPrice::updateOrCreate(
+                    [
+                        'product_id' => $this->product->id,
+                        'product_variant_id' => null,
+                        'price_group_id' => $priceGroupId,
+                    ],
+                    [
+                        'price_net' => $priceData['net'] ?? 0.00,
+                        'price_gross' => $priceData['gross'] ?? 0.00,
+                        'margin_percentage' => $priceData['margin'] ?? null,
+                        'is_active' => $priceData['is_active'] ?? true,
+                        'auto_calculate_gross' => false,
+                        'auto_calculate_margin' => false,
+                    ]
+                );
+
+                $savedCount++;
+            }
+
+            Log::info('Product prices saved', [
+                'product_id' => $this->product->id,
+                'saved_count' => $savedCount,
+                'deleted_count' => $deletedCount,
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Failed to save product prices', [
+                'product_id' => $this->product->id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+            throw $e;
+        }
+    }
+
+    /**
+     * Save product stock to database
+     * Called from savePendingChangesToProduct()
+     */
+    private function saveStockInternal(): void
+    {
+        if (!$this->product || !$this->product->exists) {
+            Log::debug('saveStockInternal: No product to save stock for');
+            return;
+        }
+
+        $savedCount = 0;
+
+        try {
+            Log::debug('BEFORE saveStockInternal', [
+                'stock_array' => $this->stock,
+                'stock_count' => count($this->stock),
+            ]);
+
+            foreach ($this->stock as $warehouseId => $stockData) {
+                \App\Models\ProductStock::updateOrCreate(
+                    [
+                        'product_id' => $this->product->id,
+                        'product_variant_id' => null,
+                        'warehouse_id' => $warehouseId,
+                    ],
+                    [
+                        'quantity' => $stockData['quantity'] ?? 0,
+                        'reserved_quantity' => $stockData['reserved'] ?? 0,
+                        'minimum_stock_level' => $stockData['minimum'] ?? 0,
+                        'is_active' => true,
+                        'track_stock' => true,
+                    ]
+                );
+
+                $savedCount++;
+            }
+
+            Log::info('Product stock saved', [
+                'product_id' => $this->product->id,
+                'saved_count' => $savedCount,
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Failed to save product stock', [
+                'product_id' => $this->product->id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+            throw $e;
+        }
+    }
+}

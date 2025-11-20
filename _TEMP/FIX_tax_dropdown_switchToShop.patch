@@ -1,0 +1,14 @@
+--- a/app/Http/Livewire/Products/Management/ProductForm.php
++++ b/app/Http/Livewire/Products/Management/ProductForm.php
+@@ -1826,6 +1826,11 @@ public function switchToShop(?int $shopId = null): void
+                 // Switch to default data
+                 $this->loadDefaultDataToForm();
+             } else {
++                // 🔥 FAZA 5.2 FIX (2025-11-17): Load tax rules BEFORE loading form data
++                // Root cause: loadShopDataToForm() sets selectedTaxRateOption, but dropdown options
++                // may not be available yet, causing UI to fallback to "use_default"
++                $this->loadTaxRuleGroupsForShop($shopId);
++
+                 // Switch to shop-specific data with inheritance
+                 $this->loadShopDataToForm($shopId);
+             }

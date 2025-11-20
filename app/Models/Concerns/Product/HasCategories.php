@@ -3,7 +3,7 @@
 namespace App\Models\Concerns\Product;
 
 use App\Models\Category;
-use App\Models\ProductShopCategory;
+
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Collection;
@@ -206,21 +206,7 @@ trait HasCategories
                     ->limit(1);
     }
 
-    /**
-     * Shop-specific categories relationship (1:many) - ETAP_05 ✅ IMPLEMENTED
-     *
-     * Business Logic: Kategorie per sklep PrestaShop z dziedziczeniem
-     * Performance: Eager loading ready z proper indexing
-     * Integration: ps_category_product per sklep mapping ready
-     *
-     * @return \Illuminate\Database\Eloquent\Relations\HasMany
-     */
-    public function shopCategories(): HasMany
-    {
-        return $this->hasMany(ProductShopCategory::class, 'product_id', 'id')
-                    ->orderBy('shop_id', 'asc')
-                    ->orderBy('sort_order', 'asc');
-    }
+
 
     /*
     |--------------------------------------------------------------------------

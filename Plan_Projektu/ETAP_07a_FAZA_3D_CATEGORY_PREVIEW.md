@@ -1,10 +1,19 @@
 # 🆕 ETAP 07 FAZA 3D: CATEGORY IMPORT PREVIEW SYSTEM
 
+## PLAN RAMOWY ETAPU
+
+- ✅ Analysis Phase: analiza produktów i wykrywanie brakujących kategorii
+- ✅ Preview Phase: podgląd drzewa kategorii do utworzenia
+- 🛠️ Import Phase: masowe tworzenie kategorii + import produktów (auto-select TODO)
+
+---
+
+
 **Status Ogolny:** 🛠️ **90% UKOŃCZONE** - Manual Category Creator COMPLETED + auto-select TODO
 **Priorytet:** HIGH - User requested feature dla bulk product imports
-**Zaleznosci:** FAZA 3A (Import) - COMPLETED ✅
+**Zaleznosci:** FAZA 3A (Import) - COMPLETED ✅, FIX #12 (category_mappings) - COMPLETED ✅
 **Utworzono:** 2025-10-08
-**Zaktualizowano:** 2025-10-15 10:50
+**Zaktualizowano:** 2025-11-18 (Added FIX #12 Reference)
 **Autor Planu:** Claude Code (architect agent)
 **Deployed:** ✅ PRODUCTION (2025-10-08 + 2025-10-09 + 2025-10-15)
 
@@ -679,8 +688,69 @@ User musi przetestować następujący workflow na https://ppm.mpptrade.pl:
 
 ---
 
+## 🔧 FIX #12: category_mappings Canonical Architecture (2025-11-18)
+
+**Problem:** Niespójna struktura category_mappings w product_shop_data (3 różne formaty)
+
+**Solution:** Option A (Comprehensive Structure) z separacją UI state + mappings + metadata
+
+**Status:** ✅ IMPLEMENTED
+
+**Files Updated:**
+- ✅ `app/Models/ProductShopData.php` - category_mappings field
+- ✅ `app/Services/CategoryMappingsValidator.php` - validation logic
+- ✅ `app/Http/Livewire/Products/Management/Services/ProductFormSaver.php` - saveShopSpecificData()
+- ✅ `app/Http/Livewire/Products/Management/ProductForm.php` - pullShopData()
+- ✅ `app/Services/PrestaShop/ProductTransformer.php` - buildCategoryAssociations()
+- ✅ `app/Services/PrestaShop/Sync/ProductSyncStrategy.php` - calculateChecksum()
+
+**Documentation Created:**
+- ✅ `_DOCS/CATEGORY_MAPPINGS_ARCHITECTURE.md` - Full design document (1001 lines)
+- ✅ `_DOCS/CATEGORY_MAPPINGS_QUICK_REFERENCE.md` - Developer guide
+- ✅ `_DOCS/Struktura_Bazy_Danych.md` - Updated with new structure
+
+**New Structure (v2.0):**
+```json
+{
+  "ui": {
+    "selected": [100, 103, 42],
+    "primary": 100
+  },
+  "mappings": {
+    "100": 9,
+    "103": 15,
+    "42": 800
+  },
+  "metadata": {
+    "last_updated": "2025-11-18T10:30:00Z",
+    "source": "manual|pull|sync"
+  }
+}
+```
+
+**Key Benefits:**
+- ✅ Clear separation of concerns (UI vs Sync vs Metadata)
+- ✅ Deterministic format (always PPM → PS direction)
+- ✅ Backward compatible (reads old format, writes new)
+- ✅ Debuggable (source tracking in metadata)
+- ✅ Checksum-friendly (deterministic PrestaShop IDs)
+
+**Deployment Phases:**
+1. Phase 1: Code deployment (with backward-compatible reading) ✅
+2. Phase 2: Database migration (pending: `php artisan migrate`)
+3. Phase 3: Production monitoring (pending)
+4. Phase 4: Cleanup (pending - after 30 days)
+
+**Migration:**
+- Migration file: `database/migrations/2025_11_18_000001_migrate_category_mappings_structure.php`
+- Backward compatibility: Reads both old and new formats
+- Rollback: `php artisan migrate:rollback --step=1`
+
+---
+
 **KONIEC PLANU - OCZEKIWANIE NA AKCEPTACJE UZYTKOWNIKA**
 
 *Wygenerowano przez: architect agent (Claude Code)*
 *Data: 2025-10-08*
-*Wersja: 1.0*
+*Ostatnia aktualizacja: 2025-11-18 (Added FIX #12 Reference)*
+*Wersja: 1.1*

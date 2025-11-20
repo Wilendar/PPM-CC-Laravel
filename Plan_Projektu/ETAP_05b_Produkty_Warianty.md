@@ -11,6 +11,22 @@
 
 ---
 
+## PLAN RAMOWY ETAPU
+
+- 🛠️ Phase 0: Cleanup & Architectural Review (2h) - COMPLETED
+- 🛠️ Phase 1: Database Schema (3-4h) - COMPLETED
+- 🛠️ Phase 2: PrestaShop Integration Service (8-10h) - CODE COMPLETE, VERIFICATION PENDING
+- 🛠️ Phase 3: Color Picker Component (6-8h) - COMPLETED
+- 🛠️ Phase 4: AttributeSystemManager UI (10-12h) - COMPLETED
+- 🛠️ Phase 5: AttributeValueManager Enhancement (8-10h) - COMPLETED
+- 🛠️ Phase 6: ProductForm - Variant Management Section (12-15h) - READY TO START
+- 🛠️ Phase 7: ProductList - Expandable Variant Rows (10-12h) - NOT STARTED
+- 🛠️ Phase 8: ProductList - Bulk Variant Operations (14-16h) - NOT STARTED
+- 🛠️ Phase 9: Integration Testing & Code Review (8-10h) - NOT STARTED
+- 🛠️ Phase 10: Deployment & Documentation (4-6h) - NOT STARTED
+
+---
+
 ## ⚠️ WAŻNA INFORMACJA - ZMIANA ARCHITEKTURY (2025-10-24)
 
 ### 🚨 Stary Koncept (NIEPRAWIDŁOWY - ODRZUCONY)

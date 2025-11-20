@@ -65,7 +65,25 @@ trait ProductFormValidation
             'height' => 'nullable|numeric|min:0|max:999999.99',
             'width' => 'nullable|numeric|min:0|max:999999.99',
             'length' => 'nullable|numeric|min:0|max:999999.99',
-            'tax_rate' => 'required|numeric|min:0|max:100',
+
+            // Tax Rate - Global Default (required for all products)
+            'tax_rate' => [
+                'required',
+                'numeric',
+                'min:0',
+                'max:100',
+                'regex:/^\d{1,2}(\.\d{1,2})?$/', // Format: XX.XX (e.g., 23.00, 8.00, 5.00, 0.00)
+            ],
+
+            // Tax Rate - Shop Overrides (optional, per shop) - FAZA 5.3
+            'shopTaxRateOverrides' => 'nullable|array',
+            'shopTaxRateOverrides.*' => [
+                'nullable',
+                'numeric',
+                'min:0',
+                'max:100',
+                'regex:/^\d{1,2}(\.\d{1,2})?$/',
+            ],
 
             // Categories
             'selectedCategories' => 'array',
@@ -92,10 +110,20 @@ trait ProductFormValidation
             'product_type_id.required' => 'Typ produktu jest wymagany.',
             'product_type_id.exists' => 'Wybrany typ produktu nie istnieje.',
             'ean.regex' => 'EAN musi składać się z 8-13 cyfr.',
+
+            // Tax Rate - Global Default
             'tax_rate.required' => 'Stawka VAT jest wymagana.',
             'tax_rate.numeric' => 'Stawka VAT musi być liczbą.',
             'tax_rate.min' => 'Stawka VAT nie może być ujemna.',
             'tax_rate.max' => 'Stawka VAT nie może przekraczać 100%.',
+            'tax_rate.regex' => 'Stawka VAT musi być w formacie XX.XX (np. 23.00).',
+
+            // Tax Rate - Shop Overrides (FAZA 5.3)
+            'shopTaxRateOverrides.*.numeric' => 'Stawka VAT dla sklepu musi być liczbą.',
+            'shopTaxRateOverrides.*.min' => 'Stawka VAT dla sklepu nie może być ujemna.',
+            'shopTaxRateOverrides.*.max' => 'Stawka VAT dla sklepu nie może przekraczać 100%.',
+            'shopTaxRateOverrides.*.regex' => 'Stawka VAT dla sklepu musi być w formacie XX.XX (np. 8.00).',
+
             'primaryCategoryId.exists' => 'Wybrana kategoria główna nie istnieje.',
         ];
     }

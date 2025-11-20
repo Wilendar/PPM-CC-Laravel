@@ -178,6 +178,82 @@ class PrestaShop9Client extends BasePrestaShopClient
         return $this->makeRequest('GET', "/products/{$productId}/metrics");
     }
 
+    /**
+     * Get specific prices for product
+     *
+     * PROBLEM #4 - Task 16: PrestaShop Price Import
+     * Fetches all specific_prices for a product (discounts, group prices, etc.)
+     *
+     * @param int $productId PrestaShop product ID
+     * @return array Specific prices data
+     * @throws \App\Exceptions\PrestaShopAPIException
+     */
+    public function getSpecificPrices(int $productId): array
+    {
+        return $this->makeRequest('GET', "/specific_prices?filter[id_product]={$productId}&display=full");
+    }
+
+    /**
+     * Get all price groups (customer groups) from PrestaShop
+     *
+     * Used for price mapping configuration in shop wizard.
+     * Fetches all customer groups which can have specific prices.
+     *
+     * @return array Price groups data
+     * @throws \App\Exceptions\PrestaShopAPIException
+     */
+    public function getPriceGroups(): array
+    {
+        return $this->makeRequest('GET', '/groups?display=full');
+    }
+
+    /**
+     * Create specific price
+     *
+     * PROBLEM #4 - Task 18: PrestaShop Price Sync
+     * Creates a new specific_price entry (discount, group price)
+     *
+     * @param array $priceData Specific price data
+     * @return array Created specific price with ID
+     * @throws \App\Exceptions\PrestaShopAPIException
+     */
+    public function createSpecificPrice(array $priceData): array
+    {
+        return $this->makeRequest('POST', '/specific_prices', ['specific_price' => $priceData]);
+    }
+
+    /**
+     * Update specific price
+     *
+     * PROBLEM #4 - Task 18: PrestaShop Price Sync
+     * Updates existing specific_price entry
+     *
+     * @param int $priceId PrestaShop specific_price ID
+     * @param array $priceData Updated price data
+     * @return array Updated specific price
+     * @throws \App\Exceptions\PrestaShopAPIException
+     */
+    public function updateSpecificPrice(int $priceId, array $priceData): array
+    {
+        return $this->makeRequest('PUT', "/specific_prices/{$priceId}", ['specific_price' => $priceData]);
+    }
+
+    /**
+     * Delete specific price
+     *
+     * PROBLEM #4 - Task 18: PrestaShop Price Sync
+     * Deletes specific_price entry
+     *
+     * @param int $priceId PrestaShop specific_price ID
+     * @return bool True on success
+     * @throws \App\Exceptions\PrestaShopAPIException
+     */
+    public function deleteSpecificPrice(int $priceId): bool
+    {
+        $this->makeRequest('DELETE', "/specific_prices/{$priceId}");
+        return true;
+    }
+
     // ===================================
     // ATTRIBUTE GROUPS API METHODS
     // ===================================
@@ -314,5 +390,167 @@ class PrestaShop9Client extends BasePrestaShopClient
     {
         $this->makeRequest('DELETE', "/product_option_values/{$valueId}");
         return true;
+    }
+
+    /**
+     * Get products by category ID
+     *
+     * Fetches products that belong to a specific category using the PrestaShop API filter parameter.
+     * Uses filter[id_category_default] to match products by their default category.
+     * PrestaShop 9.x may have enhanced filtering capabilities compared to 8.x.
+     *
+     * @param int $categoryId Category ID
+     * @param bool $includeSubcategories Include products from subcategories (not implemented in basic PS API)
+     * @param int $limit Maximum number of products to fetch (default: 100)
+     * @param int $offset Pagination offset (default: 0)
+     * @return array Products array
+     * @throws \App\Exceptions\PrestaShopAPIException
+     */
+    public function getProductsByCategory(int $categoryId, bool $includeSubcategories = false, int $limit = 100, int $offset = 0): array
+    {
+        try {
+            \Log::info('PrestaShop9Client: Fetching products by category', [
+                'category_id' => $categoryId,
+                'include_subcategories' => $includeSubcategories,
+                'limit' => $limit,
+                'offset' => $offset,
+                'shop_url' => $this->shop->url
+            ]);
+
+            // Build filters using PrestaShop API filter syntax
+            $filters = [
+                'filter[id_category_default]' => $categoryId,
+                'display' => 'full',
+                'limit' => $limit,
+            ];
+
+            if ($offset > 0) {
+                $filters['limit'] = "$offset,$limit";
+            }
+
+            $response = $this->getProducts($filters);
+
+            $products = [];
+            if (isset($response['products'])) {
+                $products = is_array($response['products']) ? $response['products'] : [$response['products']];
+            }
+
+            \Log::info('PrestaShop9Client: Products fetched successfully by category', [
+                'category_id' => $categoryId,
+                'products_count' => count($products)
+            ]);
+
+            return $products;
+
+        } catch (\Exception $e) {
+            \Log::error('PrestaShop9Client: Failed to fetch products by category', [
+                'category_id' => $categoryId,
+                'error' => $e->getMessage(),
+                'shop_url' => $this->shop->url
+            ]);
+
+            throw new \App\Exceptions\PrestaShopAPIException(
+                "Failed to fetch products from category {$categoryId}: " . $e->getMessage(),
+                $e->getCode(),
+                $e
+            );
+        }
+    }
+
+    /**
+     * Get tax rule groups from PrestaShop
+     *
+     * FAZA 5.1 - Tax Rules UI Enhancement System
+     * Implementation for PrestaShop 9.x
+     *
+     * Endpoint: GET /tax_rule_groups?display=full
+     * Returns ONLY active tax rule groups
+     *
+     * NOTE: PrestaShop 9.x uses same API structure as 8.x for tax_rule_groups
+     * (only base path differs: /api/v1 vs /api)
+     *
+     * @return array Standardized format: [['id' => 6, 'name' => 'PL Standard Rate (23%)', 'rate' => null, 'active' => true], ...]
+     * @throws \App\Exceptions\PrestaShopAPIException
+     */
+    public function getTaxRuleGroups(): array
+    {
+        try {
+            $queryParams = $this->buildQueryParams([
+                'display' => 'full',
+            ]);
+
+            $response = $this->makeRequest('GET', "tax_rule_groups?{$queryParams}");
+
+            // PrestaShop API returns: {"tax_rule_groups": [{"id": 1, "name": {...}, "active": "1"}, ...]}
+            $taxRuleGroups = [];
+
+            if (!isset($response['tax_rule_groups']) || empty($response['tax_rule_groups'])) {
+                \Log::warning('No tax rule groups found in PrestaShop', [
+                    'shop_id' => $this->shop->id,
+                    'shop_name' => $this->shop->name,
+                ]);
+                return [];
+            }
+
+            // Handle both single group (object) and multiple groups (array)
+            $groups = is_array($response['tax_rule_groups']) ? $response['tax_rule_groups'] : [$response['tax_rule_groups']];
+
+            foreach ($groups as $groupData) {
+                $group = is_array($groupData) ? $groupData : (array) $groupData;
+
+                // Filter: ONLY active groups
+                if (($group['active'] ?? '0') !== '1') {
+                    continue;
+                }
+
+                $groupId = (int) ($group['id'] ?? 0);
+
+                // Extract name (handle multilang format: ['language' => [['id' => 1, 'value' => 'Text']]])
+                $groupName = '';
+                if (is_array($group['name'] ?? null)) {
+                    // Multilang format
+                    if (isset($group['name']['language'])) {
+                        $languages = is_array($group['name']['language']) ? $group['name']['language'] : [$group['name']['language']];
+                        $firstLang = is_array($languages) ? reset($languages) : $languages;
+                        $groupName = is_array($firstLang) ? ($firstLang['value'] ?? '') : (string) $firstLang;
+                    }
+                } else {
+                    // Simple string
+                    $groupName = (string) ($group['name'] ?? '');
+                }
+
+                // Rate extraction from name (basic implementation)
+                // Examples: "PL Standard Rate (23%)", "Reduced Rate (8%)", "Exempt (0%)"
+                $rate = null;
+                if (preg_match('/\((\d+(?:\.\d+)?)%\)/', $groupName, $matches)) {
+                    $rate = (float) $matches[1];
+                }
+
+                $taxRuleGroups[] = [
+                    'id' => $groupId,
+                    'name' => $groupName,
+                    'rate' => $rate,
+                    'active' => true, // Already filtered for active only
+                ];
+            }
+
+            \Log::info('Tax rule groups fetched successfully from PrestaShop', [
+                'shop_id' => $this->shop->id,
+                'shop_name' => $this->shop->name,
+                'count' => count($taxRuleGroups),
+            ]);
+
+            return $taxRuleGroups;
+
+        } catch (\App\Exceptions\PrestaShopAPIException $e) {
+            \Log::error('Failed to fetch tax rule groups from PrestaShop', [
+                'shop_id' => $this->shop->id,
+                'shop_name' => $this->shop->name,
+                'http_status' => $e->getHttpStatusCode(),
+                'error' => $e->getMessage(),
+            ]);
+
+            throw $e;
+        }
     }
 }

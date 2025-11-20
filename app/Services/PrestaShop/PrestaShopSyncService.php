@@ -240,7 +240,8 @@ class PrestaShopSyncService
         );
 
         // Dispatch job
-        SyncProductToPrestaShop::dispatch($product, $shop);
+        // USER_ID FIX (2025-11-07): Pass auth()->id() to capture user who triggered sync
+        SyncProductToPrestaShop::dispatch($product, $shop, auth()->id());
     }
 
     /**

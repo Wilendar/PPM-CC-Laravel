@@ -330,8 +330,302 @@
                     @endif
                 </div>
 
-            <!-- Step 4: Initial Sync Settings -->
+            <!-- Step 4: Price Group Mapping + Tax Rules Mapping -->
             @elseif ($currentStep === 4)
+                <div class="space-y-6">
+                    <div class="text-center mb-6">
+                        <h3 class="text-lg font-semibold text-white mb-2">Konfiguracja mapowań</h3>
+                        <p class="text-gray-300">Skonfiguruj grupy podatkowe i cenowe PrestaShop</p>
+                    </div>
+
+                    {{-- Tax Rules Mapping Section (FAZA 5.1) --}}
+                    <div class="tax-rules-mapping-section">
+                        <div class="section-header mb-4">
+                            <h4 class="text-lg font-semibold text-white flex items-center mb-2">
+                                <svg class="w-5 h-5 mr-2 text-[#e0ac7e]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path>
+                                </svg>
+                                Mapowanie Grup Podatkowych
+                            </h4>
+                            <p class="text-sm text-gray-300">
+                                Wybierz grupy podatkowe PrestaShop odpowiadające stawkom VAT w PPM.
+                                <span class="text-red-400 font-medium ml-2">*Stawka 23% jest wymagana</span>
+                            </p>
+                        </div>
+
+                        {{-- Loading State --}}
+                        @if (!isset($taxRulesFetched) || $taxRulesFetched === false)
+                            <div class="tax-rules-loading flex items-center justify-center py-6">
+                                <svg class="animate-spin w-5 h-5 text-[#e0ac7e] mr-3" fill="none" viewBox="0 0 24 24">
+                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                                <span class="text-gray-300">Pobieranie grup podatkowych z PrestaShop...</span>
+                            </div>
+                        @endif
+
+                        {{-- Error State --}}
+                        @error('tax_rules')
+                            <div class="alert alert-warning p-4 rounded-lg bg-red-900 bg-opacity-20 border border-red-500 border-opacity-30 flex items-start mb-4">
+                                <svg class="w-5 h-5 text-red-400 mr-3 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                </svg>
+                                <div class="flex-1">
+                                    <p class="text-sm text-red-300">{{ $message }}</p>
+                                    <button wire:click="fetchTaxRuleGroups"
+                                            class="mt-2 text-sm text-red-200 hover:text-red-100 underline transition-colors duration-200">
+                                        Spróbuj ponownie
+                                    </button>
+                                </div>
+                            </div>
+                        @enderror
+
+                        {{-- Tax Rules Grid --}}
+                        @if (isset($availableTaxRuleGroups) && count($availableTaxRuleGroups) > 0)
+                            <div class="tax-rules-grid">
+                                {{-- 23% VAT (Required) --}}
+                                <div class="tax-rule-item required">
+                                    <label for="taxRulesGroup23" class="form-label block text-sm font-medium text-white mb-2">
+                                        VAT 23% (Standard) <span class="required-asterisk">*</span>
+                                    </label>
+                                    <select
+                                        wire:model.defer="taxRulesGroup23"
+                                        id="taxRulesGroup23"
+                                        class="form-select w-full px-4 py-3 bg-gray-800 bg-opacity-60 border border-gray-600 text-white rounded-lg focus:ring-2 focus:ring-[#e0ac7e] focus:border-[#e0ac7e] transition-all duration-200 @error('taxRulesGroup23') border-red-500 @enderror"
+                                        required>
+                                        <option value="">-- Wybierz grupę --</option>
+                                        @foreach ($availableTaxRuleGroups as $group)
+                                            <option value="{{ $group['id'] }}">
+                                                {{ $group['name'] }} (ID: {{ $group['id'] }})
+                                            </option>
+                                        @endforeach
+                                    </select>
+                                    @error('taxRulesGroup23')
+                                        <span class="invalid-feedback text-red-400 text-sm mt-1 block">{{ $message }}</span>
+                                    @enderror
+                                    @if (isset($taxRulesGroup23) && $taxRulesGroup23)
+                                        <span class="selected-indicator text-green-400 text-sm mt-1 flex items-center">
+                                            <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                                            </svg>
+                                            Wybrano
+                                        </span>
+                                    @endif
+                                </div>
+
+                                {{-- 8% VAT (Optional) --}}
+                                <div class="tax-rule-item">
+                                    <label for="taxRulesGroup8" class="form-label block text-sm font-medium text-white mb-2">
+                                        VAT 8% (Obniżona)
+                                    </label>
+                                    <select
+                                        wire:model.defer="taxRulesGroup8"
+                                        id="taxRulesGroup8"
+                                        class="form-select w-full px-4 py-3 bg-gray-800 bg-opacity-60 border border-gray-600 text-white rounded-lg focus:ring-2 focus:ring-[#e0ac7e] focus:border-[#e0ac7e] transition-all duration-200">
+                                        <option value="">-- Wybierz grupę (opcjonalnie) --</option>
+                                        @foreach ($availableTaxRuleGroups as $group)
+                                            <option value="{{ $group['id'] }}">
+                                                {{ $group['name'] }} (ID: {{ $group['id'] }})
+                                            </option>
+                                        @endforeach
+                                    </select>
+                                    @if (isset($taxRulesGroup8) && $taxRulesGroup8)
+                                        <span class="selected-indicator text-green-400 text-sm mt-1 flex items-center">
+                                            <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                                            </svg>
+                                            Wybrano
+                                        </span>
+                                    @endif
+                                </div>
+
+                                {{-- 5% VAT (Optional) --}}
+                                <div class="tax-rule-item">
+                                    <label for="taxRulesGroup5" class="form-label block text-sm font-medium text-white mb-2">
+                                        VAT 5% (Super Obniżona)
+                                    </label>
+                                    <select
+                                        wire:model.defer="taxRulesGroup5"
+                                        id="taxRulesGroup5"
+                                        class="form-select w-full px-4 py-3 bg-gray-800 bg-opacity-60 border border-gray-600 text-white rounded-lg focus:ring-2 focus:ring-[#e0ac7e] focus:border-[#e0ac7e] transition-all duration-200">
+                                        <option value="">-- Wybierz grupę (opcjonalnie) --</option>
+                                        @foreach ($availableTaxRuleGroups as $group)
+                                            <option value="{{ $group['id'] }}">
+                                                {{ $group['name'] }} (ID: {{ $group['id'] }})
+                                            </option>
+                                        @endforeach
+                                    </select>
+                                    @if (isset($taxRulesGroup5) && $taxRulesGroup5)
+                                        <span class="selected-indicator text-green-400 text-sm mt-1 flex items-center">
+                                            <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                                            </svg>
+                                            Wybrano
+                                        </span>
+                                    @endif
+                                </div>
+
+                                {{-- 0% VAT (Optional) --}}
+                                <div class="tax-rule-item">
+                                    <label for="taxRulesGroup0" class="form-label block text-sm font-medium text-white mb-2">
+                                        VAT 0% (Zwolniona)
+                                    </label>
+                                    <select
+                                        wire:model.defer="taxRulesGroup0"
+                                        id="taxRulesGroup0"
+                                        class="form-select w-full px-4 py-3 bg-gray-800 bg-opacity-60 border border-gray-600 text-white rounded-lg focus:ring-2 focus:ring-[#e0ac7e] focus:border-[#e0ac7e] transition-all duration-200">
+                                        <option value="">-- Wybierz grupę (opcjonalnie) --</option>
+                                        @foreach ($availableTaxRuleGroups as $group)
+                                            <option value="{{ $group['id'] }}">
+                                                {{ $group['name'] }} (ID: {{ $group['id'] }})
+                                            </option>
+                                        @endforeach
+                                    </select>
+                                    @if (isset($taxRulesGroup0) && $taxRulesGroup0)
+                                        <span class="selected-indicator text-green-400 text-sm mt-1 flex items-center">
+                                            <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                                            </svg>
+                                            Wybrano
+                                        </span>
+                                    @endif
+                                </div>
+                            </div>
+
+                            {{-- Info Card --}}
+                            <div class="tax-rules-info mt-4 p-4 rounded-lg bg-blue-900 bg-opacity-20 border border-blue-500 border-opacity-30 flex items-start">
+                                <svg class="w-5 h-5 text-blue-400 mr-3 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                </svg>
+                                <span class="text-sm text-blue-200">Inteligentne domyślne wybory zastosowane na podstawie nazw grup. Możesz je zmienić ręcznie wybierając odpowiednią grupę z listy.</span>
+                            </div>
+                        @endif
+                    </div>
+
+                    {{-- Price Group Mapping Section --}}
+                    <div class="price-group-mapping-section mt-8">
+                        <div class="section-header mb-4">
+                            <h4 class="text-lg font-semibold text-white flex items-center mb-2">
+                                <svg class="w-5 h-5 mr-2 text-[#e0ac7e]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                </svg>
+                                Mapowanie Grup Cenowych
+                            </h4>
+                            <p class="text-sm text-gray-300">
+                                Połącz grupy cenowe PrestaShop z grupami cenowymi PPM
+                            </p>
+                        </div>
+
+                    <!-- Fetch Button -->
+                    @if (empty($prestashopPriceGroups))
+                        <div class="text-center">
+                            <button wire:click="fetchPrestashopPriceGroups"
+                                    wire:loading.attr="disabled"
+                                    wire:target="fetchPrestashopPriceGroups"
+                                    class="relative px-6 py-3 text-white rounded-lg transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl flex items-center justify-center mx-auto font-medium"
+                                    style="background: linear-gradient(45deg, rgba(224, 172, 126, 0.8), rgba(209, 151, 90, 0.8)); border: 1px solid rgba(224, 172, 126, 0.5);">
+                                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" wire:loading.remove wire:target="fetchPrestashopPriceGroups">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                                </svg>
+                                <svg class="animate-spin w-5 h-5 mr-2" fill="none" viewBox="0 0 24 24" wire:loading wire:target="fetchPrestashopPriceGroups">
+                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                                <span wire:loading.remove wire:target="fetchPrestashopPriceGroups">
+                                    Pobierz grupy cenowe z PrestaShop
+                                </span>
+                                <span wire:loading wire:target="fetchPrestashopPriceGroups">
+                                    Pobieram grupy cenowe...
+                                </span>
+                            </button>
+                        </div>
+                    @endif
+
+                    <!-- Error Display -->
+                    @if ($fetchPriceGroupsError)
+                        <div class="bg-red-900 bg-opacity-20 border border-red-500 border-opacity-30 rounded-lg p-4 backdrop-blur-sm">
+                            <div class="flex">
+                                <svg class="w-5 h-5 text-red-400 mr-3 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                </svg>
+                                <div>
+                                    <h4 class="text-sm font-medium text-red-300 mb-1">Błąd:</h4>
+                                    <p class="text-sm text-red-200">{{ $fetchPriceGroupsError }}</p>
+                                </div>
+                            </div>
+                        </div>
+                    @endif
+
+                    <!-- Mapping Table -->
+                    @if (!empty($prestashopPriceGroups))
+                        <div class="overflow-x-auto">
+                            <table class="w-full border-collapse">
+                                <thead>
+                                    <tr class="bg-gray-800 bg-opacity-60">
+                                        <th class="px-4 py-3 text-left text-sm font-semibold text-white border-b border-gray-600">Grupa PrestaShop</th>
+                                        <th class="px-4 py-3 text-left text-sm font-semibold text-white border-b border-gray-600">ID</th>
+                                        <th class="px-4 py-3 text-left text-sm font-semibold text-white border-b border-gray-600">Grupa PPM</th>
+                                        <th class="px-4 py-3 text-center text-sm font-semibold text-white border-b border-gray-600">Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach ($prestashopPriceGroups as $psGroup)
+                                        <tr class="border-b border-gray-700 hover:bg-gray-800 hover:bg-opacity-30 transition-colors">
+                                            <td class="px-4 py-3 text-white">{{ $psGroup['name'] }}</td>
+                                            <td class="px-4 py-3 text-gray-400 text-sm">#{{ $psGroup['id'] }}</td>
+                                            <td class="px-4 py-3">
+                                                <select wire:model.defer="priceGroupMappings.{{ $psGroup['id'] }}"
+                                                        class="w-full px-3 py-2 bg-gray-800 bg-opacity-60 border border-gray-600 text-white rounded-lg focus:ring-2 focus:ring-[#e0ac7e] focus:border-[#e0ac7e] transition-all duration-200 text-sm">
+                                                    <option value="">-- Wybierz grupę PPM --</option>
+                                                    @foreach ($ppmPriceGroups as $ppmGroup)
+                                                        <option value="{{ $ppmGroup }}">{{ $ppmGroup }}</option>
+                                                    @endforeach
+                                                </select>
+                                            </td>
+                                            <td class="px-4 py-3 text-center">
+                                                @if (!empty($priceGroupMappings[$psGroup['id']]))
+                                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-900 bg-opacity-40 text-green-300 border border-green-500 border-opacity-30">
+                                                        <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                                                        </svg>
+                                                        Zmapowane
+                                                    </span>
+                                                @else
+                                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-900 bg-opacity-40 text-yellow-300 border border-yellow-500 border-opacity-30">
+                                                        <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                                        </svg>
+                                                        Nie zmapowane
+                                                    </span>
+                                                @endif
+                                            </td>
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <!-- Info Card -->
+                        <div class="bg-blue-900 bg-opacity-20 border border-blue-500 border-opacity-30 rounded-lg p-4 backdrop-blur-sm">
+                            <div class="flex">
+                                <svg class="w-5 h-5 text-blue-400 mr-3 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                </svg>
+                                <div>
+                                    <h4 class="text-sm font-medium text-blue-300 mb-1">Mapowanie grup cenowych</h4>
+                                    <p class="text-sm text-blue-200">
+                                        Mapowanie pozwala na synchronizację cen specjalnych z PrestaShop do odpowiednich grup cenowych w PPM.
+                                        Musisz zmapować przynajmniej jedną grupę aby przejść dalej.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    @endif
+                    </div>
+                </div>
+
+            <!-- Step 5: Initial Sync Settings (was Step 4) -->
+            @elseif ($currentStep === 5)
                 <div class="space-y-6">
                     <div>
                         <label for="syncFrequency" class="block text-sm font-medium text-white mb-2">
@@ -422,8 +716,8 @@
                     </div>
                 </div>
 
-            <!-- Step 5: Advanced Settings -->
-            @elseif ($currentStep === 5)
+            <!-- Step 6: Advanced Settings (was Step 5) -->
+            @elseif ($currentStep === 6)
                 <div class="space-y-6">
                     
                     <!-- Conflict Resolution -->

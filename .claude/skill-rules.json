@@ -1,0 +1,913 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "description": "PPM Project - Skills Auto-Activation Configuration",
+  "version": "1.1.0",
+  "lastUpdated": "2025-11-19",
+
+  "skills": {
+    "ppm-styling-guidelines": {
+      "type": "domain",
+      "enforcement": "require",
+      "priority": "critical",
+      "promptTriggers": {
+        "keywords": [
+          "style",
+          "styling",
+          "css",
+          "color",
+          "button",
+          "badge",
+          "card",
+          "form",
+          "input",
+          "checkbox",
+          "progress",
+          "tab",
+          "modal",
+          "dropdown",
+          "z-index",
+          "layout",
+          "spacing",
+          "typography",
+          "enterprise component",
+          "ppm color",
+          "mpp orange"
+        ],
+        "intentPatterns": [
+          "(style|design).*?(button|card|badge|form|modal)",
+          "(create|add).*?(component|ui|style)",
+          "color.*?(palette|token|system)",
+          "(mpp|ppm).*?(orange|blue|green|red|primary|secondary)",
+          "enterprise.*?(card|button|badge|component)",
+          "progress.*?bar",
+          "tab.*?(system|component)",
+          "z-index.*?(layer|conflict|modal)",
+          "css.*?(token|variable|custom property)",
+          "gradient",
+          "brand.*?(color|mantra|style)"
+        ]
+      },
+      "fileTriggers": {
+        "pathPatterns": [
+          "resources/css/**/*.css",
+          "resources/views/**/*.blade.php",
+          "tailwind.config.js"
+        ],
+        "contentPatterns": [
+          "--mpp-primary",
+          "--ppm-primary",
+          "--bg-card",
+          "--text-primary",
+          "\\.btn-enterprise-",
+          "\\.enterprise-card",
+          "\\.badge-enterprise",
+          "\\.layer-",
+          "\\.progress-enterprise",
+          "\\.tabs-enterprise",
+          "\\.icon-chip",
+          "var\\(--",
+          "background:.*gradient",
+          "z-index:"
+        ]
+      },
+      "criticalRules": [
+        "ZAKAZ: Inline styles (style=\"...\")",
+        "ZAKAZ: Hardcoded colors (use CSS Custom Properties)",
+        "ZAKAZ: Arbitrary z-index values (use .layer-* system)",
+        "WYMAGANE: PPM color tokens (--mpp-primary, --ppm-primary, etc.)",
+        "WYMAGANE: Enterprise component classes (.btn-enterprise-*, .enterprise-card)",
+        "WYMAGANE: HTTP 200 verification before completion",
+        "WYMAGANE: Screenshot verification after UI changes"
+      ],
+      "description": "PPM-specific styling standards: Color tokens, enterprise components, layer system, deployment workflow"
+    },
+    "laravel-dev-guidelines": {
+      "type": "domain",
+      "enforcement": "suggest",
+      "priority": "high",
+      "promptTriggers": {
+        "keywords": [
+          "laravel",
+          "controller",
+          "service",
+          "model",
+          "eloquent",
+          "migration",
+          "artisan",
+          "php",
+          "backend",
+          "api",
+          "endpoint",
+          "route"
+        ],
+        "intentPatterns": [
+          "(create|add|build).*?(controller|service|model|migration)",
+          "(how to|best practice).*?(laravel|backend|api)",
+          "service layer",
+          "eloquent.*?(relationship|query|scope)",
+          "(implement|write).*?(endpoint|route|api)"
+        ]
+      },
+      "fileTriggers": {
+        "pathPatterns": [
+          "app/**/*.php",
+          "database/migrations/*.php",
+          "routes/*.php",
+          "app/Http/Controllers/**/*.php",
+          "app/Services/**/*.php",
+          "app/Models/**/*.php"
+        ],
+        "contentPatterns": [
+          "namespace App\\\\",
+          "use Illuminate\\\\",
+          "extends Model",
+          "extends Controller",
+          "class.*Service",
+          "Schema::"
+        ]
+      },
+      "description": "Laravel best practices: Service Layer, Controllers, Models, Migrations, Eloquent patterns"
+    },
+
+    "livewire-dev-guidelines": {
+      "type": "domain",
+      "enforcement": "require",
+      "priority": "critical",
+      "promptTriggers": {
+        "keywords": [
+          "livewire",
+          "component",
+          "wire:",
+          "alpine",
+          "@livewire",
+          "trait composition",
+          "livewire validation",
+          "reactive",
+          "wire:model",
+          "wire:click"
+        ],
+        "intentPatterns": [
+          "(create|add|build).*?(livewire|component)",
+          "wire:(model|click|submit|poll|loading|dirty)",
+          "(how to|best practice).*?livewire",
+          "trait.*?composition",
+          "component.*?(refactor|split|extract)",
+          "(reactive|computed).*?propert"
+        ]
+      },
+      "fileTriggers": {
+        "pathPatterns": [
+          "app/Livewire/**/*.php",
+          "resources/views/livewire/**/*.blade.php",
+          "app/Http/Livewire/**/*.php"
+        ],
+        "contentPatterns": [
+          "use Livewire\\\\Component",
+          "extends Component",
+          "#\\[Layout\\]",
+          "wire:model",
+          "wire:click",
+          "wire:submit",
+          "public \\$",
+          "#\\[Computed\\]"
+        ]
+      },
+      "description": "Livewire 3.x patterns: Single Responsibility, Trait Composition, Service Injection, Lifecycle hooks"
+    },
+
+    "frontend-dev-guidelines": {
+      "type": "domain",
+      "enforcement": "require",
+      "priority": "critical",
+      "promptTriggers": {
+        "keywords": [
+          "css",
+          "tailwind",
+          "alpine",
+          "blade",
+          "frontend",
+          "ui",
+          "style",
+          "styling",
+          "modal",
+          "dropdown",
+          "button",
+          "form",
+          "layout",
+          "design"
+        ],
+        "intentPatterns": [
+          "(style|design|ui|layout)",
+          "(add|create).*?(modal|dropdown|button|form)",
+          "inline.*?style",
+          "arbitrary.*?tailwind",
+          "z-index",
+          "(css|tailwind).*?(class|style)",
+          "(animate|transition)"
+        ]
+      },
+      "fileTriggers": {
+        "pathPatterns": [
+          "resources/css/**/*.css",
+          "resources/views/**/*.blade.php",
+          "resources/js/**/*.js"
+        ],
+        "contentPatterns": [
+          "@apply",
+          "x-data",
+          "class=\"",
+          "style=\"",
+          "z-\\[",
+          "@layer",
+          "tailwind.config"
+        ]
+      },
+      "criticalRules": [
+        "ZAKAZ: Inline styles (style=\"...\")",
+        "ZAKAZ: Arbitrary Tailwind values (class=\"z-[9999]\")",
+        "WYMAGANE: Dedicated CSS classes in resources/css/",
+        "WYMAGANE: Mandatory screenshot verification after UI changes"
+      ],
+      "description": "Frontend rules: ZAKAZ inline styles, ZAKAZ arbitrary Tailwind, dedicated CSS classes, mandatory verification"
+    },
+
+    "prestashop-sync-manager": {
+      "type": "domain",
+      "enforcement": "suggest",
+      "priority": "high",
+      "promptTriggers": {
+        "keywords": [
+          "prestashop",
+          "sync",
+          "import",
+          "export",
+          "ps8",
+          "ps9",
+          "transformer",
+          "mapper",
+          "shop",
+          "multi-shop",
+          "sync job",
+          "prestashop api"
+        ],
+        "intentPatterns": [
+          "sync.*?(prestashop|product|category)",
+          "import.*?prestashop",
+          "export.*?(product|category)",
+          "prestashop.*?(api|client|integration)",
+          "conflict.*?resolution",
+          "(map|transform).*?(product|category)",
+          "sync.*?(status|log|error)"
+        ]
+      },
+      "fileTriggers": {
+        "pathPatterns": [
+          "app/Services/PrestaShop/**/*.php",
+          "app/Livewire/Admin/Shops/*.php",
+          "app/Models/ProductShopData.php",
+          "app/Models/PrestaShopShop.php",
+          "app/Models/SyncJob.php",
+          "app/Models/SyncLog.php"
+        ],
+        "contentPatterns": [
+          "PrestaShopService",
+          "PrestaShopClient",
+          "SyncJob",
+          "ProductTransformer",
+          "CategoryTransformer",
+          "CategoryMapper",
+          "PriceGroupMapper",
+          "WarehouseMapper",
+          "namespace.*PrestaShop"
+        ]
+      },
+      "description": "PrestaShop integration: API clients (8.x/9.x), Transformers, Mappers, Sync jobs, Conflict resolution"
+    },
+
+    "sku-architecture-validator": {
+      "type": "guardrail",
+      "enforcement": "require",
+      "priority": "critical",
+      "promptTriggers": {
+        "keywords": [
+          "product",
+          "find",
+          "where",
+          "id",
+          "primary key",
+          "product id",
+          "product lookup",
+          "find product"
+        ],
+        "intentPatterns": [
+          "Product::find",
+          "->id",
+          "where\\('id'",
+          "find.*?product",
+          "product.*?by.*?id",
+          "whereId",
+          "findOrFail"
+        ]
+      },
+      "fileTriggers": {
+        "pathPatterns": [
+          "app/**/*.php"
+        ],
+        "contentPatterns": [
+          "Product::find\\(",
+          "->where\\('id',",
+          "whereId\\(",
+          "findOrFail\\(",
+          "Product::findOrFail",
+          "->find\\(\\$"
+        ]
+      },
+      "criticalRules": [
+        "ZAKAZ: Product::find($id) - use Product::where('sku', $sku)->first()",
+        "ZAKAZ: Hard-coded product IDs",
+        "WYMAGANE: SKU as primary identifier",
+        "WYMAGANE: Use SKU in relationships"
+      ],
+      "description": "SKU-first architecture enforcement: ZAKAZ hard-coded IDs, WYMAGANE SKU usage, validation script"
+    },
+
+    "multi-store-data-manager": {
+      "type": "domain",
+      "enforcement": "suggest",
+      "priority": "high",
+      "promptTriggers": {
+        "keywords": [
+          "multi-store",
+          "per-shop",
+          "shop_id",
+          "ProductShopData",
+          "shop-specific",
+          "shop override",
+          "shop data",
+          "per shop"
+        ],
+        "intentPatterns": [
+          "per.?shop",
+          "multi.?store",
+          "shop.?(override|specific|data)",
+          "sync.*?status",
+          "pending.*?change",
+          "shop.*?(data|config|setting)",
+          "override.*?shop"
+        ]
+      },
+      "fileTriggers": {
+        "pathPatterns": [
+          "app/Models/ProductShopData.php",
+          "app/Services/**/*MultiStore*.php",
+          "app/Livewire/Products/**/*.php",
+          "app/Models/ProductShopCategory.php"
+        ],
+        "contentPatterns": [
+          "ProductShopData",
+          "shop_id",
+          "shopData\\(",
+          "per_shop_",
+          "shop_override",
+          "hasShopData",
+          "shopSpecific"
+        ]
+      },
+      "description": "Multi-store patterns: Per-shop data, Sync status tracking, Conflict detection, Pending changes system"
+    },
+
+    "variant-system-manager": {
+      "type": "domain",
+      "enforcement": "suggest",
+      "priority": "medium",
+      "promptTriggers": {
+        "keywords": [
+          "variant",
+          "attribute",
+          "combination",
+          "sku_variantu",
+          "attribute type",
+          "attribute value",
+          "variant price",
+          "variant stock"
+        ],
+        "intentPatterns": [
+          "create.*?variant",
+          "generate.*?combination",
+          "attribute.*?mapping",
+          "variant.*?(price|stock|image)",
+          "(attribute|variant).*?prestashop",
+          "combination.*?matrix"
+        ]
+      },
+      "fileTriggers": {
+        "pathPatterns": [
+          "app/Models/ProductVariant.php",
+          "app/Models/AttributeType.php",
+          "app/Models/AttributeValue.php",
+          "app/Services/**/*Variant*.php",
+          "app/Livewire/Admin/Variants/*.php"
+        ],
+        "contentPatterns": [
+          "ProductVariant",
+          "AttributeType",
+          "AttributeValue",
+          "variant_attributes",
+          "generateCombinations",
+          "VariantAttribute",
+          "variantPrices"
+        ]
+      },
+      "description": "Variant system: Attribute types/values, Combination generation, Variant pricing, PrestaShop mapping"
+    },
+
+    "database-migration-manager": {
+      "type": "domain",
+      "enforcement": "suggest",
+      "priority": "medium",
+      "promptTriggers": {
+        "keywords": [
+          "migration",
+          "schema",
+          "table",
+          "column",
+          "index",
+          "foreign key",
+          "database",
+          "alter table",
+          "create table"
+        ],
+        "intentPatterns": [
+          "create.*?migration",
+          "add.*?column",
+          "create.*?index",
+          "drop.*?(table|column)",
+          "alter.*?table",
+          "foreign.*?key",
+          "rollback",
+          "migrate"
+        ]
+      },
+      "fileTriggers": {
+        "pathPatterns": [
+          "database/migrations/*.php"
+        ],
+        "contentPatterns": [
+          "Schema::create",
+          "Schema::table",
+          "->index\\(",
+          "->foreign\\(",
+          "->dropColumn",
+          "->dropTable",
+          "->renameColumn"
+        ]
+      },
+      "description": "Migration best practices: Naming conventions, Rollback safety, Index optimization, Data migrations"
+    },
+
+    "ppm-architecture-compliance": {
+      "type": "workflow",
+      "enforcement": "require",
+      "priority": "critical",
+      "promptTriggers": {
+        "keywords": [
+          "architecture",
+          "compliance",
+          "best practice",
+          "pattern",
+          "standard",
+          "guideline"
+        ],
+        "intentPatterns": [
+          "architecture.*?compliance",
+          "check.*?(compliance|standard|pattern)",
+          "verify.*?architecture",
+          "validate.*?pattern"
+        ]
+      },
+      "description": "PPM architecture compliance: Existing skill, checks project-specific patterns"
+    },
+
+    "livewire-troubleshooting": {
+      "type": "workflow",
+      "enforcement": "suggest",
+      "priority": "high",
+      "promptTriggers": {
+        "keywords": [
+          "livewire error",
+          "wire:snapshot",
+          "livewire not working",
+          "component error",
+          "livewire bug"
+        ],
+        "intentPatterns": [
+          "livewire.*?(error|bug|issue|problem)",
+          "wire:snapshot.*?rendering",
+          "component.*?(not.*?work|fail|error)",
+          "dependency.*?injection.*?conflict"
+        ]
+      },
+      "description": "Livewire troubleshooting: Existing skill, 9 known Livewire issues and solutions"
+    },
+
+    "frontend-verification": {
+      "type": "workflow",
+      "enforcement": "require",
+      "priority": "critical",
+      "promptTriggers": {
+        "keywords": [
+          "ui change",
+          "frontend change",
+          "screenshot",
+          "verification",
+          "ui test"
+        ],
+        "intentPatterns": [
+          "(ui|frontend).*?change",
+          "screenshot.*?test",
+          "verify.*?(ui|frontend)",
+          "visual.*?regression"
+        ]
+      },
+      "description": "Frontend verification: MANDATORY screenshot testing after UI changes, console monitoring"
+    },
+
+    "hostido-deployment": {
+      "type": "workflow",
+      "enforcement": "suggest",
+      "priority": "high",
+      "description": "Hostido deployment: Existing skill, production deployment automation"
+    },
+
+    "agent-report-writer": {
+      "type": "workflow",
+      "enforcement": "require",
+      "priority": "critical",
+      "description": "Agent reporting: MANDATORY reports for all agents in _AGENT_REPORTS/"
+    },
+
+    "project-plan-manager": {
+      "type": "workflow",
+      "enforcement": "suggest",
+      "priority": "high",
+      "description": "Project plan management: Updates Plan_Projektu/ with statuses and file references"
+    },
+
+    "context7-docs-lookup": {
+      "type": "workflow",
+      "enforcement": "require",
+      "priority": "high",
+      "promptTriggers": {
+        "keywords": [
+          "laravel documentation",
+          "livewire documentation",
+          "official docs",
+          "how to"
+        ],
+        "intentPatterns": [
+          "look up.*?documentation",
+          "check.*?official.*?docs",
+          "laravel.*?docs",
+          "livewire.*?docs"
+        ]
+      },
+      "description": "Context7 MCP: MANDATORY docs lookup BEFORE implementing Laravel/Livewire features"
+    },
+
+    "issue-documenter": {
+      "type": "workflow",
+      "enforcement": "suggest",
+      "priority": "medium",
+      "description": "Issue documentation: Document issues requiring >2h debugging in _ISSUES_FIXES/"
+    },
+
+    "debug-log-cleanup": {
+      "type": "workflow",
+      "enforcement": "suggest",
+      "priority": "low",
+      "description": "Debug cleanup: Remove debug logging after user confirms functionality works"
+    },
+
+    "skill-creator": {
+      "type": "meta",
+      "enforcement": "require",
+      "priority": "critical",
+      "promptTriggers": {
+        "keywords": [
+          "skill",
+          "create skill",
+          "new skill",
+          "build skill",
+          "skill creation",
+          "skill template",
+          "skill pattern",
+          "generate skill",
+          "skill based on",
+          "workflow pattern",
+          "reusable pattern"
+        ],
+        "intentPatterns": [
+          "(create|add|build|make|generate).*?skill",
+          "skill.*?(creation|template|pattern)",
+          "new.*?skill",
+          "skill.*?based on",
+          "(stwórz|utwórz).*?skill",
+          "na.*?podstawie.*?skill"
+        ]
+      },
+      "description": "Skill-Creator: Meta-skill for creating/updating skills, auto-activation, feedback system"
+    },
+
+    "prestashop-xml-integration": {
+      "type": "domain",
+      "enforcement": "require",
+      "priority": "critical",
+      "promptTriggers": {
+        "keywords": [
+          "prestashop xml",
+          "prestashop api",
+          "xml format",
+          "manufacturer_name",
+          "readonly field",
+          "prestashop error",
+          "start tag expected",
+          "not writable",
+          "id is required",
+          "prestashop 8",
+          "prestashop 9",
+          "webservices"
+        ],
+        "intentPatterns": [
+          "prestashop.*?(xml|api|integration)",
+          "xml.*?prestashop",
+          "(error|błąd).*?(manufacturer_name|readonly|not writable)",
+          "start tag expected",
+          "prestashop.*?(create|update|sync)",
+          "(convert|konwersja).*?xml",
+          "manufacturer.*?(lookup|id)"
+        ]
+      },
+      "fileTriggers": {
+        "pathPatterns": [
+          "app/Services/PrestaShop/**/*.php"
+        ],
+        "contentPatterns": [
+          "arrayToXml",
+          "PrestaShop8Client",
+          "PrestaShop9Client",
+          "ProductTransformer",
+          "manufacturer_name",
+          "id_manufacturer",
+          "makeRequest.*POST.*products",
+          "makeRequest.*PUT.*products"
+        ]
+      },
+      "description": "PrestaShop XML workflow: XML conversion, readonly fields, manufacturer lookup, CREATE vs UPDATE patterns"
+    },
+
+    "prestashop-database-structure": {
+      "type": "reference",
+      "enforcement": "suggest",
+      "priority": "high",
+      "promptTriggers": {
+        "keywords": [
+          "prestashop database",
+          "prestashop table",
+          "ps_product",
+          "ps_category",
+          "ps_stock",
+          "objectmodel",
+          "multilang",
+          "multistore",
+          "_lang table",
+          "_shop table",
+          "prestashop schema",
+          "prestashop query",
+          "nested set",
+          "nleft nright"
+        ],
+        "intentPatterns": [
+          "prestashop.*?(database|table|schema|structure)",
+          "ps_.*?(product|category|stock|manufacturer)",
+          "(query|select).*?(ps_|prestashop)",
+          "objectmodel.*?(definition|pattern)",
+          "(multilang|multistore).*?(table|pattern)",
+          "prestashop.*?(migration|database query)",
+          "id_shop.*?id_lang"
+        ]
+      },
+      "fileTriggers": {
+        "pathPatterns": [
+          "database/migrations/*_prestashop_*.php",
+          "app/Models/*PrestaShop*.php",
+          "app/Services/PrestaShop/**/*.php"
+        ],
+        "contentPatterns": [
+          "ps_product",
+          "ps_category",
+          "ps_stock_available",
+          "ps_manufacturer",
+          "DB::connection\\('prestashop'\\)",
+          "ObjectModel",
+          "multilang.*?true",
+          "multishop.*?true",
+          "id_shop.*?id_lang"
+        ]
+      },
+      "description": "PrestaShop database structure: Table schemas, ObjectModel patterns, multilang/multistore, query optimization"
+    },
+
+    "prestashop-api-integration": {
+      "type": "workflow",
+      "enforcement": "suggest",
+      "priority": "high",
+      "promptTriggers": {
+        "keywords": [
+          "prestashop api",
+          "webservice",
+          "cqrs",
+          "prestashop sync",
+          "prestashop integration",
+          "api authentication",
+          "prestashop client",
+          "cqrsget",
+          "cqrscreate",
+          "api workflow",
+          "prestashop endpoint",
+          "resource schema"
+        ],
+        "intentPatterns": [
+          "prestashop.*?(api|webservice|integration)",
+          "(cqrs|api).*?(get|create|update|delete)",
+          "prestashop.*?(sync|import|export)",
+          "(authenticate|connect).*?prestashop",
+          "api.*?(call|request|response)",
+          "(create|update|delete).*?prestashop.*?(product|category)",
+          "prestashop.*?(workflow|pipeline)"
+        ]
+      },
+      "fileTriggers": {
+        "pathPatterns": [
+          "app/Services/PrestaShop/**/*Client.php",
+          "app/Services/PrestaShop/**/*Sync*.php",
+          "app/Console/Commands/PrestaShop*.php"
+        ],
+        "contentPatterns": [
+          "PrestaShopApiClient",
+          "withBasicAuth",
+          "config\\('prestashop.api",
+          "CQRSGet",
+          "CQRSCreate",
+          "CQRSUpdate",
+          "output_format.*?JSON",
+          "schema.*?blank",
+          "schema.*?synopsis"
+        ]
+      },
+      "description": "PrestaShop API integration: Complete workflow - Authentication, CRUD operations, Error handling, Performance optimization"
+    },
+
+    "deployment-testing-cycle": {
+      "type": "workflow",
+      "enforcement": "require",
+      "priority": "critical",
+      "promptTriggers": {
+        "keywords": [
+          "deployment",
+          "deploy",
+          "production",
+          "test",
+          "testing",
+          "manual test",
+          "działa",
+          "works",
+          "tested",
+          "verify",
+          "check production"
+        ],
+        "intentPatterns": [
+          "(deploy|wdróż|upload).*?(production|produkcja)",
+          "(test|testuj|sprawdź).*?(production|produkcja|działa)",
+          "after.*?(code|changes|update|refactor)",
+          "(ready|gotowe).*?test",
+          "completed.*?(feature|task|fix)",
+          "manual.*?test"
+        ]
+      },
+      "fileTriggers": {
+        "pathPatterns": [
+          "app/**/*.php",
+          "resources/views/**/*.blade.php",
+          "resources/css/**/*.css",
+          "resources/js/**/*.js"
+        ],
+        "contentPatterns": [
+          "class.*Component",
+          "class.*Controller",
+          "@livewire",
+          "wire:",
+          "Route::"
+        ]
+      },
+      "description": "MANDATORY deployment-testing workflow: Deploy → Test → Update Plan → Decision Loop (auto-trigger after code changes)"
+    },
+
+    "hook-creator": {
+      "type": "workflow",
+      "enforcement": "suggest",
+      "priority": "medium",
+      "promptTriggers": {
+        "keywords": [
+          "hook",
+          "create hook",
+          "generate hook",
+          "sessionstart",
+          "precompact",
+          "posttooluse",
+          "pretooluse",
+          "automation",
+          "custom hook"
+        ],
+        "intentPatterns": [
+          "(create|make|build|generate).*?hook",
+          "hook.*?(for|that|which)",
+          "session.*?start.*?hook",
+          "pre.*?compact.*?hook",
+          "post.*?tool.*?hook",
+          "pre.*?tool.*?hook",
+          "(stwórz|utwórz).*?hook"
+        ]
+      },
+      "fileTriggers": {
+        "pathPatterns": [
+          ".claude/hooks/**/*.py",
+          ".claude/settings.local.json"
+        ],
+        "contentPatterns": [
+          "SessionStart",
+          "PreCompact",
+          "PostToolUse",
+          "PreToolUse",
+          "sys.stderr.write"
+        ]
+      },
+      "description": "Hook creation: SessionStart, PreCompact, PostToolUse, PreToolUse templates with best practices"
+    }
+  },
+
+  "globalRules": {
+    "fileSize": {
+      "standard": 300,
+      "exceptional": 500,
+      "description": "Maximum lines per file (standard: 300, exceptional: 500)"
+    },
+    "separationOfConcerns": [
+      "Models/classes in separate files",
+      "Business logic in separate files",
+      "UI in separate files",
+      "Configuration in separate files"
+    ],
+    "todoTracking": {
+      "enabled": true,
+      "description": "ALWAYS create and update TODO lists during work"
+    },
+    "encoding": {
+      "php": "UTF-8",
+      "powershell": "UTF-8 with BOM",
+      "description": "UTF-8 encoding for all files"
+    },
+    "projectStructure": {
+      "rootClean": true,
+      "description": "ZAKAZ creating unrelated files in project root",
+      "folders": {
+        "_DOCS": "Documentation files (.md, .txt, .pdf)",
+        "_AGENT_REPORTS": "Agent reports (MANDATORY)",
+        "_TOOLS": "Project-specific tools",
+        "_TEST": "Test files/scripts",
+        "_OTHER": "Unclassified files"
+      }
+    }
+  },
+
+  "enforcementLevels": {
+    "suggest": {
+      "description": "Non-blocking suggestion, Claude can proceed without using skill",
+      "action": "Show gentle reminder"
+    },
+    "require": {
+      "description": "Strong recommendation, Claude should use skill",
+      "action": "Show prominent reminder with justification if skipped"
+    },
+    "block": {
+      "description": "Blocking enforcement, Claude must use skill",
+      "action": "Prevent action without skill compliance"
+    }
+  },
+
+  "priorityLevels": {
+    "low": "Optional skill, nice-to-have",
+    "medium": "Important skill, recommended for quality",
+    "high": "Critical skill, essential for consistency",
+    "critical": "Mandatory skill, project requirements depend on it"
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "timestamp": "2025-10-31T10:57:00.903924",
+  "session_context": {
+    "project": "PPM-CC-Laravel",
+    "critical_rules": [
+      "Context7 MANDATORY przed implementacją",
+      "NO HARDCODING - wszystko konfigurowane",
+      "NO MOCK DATA - tylko prawdziwe struktury",
+      "Agents MUST create reports in _AGENT_REPORTS/",
+      "Frontend verification MANDATORY przed informowaniem użytkownika"
+    ],
+    "deployment": {
+      "domain": "ppm.mpptrade.pl",
+      "ssh_host": "host379076@host379076.hostido.net.pl:64321",
+      "ssh_key": "D:\\OneDrive - MPP TRADE\\SSH\\Hostido\\HostidoSSHNoPass.ppk",
+      "path": "domains/ppm.mpptrade.pl/public_html/"
+    },
+    "workflow": [
+      "1. npm run build (lokalnie)",
+      "2. pscp upload ALL assets + manifest (ROOT!)",
+      "3. php artisan cache:clear (produkcja)",
+      "4. PPM Verification Tool (_TOOLS/full_console_test.cjs)",
+      "5. Screenshot verification"
+    ]
+  },
+  "active_tasks": "Check current TODO list - may contain in-progress tasks",
+  "last_actions": "Review recent operations before compact"
+}

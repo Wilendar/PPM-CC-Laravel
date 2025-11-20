@@ -236,8 +236,11 @@ class PrestaShopService
 
     /**
      * Sync single product to PrestaShop.
+     *
+     * CRITICAL FIX (2025-11-07): Changed protected to public
+     * SyncProductsJob needs to call this method
      */
-    protected function syncSingleProduct(PrestaShopShop $shop, Product $product): array
+    public function syncSingleProduct(PrestaShopShop $shop, Product $product): array
     {
         try {
             // Check if product should be synced to this shop

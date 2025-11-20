@@ -813,10 +813,30 @@ Read, Edit, Glob, Grep, WebFetch, MCP
 
 This agent should use the following Claude Code Skills when applicable:
 
-**MANDATORY Skills:**
-- **frontend-verification** - CRITICAL! ALWAYS verify UI changes with screenshots (PRIMARY SKILL!)
-- **context7-docs-lookup** - BEFORE implementing Alpine.js/Tailwind patterns (verify official docs)
-- **agent-report-writer** - For generating frontend development reports
+**MANDATORY Skills (ALWAYS activate in this order):**
+1. **ppm-styling-guidelines** - CRITICAL! PPM-specific styling standards (PRIMARY SKILL!)
+   - Color tokens (--mpp-primary, --ppm-primary, etc.)
+   - Enterprise components (.btn-enterprise-*, .enterprise-card)
+   - Layer system for z-index (.layer-*)
+   - Deployment workflow with HTTP 200 verification
+   - **Priority:** CRITICAL - Execute BEFORE frontend-dev-guidelines
+
+2. **frontend-dev-guidelines** - Generic frontend rules (complements ppm-styling-guidelines)
+   - ZAKAZ inline styles and arbitrary Tailwind
+   - Dedicated CSS files organization
+   - Vite build process
+   - Alpine.js integration patterns
+
+3. **frontend-verification** - CRITICAL! ALWAYS verify UI changes with screenshots
+   - Screenshot testing workflow
+   - Console error monitoring
+   - HTTP 200 verification
+
+4. **context7-docs-lookup** - BEFORE implementing Alpine.js/Blade/Vite patterns
+   - Verify official documentation
+   - Get latest best practices
+
+5. **agent-report-writer** - For generating frontend development reports
 
 **Optional Skills:**
 - **debug-log-cleanup** - After user confirms frontend functionality works
@@ -824,13 +844,54 @@ This agent should use the following Claude Code Skills when applicable:
 
 **Skills Usage Pattern:**
 ```
-1. Before implementing frontend feature → Use context7-docs-lookup skill
-2. During development → Add console.log debugging as needed
-3. After completing UI changes → Use frontend-verification skill (MANDATORY!)
-4. After deployment + user testing → Use debug-log-cleanup skill
-5. After completing work → Use agent-report-writer skill
-6. If discovering complex UI issue → Use issue-documenter skill
+1. FIRST → Use ppm-styling-guidelines skill (PPM-specific standards)
+   - Check PPM color palette
+   - Use enterprise components (.btn-enterprise-*, .enterprise-card)
+   - Follow PPM deployment workflow
+
+2. SECOND → Use frontend-dev-guidelines skill (generic enforcement)
+   - NO inline styles enforcement
+   - NO arbitrary Tailwind enforcement
+   - CSS file organization
+
+3. THIRD → Use context7-docs-lookup skill (official docs verification)
+   - Verify Alpine.js patterns
+   - Check Blade best practices
+   - Confirm Vite configuration
+
+4. During development → Add debug logging as needed
+
+5. BEFORE reporting completion → Use frontend-verification skill (MANDATORY!)
+   - HTTP 200 verification for ALL CSS files
+   - Screenshot testing
+   - Console error check
+
+6. After deployment + user testing → Use debug-log-cleanup skill
+
+7. After completing work → Use agent-report-writer skill
+
+8. If discovering complex UI issue → Use issue-documenter skill
 ```
+
+**⚠️ CRITICAL PRIORITY ORDER:**
+
+```
+ppm-styling-guidelines (CRITICAL, enforce: require)
+          ↓
+frontend-dev-guidelines (CRITICAL, enforce: require)
+          ↓
+context7-docs-lookup (HIGH, enforce: require)
+          ↓
+[Implementation]
+          ↓
+frontend-verification (CRITICAL, enforce: require)
+```
+
+**Skills Overlap Resolution:**
+- Both ppm-styling-guidelines AND frontend-dev-guidelines enforce ZAKAZ inline styles → Reinforced
+- Both enforce ZAKAZ arbitrary Tailwind → Reinforced
+- ppm-styling-guidelines ADDS: PPM tokens, enterprise components, layer system
+- frontend-dev-guidelines ADDS: Generic patterns, Alpine.js integration, Vite workflow
 
 **⚠️ CRITICAL FRONTEND VERIFICATION REQUIREMENT:**
 

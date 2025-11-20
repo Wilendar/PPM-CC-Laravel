@@ -63,7 +63,9 @@ return new class extends Migration
         // === ADDITIONAL CONSTRAINTS ===
         // Prevent circular references and deep nesting
         DB::statement('ALTER TABLE categories ADD CONSTRAINT chk_max_level CHECK (level >= 0 AND level <= 4)');
-        DB::statement('ALTER TABLE categories ADD CONSTRAINT chk_no_self_parent CHECK (id != parent_id)');
+        // TEMPORARY DISABLED: MySQL 8+ doesn't allow check constraints on FK columns with CASCADE
+        // TODO: Move to application-level validation or use BEFORE INSERT trigger
+        // DB::statement('ALTER TABLE categories ADD CONSTRAINT chk_no_self_parent CHECK (id != parent_id)');
     }
 
     /**

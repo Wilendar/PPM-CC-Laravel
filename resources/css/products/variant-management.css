@@ -1,0 +1,1015 @@
+/* PPM-CC-Laravel - Variant Management Styles */
+/* ETAP_05b Phase 6 - ProductForm Variant Section */
+/* Compliant with _DOCS/UI_UX_STANDARDS_PPM.md */
+
+/* ========================================
+   COLOR PALETTE (PPM Standards)
+   ======================================== */
+:root {
+    /* Primary Actions - Orange (Brand) */
+    --color-primary: #f97316;        /* Orange-500 */
+    --color-primary-hover: #ea580c;  /* Orange-600 */
+    --color-primary-light: #fb923c;  /* Orange-400 */
+
+    /* Secondary Actions - Blue */
+    --color-secondary: #3b82f6;      /* Blue-500 */
+    --color-secondary-hover: #2563eb; /* Blue-600 */
+
+    /* Success - Green */
+    --color-success: #10b981;        /* Emerald-500 */
+    --color-success-hover: #059669;  /* Emerald-600 */
+    --color-success-bg: rgba(16, 185, 129, 0.1);
+    --color-success-text: #34d399;
+    --color-success-border: rgba(16, 185, 129, 0.3);
+
+    /* Danger - Red */
+    --color-danger: #ef4444;         /* Red-500 */
+    --color-danger-hover: #dc2626;   /* Red-600 */
+    --color-error-bg: rgba(239, 68, 68, 0.1);
+    --color-error-text: #f87171;
+
+    /* Background Colors */
+    --color-bg-primary: #0f172a;     /* Slate-900 */
+    --color-bg-secondary: #1e293b;   /* Slate-800 */
+    --color-bg-tertiary: #334155;    /* Slate-700 */
+    --color-bg-hover: rgba(255, 255, 255, 0.05);
+
+    /* Text Colors */
+    --color-text-primary: #f8fafc;   /* Slate-50 */
+    --color-text-secondary: #cbd5e1; /* Slate-300 */
+    --color-text-muted: #94a3b8;     /* Slate-400 */
+
+    /* Border Colors */
+    --color-border: #334155;         /* Slate-700 */
+    --color-border-light: #475569;   /* Slate-600 */
+}
+
+/* ========================================
+   VARIANT SECTION HEADER
+   ======================================== */
+.variant-section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 24px;
+    padding: 16px 0;
+    border-bottom: 2px solid var(--color-border);
+}
+
+.variant-section-header h3 {
+    font-size: 20px;
+    font-weight: 600;
+    color: var(--color-text-primary);
+    margin: 0;
+}
+
+.variant-section-header .badge {
+    background: var(--color-primary);
+    color: white;
+    padding: 4px 12px;
+    border-radius: 12px;
+    font-size: 14px;
+    font-weight: 500;
+}
+
+/* ========================================
+   VARIANT LIST TABLE
+   ======================================== */
+.variant-list-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 20px;
+    background: var(--color-bg-secondary);
+    border-radius: 12px;
+    overflow: hidden;
+}
+
+.variant-list-table th {
+    background: var(--color-bg-tertiary);
+    padding: 12px 16px;
+    text-align: left;
+    font-weight: 600;
+    font-size: 13px;
+    color: var(--color-text-primary);
+    border-bottom: 2px solid var(--color-border);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.variant-list-table td {
+    padding: 16px;
+    border-bottom: 1px solid var(--color-border-light);
+    vertical-align: middle;
+}
+
+.variant-list-table tbody tr {
+    transition: background 0.2s ease;
+}
+
+.variant-list-table tbody tr:hover {
+    background: var(--color-bg-hover);
+    /* NO TRANSFORM! Professional standard */
+}
+
+.variant-list-table tbody tr:last-child td {
+    border-bottom: none;
+}
+
+/* Empty State */
+.variant-empty-state {
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--color-text-secondary);
+}
+
+.variant-empty-state i {
+    font-size: 48px;
+    color: var(--color-border);
+    margin-bottom: 16px;
+    display: block;
+}
+
+.variant-empty-state p {
+    font-size: 16px;
+    margin-bottom: 8px;
+}
+
+.variant-empty-state p.text-sm {
+    font-size: 14px;
+    color: var(--color-text-muted);
+}
+
+/* ========================================
+   VARIANT ROW COMPONENTS
+   ======================================== */
+
+/* SKU Column */
+.variant-sku {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--color-text-primary);
+}
+
+/* Variant Attributes Badges */
+.variant-attributes {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.variant-attribute-badge {
+    background: var(--color-bg-secondary);
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 13px;
+    color: var(--color-text-primary);
+    border: 1px solid var(--color-border);
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.2s ease;
+}
+
+.variant-attribute-badge:hover {
+    border-color: var(--color-border-light);
+    background: var(--color-bg-tertiary);
+    /* NO TRANSFORM! */
+}
+
+.variant-attribute-badge .badge-label {
+    color: var(--color-text-secondary);
+    font-size: 11px;
+    text-transform: uppercase;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+}
+
+.variant-attribute-badge .badge-value {
+    color: var(--color-text-primary);
+    font-weight: 500;
+}
+
+/* Default Variant Indicator */
+.variant-default-badge {
+    background: var(--color-success-bg);
+    color: var(--color-success-text);
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    border: 1px solid var(--color-success-border);
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.variant-default-badge i {
+    font-size: 10px;
+}
+
+/* Active/Inactive Status */
+.variant-status-active {
+    color: var(--color-success-text);
+    font-weight: 500;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.variant-status-active::before {
+    content: '';
+    width: 8px;
+    height: 8px;
+    background: var(--color-success);
+    border-radius: 50%;
+    display: inline-block;
+}
+
+.variant-status-inactive {
+    color: var(--color-error-text);
+    font-weight: 500;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.variant-status-inactive::before {
+    content: '';
+    width: 8px;
+    height: 8px;
+    background: var(--color-danger);
+    border-radius: 50%;
+    display: inline-block;
+}
+
+/* Price Display */
+.variant-price {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--color-text-primary);
+}
+
+.variant-price-range {
+    font-size: 12px;
+    color: var(--color-text-secondary);
+}
+
+/* Stock Display */
+.variant-stock {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.variant-stock-value {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.variant-stock-low {
+    background: var(--color-error-bg);
+    color: var(--color-error-text);
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.variant-stock-ok {
+    color: var(--color-success-text);
+    font-weight: 500;
+}
+
+/* Action Buttons in Row */
+.variant-actions {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+}
+
+.variant-action-btn {
+    padding: 8px 14px;
+    font-size: 13px;
+    border: 1px solid var(--color-border);
+    background: transparent;
+    color: var(--color-text-primary);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-weight: 500;
+}
+
+.variant-action-btn:hover {
+    background: var(--color-bg-hover);
+    border-color: var(--color-primary);
+    /* NO TRANSFORM! */
+}
+
+.variant-action-btn.danger:hover {
+    background: rgba(239, 68, 68, 0.1);
+    border-color: var(--color-danger);
+    color: var(--color-danger);
+}
+
+.variant-action-btn i {
+    font-size: 12px;
+}
+
+/* ========================================
+   VARIANT MODALS (Create/Edit)
+   ======================================== */
+
+/* Variant Modal Overlay */
+.variant-modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.6);
+    z-index: 50;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(4px);
+}
+
+/* Variant Modal Container */
+.variant-modal {
+    background: var(--color-bg-secondary);
+    border-radius: 12px;
+    padding: 24px;
+    max-width: 800px;
+    width: 90%;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.4),
+                0 0 0 1px rgba(249, 115, 22, 0.1);
+    border: 1px solid var(--color-border);
+}
+
+.variant-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 24px;
+    padding-bottom: 16px;
+    border-bottom: 2px solid var(--color-border);
+}
+
+.variant-modal-header h3 {
+    font-size: 20px;
+    font-weight: 600;
+    color: var(--color-text-primary);
+    margin: 0;
+}
+
+.variant-modal-close {
+    background: transparent;
+    border: none;
+    font-size: 24px;
+    color: var(--color-text-secondary);
+    cursor: pointer;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+    transition: all 0.2s ease;
+}
+
+.variant-modal-close:hover {
+    background: var(--color-bg-hover);
+    color: var(--color-text-primary);
+    /* NO TRANSFORM! */
+}
+
+.variant-modal-body {
+    /* Content spacing handled by child elements */
+}
+
+.variant-modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+    margin-top: 24px;
+    padding-top: 20px;
+    border-top: 1px solid var(--color-border-light);
+}
+
+/* Modal Section Titles */
+.variant-modal-section-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--color-text-primary);
+    margin-bottom: 16px;
+    margin-top: 24px;
+}
+
+.variant-modal-section-title:first-child {
+    margin-top: 0;
+}
+
+/* ========================================
+   PRICE GRID
+   ======================================== */
+.variant-price-grid {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 20px;
+    background: var(--color-bg-secondary);
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.variant-price-grid th {
+    background: var(--color-bg-tertiary);
+    padding: 12px 16px;
+    text-align: center;
+    font-weight: 600;
+    font-size: 13px;
+    color: var(--color-text-primary);
+    border: 1px solid var(--color-border);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.variant-price-grid td {
+    padding: 12px 16px;
+    text-align: center;
+    border: 1px solid var(--color-border-light);
+    background: var(--color-bg-primary);
+}
+
+.variant-price-grid .row-header {
+    background: var(--color-bg-tertiary);
+    text-align: left;
+    font-weight: 600;
+    color: var(--color-text-primary);
+}
+
+.variant-price-input {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+    text-align: right;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 14px;
+    background: var(--color-bg-secondary);
+    color: var(--color-text-primary);
+    transition: all 0.2s ease;
+}
+
+.variant-price-input:focus {
+    outline: none;
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.1);
+}
+
+.variant-price-input::placeholder {
+    color: var(--color-text-muted);
+}
+
+/* ========================================
+   STOCK GRID
+   ======================================== */
+.variant-stock-grid {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 20px;
+    background: var(--color-bg-secondary);
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.variant-stock-grid th {
+    background: var(--color-bg-tertiary);
+    padding: 12px 16px;
+    text-align: center;
+    font-weight: 600;
+    font-size: 13px;
+    color: var(--color-text-primary);
+    border: 1px solid var(--color-border);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.variant-stock-grid td {
+    padding: 12px 16px;
+    text-align: center;
+    border: 1px solid var(--color-border-light);
+    background: var(--color-bg-primary);
+}
+
+.variant-stock-grid .row-header {
+    background: var(--color-bg-tertiary);
+    text-align: left;
+    font-weight: 600;
+    color: var(--color-text-primary);
+}
+
+.variant-stock-input {
+    width: 100px;
+    padding: 8px 12px;
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+    text-align: center;
+    font-size: 14px;
+    font-family: 'JetBrains Mono', monospace;
+    background: var(--color-bg-secondary);
+    color: var(--color-text-primary);
+    transition: all 0.2s ease;
+}
+
+.variant-stock-input:focus {
+    outline: none;
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.1);
+}
+
+/* ========================================
+   IMAGES MANAGER
+   ======================================== */
+
+/* Images Upload Dropzone */
+.variant-images-dropzone {
+    border: 2px dashed var(--color-border);
+    border-radius: 12px;
+    padding: 48px 24px;
+    text-align: center;
+    background: var(--color-bg-secondary);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    margin-top: 20px;
+}
+
+.variant-images-dropzone:hover {
+    border-color: var(--color-primary);
+    background: var(--color-bg-hover);
+    /* NO TRANSFORM! */
+}
+
+.variant-images-dropzone.dragging {
+    border-color: var(--color-primary);
+    background: rgba(249, 115, 22, 0.1);
+    border-style: solid;
+}
+
+.variant-images-dropzone i {
+    font-size: 40px;
+    color: var(--color-border-light);
+    margin-bottom: 16px;
+}
+
+.variant-images-dropzone p {
+    color: var(--color-text-secondary);
+    font-size: 14px;
+    margin-bottom: 8px;
+}
+
+.variant-images-dropzone p.text-sm {
+    color: var(--color-text-muted);
+    font-size: 12px;
+}
+
+/* Images Grid */
+.variant-images-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 16px;
+    margin-top: 20px;
+}
+
+.variant-image-item {
+    position: relative;
+    aspect-ratio: 1;
+    border-radius: 8px;
+    overflow: hidden;
+    border: 2px solid var(--color-border);
+    background: var(--color-bg-primary);
+    transition: all 0.2s ease;
+}
+
+.variant-image-item:hover {
+    border-color: var(--color-border-light);
+    /* NO TRANSFORM! */
+}
+
+.variant-image-item img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.variant-image-cover {
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.2);
+}
+
+.variant-image-cover::after {
+    content: 'Cover';
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    background: var(--color-primary);
+    color: white;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.variant-image-actions {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    display: flex;
+    gap: 4px;
+}
+
+.variant-image-btn {
+    background: rgba(255, 255, 255, 0.95);
+    border: none;
+    padding: 8px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 12px;
+    transition: all 0.2s ease;
+    color: #1f2937;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.variant-image-btn:hover {
+    background: white;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    /* Small buttons CAN have subtle scale */
+    transform: scale(1.05);
+}
+
+.variant-image-btn.danger:hover {
+    background: var(--color-danger);
+    color: white;
+}
+
+/* ========================================
+   BUTTONS (PPM Standards)
+   ======================================== */
+
+/* Primary Button - Orange */
+.variant-btn-primary {
+    background: var(--color-primary);
+    color: white;
+    padding: 10px 20px;
+    border-radius: 8px;
+    font-weight: 600;
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+}
+
+.variant-btn-primary:hover {
+    background: var(--color-primary-hover);
+    /* NO TRANSFORM! */
+}
+
+.variant-btn-primary:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Secondary Button - Border */
+.variant-btn-secondary {
+    background: transparent;
+    color: var(--color-secondary);
+    padding: 10px 20px;
+    border: 2px solid var(--color-secondary);
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+}
+
+.variant-btn-secondary:hover {
+    background: rgba(59, 130, 246, 0.1);
+    /* NO TRANSFORM! */
+}
+
+/* Danger Button - Red */
+.variant-btn-danger {
+    background: var(--color-danger);
+    color: white;
+    padding: 10px 20px;
+    border-radius: 8px;
+    font-weight: 600;
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+}
+
+.variant-btn-danger:hover {
+    background: var(--color-danger-hover);
+    /* NO TRANSFORM! */
+}
+
+/* ========================================
+   FORM ELEMENTS
+   ======================================== */
+.variant-form-group {
+    margin-bottom: 20px;
+}
+
+.variant-form-label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 500;
+    color: var(--color-text-secondary);
+    font-size: 14px;
+}
+
+.variant-form-input {
+    width: 100%;
+    padding: 12px 16px;
+    background: var(--color-bg-primary);
+    border: 2px solid var(--color-border);
+    border-radius: 8px;
+    color: var(--color-text-primary);
+    font-size: 14px;
+    transition: all 0.2s ease;
+}
+
+.variant-form-input:focus {
+    border-color: var(--color-primary);
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.1);
+}
+
+.variant-form-input::placeholder {
+    color: var(--color-text-muted);
+}
+
+.variant-form-select {
+    width: 100%;
+    padding: 12px 16px;
+    background: var(--color-bg-primary);
+    border: 2px solid var(--color-border);
+    border-radius: 8px;
+    color: var(--color-text-primary);
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.variant-form-select:focus {
+    border-color: var(--color-primary);
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.1);
+}
+
+/* Checkbox */
+.variant-form-checkbox {
+    width: 20px;
+    height: 20px;
+    border-radius: 4px;
+    border: 2px solid var(--color-border);
+    background: var(--color-bg-primary);
+    cursor: pointer;
+}
+
+.variant-form-checkbox:checked {
+    background: var(--color-primary);
+    border-color: var(--color-primary);
+}
+
+/* ========================================
+   RESPONSIVE DESIGN
+   ======================================== */
+@media (max-width: 1024px) {
+    .variant-modal {
+        max-width: 95%;
+    }
+
+    .variant-images-grid {
+        grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    }
+
+    .variant-actions {
+        flex-direction: column;
+        gap: 6px;
+    }
+}
+
+@media (max-width: 768px) {
+    .variant-section-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 12px;
+    }
+
+    .variant-list-table {
+        font-size: 12px;
+    }
+
+    .variant-list-table th,
+    .variant-list-table td {
+        padding: 10px 12px;
+    }
+
+    .variant-modal {
+        max-width: 100%;
+        max-height: 100vh;
+        border-radius: 0;
+    }
+
+    .variant-price-grid,
+    .variant-stock-grid {
+        font-size: 12px;
+    }
+
+    .variant-images-grid {
+        grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+        gap: 12px;
+    }
+}
+
+/* ========================================
+   UTILITY CLASSES
+   ======================================== */
+.variant-text-muted {
+    color: var(--color-text-muted);
+}
+
+.variant-text-success {
+    color: var(--color-success-text);
+}
+
+.variant-text-error {
+    color: var(--color-error-text);
+}
+
+.variant-divider {
+    height: 1px;
+    background: var(--color-border-light);
+    margin: 24px 0;
+}
+
+/* Loading State */
+.variant-loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 40px;
+    color: var(--color-text-secondary);
+}
+
+.variant-loading i {
+    animation: spin 1s linear infinite;
+    font-size: 32px;
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+/* ========================================
+   PRESTASHOP COMPARISON PANEL
+   (Added: 2025-11-06 - SHOP_DATA_SYNC_ISSUE fix)
+   ======================================== */
+
+/* Main Comparison Panel Container */
+.prestashop-comparison-panel {
+    background: var(--color-bg-secondary);
+    border: 2px solid var(--color-secondary);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 24px;
+}
+
+/* Comparison Header */
+.comparison-header {
+    font-weight: 600;
+    font-size: 16px;
+    margin-bottom: 16px;
+    color: var(--color-text-primary);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+/* Comparison Grid - Two Columns (PPM vs PrestaShop) */
+.comparison-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 16px;
+}
+
+/* Individual Column */
+.comparison-column {
+    background: var(--color-bg-primary);
+    padding: 16px;
+    border-radius: 8px;
+    border: 1px solid var(--color-border);
+}
+
+/* Column Label */
+.comparison-label {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--color-text-secondary);
+    display: block;
+    margin-bottom: 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* Value Display */
+.comparison-value {
+    font-size: 14px;
+    color: var(--color-text-primary);
+    word-break: break-word;
+    line-height: 1.5;
+    min-height: 24px;
+}
+
+/* Conflict Indicator - Red Warning */
+.conflict-indicator {
+    background: var(--color-error-bg);
+    border: 2px solid var(--color-danger);
+    color: var(--color-danger);
+    padding: 12px 16px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+/* Match Indicator - Green Success */
+.match-indicator {
+    background: var(--color-success-bg);
+    border: 2px solid var(--color-success);
+    color: var(--color-success-text);
+    padding: 12px 16px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+/* Conflict Action Buttons Container */
+.conflict-actions {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+/* Conflict Action Buttons - Using Standard Button Classes */
+.conflict-actions .btn-primary,
+.conflict-actions .btn-secondary {
+    flex: 1;
+    min-width: 200px;
+    justify-content: center;
+}
+
+/* Responsive Design for Comparison Panel */
+@media (max-width: 768px) {
+    .comparison-grid {
+        grid-template-columns: 1fr;
+        gap: 12px;
+    }
+
+    .conflict-actions {
+        flex-direction: column;
+    }
+
+    .conflict-actions .btn-primary,
+    .conflict-actions .btn-secondary {
+        width: 100%;
+        min-width: 0;
+    }
+}

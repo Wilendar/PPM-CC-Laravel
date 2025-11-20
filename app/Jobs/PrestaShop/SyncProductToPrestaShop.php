@@ -13,6 +13,7 @@ use App\Models\Product;
 use App\Models\PrestaShopShop;
 use App\Models\ProductShopData;
 use App\Models\SyncLog;
+use App\Models\SyncJob;
 use App\Services\PrestaShop\Sync\ProductSyncStrategy;
 use App\Services\PrestaShop\PrestaShopClientFactory;
 use Carbon\Carbon;
@@ -49,14 +50,21 @@ class SyncProductToPrestaShop implements ShouldQueue, ShouldBeUnique
     public PrestaShopShop $shop;
 
     /**
+     * User ID who triggered the sync (2025-11-07)
+     * NULL = SYSTEM (scheduled/automated sync)
+     */
+    public ?int $userId = null;
+
+    /**
      * Number of times job may be attempted
      */
     public int $tries = 3;
 
     /**
      * Maximum seconds job can run before timing out
+     * ETAP_07 FAZA 9.2: Dynamic timeout from SystemSettings (2025-11-13)
      */
-    public int $timeout = 600; // 10 minutes (for large image uploads)
+    public int $timeout;
 
     /**
      * Unique job identifier (prevents duplicate syncs)
@@ -73,11 +81,20 @@ class SyncProductToPrestaShop implements ShouldQueue, ShouldBeUnique
 
     /**
      * Create new job instance
+     * ETAP_07 FAZA 9.2: Load dynamic settings (2025-11-13)
+     *
+     * @param Product $product Product to sync
+     * @param PrestaShopShop $shop Target shop
+     * @param int|null $userId User who triggered sync (NULL = SYSTEM)
      */
-    public function __construct(Product $product, PrestaShopShop $shop)
+    public function __construct(Product $product, PrestaShopShop $shop, ?int $userId = null)
     {
         $this->product = $product;
         $this->shop = $shop;
+        $this->userId = $userId;
+
+        // Load timeout from system settings
+        $this->timeout = \App\Models\SystemSetting::get('sync.timeout', 300);
 
         // Use default queue for CRON compatibility
         // Set queue based on priority
@@ -97,9 +114,38 @@ class SyncProductToPrestaShop implements ShouldQueue, ShouldBeUnique
         PrestaShopClientFactory $factory
     ): void {
         $startTime = microtime(true);
+        $startMemory = memory_get_peak_usage(true);
+
+        // Create SyncJob record (OPTION 1 FIX - 2025-11-07)
+        // USER_ID FIX (2025-11-07): Use $this->userId instead of auth()->id()
+        // auth()->id() returns NULL in queue context!
+        $syncJob = SyncJob::create([
+            'job_id' => \Str::uuid(),
+            'job_type' => SyncJob::JOB_PRODUCT_SYNC,
+            'job_name' => "Sync Product #{$this->product->id} to {$this->shop->name}",
+            'source_type' => SyncJob::TYPE_PPM,
+            'source_id' => $this->product->id,
+            'target_type' => SyncJob::TYPE_PRESTASHOP,
+            'target_id' => $this->shop->id,
+            'status' => SyncJob::STATUS_PENDING,
+            'trigger_type' => SyncJob::TRIGGER_EVENT, // Auto-dispatched after save
+            'user_id' => $this->userId, // Captured in web context, NULL = SYSTEM
+            'queue_name' => $this->queue ?? 'default',
+            'queue_job_id' => $this->job->getJobId(), // CRITICAL LINK!
+            'queue_attempts' => $this->attempts(),
+            'total_items' => 1,
+            'processed_items' => 0,
+            'successful_items' => 0,
+            'failed_items' => 0,
+            'scheduled_at' => now(),
+        ]);
+
+        // Start job tracking
+        $syncJob->start();
 
         Log::info('Product sync job started', [
             'job_id' => $this->job->getJobId(),
+            'sync_job_id' => $syncJob->id,
             'product_id' => $this->product->id,
             'product_sku' => $this->product->sku,
             'shop_id' => $this->shop->id,
@@ -119,30 +165,57 @@ class SyncProductToPrestaShop implements ShouldQueue, ShouldBeUnique
             // Execute sync through strategy
             $result = $strategy->syncToPrestaShop($this->product, $client, $this->shop);
 
-            // Calculate execution time
-            $executionTimeMs = round((microtime(true) - $startTime) * 1000, 2);
+            // Calculate performance metrics
+            $duration = microtime(true) - $startTime;
+            $memoryPeakMb = (memory_get_peak_usage(true) - $startMemory) / 1024 / 1024;
 
-            // Log success
+            // Update SyncJob with success
+            $syncJob->updateProgress(1, 1, 0);
+            $syncJob->updatePerformanceMetrics(
+                memoryPeakMb: (int) round($memoryPeakMb),
+                cpuTimeSeconds: $duration,
+                apiCallsMade: 1 // One API call per product sync
+            );
+
+            // Pass full $result to complete() including synced_data and changed_fields (2025-11-07)
+            $syncJob->complete($result);
+
             Log::info('Product sync job completed successfully', [
                 'job_id' => $this->job->getJobId(),
+                'sync_job_id' => $syncJob->id,
                 'product_id' => $this->product->id,
                 'shop_id' => $this->shop->id,
                 'external_id' => $result['external_id'] ?? null,
                 'operation' => $result['operation'] ?? 'unknown',
                 'skipped' => $result['skipped'] ?? false,
-                'execution_time_ms' => $executionTimeMs,
+                'duration_seconds' => round($duration, 2),
+                'memory_peak_mb' => round($memoryPeakMb, 2),
             ]);
 
         } catch (Throwable $e) {
-            $executionTimeMs = round((microtime(true) - $startTime) * 1000, 2);
+            $duration = microtime(true) - $startTime;
+            $memoryPeakMb = (memory_get_peak_usage(true) - $startMemory) / 1024 / 1024;
+
+            // Update SyncJob with failure
+            $syncJob->updateProgress(1, 0, 1);
+            $syncJob->updatePerformanceMetrics(
+                memoryPeakMb: (int) round($memoryPeakMb),
+                cpuTimeSeconds: $duration
+            );
+            $syncJob->fail(
+                errorMessage: $e->getMessage(),
+                errorDetails: $e->getFile() . ':' . $e->getLine(),
+                stackTrace: $e->getTraceAsString()
+            );
 
             Log::error('Product sync job failed', [
                 'job_id' => $this->job->getJobId(),
+                'sync_job_id' => $syncJob->id,
                 'product_id' => $this->product->id,
                 'shop_id' => $this->shop->id,
                 'attempt' => $this->attempts(),
                 'error' => $e->getMessage(),
-                'execution_time_ms' => $executionTimeMs,
+                'duration_seconds' => round($duration, 2),
             ]);
 
             // Re-throw to trigger Laravel retry mechanism

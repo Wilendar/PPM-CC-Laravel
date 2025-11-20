@@ -1,5 +1,20 @@
 # 🛠️ ETAP_02: Modele i Struktura Bazy Danych
 
+## PLAN RAMOWY ETAPU
+
+- 🛠️ 1. Projektowanie struktury bazy danych
+- 🛠️ 2. Implementacja tabel MySQL - faza A ukończona
+- 🛠️ 3. Tabele mediów i plików
+- 🛠️ 4. Tabele relacji i mapowań - faza A częściowo
+- 🛠️ 5. Tabele systemu i audytowania - faza D ukończona
+- 🛠️ 6. Modele Eloquent i relacje
+- 🛠️ 7. Migracje i seedery
+- 🛠️ 8. Testy i weryfikacja
+- 🛠️ 9. Optymalizacja i monitoring
+- 🛠️ 10. Finalizacja i deployment
+
+---
+
 ## 🔍 INSTRUKCJE PRZED ROZPOCZĘCIEM ETAP
 
 **⚠️ OBOWIĄZKOWE KROKI:**
@@ -877,3 +892,4 @@ Po ukończeniu ETAP_02 będziemy mieli:
 - ✅ Tabela users rozszerzona
 - ✅ Audit trail zaimplementowany
 - ✅ Brak blokerów technicznych
+

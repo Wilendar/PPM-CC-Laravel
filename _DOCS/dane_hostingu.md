@@ -24,7 +24,7 @@ Login: host379076
 Login:	ai@ppm.mpptrade.pl
 Hasło:	aprsArbnRGUC7FbJxDL4
 
-**Baza danych:**
+**Baza danych PPM:**
 Nazwa hosta: localhost
 Nazwa hosta "z zewnątrz": host379076.hostido.net.pl
 Baza danych: host379076_ppm
@@ -35,6 +35,20 @@ Hasło: qkS4FuXMMDDN4DJhatg6
 https://dev.mpptrade.pl/api
 RPV43WNRX8Y7ZJWAPXU3ZA1Z9ZEE9Y22
 
+**BAZA DANYCH B2B Test DEV:**
+Nazwa hosta => 'localhost'
+Nazwa hosta "z zewnątrz": host379076.hostido.net.pl
+database_name => 'host379076_b2b'
+database_user => 'host379076_b2b'
+database_password => 'YvpQMNnCSj69Wu2qjJNc'
+
 https://test.kayomoto.pl/api
 
 1ZEUFUI8JTYY5Z9XXQV2RRANZTKK4R77
+
+**Baza danych KAYO:**
+Nazwa hosta: localhost
+Nazwa hosta "z zewnątrz": host226673.hostido.net.pl
+Baza danych: host226673_test_kayoshop
+Nazwa użytkownika: host226673_test_kayoshop
+Hasło: hnMnzhGaCEhcKArm7U4v

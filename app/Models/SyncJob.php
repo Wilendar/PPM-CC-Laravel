@@ -175,6 +175,7 @@ class SyncJob extends Model
     public const STATUS_RUNNING = 'running';
     public const STATUS_PAUSED = 'paused';
     public const STATUS_COMPLETED = 'completed';
+    public const STATUS_COMPLETED_WITH_ERRORS = 'completed_with_errors'; // 2025-11-12: Partial success
     public const STATUS_FAILED = 'failed';
     public const STATUS_CANCELLED = 'cancelled';
     public const STATUS_TIMEOUT = 'timeout';
@@ -416,12 +417,16 @@ class SyncJob extends Model
      */
     public function complete(array $resultSummary = []): void
     {
-        $started_at = $this->started_at ?: Carbon::now();
-        $duration = Carbon::now()->diffInSeconds($started_at);
-        
+        $completedAt = Carbon::now();
+        $started_at = $this->started_at ?: $completedAt;
+
+        // BUG FIX (2025-11-12): Ensure duration is never negative
+        // Use absolute value to handle edge cases where started_at > completed_at
+        $duration = abs($completedAt->diffInSeconds($started_at));
+
         $this->update([
             'status' => self::STATUS_COMPLETED,
-            'completed_at' => Carbon::now(),
+            'completed_at' => $completedAt,
             'duration_seconds' => $duration,
             'progress_percentage' => 100.00,
             'result_summary' => array_merge($this->result_summary ?: [], $resultSummary),
@@ -429,19 +434,49 @@ class SyncJob extends Model
     }
 
     /**
+     * Complete the job with errors (Partial Success) - 2025-11-12
+     *
+     * Used when some items succeeded but others failed.
+     * Example: 5 products synced successfully, 3 failed
+     *
+     * @param array $resultSummary Result summary with successful_items and failed_items counts
+     * @return void
+     */
+    public function completeWithErrors(array $resultSummary = []): void
+    {
+        $completedAt = Carbon::now();
+        $started_at = $this->started_at ?: $completedAt;
+
+        // BUG FIX (2025-11-12): Ensure duration is never negative
+        $duration = abs($completedAt->diffInSeconds($started_at));
+
+        $this->update([
+            'status' => self::STATUS_COMPLETED_WITH_ERRORS,
+            'completed_at' => $completedAt,
+            'duration_seconds' => $duration,
+            'progress_percentage' => 100.00,
+            'result_summary' => array_merge($this->result_summary ?: [], $resultSummary),
+            'error_message' => 'Job completed with partial failures. See result_summary for details.',
+        ]);
+    }
+
+    /**
      * Fail the job.
      */
     public function fail(
-        string $errorMessage, 
-        ?string $errorDetails = null, 
+        string $errorMessage,
+        ?string $errorDetails = null,
         ?string $stackTrace = null
     ): void {
-        $started_at = $this->started_at ?: Carbon::now();
-        $duration = Carbon::now()->diffInSeconds($started_at);
-        
+        $completedAt = Carbon::now();
+        $started_at = $this->started_at ?: $completedAt;
+
+        // BUG FIX (2025-11-12): Ensure duration is never negative
+        $duration = abs($completedAt->diffInSeconds($started_at));
+
         $this->update([
             'status' => self::STATUS_FAILED,
-            'completed_at' => Carbon::now(),
+            'completed_at' => $completedAt,
             'duration_seconds' => $duration,
             'error_message' => $errorMessage,
             'error_details' => $errorDetails,
@@ -456,12 +491,15 @@ class SyncJob extends Model
      */
     public function cancel(): void
     {
-        $started_at = $this->started_at ?: Carbon::now();
-        $duration = Carbon::now()->diffInSeconds($started_at);
-        
+        $completedAt = Carbon::now();
+        $started_at = $this->started_at ?: $completedAt;
+
+        // BUG FIX (2025-11-12): Ensure duration is never negative
+        $duration = abs($completedAt->diffInSeconds($started_at));
+
         $this->update([
             'status' => self::STATUS_CANCELLED,
-            'completed_at' => Carbon::now(),
+            'completed_at' => $completedAt,
             'duration_seconds' => $duration,
         ]);
     }

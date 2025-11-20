@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Log;
+use App\Casts\CategoryMappingsCast;
 
 /**
  * ProductShopData Model
@@ -60,6 +61,7 @@ class ProductShopData extends Model
         'length',
         'ean',
         'tax_rate',
+        'tax_rate_override',  // FAZA 5.3: Per-shop tax rate override (NULL = use products.tax_rate)
 
         // Product status & variants
         'is_active',
@@ -74,9 +76,12 @@ class ProductShopData extends Model
         // Synchronization control - CONSOLIDATED 2025-10-13
         'prestashop_product_id',     // PrestaShop external ID (migrated from external_id)
         'sync_status',
+        'pending_fields',            // Field-Level Pending Tracking (2025-11-07) - JSON array of pending field names
         'sync_direction',
         'last_sync_at',
         'last_success_sync_at',
+        'last_pulled_at',            // ETAP_13 (2025-11-06): PrestaShop → PPM pull timestamp
+        'last_push_at',              // ETAP_13 (2025-11-17): PPM → PrestaShop push timestamp
         'last_sync_hash',
         'checksum',
         'error_message',             // Migrated from sync_errors (JSON → TEXT)
@@ -93,26 +98,45 @@ class ProductShopData extends Model
 
         // External system reference
         'external_reference',
+
+        // Validation fields (2025-11-13)
+        'validation_warnings',
+        'has_validation_warnings',
+        'validation_checked_at',
+
+        // Conflict resolution (PROBLEM #9.3 - 2025-11-13)
+        'conflict_log',
+        'has_conflicts',
+        'conflicts_detected_at',
     ];
 
     protected $casts = [
-        // JSON fields
-        'category_mappings' => 'array',
+        // JSON fields with custom casts
+        'category_mappings' => CategoryMappingsCast::class,  // REFACTORED 2025-11-18: Option A architecture
         'attribute_mappings' => 'array',
         'image_settings' => 'array',
         'conflict_data' => 'array',
+        'pending_fields' => 'array',  // Field-Level Pending Tracking (2025-11-07)
+        'validation_warnings' => 'array',  // Validation warnings (2025-11-13)
+        'conflict_log' => 'array',  // Conflict resolution log (PROBLEM #9.3 - 2025-11-13)
 
         // Datetime fields
         'last_sync_at' => 'datetime',
         'last_success_sync_at' => 'datetime',
+        'last_pulled_at' => 'datetime',          // ETAP_13 (2025-11-06)
+        'last_push_at' => 'datetime',            // ETAP_13 (2025-11-17)
         'conflict_detected_at' => 'datetime',
         'published_at' => 'datetime',
         'unpublished_at' => 'datetime',
+        'validation_checked_at' => 'datetime',  // Validation timestamp (2025-11-13)
+        'conflicts_detected_at' => 'datetime',  // Conflict detection timestamp (PROBLEM #9.3 - 2025-11-13)
 
         // Boolean fields - ENHANCEMENT 2025-09-19
         'is_published' => 'boolean',
         'is_active' => 'boolean',
         'is_variant_master' => 'boolean',
+        'has_validation_warnings' => 'boolean',  // Validation warnings flag (2025-11-13)
+        'has_conflicts' => 'boolean',  // Conflict resolution flag (PROBLEM #9.3 - 2025-11-13)
 
         // Numeric fields with precision
         'weight' => 'decimal:3',
@@ -120,6 +144,7 @@ class ProductShopData extends Model
         'width' => 'decimal:2',
         'length' => 'decimal:2',
         'tax_rate' => 'decimal:2',
+        'tax_rate_override' => 'decimal:2',  // FAZA 5.3: Per-shop tax rate override
         'sort_order' => 'integer',
         'product_type_id' => 'integer',
 
@@ -133,9 +158,12 @@ class ProductShopData extends Model
     protected $dates = [
         'last_sync_at',
         'last_success_sync_at',
+        'last_pulled_at',          // ETAP_13 (2025-11-06)
+        'last_push_at',            // ETAP_13 (2025-11-17)
         'conflict_detected_at',
         'published_at',
         'unpublished_at',
+        'validation_checked_at',
         'created_at',
         'updated_at',
     ];
@@ -464,6 +492,7 @@ class ProductShopData extends Model
             'conflict_data' => null,
             'conflict_detected_at' => null,
             'retry_count' => 0,
+            'pending_fields' => null, // FEATURE (2025-11-07): Clear field-level tracking after successful sync
         ];
 
         if ($prestashopProductId !== null) {
@@ -618,6 +647,7 @@ class ProductShopData extends Model
     /**
      * Generate hash of current data for change detection
      * ENHANCEMENT 2025-09-19: Include all product fields
+     * ENHANCEMENT 2025-11-14: Include tax_rate_override (FAZA 5.3)
      */
     public function generateDataHash(): string
     {
@@ -643,6 +673,7 @@ class ProductShopData extends Model
             'length' => $this->length,
             'ean' => $this->ean,
             'tax_rate' => $this->tax_rate,
+            'tax_rate_override' => $this->tax_rate_override,  // FAZA 5.3: Include override in checksum
 
             // Status and variants
             'is_active' => $this->is_active,
@@ -742,5 +773,321 @@ class ProductShopData extends Model
         }
 
         return $this->last_sync_at->diffForHumans();
+    }
+
+    // ==========================================
+    // ETAP_13 HELPER METHODS (2025-11-17)
+    // ==========================================
+
+    /**
+     * Get time since last pull (PrestaShop → PPM)
+     *
+     * ETAP_13: Sync Panel UX Refactoring
+     *
+     * @return string Human-readable timestamp or "Nigdy"
+     */
+    public function getTimeSinceLastPull(): string
+    {
+        if (!$this->last_pulled_at) {
+            return 'Nigdy';
+        }
+
+        return $this->last_pulled_at->diffForHumans();
+    }
+
+    /**
+     * Get time since last push (PPM → PrestaShop)
+     *
+     * ETAP_13: Sync Panel UX Refactoring
+     *
+     * @return string Human-readable timestamp or "Nigdy"
+     */
+    public function getTimeSinceLastPush(): string
+    {
+        if (!$this->last_push_at) {
+            return 'Nigdy';
+        }
+
+        return $this->last_push_at->diffForHumans();
+    }
+
+    // ==========================================
+    // TAX RATE HELPERS (FAZA 5.3 - 2025-11-14)
+    // ==========================================
+
+    /**
+     * Get effective tax rate (override or default)
+     *
+     * ETAP_07 FAZA 5.3 - Tax Rules UI Enhancement
+     *
+     * Priority:
+     * 1. tax_rate_override (shop-specific override)
+     * 2. product->tax_rate (global product default)
+     * 3. 23.00 (Poland standard VAT as fallback)
+     *
+     * @return float Effective tax rate for this shop
+     */
+    public function getEffectiveTaxRate(): float
+    {
+        // Priority: Override → Product Default → Fallback
+        return $this->tax_rate_override ?? $this->product->tax_rate ?? 23.00;
+    }
+
+    /**
+     * Check if shop has tax rate override
+     *
+     * @return bool True if override is set
+     */
+    public function hasTaxRateOverride(): bool
+    {
+        return $this->tax_rate_override !== null;
+    }
+
+    /**
+     * Get tax rate source description (for UI display)
+     *
+     * @return string Source description
+     */
+    public function getTaxRateSource(): string
+    {
+        if ($this->tax_rate_override !== null) {
+            return 'Nadpisany dla sklepu (' . $this->tax_rate_override . '%)';
+        }
+
+        if ($this->product && $this->product->tax_rate !== null) {
+            return 'Domyślny PPM (' . $this->product->tax_rate . '%)';
+        }
+
+        return 'Fallback (23.00%)';
+    }
+
+    /**
+     * Get tax rate source type (for programmatic use)
+     *
+     * @return string 'shop_override' | 'product_default' | 'system_fallback'
+     */
+    public function getTaxRateSourceType(): string
+    {
+        if ($this->tax_rate_override !== null) {
+            return 'shop_override';
+        }
+
+        if ($this->product && $this->product->tax_rate !== null) {
+            return 'product_default';
+        }
+
+        return 'system_fallback';
+    }
+
+    /**
+     * Check if tax rate matches PrestaShop tax rule group mapping
+     *
+     * Validation helper - checks if current effective rate matches
+     * any of the mapped tax rule groups for this shop.
+     *
+     * @return bool True if rate is mapped in shop settings
+     */
+    public function taxRateMatchesPrestaShopMapping(): bool
+    {
+        $effectiveRate = $this->getEffectiveTaxRate();
+        $shop = $this->shop;
+
+        if (!$shop) {
+            return false;
+        }
+
+        // Check against all mapped tax rule groups (23, 8, 5, 0)
+        $mappedRates = [
+            $shop->tax_rules_group_id_23 ? 23.00 : null,
+            $shop->tax_rules_group_id_8 ? 8.00 : null,
+            $shop->tax_rules_group_id_5 ? 5.00 : null,
+            $shop->tax_rules_group_id_0 ? 0.00 : null,
+        ];
+
+        // Filter out null values (unmapped rates)
+        $mappedRates = array_filter($mappedRates, fn($rate) => $rate !== null);
+
+        // Float comparison with precision tolerance
+        return in_array(
+            round($effectiveRate, 2),
+            array_map(fn($rate) => round($rate, 2), $mappedRates),
+            true
+        );
+    }
+
+    /**
+     * Get validation warning for tax rate mismatch
+     *
+     * @return string|null Warning message or null if valid
+     */
+    public function getTaxRateValidationWarning(): ?string
+    {
+        if (!$this->taxRateMatchesPrestaShopMapping()) {
+            $effectiveRate = $this->getEffectiveTaxRate();
+            $shop = $this->shop;
+
+            if (!$shop) {
+                return 'Sklep nie istnieje - nie można zweryfikować stawki VAT';
+            }
+
+            // Get available rates for this shop
+            $availableRates = [];
+            if ($shop->tax_rules_group_id_23) $availableRates[] = '23%';
+            if ($shop->tax_rules_group_id_8) $availableRates[] = '8%';
+            if ($shop->tax_rules_group_id_5) $availableRates[] = '5%';
+            if ($shop->tax_rules_group_id_0) $availableRates[] = '0%';
+
+            $ratesString = !empty($availableRates)
+                ? implode(', ', $availableRates)
+                : 'brak zmapowanych stawek';
+
+            return "Stawka VAT {$effectiveRate}% nie jest zmapowana w ustawieniach sklepu PrestaShop. Dostępne stawki: {$ratesString}";
+        }
+
+        return null;
+    }
+
+    // ==========================================
+    // CATEGORY MAPPINGS HELPERS (ARCHITECTURE REFACTORING 2025-11-18)
+    // ==========================================
+
+    /**
+     * Get category_mappings UI section
+     *
+     * Architecture: CATEGORY_MAPPINGS_ARCHITECTURE.md v2.0
+     *
+     * Returns UI-specific data for Livewire components:
+     * - selected: Array of PPM category IDs
+     * - primary: Primary category ID (or null)
+     *
+     * @return array UI section (selected + primary)
+     */
+    public function getCategoryMappingsUi(): array
+    {
+        $mappings = $this->category_mappings ?? [];
+
+        return [
+            'selected' => $mappings['ui']['selected'] ?? [],
+            'primary' => $mappings['ui']['primary'] ?? null,
+        ];
+    }
+
+    /**
+     * Get PrestaShop category IDs list (for sync operations)
+     *
+     * Architecture: CATEGORY_MAPPINGS_ARCHITECTURE.md v2.0
+     *
+     * Returns array of PrestaShop category IDs from mappings section.
+     * Filters out placeholder values (0 = not mapped yet).
+     *
+     * @return array Array of PrestaShop category IDs
+     */
+    public function getCategoryMappingsList(): array
+    {
+        $mappings = $this->category_mappings ?? [];
+        $prestashopIds = array_values($mappings['mappings'] ?? []);
+
+        // Filter out placeholders (0 = not mapped)
+        return array_values(array_filter($prestashopIds, fn($id) => $id > 0));
+    }
+
+    /**
+     * Check if product has valid category mappings
+     *
+     * Valid = at least one mapping with PrestaShop ID > 0
+     *
+     * @return bool True if has valid mappings
+     */
+    public function hasCategoryMappings(): bool
+    {
+        $list = $this->getCategoryMappingsList();
+        return !empty($list);
+    }
+
+    /**
+     * Get primary PrestaShop category ID
+     *
+     * Resolves primary category from UI to PrestaShop ID via mappings
+     *
+     * @return int|null Primary PrestaShop category ID or null
+     */
+    public function getPrimaryCategoryId(): ?int
+    {
+        $mappings = $this->category_mappings ?? [];
+        $primaryPpmId = $mappings['ui']['primary'] ?? null;
+
+        if ($primaryPpmId === null) {
+            return null;
+        }
+
+        // Lookup in mappings
+        $prestashopId = $mappings['mappings'][(string) $primaryPpmId] ?? null;
+
+        // Filter out placeholder (0 = not mapped)
+        if ($prestashopId === 0 || $prestashopId === null) {
+            return null;
+        }
+
+        return $prestashopId;
+    }
+
+    /**
+     * Get count of unmapped categories
+     *
+     * Counts categories in UI.selected that don't have valid PrestaShop mapping
+     *
+     * @return int Count of unmapped categories
+     */
+    public function getUnmappedCategoriesCount(): int
+    {
+        $mappings = $this->category_mappings ?? [];
+        $selected = $mappings['ui']['selected'] ?? [];
+        $prestashopMappings = $mappings['mappings'] ?? [];
+
+        $unmappedCount = 0;
+
+        foreach ($selected as $ppmId) {
+            $prestashopId = $prestashopMappings[(string) $ppmId] ?? 0;
+
+            if ($prestashopId === 0) {
+                $unmappedCount++;
+            }
+        }
+
+        return $unmappedCount;
+    }
+
+    /**
+     * Get category mappings source
+     *
+     * Returns metadata.source indicating how mappings were created
+     *
+     * @return string Source identifier ('manual', 'pull', 'sync', 'migration', 'empty')
+     */
+    public function getCategoryMappingsSource(): string
+    {
+        $mappings = $this->category_mappings ?? [];
+        return $mappings['metadata']['source'] ?? 'unknown';
+    }
+
+    /**
+     * Get category mappings last updated timestamp
+     *
+     * @return \Carbon\Carbon|null Last updated timestamp or null
+     */
+    public function getCategoryMappingsLastUpdated(): ?\Carbon\Carbon
+    {
+        $mappings = $this->category_mappings ?? [];
+        $timestamp = $mappings['metadata']['last_updated'] ?? null;
+
+        if ($timestamp === null) {
+            return null;
+        }
+
+        try {
+            return \Carbon\Carbon::parse($timestamp);
+        } catch (\Exception $e) {
+            return null;
+        }
     }
 }

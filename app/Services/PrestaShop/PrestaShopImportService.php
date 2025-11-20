@@ -168,7 +168,7 @@ class PrestaShopImportService
                                 ],
                                 [
                                     'price_net' => $priceData['price'],
-                                    'price_gross' => $priceData['price'], // Will be recalculated
+                                    'price_gross' => $priceData['price'] * (1 + ($product->tax_rate / 100)),
                                     'currency' => $priceData['currency'],
                                 ]
                             );

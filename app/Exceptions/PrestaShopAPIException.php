@@ -107,6 +107,18 @@ class PrestaShopAPIException extends Exception
     }
 
     /**
+     * Check if this is a 404 Not Found error
+     *
+     * Used for detecting products deleted from PrestaShop (BUG #8 FIX #1)
+     *
+     * @return bool True if HTTP 404 error
+     */
+    public function isNotFound(): bool
+    {
+        return $this->httpStatusCode === 404;
+    }
+
+    /**
      * Convert exception to array for logging/debugging
      *
      * @return array Exception details as array

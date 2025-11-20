@@ -1,0 +1,1 @@
+<?php require "vendor/autoload.php"; $app = require_once "bootstrap/app.php"; $app->make("Illuminate\Contracts\Console\Kernel")->bootstrap(); $shops = DB::table("prestashop_shops")->get(["id", "name"]); foreach($shops as $s) echo "{$s->id}|{$s->name}\n";

@@ -31,7 +31,8 @@
             wire:click="toggleCategory({{ $category->id }})"
             type="checkbox"
             id="category_{{ $context }}_{{ $category->id }}"
-            {{ in_array($category->id, $this->getCategoriesForContext($activeShopId)) ? 'checked' : '' }}
+            {{-- ETAP_07b FIZA 1 FIX: Use getPrestaShopCategoryIdsForContext() for correct ID space --}}
+            {{ in_array($category->id, $this->getPrestaShopCategoryIdsForContext($activeShopId)) ? 'checked' : '' }}
             class="rounded border-gray-300 dark:border-gray-600 text-blue-600 shadow-sm focus:border-blue-500 focus:ring-blue-500"
         >
 
@@ -40,13 +41,16 @@
             {{ $category->name }}
         </label>
 
-        @if(in_array($category->id, $this->getCategoriesForContext($activeShopId)))
+        {{-- ETAP_07b FIZA 1 FIX: Use getPrestaShopCategoryIdsForContext() for correct ID space --}}
+        @if(in_array($category->id, $this->getPrestaShopCategoryIdsForContext($activeShopId)))
             <button
                 wire:click="setPrimaryCategory({{ $category->id }})"
                 type="button"
-                class="px-2 py-1 text-xs rounded {{ $this->getPrimaryCategoryForContext($activeShopId) == $category->id ? 'category-primary-btn' : 'category-set-primary-btn' }}"
+                {{-- ETAP_07b FIX: Use getPrimaryPrestaShopCategoryIdForContext() for correct ID comparison --}}
+                class="px-2 py-1 text-xs rounded {{ $this->getPrimaryPrestaShopCategoryIdForContext($activeShopId) == $category->id ? 'category-primary-btn' : 'category-set-primary-btn' }}"
             >
-                {{ $this->getPrimaryCategoryForContext($activeShopId) == $category->id ? 'Główna' : 'Ustaw główną' }}
+                {{-- ETAP_07b FIX: Use getPrimaryPrestaShopCategoryIdForContext() for correct ID comparison --}}
+                {{ $this->getPrimaryPrestaShopCategoryIdForContext($activeShopId) == $category->id ? 'Główna' : 'Ustaw główną' }}
             </button>
         @endif
     </div>

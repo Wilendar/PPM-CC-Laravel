@@ -355,7 +355,26 @@
 - meta_title, meta_description - SEO per sklep
 
 // Shop-specific Mappings
-- category_mappings - Mapowanie kategorii (JSON)
+- category_mappings - Shop-specific category mappings (JSON - Option A format)
+  Structure v2.0 (2025-11-18):
+  {
+    "ui": {
+      "selected": [100, 103, 42],      // PPM category IDs for UI
+      "primary": 100                   // Default category ID
+    },
+    "mappings": {
+      "100": 9,                        // PPM ID → PrestaShop ID
+      "103": 15,
+      "42": 800
+    },
+    "metadata": {
+      "last_updated": "2025-11-18T10:30:00Z",
+      "source": "manual|pull|sync"     // How mappings were set
+    }
+  }
+  Cast: CategoryMappingsCast (auto validation & backward compatibility)
+  Helpers: hasCategoryMappings(), getCategoryMappingsUi(), getPrestaShopCategories()
+  Reference: _DOCS/CATEGORY_MAPPINGS_ARCHITECTURE.md
 - attribute_mappings - Mapowanie atrybutów (JSON)
 - image_settings - Ustawienia zdjęć (JSON)
 
@@ -543,19 +562,27 @@ Tabela zostanie rozszerzona o kolumny sync tracking z `product_sync_status`:
 
 ---
 
-#### **product_shop_categories** - Kategorie per sklep
+#### **product_shop_categories** - Kategorie per sklep ⚠️ **DEPRECATED & REMOVED**
+
+**STATUS:** ❌ **REMOVED** 2025-11-19 (Migration: `2025_11_19_000001_consolidate_product_categories_tables.php`)
+
+**PROBLEM:** Duplikacja funkcjonalności z `product_categories` pivot table (shop_id column added 2025-10-13)
+
+**MIGRATION:** Data merged into `product_categories` with `shop_id` column:
+- 3 unique records migrated
+- Table dropped
+- ProductShopCategory model moved to `_ARCHIVE/`
+
+**REPLACEMENT:** Use `product_categories` pivot table with `shop_id` column:
 ```sql
-- id (PK) - Serial primary key
-- product_id (FK) - ID produktu
-- shop_id (FK) - ID sklepu
-- category_id (FK) - ID kategorii
-- is_primary - Kategoria główna per sklep
-- sort_order - Kolejność w kategorii per sklep
-- timestamps
+-- OLD (removed)
+SELECT * FROM product_shop_categories WHERE product_id = ? AND shop_id = ?
+
+-- NEW (current)
+SELECT * FROM product_categories WHERE product_id = ? AND shop_id = ? AND shop_id IS NOT NULL
 ```
 
-**ETAP:** ETAP_05 ✅ **Status:** COMPLETED
-**Unique:** product_id + shop_id + category_id
+**ETAP:** ETAP_05 ✅ **Status:** ❌ DEPRECATED 2025-11-19, replaced by `product_categories.shop_id`
 
 ---
 
@@ -1088,13 +1115,20 @@ php artisan migrate:status
 4. Po wdrożeniu na production → zmień status na ✅
 5. Dodaj nowe indeksy i constrainty do sekcji optymalizacji
 
-**OSTATNIA AKTUALIZACJA:** 2025-10-22
+**OSTATNIA AKTUALIZACJA:** 2025-11-19
+- ✅ **CONSOLIDATION:** Usunięto tabelę `product_shop_categories` (duplikacja funkcjonalności)
+- ✅ Migration: `2025_11_19_000001_consolidate_product_categories_tables.php` - merge do `product_categories` pivot table
+- ✅ Refactoring: Cały kod używa teraz `product_categories` z `shop_id` column (single source of truth)
+- ✅ Deprecated: ProductShopCategory model moved to `_ARCHIVE/Models/`
+- ✅ Fix: "Aktualizuj aktualny sklep" button bug resolved (ROOT CAUSE: wrong table)
+- ⚠️ **AKTUALNY STATUS:** ETAP_04 ✅, ETAP_05 ✅, ETAP_06 ✅, ETAP_07 @ 75% 🔄, ETAP_08 ⏳
+
+**PREVIOUS UPDATE:** 2025-10-22
 - ✅ Dodano referencję do modułowej dokumentacji ARCHITEKTURA_PPM/ (21 modułów)
 - ✅ Zaktualizowano ETAP_06 → COMPLETED (Unified Import System w PRODUKTY)
 - ✅ Zaktualizowano ETAP_07 → FAZA 1+2 COMPLETED, FAZA 3 @ 75% (4 tabele + 15 Services + 9 Jobs)
 - ✅ Dodano szczegóły systemu CSV (6 serwisów używających istniejących tabel)
 - ✅ Zachowano informację o Per-Shop Categories support (2025-10-13)
-- ⚠️ **AKTUALNY STATUS:** ETAP_04 ✅, ETAP_05 ✅, ETAP_06 ✅, ETAP_07 @ 75% 🔄, ETAP_08 ⏳
 
 ---
 

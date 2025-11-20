@@ -16,6 +16,7 @@ Aplikacja klasy enterprise do zarządzania produktami na wielu sklepach Prestash
 - **Cache/Kolejki**: Redis (lub driver database jako fallback)
 - **Import XLSX**: Laravel-Excel (PhpSpreadsheet)
 - **Autoryzacja**: Laravel Socialite (Google Workspace + Microsoft Entra ID) - implementacja na końcu
+- Wszystkie potrzebne dane logowania, bazy danych prestashop, klucze API, SSH i FTP znajdują się w @_DOCS\dane_hostingu.md
 
 ### 🏗️ Build & Deployment Architecture
 
@@ -24,7 +25,7 @@ Aplikacja klasy enterprise do zarządzania produktami na wielu sklepach Prestash
 **WORKFLOW:**
 ```
 [Local Windows]                     [Production Hostido]
-npm run build                       Laravel @vite() helper
+npm run build                       Laravel vite() directive
   ↓                                   ↓
 public/build/ (hashed assets)       Reads manifest.json
   ↓                                   ↓
@@ -84,10 +85,10 @@ plink ... -batch "cat domains/.../public/build/manifest.json | grep components.c
 ### Środowisko Deployment
 - **Domena**: ppm.mpptrade.pl
 - **Hosting**: Hostido.net.pl (shared hosting - **brak Node.js/npm/Vite**)
-- **SSH**: host379076@host379076.hostido.net.pl:64321 (klucz SSH wymagany)
+- **SSH**: `host379076@host379076.hostido.net.pl:64321` (klucz SSH wymagany)
 - **SSH Key Path**: `D:\OneDrive - MPP TRADE\SSH\Hostido\HostidoSSHNoPass.ppk`
 - **Laravel Root Path**: `domains/ppm.mpptrade.pl/public_html/` (bezpośrednio w public_html, bez podfolderu)
-- **Baza**: host379076_ppm@localhost (MariaDB 10.11.13)
+- **Baza**: `host379076_ppm@localhost` (MariaDB 10.11.13)
 - **PHP**: 8.3.23 (natywnie dostępny)
 - **Composer**: 2.8.5 (preinstalowany)
 - **Node.js/npm**: ❌ NIE DOSTĘPNE (build tylko lokalnie!)
@@ -291,7 +292,7 @@ node _TOOLS/full_console_test.cjs "URL" --show --tab=Cechy --no-click
 
 **🔥 Krytyczne:**
 - [wire:snapshot](_ISSUES_FIXES/LIVEWIRE_WIRE_SNAPSHOT_ISSUE.md) - Surowy kod zamiast UI
-- [wire:poll + @if](_ISSUES_FIXES/LIVEWIRE_WIRE_POLL_CONDITIONAL_RENDERING_ISSUE.md) - Nie działa w conditional
+- [wire:poll + conditional rendering](_ISSUES_FIXES/LIVEWIRE_WIRE_POLL_CONDITIONAL_RENDERING_ISSUE.md) - Nie działa w conditional
 - [x-teleport + wire:id](_ISSUES_FIXES/LIVEWIRE_X_TELEPORT_WIRE_ID_ISSUE.md) - wire:click wymaga wire:id
 - [DI Conflict](_ISSUES_FIXES/LIVEWIRE_DEPENDENCY_INJECTION_ISSUE.md) - Non-nullable properties w Livewire 3.x
 - [Livewire Events](_ISSUES_FIXES/LIVEWIRE_EMIT_DISPATCH_ISSUE.md) - emit() → dispatch()
@@ -305,17 +306,18 @@ node _TOOLS/full_console_test.cjs "URL" --show --tab=Cechy --no-click
 **🔧 Development:**
 - [Debug Logging](_ISSUES_FIXES/DEBUG_LOGGING_BEST_PRACTICES.md) - Dev vs production
 - [Vite Manifest](_ISSUES_FIXES/VITE_MANIFEST_NEW_CSS_FILES_ISSUE.md) - Nowe pliki CSS
-- [CSS Import](_ISSUES_FIXES/CSS_IMPORT_MISSING_FROM_LAYOUT.md) - Brak w @vite()
+- [CSS Import](_ISSUES_FIXES/CSS_IMPORT_MISSING_FROM_LAYOUT.md) - Brak w `@vite()`
 
 **💡 Quick Reference:**
+
 ```php
 // ❌ BŁĘDY
 Route::get('/path', Component::class); // → Use: fn() => view('wrapper')
 $this->emit('event'); // → Use: $this->dispatch('event')
 style="z-index: 9999;" // → Use: CSS classes
 class="z-[9999]" // → Use: CSS classes
-@if($x) <div wire:poll>... // → Put wire:poll OUTSIDE @if
-<template x-teleport><button wire:click>... // → Use @click="$wire.method()"
+// @if conditional inside wire:poll // → Put wire:poll OUTSIDE conditionals
+<template x-teleport><button wire:click>... // → Use Alpine click with $wire
 public int $progressId; // → Use: public ?int $progressId = null;
 pscp "components-X.css" // → Use: pscp -r "public/build/assets/*"
 ```
@@ -398,6 +400,7 @@ n### FAZA C: System Administration - COMPLETED 2025-01-09
 **STATUS:** ✅ Connected - API: `ctx7sk-dea6...675c3` - Coverage: 100% agentów
 
 **Biblioteki:**
+
 - Laravel 12.x: `/websites/laravel_12_x` (4927 snippets, trust 7.5)
 - Livewire 3.x: `/livewire/livewire` (867 snippets, trust 7.4)
 - Alpine.js: `/alpinejs/alpine` (364 snippets, trust 6.6)
@@ -412,7 +415,7 @@ n### FAZA C: System Administration - COMPLETED 2025-01-09
 
 ## Super Admin Account
 
-**Testing Account:** admin@mpptrade.pl / Admin123!MPP (User ID: 8, wszystkie 47 permissions)
+**Testing Account:** `admin@mpptrade.pl / Admin123!MPP` (User ID: 8, wszystkie 47 permissions)
 
 **Admin Routes:** /admin (dashboard), /admin/shops, /admin/integrations, /admin/system-settings, /admin/backup, /admin/maintenance, /admin/notifications, /admin/reports, /admin/api, /admin/customization
 

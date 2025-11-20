@@ -1,0 +1,1 @@
+<?php require "vendor/autoload.php"; $app = require_once "bootstrap/app.php"; $app->make("Illuminate\Contracts\Console\Kernel")->bootstrap(); $p = DB::table("products")->orderBy("id", "desc")->limit(5)->get(["id", "sku", "name"]); foreach($p as $r) echo "{$r->id}|{$r->sku}|" . substr($r->name, 0, 30) . "\n";

@@ -49,26 +49,95 @@ class PrestaShop8Client extends BasePrestaShopClient
     /**
      * Create new product
      *
-     * @param array $productData Product data in PrestaShop format
+     * FIX (2025-11-14): Unwrap 'product' key if ProductTransformer returned wrapped structure
+     * FIX (2025-11-13): PrestaShop Web Service API requires XML for POST requests
+     *
+     * @param array $productData Product data in PrestaShop format (raw or wrapped in 'product' key)
      * @return array Created product data with ID
      * @throws \App\Exceptions\PrestaShopAPIException
      */
     public function createProduct(array $productData): array
     {
-        return $this->makeRequest('POST', '/products', ['product' => $productData]);
+        // Unwrap 'product' key if transformer returned wrapped structure
+        // ProductTransformer returns: ['product' => [...]] but this method expects raw data
+        if (isset($productData['product'])) {
+            $productData = $productData['product'];
+        }
+
+        $xmlBody = $this->arrayToXml(['product' => $productData]);
+
+        return $this->makeRequest('POST', '/products', [], [
+            'body' => $xmlBody,
+            'headers' => ['Content-Type' => 'application/xml'],
+        ]);
     }
 
     /**
      * Update existing product
      *
+     * CRITICAL FIX (2025-11-14 #3): Implemented GET-MODIFY-PUT pattern to preserve existing fields
+     * CRITICAL FIX (2025-11-14 #2): Fixed double wrapping (unwrap 'product' key from ProductTransformer)
+     * CRITICAL FIX (2025-11-14 #1): PrestaShop UPDATE requires ID injection + XML format
+     *
+     * HISTORY:
+     * - 2025-11-13: Added XML conversion (was sending JSON)
+     * - 2025-11-14 #1: Added ID injection (PrestaShop requirement for UPDATE)
+     * - 2025-11-14 #2: Fixed double wrapping (unwrap 'product' key from ProductTransformer)
+     * - 2025-11-14 #3: Implemented GET-MODIFY-PUT pattern (PrestaShop Best Practice)
+     *
+     * PrestaShop API BEST PRACTICE for UPDATE (GET-MODIFY-PUT):
+     * 1. GET existing product from PrestaShop
+     * 2. MERGE new data with existing data (preserve unchanged fields)
+     * 3. PUT merged data
+     *
+     * This prevents overwriting critical fields like:
+     * - id_tax_rules_group (tax rules) ← CRITICAL: User reported tax rules being reset
+     * - position_in_category
+     * - cache fields
+     * - Other fields not managed by PPM
+     *
+     * PrestaShop API REQUIREMENT for UPDATE operations:
+     * - Body MUST be XML (not JSON)
+     * - XML structure MUST contain <id> element at the beginning
+     * - Without <id>, PrestaShop returns: "id is required when modifying a resource"
+     *
+     * EXAMPLE XML:
+     * <prestashop>
+     *   <product>
+     *     <id><![CDATA[123]]></id>  ← REQUIRED FOR UPDATE
+     *     <name>...</name>
+     *     <price>99.99</price>
+     *   </product>
+     * </prestashop>
+     *
      * @param int $productId PrestaShop product ID
-     * @param array $productData Updated product data
+     * @param array $productData Updated product data (raw or wrapped in 'product' key)
      * @return array Updated product data
      * @throws \App\Exceptions\PrestaShopAPIException
      */
     public function updateProduct(int $productId, array $productData): array
     {
-        return $this->makeRequest('PUT', "/products/{$productId}", ['product' => $productData]);
+        // Unwrap 'product' key if transformer returned wrapped structure
+        // ProductTransformer returns: ['product' => [...]] but this method expects raw data
+        if (isset($productData['product'])) {
+            $productData = $productData['product'];
+        }
+
+        // TEMPORARY ROLLBACK (2025-11-14): Removed GET-MODIFY-PUT due to shallow merge destroying nested structures
+        // TODO: Implement SELECTIVE merge that preserves multilang/associations
+        // Issue: array_merge() destroys 'name', 'link_rewrite', 'associations' → products disappear from admin
+
+        // CRITICAL: PrestaShop requires 'id' in product data for UPDATE
+        // Inject id at the beginning of product array
+        $productData = array_merge(['id' => $productId], $productData);
+
+        // Convert to XML format (PrestaShop Web Service requirement)
+        $xmlBody = $this->arrayToXml(['product' => $productData]);
+
+        return $this->makeRequest('PUT', "/products/{$productId}", [], [
+            'body' => $xmlBody,
+            'headers' => ['Content-Type' => 'application/xml'],
+        ]);
     }
 
     /**
@@ -126,6 +195,8 @@ class PrestaShop8Client extends BasePrestaShopClient
     /**
      * Update product stock
      *
+     * FIX (2025-11-13): PrestaShop Web Service API requires XML for PUT requests
+     *
      * @param int $stockId PrestaShop stock_available ID
      * @param int $quantity New quantity
      * @return array Updated stock data
@@ -133,9 +204,112 @@ class PrestaShop8Client extends BasePrestaShopClient
      */
     public function updateStock(int $stockId, int $quantity): array
     {
-        return $this->makeRequest('PUT', "/stock_availables/{$stockId}", [
-            'stock_available' => ['quantity' => $quantity]
+        // CRITICAL: Inject id for UPDATE operation
+        $xmlBody = $this->arrayToXml([
+            'stock_available' => [
+                'id' => $stockId,
+                'quantity' => $quantity
+            ]
         ]);
+
+        return $this->makeRequest('PUT', "/stock_availables/{$stockId}", [], [
+            'body' => $xmlBody,
+            'headers' => ['Content-Type' => 'application/xml'],
+        ]);
+    }
+
+    /**
+     * Get specific prices for product
+     *
+     * PROBLEM #4 - Task 16: PrestaShop Price Import
+     * Fetches all specific_prices for a product (discounts, group prices, etc.)
+     *
+     * @param int $productId PrestaShop product ID
+     * @return array Specific prices data
+     * @throws \App\Exceptions\PrestaShopAPIException
+     */
+    public function getSpecificPrices(int $productId): array
+    {
+        return $this->makeRequest('GET', "/specific_prices?filter[id_product]={$productId}&display=full");
+    }
+
+    /**
+     * Get all price groups (customer groups) from PrestaShop
+     *
+     * Used for price mapping configuration in shop wizard.
+     * Fetches all customer groups which can have specific prices.
+     *
+     * @return array Price groups data
+     * @throws \App\Exceptions\PrestaShopAPIException
+     */
+    public function getPriceGroups(): array
+    {
+        return $this->makeRequest('GET', '/groups?display=full');
+    }
+
+    /**
+     * Create specific price
+     *
+     * PROBLEM #4 - Task 18: PrestaShop Price Sync
+     * Creates a new specific_price entry (discount, group price)
+     *
+     * FIX (2025-11-13): PrestaShop Web Service API requires XML for POST requests
+     *
+     * @param array $priceData Specific price data
+     * @return array Created specific price with ID
+     * @throws \App\Exceptions\PrestaShopAPIException
+     */
+    public function createSpecificPrice(array $priceData): array
+    {
+        $xmlBody = $this->arrayToXml(['specific_price' => $priceData]);
+
+        return $this->makeRequest('POST', '/specific_prices', [], [
+            'body' => $xmlBody,
+            'headers' => ['Content-Type' => 'application/xml'],
+        ]);
+    }
+
+    /**
+     * Update specific price
+     *
+     * PROBLEM #4 - Task 18: PrestaShop Price Sync
+     * Updates existing specific_price entry
+     *
+     * FIX (2025-11-14): Added ID injection for UPDATE operation
+     * FIX (2025-11-13): PrestaShop Web Service API requires XML for PUT requests
+     *
+     * @param int $priceId PrestaShop specific_price ID
+     * @param array $priceData Updated price data
+     * @return array Updated specific price
+     * @throws \App\Exceptions\PrestaShopAPIException
+     */
+    public function updateSpecificPrice(int $priceId, array $priceData): array
+    {
+        // CRITICAL: Inject id for UPDATE operation
+        $priceData = array_merge(['id' => $priceId], $priceData);
+
+        $xmlBody = $this->arrayToXml(['specific_price' => $priceData]);
+
+        return $this->makeRequest('PUT', "/specific_prices/{$priceId}", [], [
+            'body' => $xmlBody,
+            'headers' => ['Content-Type' => 'application/xml'],
+        ]);
+    }
+
+    /**
+     * Delete specific price
+     *
+     * PROBLEM #4 - Task 18: PrestaShop Price Sync
+     * Deletes specific_price entry
+     *
+     * @param int $priceId PrestaShop specific_price ID
+     * @return bool True on success
+     * @throws \App\Exceptions\PrestaShopAPIException
+     */
+    public function deleteSpecificPrice(int $priceId): bool
+    {
+        $this->makeRequest('DELETE', "/specific_prices/{$priceId}");
+        return true;
     }
 
     // ===================================
@@ -172,17 +346,26 @@ class PrestaShop8Client extends BasePrestaShopClient
     /**
      * Create new attribute group
      *
+     * FIX (2025-11-13): PrestaShop Web Service API requires XML for POST requests
+     *
      * @param array $groupData Attribute group data in PrestaShop format
      * @return array Created attribute group data with ID
      * @throws \App\Exceptions\PrestaShopAPIException
      */
     public function createAttributeGroup(array $groupData): array
     {
-        return $this->makeRequest('POST', '/product_options', ['product_option' => $groupData]);
+        $xmlBody = $this->arrayToXml(['product_option' => $groupData]);
+
+        return $this->makeRequest('POST', '/product_options', [], [
+            'body' => $xmlBody,
+            'headers' => ['Content-Type' => 'application/xml'],
+        ]);
     }
 
     /**
      * Update existing attribute group
+     *
+     * FIX (2025-11-13): PrestaShop Web Service API requires XML for PUT requests
      *
      * @param int $groupId PrestaShop attribute group ID
      * @param array $groupData Updated attribute group data
@@ -191,7 +374,15 @@ class PrestaShop8Client extends BasePrestaShopClient
      */
     public function updateAttributeGroup(int $groupId, array $groupData): array
     {
-        return $this->makeRequest('PUT', "/product_options/{$groupId}", ['product_option' => $groupData]);
+        // CRITICAL: Inject id for UPDATE operation
+        $groupData = array_merge(['id' => $groupId], $groupData);
+
+        $xmlBody = $this->arrayToXml(['product_option' => $groupData]);
+
+        return $this->makeRequest('PUT', "/product_options/{$groupId}", [], [
+            'body' => $xmlBody,
+            'headers' => ['Content-Type' => 'application/xml'],
+        ]);
     }
 
     /**
@@ -241,17 +432,27 @@ class PrestaShop8Client extends BasePrestaShopClient
     /**
      * Create new attribute value
      *
+     * FIX (2025-11-13): PrestaShop Web Service API requires XML for POST requests
+     *
      * @param array $valueData Attribute value data in PrestaShop format
      * @return array Created attribute value data with ID
      * @throws \App\Exceptions\PrestaShopAPIException
      */
     public function createAttributeValue(array $valueData): array
     {
-        return $this->makeRequest('POST', '/product_option_values', ['product_option_value' => $valueData]);
+        $xmlBody = $this->arrayToXml(['product_option_value' => $valueData]);
+
+        return $this->makeRequest('POST', '/product_option_values', [], [
+            'body' => $xmlBody,
+            'headers' => ['Content-Type' => 'application/xml'],
+        ]);
     }
 
     /**
      * Update existing attribute value
+     *
+     * FIX (2025-11-14): Added ID injection for UPDATE operation
+     * FIX (2025-11-13): PrestaShop Web Service API requires XML for PUT requests
      *
      * @param int $valueId PrestaShop attribute value ID
      * @param array $valueData Updated attribute value data
@@ -260,7 +461,15 @@ class PrestaShop8Client extends BasePrestaShopClient
      */
     public function updateAttributeValue(int $valueId, array $valueData): array
     {
-        return $this->makeRequest('PUT', "/product_option_values/{$valueId}", ['product_option_value' => $valueData]);
+        // CRITICAL: Inject id for UPDATE operation
+        $valueData = array_merge(['id' => $valueId], $valueData);
+
+        $xmlBody = $this->arrayToXml(['product_option_value' => $valueData]);
+
+        return $this->makeRequest('PUT', "/product_option_values/{$valueId}", [], [
+            'body' => $xmlBody,
+            'headers' => ['Content-Type' => 'application/xml'],
+        ]);
     }
 
     /**
@@ -274,5 +483,163 @@ class PrestaShop8Client extends BasePrestaShopClient
     {
         $this->makeRequest('DELETE', "/product_option_values/{$valueId}");
         return true;
+    }
+
+    /**
+     * Get products by category ID
+     *
+     * Fetches products that belong to a specific category using the PrestaShop API filter parameter.
+     * Uses filter[id_category_default] to match products by their default category.
+     *
+     * @param int $categoryId Category ID
+     * @param bool $includeSubcategories Include products from subcategories (not implemented in basic PS API)
+     * @param int $limit Maximum number of products to fetch (default: 100)
+     * @param int $offset Pagination offset (default: 0)
+     * @return array Products array
+     * @throws \App\Exceptions\PrestaShopAPIException
+     */
+    public function getProductsByCategory(int $categoryId, bool $includeSubcategories = false, int $limit = 100, int $offset = 0): array
+    {
+        try {
+            \Log::info('PrestaShop8Client: Fetching products by category', [
+                'category_id' => $categoryId,
+                'include_subcategories' => $includeSubcategories,
+                'limit' => $limit,
+                'offset' => $offset,
+                'shop_url' => $this->shop->url
+            ]);
+
+            // Build filters using PrestaShop API filter syntax
+            $filters = [
+                'filter[id_category_default]' => $categoryId,
+                'display' => 'full',
+                'limit' => $limit,
+            ];
+
+            if ($offset > 0) {
+                $filters['limit'] = "$offset,$limit";
+            }
+
+            $response = $this->getProducts($filters);
+
+            $products = [];
+            if (isset($response['products'])) {
+                $products = is_array($response['products']) ? $response['products'] : [$response['products']];
+            }
+
+            \Log::info('PrestaShop8Client: Products fetched successfully by category', [
+                'category_id' => $categoryId,
+                'products_count' => count($products)
+            ]);
+
+            return $products;
+
+        } catch (\Exception $e) {
+            \Log::error('PrestaShop8Client: Failed to fetch products by category', [
+                'category_id' => $categoryId,
+                'error' => $e->getMessage(),
+                'shop_url' => $this->shop->url
+            ]);
+
+            throw new \App\Exceptions\PrestaShopAPIException(
+                "Failed to fetch products from category {$categoryId}: " . $e->getMessage(),
+                $e->getCode(),
+                $e
+            );
+        }
+    }
+
+    /**
+     * Get tax rule groups from PrestaShop
+     *
+     * FAZA 5.1 - Tax Rules UI Enhancement System
+     * Implementation for PrestaShop 8.x
+     *
+     * Endpoint: GET /tax_rule_groups?display=full
+     * Returns ONLY active tax rule groups
+     *
+     * @return array Standardized format: [['id' => 6, 'name' => 'PL Standard Rate (23%)', 'rate' => null, 'active' => true], ...]
+     * @throws \App\Exceptions\PrestaShopAPIException
+     */
+    public function getTaxRuleGroups(): array
+    {
+        try {
+            $queryParams = $this->buildQueryParams([
+                'display' => 'full',
+            ]);
+
+            $response = $this->makeRequest('GET', "tax_rule_groups?{$queryParams}");
+
+            // PrestaShop API returns: {"tax_rule_groups": [{"id": 1, "name": {...}, "active": "1"}, ...]}
+            $taxRuleGroups = [];
+
+            if (!isset($response['tax_rule_groups']) || empty($response['tax_rule_groups'])) {
+                \Log::warning('No tax rule groups found in PrestaShop', [
+                    'shop_id' => $this->shop->id,
+                    'shop_name' => $this->shop->name,
+                ]);
+                return [];
+            }
+
+            // Handle both single group (object) and multiple groups (array)
+            $groups = is_array($response['tax_rule_groups']) ? $response['tax_rule_groups'] : [$response['tax_rule_groups']];
+
+            foreach ($groups as $groupData) {
+                $group = is_array($groupData) ? $groupData : (array) $groupData;
+
+                // Filter: ONLY active groups
+                if (($group['active'] ?? '0') !== '1') {
+                    continue;
+                }
+
+                $groupId = (int) ($group['id'] ?? 0);
+
+                // Extract name (handle multilang format: ['language' => [['id' => 1, 'value' => 'Text']]])
+                $groupName = '';
+                if (is_array($group['name'] ?? null)) {
+                    // Multilang format
+                    if (isset($group['name']['language'])) {
+                        $languages = is_array($group['name']['language']) ? $group['name']['language'] : [$group['name']['language']];
+                        $firstLang = is_array($languages) ? reset($languages) : $languages;
+                        $groupName = is_array($firstLang) ? ($firstLang['value'] ?? '') : (string) $firstLang;
+                    }
+                } else {
+                    // Simple string
+                    $groupName = (string) ($group['name'] ?? '');
+                }
+
+                // Rate extraction from name (basic implementation)
+                // Examples: "PL Standard Rate (23%)", "Reduced Rate (8%)", "Exempt (0%)"
+                $rate = null;
+                if (preg_match('/\((\d+(?:\.\d+)?)%\)/', $groupName, $matches)) {
+                    $rate = (float) $matches[1];
+                }
+
+                $taxRuleGroups[] = [
+                    'id' => $groupId,
+                    'name' => $groupName,
+                    'rate' => $rate,
+                    'active' => true, // Already filtered for active only
+                ];
+            }
+
+            \Log::info('Tax rule groups fetched successfully from PrestaShop', [
+                'shop_id' => $this->shop->id,
+                'shop_name' => $this->shop->name,
+                'count' => count($taxRuleGroups),
+            ]);
+
+            return $taxRuleGroups;
+
+        } catch (\App\Exceptions\PrestaShopAPIException $e) {
+            \Log::error('Failed to fetch tax rule groups from PrestaShop', [
+                'shop_id' => $this->shop->id,
+                'shop_name' => $this->shop->name,
+                'http_status' => $e->getHttpStatusCode(),
+                'error' => $e->getMessage(),
+            ]);
+
+            throw $e;
+        }
     }
 }

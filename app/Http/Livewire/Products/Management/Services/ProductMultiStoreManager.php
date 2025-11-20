@@ -4,6 +4,7 @@ namespace App\Http\Livewire\Products\Management\Services;
 
 use App\Models\Product;
 use App\Models\ProductShopData;
+use App\Services\CategoryMappingsConverter;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\DB;
 
@@ -61,12 +62,18 @@ class ProductMultiStoreManager
                 'last_sync_at' => $shopData->last_sync_at,
             ];
 
-            // Load shop-specific categories if they exist
-            if (!empty($shopData->category_mappings)) {
-                $this->component->shopCategories[$shopData->shop_id] = [
-                    'selected' => $shopData->category_mappings['selected'] ?? [],
-                    'primary' => $shopData->category_mappings['primary'] ?? null,
-                ];
+            // FIX 2025-11-20 (ETAP_07b Fix #2): Convert Option A to UI format with PrestaShop IDs
+            if ($shopData->hasCategoryMappings()) {
+                $converter = app(CategoryMappingsConverter::class);
+                $this->component->shopCategories[$shopData->shop_id] = $converter->toUiFormatPrestaShop(
+                    $shopData->category_mappings
+                );
+
+                Log::debug('[ETAP_07b Fix #2] ProductMultiStoreManager: Loaded PrestaShop IDs to UI', [
+                    'shop_id' => $shopData->shop_id,
+                    'canonical_format' => $shopData->category_mappings,
+                    'ui_format_prestashop_ids' => $this->component->shopCategories[$shopData->shop_id],
+                ]);
             }
 
             // Load shop-specific attributes if they exist

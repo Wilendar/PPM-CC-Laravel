@@ -2,12 +2,14 @@
 
 namespace App\Services\PrestaShop;
 
+use App\Models\Category;
 use App\Models\Product;
 use App\Models\PrestaShopShop;
 use App\Services\PrestaShop\BasePrestaShopClient;
 use App\Services\PrestaShop\CategoryMapper;
 use App\Services\PrestaShop\PriceGroupMapper;
 use App\Services\PrestaShop\WarehouseMapper;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use InvalidArgumentException;
 
@@ -67,6 +69,23 @@ class ProductTransformer
         // Get default language ID (PrestaShop default: 1 = English/Polish)
         $defaultLangId = 1;
 
+        // FIX 2025-11-19 BUG #3: Get default category ID from primary category (not first)
+        $categoryAssociations = $this->buildCategoryAssociations($product, $shop);
+        $defaultCategoryId = $this->getDefaultCategoryId($product, $shop, $categoryAssociations);
+
+        // FAZA 5.2 Integration (2025-11-14): Calculate effective tax rate BEFORE building array
+        // Use shop-specific tax_rate_override if set, otherwise fall back to product default
+        $effectiveTaxRate = $shopData?->getEffectiveTaxRate() ?? $product->tax_rate;
+
+        Log::debug('[FAZA 5.2 FIX] ProductTransformer tax rate mapping', [
+            'product_id' => $product->id,
+            'shop_id' => $shop->id,
+            'product_default_tax_rate' => $product->tax_rate,
+            'shop_override' => $shopData?->tax_rate_override ?? 'NULL',
+            'effective_tax_rate' => $effectiveTaxRate,
+            'id_tax_rules_group' => $this->mapTaxRate($effectiveTaxRate, $shop),
+        ]);
+
         // Build PrestaShop product structure
         $prestashopProduct = [
             'product' => [
@@ -103,19 +122,31 @@ class ProductTransformer
                 'show_price' => 1,
                 'visibility' => 'both', // both|catalog|search|none
 
+                // CRITICAL REQUIRED FIELDS (2025-11-14): Fix for products disappearing from admin panel
+                // Reference: _DOCS/PRESTASHOP_REQUIRED_FIELDS.md
+                'id_category_default' => $defaultCategoryId, // MUST have default category
+                'id_shop_default' => $shop->prestashop_shop_id ?? 1, // MUST for multistore
+                'minimal_quantity' => 1, // MUST be 1 (not 0)
+                'redirect_type' => '301-category', // MUST be set (not empty string)
+                'state' => 1, // MUST be 1 (not draft)
+                'additional_delivery_times' => 1, // MUST be 1
+
                 // Categories (mapped IDs)
                 'associations' => [
-                    'categories' => $this->buildCategoryAssociations($product, $shop),
+                    'categories' => $categoryAssociations,
                 ],
 
-                // Stock quantity (aggregated from warehouses)
-                'quantity' => $this->warehouseMapper->calculateStockForShop($product, $shop),
+                // Stock quantity - REMOVED (2025-11-14): quantity is READONLY field
+                // PrestaShop manages stock via separate resource: /stock_availables
+                // 'quantity' => $this->warehouseMapper->calculateStockForShop($product, $shop), // ❌ READONLY
+                // TODO: Implement stock sync via PrestaShopStockExporter service
 
-                // Tax (PrestaShop tax_rules_group_id)
-                'id_tax_rules_group' => $this->mapTaxRate($product->tax_rate),
+                // Tax (PrestaShop tax_rules_group_id) - FAZA 5.2 Integration (2025-11-14)
+                'id_tax_rules_group' => $this->mapTaxRate($effectiveTaxRate, $shop),
 
-                // Manufacturer
-                'manufacturer_name' => $product->manufacturer ?? '',
+                // Manufacturer (FIXED 2025-11-14: removed readonly manufacturer_name field)
+                // 'manufacturer_name' => $product->manufacturer ?? '', // ❌ READONLY - causes API error
+                'id_manufacturer' => null, // TODO: Implement ManufacturerMapper service
 
                 // SEO fields
                 'meta_title' => $this->buildMultilangField(
@@ -217,64 +248,468 @@ class ProductTransformer
     /**
      * Build category associations for PrestaShop
      *
+     * FIX 2025-11-18 (#12): Updated to support Option A category_mappings structure
+     *
+     * Option A structure:
+     * {
+     *   "ui": {"selected": [100, 103, 42], "primary": 100},
+     *   "mappings": {"100": 9, "103": 15, "42": 800},
+     *   "metadata": {"last_updated": "...", "source": "..."}
+     * }
+     *
+     * Strategy:
+     * 1. Check ProductShopData.category_mappings (shop-specific overrides)
+     * 2. Extract PrestaShop IDs from mappings key (Option A structure)
+     * 3. Fallback to CategoryMapper if mappings empty
+     * 4. Fallback to product global categories if no shop-specific mappings
+     * 5. Always ensure at least one category (default: Home = 2)
+     *
+     * Backward Compatibility:
+     * - ProductShopDataCast auto-converts legacy formats to Option A
+     * - Old code using category_mappings will continue to work
+     *
+     * Format: [['id' => 2], ['id' => 15], ...]
+     *
      * @param Product $product Product instance
      * @param PrestaShopShop $shop Shop instance
-     * @return array Category associations
+     * @return array Category associations in PrestaShop format
      */
     private function buildCategoryAssociations(Product $product, PrestaShopShop $shop): array
     {
-        $categories = [];
+        // FIX 2025-11-20: PRIORITY 1 = category_mappings (Option A) - FRESH USER DATA
+        $shopData = $product->dataForShop($shop->id)->first();
 
-        // Get all product categories
-        $productCategories = $product->categories;
+        if ($shopData && !empty($shopData->category_mappings)) {
+            $categoryMappings = $shopData->category_mappings;
 
-        foreach ($productCategories as $category) {
-            // Map PPM category to PrestaShop category
-            $prestashopCategoryId = $this->categoryMapper->mapToPrestaShop($category->id, $shop);
+            // Extract PPM category IDs from Option A structure: ui.selected
+            $shopCategories = $categoryMappings['ui']['selected'] ?? [];
 
-            if ($prestashopCategoryId) {
-                $categories[] = [
-                    'id' => $prestashopCategoryId,
-                ];
+            if (!empty($shopCategories)) {
+                Log::debug('[CATEGORY SYNC] Using shop-specific categories from category_mappings', [
+                    'product_id' => $product->id,
+                    'shop_id' => $shop->id,
+                    'ppm_category_ids' => $shopCategories,
+                    'source' => 'product_shop_data.category_mappings',
+                ]);
+
+                // FIX 2025-11-19 BUG #2: Map PPM category IDs → PrestaShop IDs + BUILD PARENT HIERARCHY
+                $associations = [];
+                $addedIds = []; // Track to avoid duplicates
+
+                foreach ($shopCategories as $categoryId) {
+                    // NEW: Get full category hierarchy (child → parent → grandparent → ...)
+                    $hierarchyIds = $this->getCategoryHierarchy($categoryId);
+
+                    foreach ($hierarchyIds as $hierarchyCatId) {
+                        $prestashopId = $this->categoryMapper->mapToPrestaShop((int) $hierarchyCatId, $shop);
+
+                        if ($prestashopId && !in_array($prestashopId, $addedIds)) {
+                            $associations[] = ['id' => $prestashopId];
+                            $addedIds[] = $prestashopId;
+                        } elseif (!$prestashopId) {
+                            Log::warning('[CATEGORY SYNC] Category mapping not found in hierarchy', [
+                                'product_id' => $product->id,
+                                'shop_id' => $shop->id,
+                                'ppm_category_id' => $hierarchyCatId,
+                                'parent_of' => $categoryId !== $hierarchyCatId ? $categoryId : 'root',
+                            ]);
+                        }
+                    }
+                }
+
+                if (!empty($associations)) {
+                    Log::info('[CATEGORY SYNC] Category associations built with full hierarchy', [
+                        'product_id' => $product->id,
+                        'shop_id' => $shop->id,
+                        'original_category_count' => count($shopCategories),
+                        'association_count' => count($associations),
+                        'prestashop_category_ids' => array_column($associations, 'id'),
+                    ]);
+
+                    // REQUIREMENT 2025-11-19: Auto-inject Baza + Wszystko root categories
+                    return $this->injectRootCategories($associations);
+                }
             }
         }
 
-        // Fallback: If no categories mapped, use default category (2 = Home)
-        if (empty($categories)) {
-            Log::warning('No categories mapped, using default', [
+        // PRIORITY 2: Fallback - pivot table (BACKWARD COMPATIBILITY)
+        // (Used ONLY if category_mappings is empty)
+        $shopCategories = $product->categoriesForShop($shop->id, false)
+            ->pluck('categories.id')
+            ->toArray();
+
+        if (!empty($shopCategories)) {
+            Log::debug('[CATEGORY SYNC] Fallback: Using pivot table categories', [
+                'product_id' => $product->id,
+                'shop_id' => $shop->id,
+                'ppm_category_ids' => $shopCategories,
+                'reason' => 'category_mappings empty',
+            ]);
+
+            // FIX 2025-11-19 BUG #2: Map PPM category IDs → PrestaShop IDs + BUILD PARENT HIERARCHY
+            $associations = [];
+            $addedIds = []; // Track to avoid duplicates
+
+            foreach ($shopCategories as $categoryId) {
+                // NEW: Get full category hierarchy (child → parent → grandparent → ...)
+                $hierarchyIds = $this->getCategoryHierarchy($categoryId);
+
+                foreach ($hierarchyIds as $hierarchyCatId) {
+                    $prestashopId = $this->categoryMapper->mapToPrestaShop((int) $hierarchyCatId, $shop);
+
+                    if ($prestashopId && !in_array($prestashopId, $addedIds)) {
+                        $associations[] = ['id' => $prestashopId];
+                        $addedIds[] = $prestashopId;
+                    } elseif (!$prestashopId) {
+                        Log::warning('[CATEGORY SYNC] Category mapping not found in hierarchy', [
+                            'product_id' => $product->id,
+                            'shop_id' => $shop->id,
+                            'ppm_category_id' => $hierarchyCatId,
+                            'parent_of' => $categoryId !== $hierarchyCatId ? $categoryId : 'root',
+                        ]);
+                    }
+                }
+            }
+
+            if (!empty($associations)) {
+                Log::info('[CATEGORY SYNC] Category associations built from pivot fallback', [
+                    'product_id' => $product->id,
+                    'shop_id' => $shop->id,
+                    'original_category_count' => count($shopCategories),
+                    'association_count' => count($associations),
+                    'prestashop_category_ids' => array_column($associations, 'id'),
+                ]);
+
+                // REQUIREMENT 2025-11-19: Auto-inject Baza + Wszystko root categories
+                return $this->injectRootCategories($associations);
+            }
+        }
+
+        // PRIORITY 3: Fallback - use default product categories if no shop-specific
+        $shopData = $product->dataForShop($shop->id)->first();
+
+        if ($shopData && $shopData->hasCategoryMappings()) {
+            Log::debug('[CATEGORY SYNC] Fallback: Using category_mappings cache', [
+                'product_id' => $product->id,
+                'shop_id' => $shop->id,
+                'reason' => 'Pivot table empty',
+            ]);
+
+            $prestashopIds = $this->extractPrestaShopIds($shopData->category_mappings);
+
+            if (!empty($prestashopIds)) {
+                $associations = [];
+                foreach ($prestashopIds as $prestashopId) {
+                    $associations[] = ['id' => (int) $prestashopId];
+                }
+
+                Log::info('[CATEGORY SYNC] Category associations built from cache', [
+                    'product_id' => $product->id,
+                    'shop_id' => $shop->id,
+                    'association_count' => count($associations),
+                    'prestashop_category_ids' => $prestashopIds,
+                ]);
+
+                // REQUIREMENT 2025-11-19: Auto-inject Baza + Wszystko root categories
+                return $this->injectRootCategories($associations);
+            }
+        }
+
+        // PRIORITY 3: Final fallback - global categories
+        $categoryIds = $product->categories()->pluck('categories.id')->toArray();
+
+        Log::debug('[CATEGORY SYNC] Using product default categories', [
+            'product_id' => $product->id,
+            'shop_id' => $shop->id,
+            'category_ids' => $categoryIds,
+        ]);
+
+        // If no categories at all, use default (Home)
+        if (empty($categoryIds)) {
+            Log::warning('[CATEGORY SYNC] No categories found, using default (Home)', [
                 'product_id' => $product->id,
                 'shop_id' => $shop->id,
             ]);
 
-            $categories[] = [
-                'id' => 2, // PrestaShop default category
-            ];
+            // REQUIREMENT 2025-11-19: Auto-inject Baza + Wszystko root categories
+            // Even for fallback, inject root chain (will become [1, 2])
+            return $this->injectRootCategories([['id' => 2]]);
         }
 
-        return $categories;
+        $associations = [];
+
+        // Map each PPM category ID to PrestaShop category ID via CategoryMapper
+        foreach ($categoryIds as $categoryId) {
+            $prestashopId = $this->categoryMapper->mapToPrestaShop((int) $categoryId, $shop);
+
+            if ($prestashopId) {
+                $associations[] = ['id' => $prestashopId];
+            } else {
+                Log::warning('[CATEGORY SYNC] Category mapping not found', [
+                    'product_id' => $product->id,
+                    'shop_id' => $shop->id,
+                    'ppm_category_id' => $categoryId,
+                ]);
+            }
+        }
+
+        // Fallback: If no categories mapped successfully, use default
+        if (empty($associations)) {
+            Log::warning('[CATEGORY SYNC] No categories mapped successfully, using default (Home)', [
+                'product_id' => $product->id,
+                'shop_id' => $shop->id,
+                'attempted_category_ids' => $categoryIds,
+            ]);
+
+            // REQUIREMENT 2025-11-19: Auto-inject Baza + Wszystko root categories
+            // Even for fallback, inject root chain (will become [1, 2])
+            return $this->injectRootCategories([['id' => 2]]);
+        }
+
+        Log::info('[CATEGORY SYNC] Category associations built from global categories', [
+            'product_id' => $product->id,
+            'shop_id' => $shop->id,
+            'association_count' => count($associations),
+            'prestashop_category_ids' => array_column($associations, 'id'),
+        ]);
+
+        // REQUIREMENT 2025-11-19: Auto-inject Baza + Wszystko root categories
+        return $this->injectRootCategories($associations);
+    }
+
+    /**
+     * Extract PrestaShop category IDs from category_mappings
+     *
+     * FIX #12: Handles Option A structure with backward compatibility
+     *
+     * @param array $categoryMappings Option A structure
+     * @return array PrestaShop category IDs
+     */
+    private function extractPrestaShopIds(array $categoryMappings): array
+    {
+        // Try mappings first (canonical Option A)
+        if (isset($categoryMappings['mappings']) && is_array($categoryMappings['mappings'])) {
+            return array_values($categoryMappings['mappings']);
+        }
+
+        // Backward compatibility: UI format without mappings
+        if (isset($categoryMappings['ui']) && !isset($categoryMappings['mappings'])) {
+            return []; // UI format requires CategoryMapper
+        }
+
+        // Legacy format: {"100": 9, "103": 15} (direct PPM → PrestaShop mapping)
+        $values = array_values($categoryMappings);
+        if (count($values) > 0 && is_int($values[0])) {
+            return $values;
+        }
+
+        return [];
     }
 
     /**
      * Map PPM tax rate to PrestaShop tax rules group ID
      *
-     * Common Polish tax rates:
-     * - 23% (standard VAT) → tax_rules_group_id 1
-     * - 8% (reduced VAT) → tax_rules_group_id 2
-     * - 5% (reduced VAT) → tax_rules_group_id 3
-     * - 0% (VAT exempt) → tax_rules_group_id 4
+     * ENTERPRISE SOLUTION (2025-11-14): Dynamic per-shop mapping
      *
-     * @param float $taxRate Tax rate percentage
+     * Strategy:
+     * 1. Use shop-configured tax_rules_group_id_XX from database (if set)
+     * 2. Fallback to PrestaShop API auto-detection (cache result)
+     * 3. Final fallback to sensible defaults
+     *
+     * Why dynamic mapping?
+     * - Different PrestaShop installations use different tax_rules_group IDs
+     * - Example: Shop A uses ID 1 for 23% VAT, Shop B uses ID 6
+     * - Hardcoding caused products to have wrong tax rates
+     *
+     * Reference: _ISSUES_FIXES/PRESTASHOP_TAX_RULES_OVERWRITE_ISSUE.md
+     *
+     * @param float $taxRate Tax rate percentage (23, 8, 5, 0)
+     * @param PrestaShopShop $shop Shop instance with tax rules configuration
      * @return int PrestaShop tax_rules_group_id
      */
-    private function mapTaxRate(float $taxRate): int
+    private function mapTaxRate(float $taxRate, PrestaShopShop $shop): int
     {
-        return match (true) {
-            $taxRate >= 23 => 1, // 23% VAT
-            $taxRate >= 8 && $taxRate < 23 => 2, // 8% VAT
-            $taxRate >= 5 && $taxRate < 8 => 3, // 5% VAT
-            $taxRate < 5 => 4, // 0% VAT or exempt
-            default => 1, // Default to standard VAT
+        // Round tax rate to nearest standard rate
+        $roundedRate = match (true) {
+            $taxRate >= 23 => 23,
+            $taxRate >= 8 && $taxRate < 23 => 8,
+            $taxRate >= 5 && $taxRate < 8 => 5,
+            $taxRate < 5 => 0,
+            default => 23,
         };
+
+        // 1. Try shop-configured mapping (preferred - no API calls)
+        $configuredId = match ($roundedRate) {
+            23 => $shop->tax_rules_group_id_23,
+            8 => $shop->tax_rules_group_id_8,
+            5 => $shop->tax_rules_group_id_5,
+            0 => $shop->tax_rules_group_id_0,
+            default => null,
+        };
+
+        if ($configuredId !== null) {
+            Log::debug('[ProductTransformer] Using configured tax rules group', [
+                'tax_rate' => $taxRate,
+                'rounded_rate' => $roundedRate,
+                'group_id' => $configuredId,
+                'shop_id' => $shop->id,
+            ]);
+
+            return $configuredId;
+        }
+
+        // 2. Auto-detect from PrestaShop API (if not configured or stale)
+        $shouldAutoDetect = $shop->tax_rules_last_fetched_at === null
+            || $shop->tax_rules_last_fetched_at->lt(now()->subDays(7));
+
+        if ($shouldAutoDetect) {
+            Log::info('[ProductTransformer] Auto-detecting tax rules from PrestaShop API', [
+                'shop_id' => $shop->id,
+                'last_fetched' => $shop->tax_rules_last_fetched_at,
+            ]);
+
+            try {
+                $this->autoDetectTaxRules($shop);
+
+                // Reload shop from database (fresh instance to avoid caching issues)
+                $freshShop = PrestaShopShop::find($shop->id);
+
+                if (!$freshShop) {
+                    throw new \Exception("Failed to reload shop after auto-detection");
+                }
+
+                // Retry configured mapping after auto-detection (using fresh instance)
+                $configuredId = match ($roundedRate) {
+                    23 => $freshShop->tax_rules_group_id_23,
+                    8 => $freshShop->tax_rules_group_id_8,
+                    5 => $freshShop->tax_rules_group_id_5,
+                    0 => $freshShop->tax_rules_group_id_0,
+                    default => null,
+                };
+
+                if ($configuredId !== null) {
+                    Log::debug('[ProductTransformer] Using auto-detected tax rules group', [
+                        'tax_rate' => $taxRate,
+                        'rounded_rate' => $roundedRate,
+                        'group_id' => $configuredId,
+                        'shop_id' => $shop->id,
+                    ]);
+
+                    return $configuredId;
+                }
+            } catch (\Exception $e) {
+                Log::warning('[ProductTransformer] Failed to auto-detect tax rules, using fallback', [
+                    'shop_id' => $shop->id,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        // 3. Fallback to sensible defaults (Polish tax system)
+        $fallbackId = match ($roundedRate) {
+            23 => 1, // PL Standard Rate (most common)
+            8 => 2,  // PL Reduced Rate
+            5 => 3,  // PL Super Reduced Rate
+            0 => 4,  // PL Exempt Rate
+            default => 1,
+        };
+
+        Log::warning('[ProductTransformer] Using fallback tax rules group (consider configuring shop)', [
+            'tax_rate' => $taxRate,
+            'rounded_rate' => $roundedRate,
+            'fallback_id' => $fallbackId,
+            'shop_id' => $shop->id,
+        ]);
+
+        return $fallbackId;
+    }
+
+    /**
+     * Auto-detect tax rules group IDs from PrestaShop API
+     *
+     * Fetches all tax_rule_groups from PrestaShop and maps rates to IDs
+     * Updates shop configuration and sets last_fetched timestamp
+     *
+     * @param PrestaShopShop $shop Shop to auto-detect for
+     * @throws \Exception If API call fails
+     */
+    private function autoDetectTaxRules(PrestaShopShop $shop): void
+    {
+        // REFACTORED (FAZA 5.1): Use centralized getTaxRuleGroups() method
+        // Previous: Inline API call with makeRequest('GET', '/tax_rule_groups')
+        // Current: Use new getTaxRuleGroups() method for consistency and reusability
+
+        // Create API client
+        $client = \App\Services\PrestaShop\PrestaShopClientFactory::create($shop);
+
+        // Fetch tax_rule_groups using new centralized method
+        $taxRuleGroups = $client->getTaxRuleGroups();
+
+        if (empty($taxRuleGroups)) {
+            throw new \Exception('No tax_rule_groups found in PrestaShop');
+        }
+
+        $mapping = [
+            23 => null,
+            8 => null,
+            5 => null,
+            0 => null,
+        ];
+
+        // Parse standardized response format: [['id' => 6, 'name' => 'PL Standard Rate (23%)', 'rate' => 23.0], ...]
+        foreach ($taxRuleGroups as $group) {
+            $groupId = $group['id'];
+            $groupName = $group['name'];
+
+            // Match by name patterns (Polish tax system)
+            // STRATEGY: Prefer HIGHEST ID (most recent/current configuration)
+            if (str_contains(strtolower($groupName), '23%') || str_contains(strtolower($groupName), 'standard')) {
+                if ($mapping[23] === null || $groupId > $mapping[23]) {
+                    $mapping[23] = $groupId; // Prefer highest ID
+                }
+            } elseif (str_contains(strtolower($groupName), '8%') || str_contains(strtolower($groupName), 'reduced rate (8%)')) {
+                if ($mapping[8] === null || $groupId > $mapping[8]) {
+                    $mapping[8] = $groupId;
+                }
+            } elseif (str_contains(strtolower($groupName), '5%') || str_contains(strtolower($groupName), 'reduced rate (5%)')) {
+                if ($mapping[5] === null || $groupId > $mapping[5]) {
+                    $mapping[5] = $groupId;
+                }
+            } elseif (str_contains(strtolower($groupName), '0%') || str_contains(strtolower($groupName), 'exempt')) {
+                if ($mapping[0] === null || $groupId > $mapping[0]) {
+                    $mapping[0] = $groupId;
+                }
+            }
+        }
+
+        // Update shop configuration
+        Log::debug('[ProductTransformer] About to update shop with tax rules mapping', [
+            'shop_id' => $shop->id,
+            'mapping' => $mapping,
+        ]);
+
+        $updated = $shop->update([
+            'tax_rules_group_id_23' => $mapping[23],
+            'tax_rules_group_id_8' => $mapping[8],
+            'tax_rules_group_id_5' => $mapping[5],
+            'tax_rules_group_id_0' => $mapping[0],
+            'tax_rules_last_fetched_at' => now(),
+        ]);
+
+        Log::info('[ProductTransformer] Auto-detected tax rules successfully', [
+            'shop_id' => $shop->id,
+            'mapping' => $mapping,
+            'update_result' => $updated,
+        ]);
+
+        // Verify update was persisted
+        $verification = PrestaShopShop::find($shop->id);
+        Log::debug('[ProductTransformer] Verification after update', [
+            'shop_id' => $shop->id,
+            'tax_rules_group_id_23_in_db' => $verification->tax_rules_group_id_23,
+            'tax_rules_group_id_23_expected' => $mapping[23],
+        ]);
     }
 
     /**
@@ -644,5 +1079,172 @@ class ProductTransformer
             4 => 0.0,  // VAT exempt
             default => 23.0, // Default to standard VAT
         };
+    }
+
+    /**
+     * Get default category ID (primary category from pivot table)
+     *
+     * FIX 2025-11-19 BUG #3: Use primary category instead of first category
+     *
+     * Business Logic:
+     * - PRIORITY 1: Primary category from pivot table (is_primary=true)
+     * - PRIORITY 2: First category in associations (fallback)
+     * - PRIORITY 3: PrestaShop default (2 = Home)
+     *
+     * @param Product $product Product instance
+     * @param PrestaShopShop $shop Shop instance
+     * @param array $categoryAssociations Built category associations
+     * @return int PrestaShop category ID
+     */
+    private function getDefaultCategoryId(Product $product, PrestaShopShop $shop, array $categoryAssociations): int
+    {
+        // PRIORITY 1: Get primary category from pivot table
+        $primaryCategoryId = DB::table('product_categories')
+            ->where('product_id', $product->id)
+            ->where('shop_id', $shop->id)
+            ->where('is_primary', true)
+            ->value('category_id');
+
+        if ($primaryCategoryId) {
+            $prestashopPrimaryId = $this->categoryMapper->mapToPrestaShop((int) $primaryCategoryId, $shop);
+
+            if ($prestashopPrimaryId) {
+                Log::debug('[CATEGORY SYNC] Using primary category as default', [
+                    'product_id' => $product->id,
+                    'shop_id' => $shop->id,
+                    'ppm_primary_id' => $primaryCategoryId,
+                    'prestashop_primary_id' => $prestashopPrimaryId,
+                ]);
+
+                return $prestashopPrimaryId;
+            }
+        }
+
+        // PRIORITY 2: Fallback to first NON-ROOT category in associations
+        // BUG FIX 2025-11-19: After injectRootCategories(), first category is always Baza (1)
+        // Skip root categories (1 = Baza, 2 = Wszystko) to find first real category
+        if (!empty($categoryAssociations)) {
+            $firstRealCategory = null;
+
+            foreach ($categoryAssociations as $assoc) {
+                if (!in_array($assoc['id'], [1, 2])) {
+                    $firstRealCategory = $assoc['id'];
+                    break;
+                }
+            }
+
+            if ($firstRealCategory) {
+                Log::warning('[CATEGORY SYNC] No primary category, using first NON-ROOT association', [
+                    'product_id' => $product->id,
+                    'shop_id' => $shop->id,
+                    'default_id' => $firstRealCategory,
+                    'skipped_root_categories' => [1, 2],
+                ]);
+
+                return $firstRealCategory;
+            }
+        }
+
+        // PRIORITY 3: Fallback to PrestaShop default (2 = Home)
+        Log::warning('[CATEGORY SYNC] No categories, using PrestaShop default', [
+            'product_id' => $product->id,
+            'shop_id' => $shop->id,
+        ]);
+
+        return 2;
+    }
+
+    /**
+     * Get full category hierarchy (child → parent → grandparent → root)
+     *
+     * FIX 2025-11-19 BUG #2: Build parent hierarchy to send full tree to PrestaShop
+     *
+     * Example:
+     * Input: Category ID 61 (TEST-PPM, parent: 60 Buggy, grandparent: NULL)
+     * Output: [61, 60] (child to root)
+     *
+     * @param int $categoryId Leaf category ID
+     * @return array Array of category IDs from leaf to root
+     */
+    private function getCategoryHierarchy(int $categoryId): array
+    {
+        $hierarchy = [];
+        $currentId = $categoryId;
+        $maxDepth = 10; // Safety limit to prevent infinite loops
+        $depth = 0;
+
+        while ($currentId && $depth < $maxDepth) {
+            $hierarchy[] = $currentId;
+
+            // Get parent
+            $category = Category::find($currentId);
+
+            if (!$category || !$category->parent_id) {
+                break;
+            }
+
+            $currentId = $category->parent_id;
+            $depth++;
+        }
+
+        if ($depth >= $maxDepth) {
+            Log::error('[CATEGORY SYNC] Max depth reached in category hierarchy', [
+                'start_category_id' => $categoryId,
+                'hierarchy' => $hierarchy,
+            ]);
+        }
+
+        // Return hierarchy from child to root (e.g., [61, 60, 1])
+        return $hierarchy;
+    }
+
+    /**
+     * Inject PrestaShop root categories (Baza + Wszystko)
+     *
+     * REQUIREMENT 2025-11-19: Auto-inject root category chain for ALL products
+     *
+     * Business Rule:
+     * - Every PrestaShop product MUST have root category chain
+     * - Structure: Baza (1) → Wszystko (2) → [Product Categories]
+     * - UI Display: PPM hides Baza/Wszystko for readability
+     * - Export Behavior: ALWAYS include Baza + Wszystko in associations
+     *
+     * PrestaShop Root Categories (STANDARD in every installation):
+     * - ID 1: "Baza" (Root category, parent_id = 0)
+     * - ID 2: "Wszystko" or "Home" (Home category, parent_id = 1)
+     *
+     * These IDs are HARDCODED because they are standard in every PrestaShop
+     * installation and never change between shops.
+     *
+     * @param array $associations Existing category associations
+     * @return array Associations with root categories prepended
+     */
+    private function injectRootCategories(array $associations): array
+    {
+        // PrestaShop root categories (HARDCODED - standard in every PS installation)
+        $rootCategories = [
+            ['id' => 1], // Baza (Root)
+            ['id' => 2], // Wszystko (Home)
+        ];
+
+        // Extract IDs from existing associations
+        $existingIds = array_column($associations, 'id');
+
+        // Remove root categories if already present (avoid duplicates)
+        $filteredAssociations = array_filter($associations, function($assoc) {
+            return !in_array($assoc['id'], [1, 2]);
+        });
+
+        // Prepend root categories → Final structure: [1, 2, 9, 15, 800, ...]
+        $result = array_merge($rootCategories, array_values($filteredAssociations));
+
+        Log::info('[ROOT INJECTION] Added Baza + Wszystko to category associations', [
+            'original_count' => count($associations),
+            'final_count' => count($result),
+            'original_ids' => $existingIds,
+            'final_ids' => array_column($result, 'id'),
+        ]);
+
+        return $result;
     }
 }

@@ -50,6 +50,22 @@ Routes Admin:
 
 ---
 
+## PLAN RAMOWY ETAPU
+
+- 🛠️ 1. ADMIN DASHBOARD - CENTRUM KONTROLI [FAZA A]
+- 🛠️ 2. SHOP MANAGEMENT - ZARZĄDZANIE PRESTASHOP [FAZA B]
+- 🛠️ 3. ERP INTEGRATION - ZARZĄDZANIE ERP [FAZA B]
+- 🛠️ 4. SYSTEM SETTINGS - KONFIGURACJA APLIKACJI [FAZA C]
+- 🛠️ 5. LOGS & MONITORING - NADZÓR SYSTEMU [FAZA C]
+- 🛠️ 6. MAINTENANCE - KONSERWACJA I BACKUP [FAZA C]
+- 🛠️ 7. NOTIFICATION SYSTEM - POWIADOMIENIA [FAZA D]
+- 🛠️ 8. REPORTS & ANALYTICS - RAPORTY [FAZA D]
+- 🛠️ 9. API MANAGEMENT - ZARZĄDZANIE API [FAZA D]
+- 🛠️ 10. CUSTOMIZATION & EXTENSIONS [FAZA E]
+- 🛠️ 11. DEPLOYMENT I TESTING [FAZA E]
+
+---
+
 ## 🎯 OPIS ETAPU
 
 Czwarty etap budowy aplikacji PPM koncentruje się na implementacji kompleksowego panelu administracyjnego, który umożliwia zarządzanie całym systemem PIM. Panel obejmuje dashboard z zaawansowanymi statystykami, zarządzanie integracjami z PrestaShop i ERP, konfigurację systemu, monitoring, backup oraz narzędzia konserwacyjne.

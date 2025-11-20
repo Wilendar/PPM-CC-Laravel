@@ -36,9 +36,14 @@ class SystemSetting extends Model
 
     /**
      * Kastowanie typów
+     *
+     * CRITICAL FIX (2025-11-13): Removed 'value' => 'json' cast
+     * REASON: Conflict with custom accessor/mutator causing double encoding/decoding
+     * SYMPTOM: Values not persisting (e.g., frequency reverts to "hourly")
+     * SOLUTION: JSON logic handled exclusively in accessor/mutator methods
      */
     protected $casts = [
-        'value' => 'json',
+        // 'value' => 'json',  // ❌ REMOVED - conflicts with custom accessor/mutator
         'is_encrypted' => 'boolean',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',

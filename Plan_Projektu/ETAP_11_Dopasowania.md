@@ -1,5 +1,18 @@
 # ❌ ETAP 11: SYSTEM DOPASOWAŃ I WARIANTÓW
 
+## PLAN RAMOWY ETAPU
+
+- ❌ 11.1 Analiza i architektura systemu dopasowań
+- ❌ 11.2 Modele i migracje systemu dopasowań
+- ❌ 11.3 Vehicle Service Layer
+- ❌ 11.4 Product Matching Service
+- ❌ 11.5 Variant Service Layer
+- ❌ 11.6 Livewire components
+- ❌ 11.7 Testy i dokumentacja
+
+---
+
+
 ## 🔍 INSTRUKCJE PRZED ROZPOCZĘCIEM ETAPU
 
 **OBOWIĄZKOWE CZYNNOŚCI:**

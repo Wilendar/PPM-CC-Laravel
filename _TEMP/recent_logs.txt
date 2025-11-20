@@ -1,0 +1,500 @@
+[2025-11-20 13:27:40] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:27:40] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:27:40] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:27:41] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:27:41] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:27:41] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:27:42] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:27:42] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:27:42] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:27:44] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:27:44] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:27:44] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:27:46] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:27:46] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:27:46] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:27:48] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:27:48] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:27:48] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:27:50] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:27:50] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:27:50] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:27:51] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:27:51] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:27:51] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:27:52] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:27:52] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:27:52] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:27:54] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:27:54] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:27:54] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:27:56] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:27:57] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:27:57] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:27:58] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:27:58] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:27:59] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:28:00] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:28:00] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:28:00] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:28:01] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:28:01] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:28:01] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:28:02] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:28:02] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:28:02] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:28:04] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:28:04] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:28:04] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:28:06] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:28:06] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:28:06] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:28:08] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:28:08] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:28:08] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:28:10] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:28:10] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:28:10] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:28:11] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:28:11] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:28:11] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:28:13] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:28:13] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:28:13] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:28:14] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:28:14] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:28:14] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:28:16] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:28:16] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:28:17] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:28:18] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:28:18] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:28:18] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:28:20] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:28:20] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:28:20] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:28:21] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:28:21] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:28:21] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:28:22] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:28:23] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:28:23] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:28:24] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:28:24] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:28:24] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:28:26] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:28:26] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:28:26] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:28:28] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:28:28] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:28:28] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:28:30] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:28:31] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:28:31] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:28:31] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:28:31] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:28:31] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:28:32] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:28:32] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:28:32] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:28:34] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:28:34] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:28:34] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:28:36] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:28:37] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:28:37] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:28:38] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:28:38] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:28:38] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:28:40] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:28:40] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:28:40] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:28:41] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:28:41] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:28:41] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:28:42] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:28:42] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:28:42] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:28:44] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:28:44] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:28:44] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:28:46] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:28:46] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:28:46] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:28:48] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:28:48] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:28:48] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:28:50] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:28:50] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:28:51] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:28:51] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:28:51] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:28:51] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:28:52] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:28:52] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:28:52] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:28:54] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:28:54] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:28:54] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:28:56] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:28:57] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:28:57] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:28:59] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:28:59] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:28:59] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:29:00] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:29:01] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:29:01] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:29:01] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:29:01] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:29:01] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:29:02] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:29:02] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:29:02] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:29:04] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:29:04] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:29:04] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:29:06] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:29:06] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:29:06] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:29:08] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:29:08] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:29:08] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:29:10] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:29:10] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:29:10] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:29:11] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:29:11] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:29:11] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:29:12] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:29:12] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:29:12] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:29:14] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:29:14] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:29:14] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:29:16] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:29:17] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:29:17] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:29:18] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:29:18] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:29:18] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:29:20] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:29:20] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:29:21] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:29:21] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:29:21] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:29:21] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:29:22] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:29:22] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:29:22] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:29:24] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:29:24] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:29:25] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:29:27] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:29:27] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:29:27] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:29:28] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:29:28] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:29:28] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:29:30] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:29:30] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:29:30] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:29:31] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:29:31] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:29:31] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:29:32] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:29:32] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:29:33] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:29:34] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:29:34] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:29:34] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:29:36] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:29:36] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:29:36] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:29:38] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:29:38] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:29:38] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:29:40] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:29:40] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:29:40] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:29:41] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:29:41] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:29:41] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:29:42] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:29:42] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:29:42] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:29:44] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:29:44] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:29:44] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:29:46] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:29:47] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:29:47] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:29:48] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:29:48] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:29:48] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:29:50] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:29:51] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:29:51] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:29:51] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:29:51] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:29:51] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:29:52] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:29:52] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:29:53] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:29:54] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:29:54] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:29:54] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:29:56] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:29:57] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:29:57] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:29:58] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:29:58] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:29:58] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:30:00] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:30:00] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:30:00] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:30:01] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:30:02] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:30:02] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:30:02] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:30:02] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:30:02] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:30:04] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:30:04] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:30:04] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:30:06] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:30:06] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:30:06] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:30:08] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:30:09] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:30:09] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:30:10] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:30:10] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:30:10] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:30:11] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:30:11] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:30:12] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:30:12] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:30:12] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:30:12] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:30:15] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:30:15] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:30:15] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:30:16] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:30:16] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:30:17] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:30:19] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:30:19] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:30:19] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:30:21] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:30:21] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:30:21] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:30:21] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:30:22] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:30:22] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:30:22] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:30:23] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:30:23] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:30:24] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:30:24] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:30:24] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:30:26] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:30:27] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:30:27] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:30:29] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:30:29] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:30:29] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:30:30] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:30:30] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:30:30] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:30:31] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:30:32] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:30:32] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:30:33] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:30:33] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:30:33] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:30:35] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:30:35] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:30:35] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:30:36] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:30:36] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:30:37] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:30:38] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:30:38] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:30:38] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:30:40] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:30:40] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:30:40] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:30:41] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:30:41] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:30:41] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:30:42] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:30:42] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:30:42] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:30:44] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:30:44] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:30:44] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:30:46] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:30:46] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:30:46] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:30:48] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:30:48] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:30:48] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:30:50] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:30:50] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:30:50] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:30:51] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:30:51] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:30:51] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:30:52] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:30:52] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:30:52] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:30:54] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:30:54] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:30:54] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:30:55] production.INFO: Fetching fresh categories from PrestaShop {"shop_id":1,"shop_name":"B2B Test DEV"} 
+[2025-11-20 13:30:55] production.INFO: Fetching categories from PrestaShop {"shop_id":1,"shop_name":"B2B Test DEV","prestashop_version":"8"} 
+[2025-11-20 13:30:56] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:30:56] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:30:56] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:30:58] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:30:58] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:30:58] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:31:00] production.INFO: PrestaShop API Request {"shop_id":1,"shop_name":"B2B Test DEV","prestashop_version":"8","method":"GET","url":"https://dev.mpptrade.pl/api/categories?display=full","status_code":200,"execution_time_ms":5936.81,"request_size_bytes":2,"response_size_bytes":1016483,"timestamp":"2025-11-20T13:31:00+00:00"} 
+[2025-11-20 13:31:00] production.INFO: Categories fetched successfully {"shop_id":1,"category_count":1176} 
+[2025-11-20 13:31:00] production.INFO: Category tree built successfully {"shop_id":1,"category_count":1176,"tree_roots":1} 
+[2025-11-20 13:31:01] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:31:01] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:31:01] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:31:02] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:31:02] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:31:02] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:31:02] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:31:02] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:31:02] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:31:05] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:31:05] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:31:05] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:31:06] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:31:06] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:31:06] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:31:07] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:31:07] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:31:07] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:31:08] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:31:08] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:31:08] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:31:10] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:31:10] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:31:10] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:31:11] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:31:11] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:31:11] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:31:12] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:31:12] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:31:12] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:31:14] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:31:15] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:31:15] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:31:16] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:31:16] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:31:16] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:31:18] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:31:18] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:31:19] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:31:20] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:31:20] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:31:21] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:31:21] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:31:21] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:31:21] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:31:22] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:31:22] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:31:23] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:31:24] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:31:24] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:31:25] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:31:27] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:31:27] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:31:27] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:31:28] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:31:28] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:31:28] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:31:30] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:31:31] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:31:31] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:31:31] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:31:32] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:31:32] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:31:32] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:31:32] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:31:33] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:31:34] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:31:35] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:31:35] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:31:37] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:31:37] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:31:37] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:31:38] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:31:38] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:31:38] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:31:41] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:31:41] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:31:41] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:31:41] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:31:41] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:31:41] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:31:42] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:31:43] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:31:43] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:31:44] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:31:44] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:31:45] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:31:46] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:31:47] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:31:47] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:31:48] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:31:48] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:31:49] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:31:50] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:31:50] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:31:50] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:31:51] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:31:52] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:31:52] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:31:53] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:31:53] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:31:53] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:31:54] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:31:54] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:31:55] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:31:57] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:31:57] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:31:57] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:31:58] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:31:59] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:31:59] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:32:00] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:32:00] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:32:01] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:32:01] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:32:02] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:32:02] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:32:02] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:32:03] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:32:03] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:32:04] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:32:04] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:32:04] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:32:07] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:32:07] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:32:07] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:32:08] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:32:08] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:32:08] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:32:10] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:32:10] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:32:10] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 
+[2025-11-20 13:32:11] production.INFO: ProductForm render() called {"isEditMode":true,"pageTitle":"Edytuj produkt: Quad KAYO eA70"} 
+[2025-11-20 13:32:11] production.DEBUG: [FIX #12] Detected category changes {"product_id":11034,"shop_id":1,"saved_ps_ids":[2],"cached_ps_ids":[2,2352]} 
+[2025-11-20 13:32:12] production.DEBUG: CATEGORY STATUS COMPARISON (in-memory) {"shop_id":1,"current_shop_categories":[2],"default_categories":[1,2,42,57],"are_identical":false,"result":"different"} 

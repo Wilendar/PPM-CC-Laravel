@@ -149,6 +149,10 @@ class ShopManager extends Component
     {
         $query = PrestaShopShop::query();
 
+        // BUG FIX #13 (2025-11-13): Load mapping counts via Eloquent relations
+        // Replaces empty JSON columns with real database counts
+        $query->withCount(['priceGroupMappings', 'warehouseMappings']);
+
         // Apply search filter
         if ($this->search) {
             $query->where(function ($q) {

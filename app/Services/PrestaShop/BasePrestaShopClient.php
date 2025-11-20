@@ -155,6 +155,38 @@ abstract class BasePrestaShopClient
 
             // Check if response is successful (2xx status code)
             if ($response->successful()) {
+                // ETAP_07 FIX (2025-11-13): Detect HTML error pages before parsing as JSON/XML
+                $contentType = $response->header('Content-Type');
+                $body = $response->body();
+
+                // If PrestaShop returns HTML error page instead of XML/JSON (happens on 500 errors)
+                if (str_contains($contentType ?? '', 'text/html') ||
+                    (stripos($body, '<!DOCTYPE') === 0) ||
+                    (stripos($body, '<html') === 0)) {
+
+                    Log::warning('PrestaShop returned HTML error page instead of XML/JSON', [
+                        'shop_id' => $this->shop->id,
+                        'method' => $method,
+                        'url' => $url,
+                        'content_type' => $contentType,
+                        'body_preview' => substr($body, 0, 500),
+                    ]);
+
+                    throw new PrestaShopAPIException(
+                        "PrestaShop returned HTML error page (likely internal server error). Check PrestaShop logs for details.",
+                        500,
+                        null,
+                        [
+                            'shop_id' => $this->shop->id,
+                            'shop_name' => $this->shop->name,
+                            'method' => $method,
+                            'url' => $url,
+                            'content_type' => $contentType,
+                            'html_preview' => substr($body, 0, 1000),
+                        ]
+                    );
+                }
+
                 return $response->json() ?? [];
             }
 
@@ -388,5 +420,249 @@ abstract class BasePrestaShopClient
         $filters['output_format'] = 'JSON';
 
         return http_build_query($filters);
+    }
+
+    /**
+     * Get specific prices (price rules/discounts) for product
+     *
+     * PrestaShop API endpoint: GET /specific_prices?filter[id_product]={id}&display=full
+     *
+     * Returns specific_prices data including:
+     * - reduction: Discount amount (0.15 = 15% or 5.00 = 5 PLN)
+     * - reduction_type: "percentage" or "amount"
+     * - id_group: Customer group ID (0 = all groups)
+     * - id_shop: Shop ID
+     * - price: Override price (or -1 = use base price)
+     * - from/to: Date validity range
+     *
+     * Used by PrestaShopPriceImporter to import prices from PrestaShop.
+     *
+     * @param int $productId PrestaShop product ID
+     * @return array Specific prices data (returns empty array on error/404)
+     */
+    public function getSpecificPrices(int $productId): array
+    {
+        try {
+            $queryParams = $this->buildQueryParams([
+                'filter[id_product]' => $productId,
+                'display' => 'full',
+            ]);
+
+            $response = $this->makeRequest('GET', "specific_prices?{$queryParams}");
+
+            // PrestaShop API returns: {"specific_prices": [{"id": 1, ...}, ...]}
+            return $response;
+
+        } catch (PrestaShopAPIException $e) {
+            // Graceful handling: If product has no specific prices, PrestaShop returns 404
+            // This is expected behavior, not an error
+            if ($e->isNotFound()) {
+                Log::info('No specific prices found for product', [
+                    'product_id' => $productId,
+                    'shop_id' => $this->shop->id,
+                ]);
+                return ['specific_prices' => []];
+            }
+
+            // For other errors, log warning and return empty array
+            Log::warning('Failed to fetch specific prices', [
+                'product_id' => $productId,
+                'shop_id' => $this->shop->id,
+                'http_status' => $e->getHttpStatusCode(),
+                'error' => $e->getMessage(),
+            ]);
+
+            return ['specific_prices' => []];
+        }
+    }
+
+    /**
+     * Get tax rule groups from PrestaShop
+     *
+     * PrestaShop API endpoint: GET /tax_rule_groups?display=full
+     *
+     * FAZA 5.1 - Tax Rules UI Enhancement System
+     * Used by AddShop/EditShop forms to populate tax rules dropdown
+     *
+     * Returns tax_rule_groups data including:
+     * - id: Tax rule group ID (e.g., 6)
+     * - name: Tax rule group name (e.g., "PL Standard Rate (23%)")
+     * - active: Active status (1 or 0)
+     * - rate: Tax rate (extracted from name if possible, null otherwise)
+     *
+     * Note: Rate extraction is basic (from group name). For accurate rates,
+     * you would need to fetch /tax_rules and join with /taxes table.
+     * For UI selection, group name is sufficient.
+     *
+     * @return array Tax rule groups in standardized format
+     * @throws PrestaShopAPIException
+     */
+    abstract public function getTaxRuleGroups(): array;
+
+    /**
+     * Convert array to PrestaShop XML format
+     *
+     * CRITICAL FIX (2025-11-14): Proper PrestaShop XML implementation
+     * COMPLIANCE: prestashop-xml-integration skill
+     *
+     * PREVIOUS ISSUE: Basic implementation missing:
+     * - CDATA wrapping (used htmlspecialchars instead)
+     * - PrestaShop namespace (xmlns:xlink)
+     * - Multilang fields support [['id' => 1, 'value' => '...']]
+     * - Singularization (categories → category)
+     *
+     * CURRENT IMPLEMENTATION:
+     * - ✅ CDATA wrapping for all values
+     * - ✅ Proper namespace: <prestashop xmlns:xlink="http://www.w3.org/1999/xlink">
+     * - ✅ Multilang fields: [['id' => 1, 'value' => 'Text']]
+     * - ✅ Indexed arrays with singularization
+     * - ✅ Nested associative arrays
+     *
+     * @param array $data Data to convert (e.g., ['product' => [...]])
+     * @return string XML string compliant with PrestaShop Web Services API
+     */
+    public function arrayToXml(array $data): string
+    {
+        // Create root element with PrestaShop namespace
+        $xml = new \SimpleXMLElement(
+            '<?xml version="1.0" encoding="UTF-8"?>' .
+            '<prestashop xmlns:xlink="http://www.w3.org/1999/xlink"></prestashop>'
+        );
+
+        // Build XML from array recursively
+        $this->buildXmlFromArray($data, $xml);
+
+        return $xml->asXML();
+    }
+
+    /**
+     * Recursively build XML from array
+     *
+     * Handles:
+     * - Multilang fields: [['id' => 1, 'value' => 'Text']]
+     * - Indexed arrays: [['id' => 1], ['id' => 2]] → singularized element names
+     * - Nested associative arrays
+     * - Simple values: wrapped in CDATA
+     *
+     * @param array $data Data to convert
+     * @param \SimpleXMLElement $xml Parent XML element
+     * @return void
+     */
+    protected function buildXmlFromArray(array $data, \SimpleXMLElement $xml): void
+    {
+        foreach ($data as $key => $value) {
+            if ($value === null) {
+                continue; // Skip null values
+            }
+
+            if (is_array($value)) {
+                // Multilang field: [['id' => 1, 'value' => 'Text']]
+                if ($this->isMultilangField($value)) {
+                    $fieldElement = $xml->addChild($key);
+                    foreach ($value as $langData) {
+                        $langElement = $fieldElement->addChild('language');
+                        $langElement->addAttribute('id', $langData['id']);
+                        $this->addCDataChild($langElement, $langData['value']);
+                    }
+                }
+                // Indexed array: [['id' => 1], ['id' => 2]]
+                elseif ($this->isIndexedArray($value)) {
+                    $containerElement = $xml->addChild($key);
+                    $singularKey = $this->singularize($key);
+                    foreach ($value as $item) {
+                        if (is_array($item)) {
+                            $itemElement = $containerElement->addChild($singularKey);
+                            $this->buildXmlFromArray($item, $itemElement);
+                        } else {
+                            $this->addCDataChild($containerElement->addChild($singularKey), $item);
+                        }
+                    }
+                }
+                // Nested associative array
+                else {
+                    $childElement = $xml->addChild($key);
+                    $this->buildXmlFromArray($value, $childElement);
+                }
+            }
+            // Simple values - wrap in CDATA
+            else {
+                $this->addCDataChild($xml->addChild($key), $value);
+            }
+        }
+    }
+
+    /**
+     * Add CDATA child to XML element
+     *
+     * PrestaShop requires CDATA wrapping for ALL text values
+     *
+     * @param \SimpleXMLElement $element XML element
+     * @param mixed $value Value to wrap in CDATA
+     * @return void
+     */
+    protected function addCDataChild(\SimpleXMLElement $element, $value): void
+    {
+        $node = dom_import_simplexml($element);
+        $doc = $node->ownerDocument;
+        $node->appendChild($doc->createCDATASection((string) $value));
+    }
+
+    /**
+     * Check if array is multilang field
+     *
+     * Multilang format: [['id' => 1, 'value' => 'Text'], ['id' => 2, 'value' => 'Tekst']]
+     *
+     * @param array $data Array to check
+     * @return bool True if multilang field
+     */
+    protected function isMultilangField(array $data): bool
+    {
+        if (empty($data)) {
+            return false;
+        }
+
+        $first = reset($data);
+        return is_array($first) && isset($first['id']) && isset($first['value']);
+    }
+
+    /**
+     * Check if array is indexed (numeric keys 0, 1, 2, ...)
+     *
+     * @param array $data Array to check
+     * @return bool True if indexed array
+     */
+    protected function isIndexedArray(array $data): bool
+    {
+        if (empty($data)) {
+            return false;
+        }
+
+        return array_keys($data) === range(0, count($data) - 1);
+    }
+
+    /**
+     * Singularize plural words for XML elements
+     *
+     * PrestaShop expects singular element names inside plural containers:
+     * - categories → category
+     * - products → product
+     * - associations → association
+     *
+     * @param string $word Plural word
+     * @return string Singular word
+     */
+    protected function singularize(string $word): string
+    {
+        // categories → category
+        if (str_ends_with($word, 'ies')) {
+            return substr($word, 0, -3) . 'y';
+        }
+
+        // products → product, associations → association
+        if (str_ends_with($word, 's')) {
+            return substr($word, 0, -1);
+        }
+
+        return $word;
     }
 }

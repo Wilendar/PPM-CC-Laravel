@@ -51,6 +51,19 @@ Routes Import/Export:
 
 ---
 
+## PLAN RAMOWY ETAPU
+
+- ❌ 1. XLSX IMPORT ENGINE - CORE SYSTEM
+- ❌ 2. TEMPLATE MANAGEMENT SYSTEM
+- ❌ 3. DATA VALIDATION SYSTEM
+- ❌ 4. PROGRESS TRACKING & MONITORING
+- ❌ 5. XLSX EXPORT ENGINE
+- ❌ 6. ADVANCED IMPORT FEATURES
+- ❌ 7. USER INTERFACE & EXPERIENCE
+- ❌ 8. TESTING & QUALITY ASSURANCE
+
+---
+
 **Status ETAPU:** ❌ **NIE ROZPOCZĘTE**  
 **Szacowany czas:** 40 godzin  
 **Priorytet:** 🟡 WYSOKI  

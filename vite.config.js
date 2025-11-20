@@ -9,6 +9,7 @@ export default defineConfig({
                 'resources/css/admin/layout.css',
                 'resources/css/admin/components.css',
                 'resources/css/products/category-form.css',
+                'resources/css/products/product-form.css',
                 'resources/css/components/category-picker.css',
                 'resources/js/app.js',
             ],

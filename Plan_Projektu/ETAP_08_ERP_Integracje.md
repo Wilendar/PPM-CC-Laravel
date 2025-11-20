@@ -1,5 +1,22 @@
 # ❌ ETAP 08: INTEGRACJE Z SYSTEMAMI ERP
 
+## PLAN RAMOWY ETAPU
+
+- ❌ 8.1 Analiza i dokumentacja systemów ERP
+- ❌ 8.2 Modele i migracje ERP
+- ❌ 8.3 BaseLinker Integration Service
+- ❌ 8.4 Subiekt GT Integration Service
+- ❌ 8.5 Microsoft Dynamics Integration
+- ❌ 8.6 Unified ERP Service Layer
+- ❌ 8.7 Jobs i queue system
+- ❌ 8.8 Panel administracyjny ERP
+- ❌ 8.9 Monitoring i raporty
+- ❌ 8.10 Testy i dokumentacja
+- ❌ 8.11 Deployment i finalizacja
+
+---
+
+
 ## 🔍 INSTRUKCJE PRZED ROZPOCZĘCIEM ETAPU
 
 **OBOWIĄZKOWE CZYNNOŚCI:**

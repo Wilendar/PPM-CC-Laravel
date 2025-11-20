@@ -14,6 +14,7 @@ use App\Models\IntegrationLog;
 use App\Services\PrestaShop\PrestaShopService;
 use Carbon\Carbon;
 use Exception;
+use Throwable;
 
 /**
  * SyncProductsJob
@@ -38,7 +39,7 @@ class SyncProductsJob implements ShouldQueue
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     protected SyncJob $syncJob;
-    protected int $batchSize = 50; // Products per batch
+    protected int $batchSize;
     protected int $maxMemoryUsage = 256 * 1024 * 1024; // 256MB
 
     /**
@@ -53,15 +54,22 @@ class SyncProductsJob implements ShouldQueue
 
     /**
      * The number of seconds the job can run before timing out.
+     * ETAP_07 FAZA 9.2: Dynamic timeout from SystemSettings (2025-11-13)
      */
-    public $timeout = 3600; // 1 hour
+    public $timeout;
 
     /**
      * Create a new job instance.
+     * ETAP_07 FAZA 9.2: Load dynamic settings (2025-11-13)
      */
     public function __construct(SyncJob $syncJob)
     {
         $this->syncJob = $syncJob;
+
+        // Load batch size and timeout from system settings
+        $this->batchSize = \App\Models\SystemSetting::get('sync.batch_size', 10);
+        $this->timeout = \App\Models\SystemSetting::get('sync.timeout', 300);
+
         // Use default queue for CRON compatibility
         // $this->onQueue('prestashop-sync');
     }
@@ -77,7 +85,10 @@ class SyncProductsJob implements ShouldQueue
         try {
             // Start the sync job
             $this->syncJob->start();
-            
+
+            // Store Laravel queue job ID for cross-referencing
+            $this->storeQueueJobId();
+
             // Get shop configuration
             $shop = PrestaShopShop::findOrFail($this->syncJob->target_id);
             
@@ -223,7 +234,7 @@ class SyncProductsJob implements ShouldQueue
                 $processedItems * 5  // Estimate DB queries
             );
 
-            // Complete the job
+            // Complete the job with smart status logic (2025-11-12)
             $resultSummary = [
                 'total_products' => $products->count(),
                 'processed_products' => $processedItems,
@@ -237,7 +248,21 @@ class SyncProductsJob implements ShouldQueue
                 ]
             ];
 
-            $this->syncJob->complete($resultSummary);
+            // Determine appropriate status based on results
+            if ($failedItems === 0) {
+                // All items succeeded - status: completed
+                $this->syncJob->complete($resultSummary);
+            } elseif ($successfulItems > 0) {
+                // Partial success - some succeeded, some failed - status: completed_with_errors
+                $this->syncJob->completeWithErrors($resultSummary);
+            } else {
+                // All items failed - status: failed
+                $this->syncJob->fail(
+                    'All products failed to sync',
+                    json_encode($errors, JSON_PRETTY_PRINT)
+                );
+                return; // Exit early - job failed completely
+            }
 
             // Update shop statistics
             $shop->updateSyncStats(
@@ -377,8 +402,13 @@ class SyncProductsJob implements ShouldQueue
 
     /**
      * The job failed to process.
+     *
+     * CRITICAL FIX (2025-11-07): Changed Exception to Throwable
+     * PHP 7+ has Error class separate from Exception.
+     * Both implement Throwable interface.
+     * Using Exception causes TypeError when Error is thrown.
      */
-    public function failed(Exception $exception): void
+    public function failed(Throwable $exception): void
     {
         IntegrationLog::error(
             'sync_job_failed_final',
@@ -400,6 +430,90 @@ class SyncProductsJob implements ShouldQueue
             'error_details' => $exception->getMessage(),
             'stack_trace' => $exception->getTraceAsString(),
         ]);
+    }
+
+    /**
+     * Store Laravel queue job ID in sync_jobs table for cross-referencing.
+     *
+     * FAZA 9 Phase 3 - Task 1: Queue Job ID Cross-Reference
+     *
+     * Stores the Laravel queue job ID (`$this->job->getJobId()`) in the
+     * `sync_jobs.queue_job_id` column to enable cross-referencing between:
+     * - SyncJob records (our tracking table)
+     * - Laravel queue system (jobs/failed_jobs tables)
+     *
+     * This enables:
+     * - Finding queue job details from SyncJob UI
+     * - Linking failed jobs to their SyncJob context
+     * - Debugging queue processing issues
+     *
+     * @return void
+     */
+    protected function storeQueueJobId(): void
+    {
+        try {
+            // Check if this job is running via queue (has job instance)
+            if (!isset($this->job)) {
+                IntegrationLog::debug(
+                    'queue_job_id_not_available',
+                    'Job is not running via queue, queue_job_id not available',
+                    [
+                        'sync_job_id' => $this->syncJob->job_id,
+                        'sync_job_status' => $this->syncJob->status,
+                    ],
+                    IntegrationLog::INTEGRATION_PRESTASHOP,
+                    (string) $this->syncJob->target_id
+                );
+                return;
+            }
+
+            // Get queue job ID from Laravel queue system
+            $queueJobId = $this->job->getJobId();
+
+            // Queue job ID may be null for some queue drivers (sync, array)
+            if ($queueJobId === null) {
+                IntegrationLog::debug(
+                    'queue_job_id_null',
+                    'Queue driver returned null job ID (sync or array driver)',
+                    [
+                        'sync_job_id' => $this->syncJob->job_id,
+                        'queue_connection' => config('queue.default'),
+                    ],
+                    IntegrationLog::INTEGRATION_PRESTASHOP,
+                    (string) $this->syncJob->target_id
+                );
+                return;
+            }
+
+            // Update SyncJob with queue job ID
+            $this->syncJob->update(['queue_job_id' => $queueJobId]);
+
+            IntegrationLog::info(
+                'queue_job_id_stored',
+                'Successfully stored queue job ID for cross-reference',
+                [
+                    'sync_job_id' => $this->syncJob->job_id,
+                    'queue_job_id' => $queueJobId,
+                    'queue_name' => $this->syncJob->queue_name,
+                ],
+                IntegrationLog::INTEGRATION_PRESTASHOP,
+                (string) $this->syncJob->target_id
+            );
+
+        } catch (\Exception $e) {
+            // Non-critical error - log but don't fail the job
+            IntegrationLog::warning(
+                'queue_job_id_storage_failed',
+                'Failed to store queue job ID, continuing with sync',
+                [
+                    'sync_job_id' => $this->syncJob->job_id,
+                    'error_message' => $e->getMessage(),
+                ],
+                IntegrationLog::INTEGRATION_PRESTASHOP,
+                (string) $this->syncJob->target_id,
+                $e
+            );
+        }
     }
 
     /**

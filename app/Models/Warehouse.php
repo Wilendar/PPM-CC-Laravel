@@ -5,8 +5,10 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 /**
  * Warehouse Model - Magazyny systemu PPM-CC-Laravel
@@ -68,7 +70,7 @@ use Illuminate\Database\Eloquent\Casts\Attribute;
  */
 class Warehouse extends Model
 {
-    use HasFactory;
+    use HasFactory, SoftDeletes;
 
     /**
      * The attributes that are mass assignable.
@@ -78,6 +80,8 @@ class Warehouse extends Model
     protected $fillable = [
         'name',
         'code',
+        'type', // Strategy B: master, shop_linked, custom
+        'shop_id', // Strategy B: Link to PrestaShop shop
         'address',
         'city',
         'postal_code',
@@ -88,6 +92,7 @@ class Warehouse extends Model
         'allow_negative_stock',
         'auto_reserve_stock',
         'default_minimum_stock',
+        'inherit_from_shop', // Strategy B: Pull stock from PS
         'prestashop_mapping',
         'erp_mapping',
         'contact_person',
@@ -110,6 +115,7 @@ class Warehouse extends Model
             'is_active' => 'boolean',
             'allow_negative_stock' => 'boolean',
             'auto_reserve_stock' => 'boolean',
+            'inherit_from_shop' => 'boolean', // Strategy B
             'sort_order' => 'integer',
             'default_minimum_stock' => 'integer',
             'prestashop_mapping' => 'array',
@@ -134,6 +140,27 @@ class Warehouse extends Model
     {
         return $this->hasMany(ProductStock::class, 'warehouse_id')
                     ->orderBy('updated_at', 'desc');
+    }
+
+    /**
+     * Strategy B: Related PrestaShop shop (for shop_linked warehouses)
+     *
+     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
+     */
+    public function shop()
+    {
+        return $this->belongsTo(PrestaShopShop::class, 'shop_id');
+    }
+
+    /**
+     * Strategy B: Stock inheritance logs for this warehouse
+     *
+     * @return \Illuminate\Database\Eloquent\Relations\HasMany
+     */
+    public function inheritanceLogs(): HasMany
+    {
+        return $this->hasMany(StockInheritanceLog::class, 'warehouse_id')
+                    ->orderBy('created_at', 'desc');
     }
 
     /*
@@ -314,6 +341,39 @@ class Warehouse extends Model
     public function scopeByCountry(Builder $query, string $country): Builder
     {
         return $query->where('country', strtoupper(trim($country)));
+    }
+
+    /**
+     * Strategy B Scope: Master warehouses only
+     *
+     * @param \Illuminate\Database\Eloquent\Builder $query
+     * @return \Illuminate\Database\Eloquent\Builder
+     */
+    public function scopeMaster(Builder $query): Builder
+    {
+        return $query->where('type', 'master');
+    }
+
+    /**
+     * Strategy B Scope: Shop-linked warehouses only
+     *
+     * @param \Illuminate\Database\Eloquent\Builder $query
+     * @return \Illuminate\Database\Eloquent\Builder
+     */
+    public function scopeShopLinked(Builder $query): Builder
+    {
+        return $query->where('type', 'shop_linked');
+    }
+
+    /**
+     * Strategy B Scope: Custom warehouses only
+     *
+     * @param \Illuminate\Database\Eloquent\Builder $query
+     * @return \Illuminate\Database\Eloquent\Builder
+     */
+    public function scopeCustom(Builder $query): Builder
+    {
+        return $query->where('type', 'custom');
     }
 
     /*
@@ -522,5 +582,41 @@ class Warehouse extends Model
         }
 
         return true;
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | STRATEGY B HELPER METHODS
+    |--------------------------------------------------------------------------
+    */
+
+    /**
+     * Check if warehouse is master type
+     *
+     * @return bool
+     */
+    public function isMaster(): bool
+    {
+        return $this->type === 'master';
+    }
+
+    /**
+     * Check if warehouse is shop-linked type
+     *
+     * @return bool
+     */
+    public function isShopLinked(): bool
+    {
+        return $this->type === 'shop_linked';
+    }
+
+    /**
+     * Check if warehouse is custom type
+     *
+     * @return bool
+     */
+    public function isCustom(): bool
+    {
+        return $this->type === 'custom';
     }
 }

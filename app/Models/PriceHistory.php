@@ -408,7 +408,18 @@ class PriceHistory extends Model
         $changedFields = [];
 
         if ($action === 'updated' && !empty($oldValues) && !empty($newValues)) {
-            $changedFields = array_keys(array_diff_assoc($newValues, $oldValues));
+            // BUG #14 FIX: Handle nested arrays (prestashop_mapping) by comparing serialized values
+            foreach ($newValues as $key => $value) {
+                $oldValue = $oldValues[$key] ?? null;
+
+                // Serialize arrays for comparison
+                $oldSerialized = is_array($oldValue) ? json_encode($oldValue) : $oldValue;
+                $newSerialized = is_array($value) ? json_encode($value) : $value;
+
+                if ($oldSerialized !== $newSerialized) {
+                    $changedFields[] = $key;
+                }
+            }
         }
 
         return static::create([

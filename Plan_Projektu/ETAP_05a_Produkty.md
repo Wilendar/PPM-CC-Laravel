@@ -1,5 +1,20 @@
 # 🛠️ ETAP_05a: System Wariantów, Cech i Dopasowań Pojazdów
 
+## PLAN RAMOWY ETAPU
+
+- ✅ SEKCJA 0: Pre-Implementation Refactoring
+- ✅ FAZA 1: Database
+- 🛠️ FAZA 2: Models (code completed, oczekuje deploymentu)
+- 🛠️ FAZA 3: Services (code completed, oczekuje deploymentu)
+- 🛠️ FAZA 4: UI Components (code completed, oczekuje deploymentu)
+- 🛠️ FAZA 5: PrestaShop (w trakcie)
+- 🛠️ FAZA 6: CSV (backend ukończony, frontend w trakcie)
+- 🛠️ FAZA 7: Performance (w trakcie)
+- 🛠️ OPTIONAL: Auto-Select Enhancement (w trakcie)
+
+---
+
+
 **Status ETAPU:** 🛠️ **W TRAKCIE** - 77% complete (13 tasks completed, 11 in progress)
 **Szacowany czas:** 97-126 godzin (12-16 dni = 2.5-3 tygodnie full-time)
   - ✅ PRE-IMPLEMENTATION REFACTORING (SEKCJA 0): 12-16h (COMPLETED 2025-10-17)
