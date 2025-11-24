@@ -219,9 +219,154 @@ PPM-CC-Laravel/
 
 **⚠️ KRYTYCZNA ZASADA:** Weryfikuj layout/styles PRZED informowaniem użytkownika!
 
-**WORKFLOW:** Zmiany → Build → Deploy → **PPM Verification Tool** → (jeśli OK) informuj użytkownika
+**WORKFLOW:** Zmiany → Build → Deploy → **Chrome DevTools MCP Verification** → (jeśli OK) informuj użytkownika
 
-**NARZĘDZIE:** `_TOOLS/full_console_test.cjs` - Console monitoring + screenshots + Livewire check + tab interactions
+---
+
+#### 🚀 PRIMARY TOOL: Chrome DevTools MCP (MANDATORY)
+
+**STATUS:** ✅ MCP zainstalowane i aktywne w projekcie PPM
+
+**⚠️ KRYTYCZNE: Token Overflow Prevention**
+- `take_snapshot()` bez optimizacji zwraca >25k tokenów (przekracza limit!)
+- **MANDATORY:** Używaj optimized patterns z `_DOCS/CHROME_DEVTOOLS_OPTIMIZED_QUERIES.md`
+- **Token reduction:** 85-95% (25k → 500-3000 tokenów)
+
+**DLACZEGO CHROME DEVTOOLS MCP:**
+- ✅ **Live browser inspection** - rzeczywisty stan DOM, nie teoretyczny
+- ✅ **Network monitoring** - weryfikacja HTTP 200, manifest hashes, API calls
+- ✅ **Console error detection** - wykrywanie JS/Livewire errors w runtime
+- ✅ **Interactive testing** - kliknięcia, formularze, state changes
+- ✅ **Screenshot automation** - wizualna weryfikacja UI
+- ✅ **Livewire state inspection** - component properties, wire:loading conflicts
+
+**KLUCZOWE TOOLS Z MCP (OPTIMIZED):**
+
+```javascript
+// 1. Targeted Queries (PRIMARY - 50-300 tokens)
+mcp__chrome-devtools__evaluate_script({
+  function: "() => ({disabled: document.querySelectorAll('[disabled]').length})"
+})
+
+// 2. Text Search (snapshot → file + Grep - 100-500 tokens)
+mcp__chrome-devtools__take_snapshot({verbose: false, filePath: "_TEMP/snap.txt"})
+Grep({pattern: "wire:snapshot", path: "_TEMP/snap.txt", output_mode: "content", head_limit: 5})
+
+// 3. Console/Network (already optimized)
+mcp__chrome-devtools__list_console_messages({types: ["error", "warn"]})
+mcp__chrome-devtools__list_network_requests({resourceTypes: ["stylesheet", "script"]})
+
+// 4. Visual Verification (JPEG for smaller size)
+mcp__chrome-devtools__take_screenshot({format: "jpeg", quality: 85, filePath: "_TEMP/screenshot.jpg"})
+
+// 5. Navigation
+mcp__chrome-devtools__navigate_page({type: "url", url: "..."})
+```
+
+**📖 FULL GUIDE:** [`_DOCS/CHROME_DEVTOOLS_OPTIMIZED_QUERIES.md`](_DOCS/CHROME_DEVTOOLS_OPTIMIZED_QUERIES.md)
+
+**MANDATORY VERIFICATION SCENARIOS (OPTIMIZED):**
+
+**1. POST-DEPLOYMENT (KAŻDY deployment CSS/JS/Blade):**
+```javascript
+// a) Navigate
+mcp__chrome-devtools__navigate_page({type: "url", url: "https://ppm.mpptrade.pl/admin/products", ignoreCache: true})
+
+// b) Console check (optimized - already minimal)
+mcp__chrome-devtools__list_console_messages({types: ["error", "warn"]})
+
+// c) Network check (optimized - already minimal)
+mcp__chrome-devtools__list_network_requests({resourceTypes: ["stylesheet", "script"], pageSize: 50})
+
+// d) wire:snapshot check (OPTIMIZED - snapshot → file + grep)
+mcp__chrome-devtools__take_snapshot({verbose: false, filePath: "_TEMP/snapshot_check.txt"})
+Grep({pattern: "wire:snapshot", path: "_TEMP/snapshot_check.txt", output_mode: "content", head_limit: 5})
+
+// e) Screenshot (JPEG - visual only)
+mcp__chrome-devtools__take_screenshot({format: "jpeg", quality: 85, filePath: "_TOOLS/screenshots/verification.jpg"})
+
+// TOKENS: ~2000 (was 25000+) ✅
+```
+
+**2. LIVEWIRE UPDATES (component changes):**
+```javascript
+// a) Navigate + click (via evaluate_script - no UID needed!)
+mcp__chrome-devtools__navigate_page({type: "url", url: "https://ppm.mpptrade.pl/admin/products"})
+
+mcp__chrome-devtools__evaluate_script({
+  function: "() => { const tab = Array.from(document.querySelectorAll('button')).find(btn => btn.textContent.includes('B2B Test DEV')); if(tab) tab.click(); return {clicked: !!tab}; }"
+})
+
+// b) Wait for wire:poll to settle
+await new Promise(resolve => setTimeout(resolve, 6000))
+
+// c) Check state (OPTIMIZED - targeted query)
+mcp__chrome-devtools__evaluate_script({
+  function: "() => ({ checkboxes: { total: document.querySelectorAll('input[type=\"checkbox\"]').length, disabled: document.querySelectorAll('input[disabled]').length }, livewire: { components: window.Livewire?.components?.componentsByName('product-form')?.length || 0 } })"
+})
+
+// d) wire:snapshot check (snapshot → file + grep)
+mcp__chrome-devtools__take_snapshot({verbose: false, filePath: "_TEMP/livewire_check.txt"})
+Grep({pattern: "wire:snapshot", path: "_TEMP/livewire_check.txt", output_mode: "files_with_matches"})
+
+// TOKENS: ~500 (was 25000+) ✅
+```
+
+**3. INTERACTIVE TESTING (forms, buttons, state):**
+```javascript
+// a) Navigate
+mcp__chrome-devtools__navigate_page({type: "url", url: "https://ppm.mpptrade.pl/admin/products"})
+
+// b) Test button (via evaluate_script OR click with UID)
+mcp__chrome-devtools__evaluate_script({
+  function: "() => { const btn = document.querySelector('button.main-category-btn'); if(btn) btn.click(); return {clicked: !!btn}; }"
+})
+
+// c) Wait + verify state (OPTIMIZED - targeted)
+await new Promise(resolve => setTimeout(resolve, 6000))
+
+mcp__chrome-devtools__evaluate_script({
+  function: "() => ({ buttons: { total: document.querySelectorAll('button').length, disabled: document.querySelectorAll('button[disabled]').length }, success: document.body.innerText.includes('Zapisano') })"
+})
+
+// TOKENS: ~300 (was 25000+) ✅
+```
+
+**4. CSS/STYLING VERIFICATION (OPTIMIZED - anti-patterns):**
+```javascript
+// a) Navigate
+mcp__chrome-devtools__navigate_page({type: "url", url: "https://ppm.mpptrade.pl/admin"})
+
+// b) Anti-pattern check (OPTIMIZED - single query)
+mcp__chrome-devtools__evaluate_script({
+  function: "() => ({ inlineStyles: document.querySelectorAll('[style]').length, inlineZIndex: Array.from(document.querySelectorAll('[style]')).filter(el => el.style.zIndex).length })"
+})
+// ✅ PASS if: both === 0
+
+// c) Screenshot (JPEG - visual)
+mcp__chrome-devtools__take_screenshot({fullPage: true, format: "jpeg", quality: 85, filePath: "_TOOLS/screenshots/layout.jpg"})
+
+// TOKENS: ~200 (was 25000+) ✅
+```
+
+**ANTI-PATTERNS - NIE RÓB TEGO:**
+❌ Full `take_snapshot()` bez `filePath` (>25k tokens overflow!)
+❌ Czytanie całego snapshot do context (użyj Grep zamiast tego)
+❌ Snapshot zamiast `evaluate_script()` dla element checks
+❌ Poleganie TYLKO na curl/HTTP checks (nie wykrywa JS errors, Livewire issues)
+❌ Informowanie użytkownika o completion BEZ Chrome DevTools verification
+❌ Używanie screenshot_page.cjs ZAMIAST Chrome DevTools MCP (legacy tool)
+❌ Zakładanie "działa bo build przeszedł" (manifest cache, CSS conflicts)
+
+**SUCCESS PATTERN (OPTIMIZED):**
+✅ Deploy → Chrome DevTools navigate → `evaluate_script()` targeted checks → Console/Network → snapshot→file+Grep → Screenshot → Report to user
+✅ **Total tokens: 500-3000** (was 25000+) 🎉
+
+---
+
+#### 🔧 SECONDARY TOOL: Node.js Scripts (dla automation)
+
+**NARZĘDZIE:** `_TOOLS/full_console_test.cjs` - Console monitoring + screenshots (legacy, używaj Chrome DevTools MCP)
 
 ```bash
 # Basic (default: headless, Warianty tab)
@@ -231,12 +376,21 @@ node _TOOLS/full_console_test.cjs
 node _TOOLS/full_console_test.cjs "URL" --show --tab=Cechy --no-click
 ```
 
-**MANDATORY dla agentów:**
-- Po deployment CSS/JS/Blade
-- Po Livewire updates
-- PRZED informowaniem o completion
+**UŻYCIE:** Tylko dla batch testing / CI automation. **PRIMARY = Chrome DevTools MCP**
 
-**📖 PRZEWODNIK:** [`_DOCS/FRONTEND_VERIFICATION_GUIDE.md`](_DOCS/FRONTEND_VERIFICATION_GUIDE.md)
+---
+
+**MANDATORY dla agentów:**
+- ✅ **ZAWSZE** Chrome DevTools MCP po deployment CSS/JS/Blade
+- ✅ **ZAWSZE** Chrome DevTools MCP po Livewire updates
+- ✅ **ZAWSZE** Chrome DevTools MCP PRZED informowaniem o completion
+- ✅ Snapshot (text) ZAMIAST screenshot (szybsze, dokładniejsze)
+- ✅ Console + Network monitoring dla każdej strony
+- ✅ Interactive testing dla form changes
+
+**📖 PRZEWODNIKI:**
+- [`_DOCS/FRONTEND_VERIFICATION_GUIDE.md`](_DOCS/FRONTEND_VERIFICATION_GUIDE.md) - Szczegółowe procedury
+- [`_DOCS/CHROME_DEVTOOLS_MCP_GUIDE.md`](_DOCS/CHROME_DEVTOOLS_MCP_GUIDE.md) - Chrome DevTools MCP reference
 
 ### 🔍 DEBUG LOGGING
 

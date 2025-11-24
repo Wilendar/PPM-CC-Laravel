@@ -12,6 +12,7 @@
 2. **TYLKO JEDEN** agent może być w stanie `in_progress` w danym momencie
 3. **WYMAGANE** raportowanie w `_AGENT_REPORTS/` po każdym zadaniu
 4. **OBOWIĄZKOWE** aktualizowanie TodoWrite podczas pracy agentów
+5. **🚀 MANDATORY: Chrome DevTools MCP Verification** - wszystkie agenty MUSZĄ weryfikować deployment/UI/interactivity z Chrome DevTools MCP PRZED completion
 
 ---
 
@@ -152,6 +153,140 @@ Output: "10: public function index()"
 
 **Conclusion:** Deployment VERIFIED - all steps confirmed with real command outputs.
 ```
+
+---
+
+## 🚀 OBOWIĄZKOWE: Chrome DevTools MCP Verification (WSZYSTKIE AGENTY)
+
+**STATUS:** ✅ MCP zainstalowane i aktywne w projekcie PPM od 2025-11-21
+
+**CRITICAL RULE:** Każdy agent pracujący z frontend/deployment/Livewire MUSI używać Chrome DevTools MCP do weryfikacji PRZED raportowaniem completion.
+
+### ⚡ DLACZEGO CHROME DEVTOOLS MCP (nie Node.js scripts):
+
+| Aspekt | Chrome DevTools MCP | Node.js Scripts | Wynik |
+|--------|---------------------|-----------------|-------|
+| **DOM Inspection** | ✅ Live browser state | ❌ Teoretyczny render | **MCP WINS** |
+| **Network Monitor** | ✅ Real HTTP/manifest verify | ⚠️ curl (basic) | **MCP WINS** |
+| **Console Errors** | ✅ Runtime JS/Livewire errors | ❌ Cannot detect | **MCP WINS** |
+| **Interactivity** | ✅ Clicks, forms, state changes | ❌ Cannot interact | **MCP WINS** |
+| **Livewire State** | ✅ Component properties inspect | ❌ Cannot access | **MCP WINS** |
+
+### 🎯 MANDATORY Verification Scenarios (Per Agent Type):
+
+#### deployment-specialist
+```javascript
+// MANDATORY AFTER EVERY DEPLOYMENT:
+1. Navigate: mcp__chrome-devtools__navigate_page({type: "url", url: "https://ppm.mpptrade.pl/admin"})
+2. Console: mcp__chrome-devtools__list_console_messages({types: ["error", "warn"]})
+3. Network: mcp__chrome-devtools__list_network_requests({resourceTypes: ["stylesheet", "script"]})
+4. Snapshot: mcp__chrome-devtools__take_snapshot() // Faster than screenshot
+5. Screenshot: mcp__chrome-devtools__take_screenshot() // Visual confirmation
+
+// ONLY THEN report success with evidence
+```
+
+#### frontend-specialist
+```javascript
+// MANDATORY AFTER UI CHANGES:
+1. Navigate to changed page
+2. Snapshot: mcp__chrome-devtools__take_snapshot()
+3. Check inline styles (anti-pattern): mcp__chrome-devtools__evaluate_script({
+     function: "() => document.querySelectorAll('[style]').length"
+   })
+4. Check z-index conflicts: mcp__chrome-devtools__evaluate_script({
+     function: "() => Array.from(document.querySelectorAll('[style*=\"z-index\"]')).map(el => ({tag: el.tagName, z: el.style.zIndex}))"
+   })
+5. Screenshot: mcp__chrome-devtools__take_screenshot({fullPage: true})
+```
+
+#### livewire-specialist
+```javascript
+// MANDATORY AFTER LIVEWIRE UPDATES:
+1. Navigate + interact: mcp__chrome-devtools__click(uid) // Trigger Livewire update
+2. Check wire:snapshot: mcp__chrome-devtools__take_snapshot() // Search for literal "wire:snapshot"
+3. Component state: mcp__chrome-devtools__evaluate_script({
+     function: "() => window.Livewire.components.componentsByName('product-form')[0]?.data"
+   })
+4. Console errors: mcp__chrome-devtools__list_console_messages({types: ["error"]})
+5. Disabled states (for FIX #7/#8-like issues): mcp__chrome-devtools__evaluate_script({
+     function: "() => ({ total: document.querySelectorAll('input').length, disabled: document.querySelectorAll('input[disabled]').length })"
+   })
+```
+
+#### erp-integration-expert / prestashop-api-expert
+```javascript
+// MANDATORY AFTER API INTEGRATION:
+1. Navigate to integration page
+2. Network: mcp__chrome-devtools__list_network_requests({resourceTypes: ["xhr", "fetch"]})
+3. Console: mcp__chrome-devtools__list_console_messages({types: ["error", "warn"]})
+4. Check API responses: mcp__chrome-devtools__get_network_request(reqid)
+```
+
+### 🚫 ANTI-PATTERNS - Agent FAILURES:
+
+❌ **deployment-specialist raportuje "✅ Deployed successfully" WITHOUT Chrome DevTools verification**
+   - Result: User sees broken CSS, manifest cache issues, 404 errors
+   - Actual issue: Partial deployment, manifest not updated
+
+❌ **frontend-specialist raportuje "✅ UI updated" WITHOUT snapshot verification**
+   - Result: Inline styles in production (anti-pattern), z-index conflicts
+   - Actual issue: CSS classes not applied
+
+❌ **livewire-specialist raportuje "✅ Component fixed" WITHOUT state inspection**
+   - Result: wire:loading conflicts (FIX #7/#8 repeat), disabled states
+   - Actual issue: Directive conflicts not detected
+
+### ✅ SUCCESS PATTERN - Correct Agent Report:
+
+```markdown
+## DEPLOYMENT VERIFICATION (Chrome DevTools MCP)
+
+**Page Navigation:**
+- Tool: `mcp__chrome-devtools__navigate_page({type: "url", url: "https://ppm.mpptrade.pl/admin/products"})`
+- Status: ✅ Page loaded (HTTP 200)
+
+**Console Check:**
+- Tool: `mcp__chrome-devtools__list_console_messages({types: ["error", "warn"]})`
+- Result: ✅ 0 errors, 0 warnings
+
+**Network Verification:**
+- Tool: `mcp__chrome-devtools__list_network_requests({resourceTypes: ["stylesheet", "script"]})`
+- Result: ✅ All CSS/JS assets HTTP 200
+  - components-abc123.css: 200 OK
+  - app-def456.js: 200 OK
+
+**DOM Snapshot:**
+- Tool: `mcp__chrome-devtools__take_snapshot()`
+- Result: ✅ No wire:snapshot literals, no inline styles detected
+- Evidence: Snapshot saved to _TOOLS/screenshots/verification_snapshot_2025-11-21.txt
+
+**Screenshot:**
+- Tool: `mcp__chrome-devtools__take_screenshot({fullPage: true})`
+- Result: ✅ UI renders correctly
+- Evidence: Screenshot saved to _TOOLS/screenshots/verification_full_2025-11-21.png
+
+**Conclusion:** Deployment VERIFIED with Chrome DevTools MCP - all checks passed.
+```
+
+### 📋 CHECKLIST for ALL Agents:
+
+**PRZED completion KAŻDY agent MUSI:**
+- [ ] Use Chrome DevTools MCP dla primary verification
+- [ ] Capture REAL tool outputs (not simulated!)
+- [ ] Save screenshots/snapshots to _TOOLS/screenshots/
+- [ ] Include verification evidence in _AGENT_REPORTS/
+- [ ] Report ONLY after Chrome DevTools confirms success
+
+**JEŚLI Chrome DevTools wykryje problemy:**
+- [ ] FIX issues BEFORE reporting completion
+- [ ] RE-VERIFY with Chrome DevTools after fix
+- [ ] Document what was fixed in report
+
+### 📖 PRZEWODNIKI:
+- **CLAUDE.md** - Section: "🎨 OBOWIĄZKOWA WERYFIKACJA FRONTEND" (primary reference)
+- **_DOCS/CHROME_DEVTOOLS_MCP_GUIDE.md** - Comprehensive MCP tool reference
+- **_DOCS/FRONTEND_VERIFICATION_GUIDE.md** - Szczegółowe procedury weryfikacji
 
 ---
 
@@ -360,6 +495,29 @@ AKCJA KOORDYNATORA:
 - emit() vs dispatch() migration
 - Component state corruption
 
+#### 🚀 MANDATORY: Chrome DevTools MCP Verification
+
+**CRITICAL:** Livewire-specialist MUSI używać Chrome DevTools MCP AFTER EVERY component update!
+
+**WORKFLOW:**
+```javascript
+1. Update Livewire component
+2. Deploy
+3. 🚀 VERIFY with Chrome DevTools MCP:
+   - Navigate + click: mcp__chrome-devtools__click(uid) // Trigger Livewire
+   - Check wire:snapshot: mcp__chrome-devtools__take_snapshot()
+   - Component state: evaluate_script("() => window.Livewire.components.componentsByName('product-form')[0]?.data")
+   - Console errors: mcp__chrome-devtools__list_console_messages({types: ["error"]})
+   - Disabled states: evaluate_script("() => ({total: ..., disabled: ...})")
+4. ONLY THEN report success
+```
+
+**CRITICAL CHECKS (prevent FIX #7/#8 repeats):**
+- ❌ wire:poll + wire:loading.attr conflicts
+- ❌ wire:snapshot rendering literal text
+- ❌ Disabled state flashing (race conditions)
+- ❌ Component state corruption
+
 ---
 
 ### 🛒 **prestashop-api-expert** - PrestaShop Integration Expert
@@ -464,6 +622,25 @@ AKCJA KOORDYNATORA:
 - SSH Key: D:\OneDrive - MPP TRADE\SSH\Hostido\HostidoSSHNoPass.ppk
 - Path: domains/ppm.mpptrade.pl/public_html/
 
+#### 🚀 MANDATORY: Chrome DevTools MCP Verification
+
+**CRITICAL:** Deployment-specialist MUSI używać Chrome DevTools MCP AFTER EVERY deployment!
+
+**WORKFLOW:**
+```javascript
+1. Upload files (pscp)
+2. Clear cache (plink + artisan)
+3. 🚀 VERIFY with Chrome DevTools MCP:
+   - Navigate: mcp__chrome-devtools__navigate_page()
+   - Console: mcp__chrome-devtools__list_console_messages()
+   - Network: mcp__chrome-devtools__list_network_requests()
+   - Snapshot: mcp__chrome-devtools__take_snapshot()
+   - Screenshot: mcp__chrome-devtools__take_screenshot()
+4. ONLY THEN report success
+```
+
+**NO EXCEPTIONS:** Never report "deployed successfully" without Chrome DevTools evidence!
+
 ---
 
 ### 🎨 **frontend-specialist** - UI/UX Expert
@@ -489,6 +666,28 @@ AKCJA KOORDYNATORA:
 #### ⚠️ INTEGRATION:
 - Współpracuje z livewire-specialist
 - Używa Alpine.js dla interactivity
+
+#### 🚀 MANDATORY: Chrome DevTools MCP Verification
+
+**CRITICAL:** Frontend-specialist MUSI używać Chrome DevTools MCP AFTER EVERY UI change!
+
+**WORKFLOW:**
+```javascript
+1. Update Blade/CSS/Alpine.js
+2. Build + Deploy
+3. 🚀 VERIFY with Chrome DevTools MCP:
+   - Snapshot: mcp__chrome-devtools__take_snapshot()
+   - Inline styles check: evaluate_script("() => document.querySelectorAll('[style]').length")
+   - Z-index conflicts: evaluate_script("() => Array.from(...)")
+   - Screenshot: mcp__chrome-devtools__take_screenshot({fullPage: true})
+4. ONLY THEN report success
+```
+
+**ANTI-PATTERNS TO DETECT:**
+- ❌ Inline styles (`[style]` attribute)
+- ❌ Z-index conflicts (multiple elements with z-index)
+- ❌ Missing responsive breakpoints
+- ❌ Accessibility violations
 
 ---
 

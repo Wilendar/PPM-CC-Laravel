@@ -1098,25 +1098,31 @@ class ProductTransformer
      */
     private function getDefaultCategoryId(Product $product, PrestaShopShop $shop, array $categoryAssociations): int
     {
-        // PRIORITY 1: Get primary category from pivot table
-        $primaryCategoryId = DB::table('product_categories')
-            ->where('product_id', $product->id)
-            ->where('shop_id', $shop->id)
-            ->where('is_primary', true)
-            ->value('category_id');
+        // FIX 2025-11-21: Shop-specific categories are in ProductShopData.category_mappings (Option A)
+        // NOT in product_categories pivot table (DISABLED since 2025-11-20)
 
-        if ($primaryCategoryId) {
-            $prestashopPrimaryId = $this->categoryMapper->mapToPrestaShop((int) $primaryCategoryId, $shop);
+        // PRIORITY 1: Get primary category from ProductShopData.category_mappings['ui']['primary']
+        $shopData = $product->shopData->where('shop_id', $shop->id)->first();
 
-            if ($prestashopPrimaryId) {
-                Log::debug('[CATEGORY SYNC] Using primary category as default', [
-                    'product_id' => $product->id,
-                    'shop_id' => $shop->id,
-                    'ppm_primary_id' => $primaryCategoryId,
-                    'prestashop_primary_id' => $prestashopPrimaryId,
-                ]);
+        if ($shopData && !empty($shopData->category_mappings)) {
+            $categoryMappings = $shopData->category_mappings;
+            $primaryCategoryId = $categoryMappings['ui']['primary'] ?? null;
 
-                return $prestashopPrimaryId;
+            if ($primaryCategoryId) {
+                // Map PPM category ID to PrestaShop ID
+                $prestashopPrimaryId = $this->categoryMapper->mapToPrestaShop((int) $primaryCategoryId, $shop);
+
+                if ($prestashopPrimaryId) {
+                    Log::debug('[CATEGORY SYNC] Using shop-specific primary category as default (from category_mappings)', [
+                        'product_id' => $product->id,
+                        'shop_id' => $shop->id,
+                        'ppm_primary_id' => $primaryCategoryId,
+                        'prestashop_primary_id' => $prestashopPrimaryId,
+                        'source' => 'ProductShopData.category_mappings',
+                    ]);
+
+                    return $prestashopPrimaryId;
+                }
             }
         }
 

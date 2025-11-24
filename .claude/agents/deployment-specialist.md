@@ -908,6 +908,86 @@ This agent should use the following Claude Code Skills when applicable:
 
 ---
 
+## 🚀 MANDATORY: Chrome DevTools MCP Verification
+
+**⚠️ CRITICAL REQUIREMENT:** EVERY deployment MUST be verified with Chrome DevTools MCP BEFORE reporting completion!
+
+**ZASADA:** Deploy → Chrome DevTools Verify → (jeśli OK) Report to User
+
+**POST-DEPLOYMENT VERIFICATION WORKFLOW:**
+
+```javascript
+// 1. Navigate to production page
+mcp__chrome-devtools__navigate_page({
+  type: "url",
+  url: "https://ppm.mpptrade.pl/admin/products"
+})
+
+// 2. Take snapshot (PRIMARY - faster, searchable)
+const snapshot = mcp__chrome-devtools__take_snapshot()
+// Verify: No "wire:snapshot" literal text
+// Verify: Expected UI elements present
+
+// 3. Check console for errors
+const consoleCheck = mcp__chrome-devtools__list_console_messages({
+  types: ["error", "warn"]
+})
+// Expected: 0 errors
+
+// 4. Verify network (CSS/JS HTTP 200)
+const networkCheck = mcp__chrome-devtools__list_network_requests({
+  resourceTypes: ["stylesheet", "script"]
+})
+// Expected: All HTTP 200
+
+// 5. Screenshot for visual confirmation
+mcp__chrome-devtools__take_screenshot({
+  filePath: "_TOOLS/screenshots/deployment_verification_[timestamp].png"
+})
+```
+
+**MANDATORY FOR:**
+- CSS/JS deployments (Vite assets)
+- Blade template updates
+- Livewire component changes
+- ANY production code deployment
+
+**WHY CHROME DEVTOOLS IS PRIMARY:**
+- ✅ Detects wire:snapshot rendering issues (Node.js scripts miss this!)
+- ✅ Catches wire:poll + wire:loading conflicts (FIX #7/#8 prevention)
+- ✅ Verifies disabled state flashing (real-time DOM inspection)
+- ✅ Monitors console for Livewire errors (runtime issues)
+- ✅ HTTP 200 verification for ALL assets (prevents incomplete deployment)
+- ❌ curl/HTTP checks don't detect JS runtime errors
+- ❌ Node.js scripts can't interact with Livewire components
+
+**FIX #7/#8 PREVENTION PATTERN:**
+
+```javascript
+// After deploying Livewire components:
+// WAIT 6 seconds for wire:poll.5s to settle!
+await new Promise(resolve => setTimeout(resolve, 6000))
+
+// Check disabled states (prevent FIX #7/#8 recurrence!)
+const disabledCheck = mcp__chrome-devtools__evaluate_script({
+  function: "() => ({ total: document.querySelectorAll('input').length, disabled: document.querySelectorAll('input[disabled]').length })"
+})
+// Expected: {disabled: 0} (all enabled)
+```
+
+**📖 RESOURCES:**
+- Full Guide: `_DOCS/CHROME_DEVTOOLS_MCP_GUIDE.md`
+- Skill: Use `chrome-devtools-verification` for guided workflow
+- Hook: `post-deployment-verification` auto-triggers reminder after pscp/plink
+
+**❌ ANTI-PATTERNS:**
+- Reporting completion WITHOUT Chrome DevTools check
+- Using curl/HTTP checks INSTEAD OF browser inspection
+- Assuming "build passed = production works"
+- Screenshot ONLY (need console/network verification too!)
+
+---
+
 ## Kiedy używać:
 
 Use this agent when working on:

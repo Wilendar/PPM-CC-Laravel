@@ -169,6 +169,9 @@ class ProductForm extends Component
     public array $defaultCategories = ['selected' => [], 'primary' => null]; // Default categories
     public array $shopCategories = []; // [shopId => ['selected' => [ids], 'primary' => id]]
 
+    // FIX 2025-11-21 v5: Category expansion as public property (computed property didn't execute)
+    public array $expandedCategoryIds = []; // Category IDs to expand (parent categories of selected items)
+
     public array $shopAttributes = []; // [shopId => [attributeCode => value]]
     public array $exportedShops = [];   // Shops where product is exported
     public ?int $activeShopId = null;   // null = default data, int = specific shop
@@ -185,6 +188,7 @@ class ProductForm extends Component
 
     // === UI STATE ===
     public bool $isSaving = false;
+    public bool $categoryEditingDisabled = false; // FIX #13: Reactive property for Alpine.js :disabled binding
     public array $validationErrors = [];
     public string $successMessage = '';
     public bool $showSlugField = false;
@@ -339,6 +343,9 @@ class ProductForm extends Component
             $this->showSlugField = false;
             $this->isSaving = false;
             $this->successMessage = '';
+
+            // FIX 2025-11-21 v5: Calculate expanded category IDs after mount
+            $this->expandedCategoryIds = $this->calculateExpandedCategoryIds();
 
             Log::info('ProductForm mount() completed successfully', [
                 'isEditMode' => $this->isEditMode,
@@ -1282,6 +1289,122 @@ class ProductForm extends Component
         }
     }
 
+    /**
+     * Get category IDs that should be expanded in tree (have selected children)
+     *
+     * FIX 2025-11-21: Performance optimization - expand ONLY categories with selected children
+     * FIX 2025-11-21 v2: Convert PPM IDs → PrestaShop IDs for shop context (ID mismatch)
+     *
+     * @return array Category IDs to expand
+     */
+    // FIX 2025-11-21 v5: Changed from computed property to private method called in switchToShop()
+    // Root Cause: Computed properties don't execute from @php blocks
+    // Solution: Calculate and store in public property during shop switch
+    // FIX 2025-11-22: Changed to public to allow access from Blade template (basic-tab.blade.php)
+    public function calculateExpandedCategoryIds(): array
+    {
+        // Get selected categories for current context (default or shop)
+        // Note: These are PPM IDs (stored in $this->shopCategories)
+        $selectedCategories = $this->activeShopId === null
+            ? ($this->defaultCategories['selected'] ?? [])
+            : ($this->shopCategories[$this->activeShopId]['selected'] ?? []);
+
+        if (empty($selectedCategories)) {
+            return []; // No selected categories = no expansion needed
+        }
+
+        // FIX 2025-11-21 v5: Info logging (production LOG_LEVEL=info, debug disabled)
+        Log::info('[calculateExpandedCategoryIds] START', [
+            'active_shop_id' => $this->activeShopId,
+            'selected_categories' => $selectedCategories,
+            'selected_count' => count($selectedCategories),
+        ]);
+
+        // Build list of categories to expand (parents of selected categories)
+        $expandedIds = [];
+
+        foreach ($selectedCategories as $selectedId) {
+            // Get category with parent chain (using PPM ID)
+            $category = \App\Models\Category::find($selectedId);
+
+            if ($category) {
+                // Add all parents to expanded list (recursive)
+                $parentIds = [];
+                $parent = $category->parent;
+                while ($parent) {
+                    $expandedIds[] = $parent->id; // PPM ID
+                    $parentIds[] = $parent->id;
+                    $parent = $parent->parent;
+                }
+
+                // FIX 2025-11-21 v5: Info logging (production LOG_LEVEL=info)
+                Log::info('[calculateExpandedCategoryIds] Category parents', [
+                    'selected_id' => $selectedId,
+                    'category_name' => $category->name,
+                    'parent_ids' => $parentIds,
+                    'parent_count' => count($parentIds),
+                ]);
+            } else {
+                Log::warning('[calculateExpandedCategoryIds] Category not found', [
+                    'selected_id' => $selectedId,
+                ]);
+            }
+        }
+
+        $expandedIds = array_unique($expandedIds);
+
+        // FIX 2025-11-21 v2: For shop context, convert PPM IDs → PrestaShop IDs
+        // Root Cause: Blade tree uses PrestaShop IDs ($category->id from PrestaShop tree),
+        // but $expandedIds contains PPM IDs → comparison fails → categories not expanded
+        if ($this->activeShopId !== null) {
+            $shop = \App\Models\PrestaShopShop::find($this->activeShopId);
+
+            if ($shop) {
+                try {
+                    $categoryMapper = app(\App\Services\PrestaShop\CategoryMapper::class);
+                    $prestashopExpandedIds = [];
+
+                    foreach ($expandedIds as $ppmId) {
+                        // Map PPM ID → PrestaShop ID
+                        $prestashopId = $categoryMapper->mapToPrestaShop($ppmId, $shop);
+
+                        if ($prestashopId) {
+                            $prestashopExpandedIds[] = $prestashopId;
+                        } else {
+                            // FIX 2025-11-21 v5: Info logging for unmapped parents
+                            Log::info('[calculateExpandedCategoryIds] Parent not mapped to PrestaShop', [
+                                'ppm_id' => $ppmId,
+                            ]);
+                        }
+                    }
+
+                    // FIX 2025-11-21 v5: Info logging with final result
+                    Log::info('[calculateExpandedCategoryIds] RESULT', [
+                        'ppm_expanded_ids' => $expandedIds,
+                        'ppm_count' => count($expandedIds),
+                        'prestashop_expanded_ids' => $prestashopExpandedIds,
+                        'prestashop_count' => count($prestashopExpandedIds),
+                    ]);
+
+                    return $prestashopExpandedIds;
+
+                } catch (\Exception $e) {
+                    Log::error('[calculateExpandedCategoryIds] Failed to map PPM IDs to PrestaShop IDs', [
+                        'shop_id' => $this->activeShopId,
+                        'ppm_ids' => $expandedIds,
+                        'error' => $e->getMessage(),
+                    ]);
+
+                    // Fallback: return PPM IDs (better than nothing)
+                    return $expandedIds;
+                }
+            }
+        }
+
+        // Default context: return PPM IDs (correct for PPM category tree)
+        return $expandedIds;
+    }
+
     /*
     |--------------------------------------------------------------------------
     | UI INTERACTION METHODS
@@ -1622,20 +1745,8 @@ class ProductForm extends Component
             $mappingKey = (string) $ppmId;
             if (isset($mappings[$mappingKey])) {
                 $prestashopIds[] = (int) $mappings[$mappingKey];
-            } else {
-                Log::debug('[ETAP_07b] PPM category has no PrestaShop mapping', [
-                    'shop_id' => $contextShopId,
-                    'ppm_id' => $ppmId,
-                ]);
             }
         }
-
-        Log::debug('[ETAP_07b] Converted PPM IDs to PrestaShop IDs', [
-            'shop_id' => $contextShopId,
-            'ppm_ids' => $ppmIds,
-            'prestashop_ids' => $prestashopIds,
-            'mappings_used' => $mappings,
-        ]);
 
         return $prestashopIds;
     }
@@ -1700,24 +1811,120 @@ class ProductForm extends Component
     }
 
     /**
+     * FIX 2025-11-21: Convert PrestaShop category ID → PPM category ID
+     *
+     * Uses reverse lookup in mappings to convert PrestaShop ID back to PPM ID.
+     * This is necessary because Blade passes PrestaShop IDs (from category tree),
+     * but shopCategories['selected'] stores PPM IDs.
+     *
+     * @param int $prestashopId PrestaShop category ID
+     * @param int $shopId Shop context
+     * @return int|null PPM category ID or null if not found
+     */
+    private function convertPrestaShopIdToPpmId(int $prestashopId, int $shopId): ?int
+    {
+        // Get mappings (with lazy loading if needed)
+        $mappings = $this->shopCategories[$shopId]['mappings'] ?? [];
+
+        // Lazy load mappings if missing
+        if (empty($mappings)) {
+            $productShopData = \App\Models\ProductShopData::where('product_id', $this->product->id)
+                ->where('shop_id', $shopId)
+                ->first();
+
+            if ($productShopData && !empty($productShopData->category_mappings)) {
+                $categoryMappings = $productShopData->category_mappings;
+                $mappings = $categoryMappings['mappings'] ?? [];
+                $this->shopCategories[$shopId]['mappings'] = $mappings;
+            }
+        }
+
+        // Reverse lookup: PrestaShop ID → PPM ID
+        // Mappings format: {"3": 12, "12": 11, ...} (PPM ID => PrestaShop ID)
+        // We need to find key where value == $prestashopId
+        foreach ($mappings as $ppmId => $psId) {
+            if ((int) $psId === $prestashopId) {
+                return (int) $ppmId;
+            }
+        }
+
+        return null; // Not found
+    }
+
+    /**
      * Toggle category selection with proper context isolation
      */
     public function toggleCategory(int $categoryId): void
     {
+        // FIX 2025-11-21: Convert PrestaShop ID → PPM ID for shop context
+        // Root Cause: Blade passes PrestaShop category ID (from category tree), but
+        // shopCategories['selected'] stores PPM IDs. Without conversion, we mix ID types.
+        $ppmCategoryId = $categoryId; // Default: assume PPM ID (for default context)
+
+        if ($this->activeShopId !== null) {
+            // Shop context: categoryId is PrestaShop ID → convert to PPM ID
+            // FIX #2 2025-11-21: Use mapOrCreate instead of returning null for unmapped categories
+            $ppmCategoryId = $this->convertPrestaShopIdToPpmId($categoryId, $this->activeShopId);
+
+            if ($ppmCategoryId === null) {
+                // Category not yet mapped - create mapping via CategoryMapper
+                // FIX 2025-11-21 v2: Reduce logging for better responsiveness (info → debug)
+                Log::debug('[toggleCategory] Category not mapped, creating via mapOrCreate', [
+                    'prestashop_id' => $categoryId,
+                    'shop_id' => $this->activeShopId,
+                ]);
+
+                try {
+                    $shop = \App\Models\PrestaShopShop::find($this->activeShopId);
+                    if (!$shop) {
+                        throw new \Exception("Shop {$this->activeShopId} not found");
+                    }
+
+                    $categoryMapper = app(\App\Services\PrestaShop\CategoryMapper::class);
+                    $ppmCategoryId = $categoryMapper->mapOrCreateFromPrestaShop($categoryId, $shop);
+
+                    // Get PS ID for this newly mapped category
+                    $prestashopId = $categoryMapper->mapToPrestaShop($ppmCategoryId, $shop);
+
+                    // Update shopCategories with new mapping
+                    if (!isset($this->shopCategories[$this->activeShopId])) {
+                        $this->shopCategories[$this->activeShopId] = ['selected' => [], 'primary' => null, 'mappings' => []];
+                    }
+
+                    $this->shopCategories[$this->activeShopId]['mappings'][(string)$ppmCategoryId] = $prestashopId;
+
+                    // FIX 2025-11-21 v2: Reduce logging (info → debug)
+                    Log::debug('[toggleCategory] Category mapped successfully', [
+                        'ps_id' => $categoryId,
+                        'ppm_id' => $ppmCategoryId,
+                    ]);
+                } catch (\Exception $e) {
+                    Log::error('[toggleCategory] Failed to map category via mapOrCreate', [
+                        'prestashop_id' => $categoryId,
+                        'shop_id' => $this->activeShopId,
+                        'error' => $e->getMessage(),
+                    ]);
+
+                    $this->addError('categories', 'Nie udało się dodać kategorii: ' . $e->getMessage());
+                    return; // Cannot toggle unmapped category
+                }
+            }
+        }
+
         $currentCategories = $this->getCurrentContextCategories();
         $selectedCategories = $currentCategories['selected'] ?? [];
         $primaryCategory = $currentCategories['primary'] ?? null;
 
-        if (in_array($categoryId, $selectedCategories)) {
+        if (in_array($ppmCategoryId, $selectedCategories)) {
             // Remove category
-            $selectedCategories = array_values(array_diff($selectedCategories, [$categoryId]));
+            $selectedCategories = array_values(array_diff($selectedCategories, [$ppmCategoryId]));
             // Remove as primary if it was primary
-            if ($primaryCategory === $categoryId) {
+            if ($primaryCategory === $ppmCategoryId) {
                 $primaryCategory = null;
             }
         } else {
             // Add category
-            $selectedCategories[] = $categoryId;
+            $selectedCategories[] = $ppmCategoryId;
         }
 
         // Save back to context (isolated per shop/default)
@@ -1729,15 +1936,10 @@ class ProductForm extends Component
         // Mark form as changed to track in pending changes
         $this->markFormAsChanged();
 
-        Log::info('Category toggled with context isolation', [
-            'category_id' => $categoryId,
-            'shop_id' => $this->activeShopId,
-            'context' => $this->activeShopId === null ? 'default' : "shop_{$this->activeShopId}",
-            'selected_categories' => $selectedCategories,
-            'primary_category_id' => $primaryCategory,
-            'defaultCategories_after_toggle' => $this->defaultCategories,
-            'hasUnsavedChanges' => $this->hasUnsavedChanges,
-        ]);
+        // FIX #1 2025-11-21: Badge now uses real-time comparison, no cache invalidation needed
+        // REMOVED: $this->invalidateCategoryValidationCache();
+
+        // FIX 2025-11-21 v2: Reduced logging for better responsiveness (removed verbose log)
     }
 
     /**
@@ -1745,29 +1947,86 @@ class ProductForm extends Component
      */
     public function setPrimaryCategory(int $categoryId): void
     {
+        // FIX 2025-11-21: Convert PrestaShop ID → PPM ID for shop context
+        // Root Cause: Same as toggleCategory() - Blade passes PrestaShop ID
+        $ppmCategoryId = $categoryId; // Default: assume PPM ID (for default context)
+
+        if ($this->activeShopId !== null) {
+            // Shop context: categoryId is PrestaShop ID → convert to PPM ID
+            // FIX #2 2025-11-21: Use mapOrCreate instead of returning null for unmapped categories
+            $ppmCategoryId = $this->convertPrestaShopIdToPpmId($categoryId, $this->activeShopId);
+
+            if ($ppmCategoryId === null) {
+                // Category not yet mapped - create mapping via CategoryMapper
+                Log::info('[FIX #2 2025-11-21] setPrimaryCategory: Category not mapped, creating via mapOrCreate', [
+                    'prestashop_id' => $categoryId,
+                    'shop_id' => $this->activeShopId,
+                ]);
+
+                try {
+                    $shop = \App\Models\PrestaShopShop::find($this->activeShopId);
+                    if (!$shop) {
+                        throw new \Exception("Shop {$this->activeShopId} not found");
+                    }
+
+                    $categoryMapper = app(\App\Services\PrestaShop\CategoryMapper::class);
+                    $ppmCategoryId = $categoryMapper->mapOrCreateFromPrestaShop($categoryId, $shop);
+
+                    // Get PS ID for this newly mapped category
+                    $prestashopId = $categoryMapper->mapToPrestaShop($ppmCategoryId, $shop);
+
+                    // Update shopCategories with new mapping
+                    if (!isset($this->shopCategories[$this->activeShopId])) {
+                        $this->shopCategories[$this->activeShopId] = ['selected' => [], 'primary' => null, 'mappings' => []];
+                    }
+
+                    $this->shopCategories[$this->activeShopId]['mappings'][(string)$ppmCategoryId] = $prestashopId;
+
+                    Log::info('[FIX #2 2025-11-21] setPrimaryCategory: Category mapped successfully', [
+                        'ps_id' => $categoryId,
+                        'ppm_id' => $ppmCategoryId,
+                        'shop_id' => $this->activeShopId,
+                    ]);
+                } catch (\Exception $e) {
+                    Log::error('[FIX #2 2025-11-21] setPrimaryCategory: Failed to map category via mapOrCreate', [
+                        'prestashop_id' => $categoryId,
+                        'shop_id' => $this->activeShopId,
+                        'error' => $e->getMessage(),
+                    ]);
+
+                    $this->addError('categories', 'Nie udało się ustawić głównej kategorii: ' . $e->getMessage());
+                    return; // Cannot set unmapped category as primary
+                }
+            }
+        }
+
         $currentCategories = $this->getCurrentContextCategories();
         $selectedCategories = $currentCategories['selected'] ?? [];
 
         // Ensure the category is selected first
-        if (!in_array($categoryId, $selectedCategories)) {
-            $selectedCategories[] = $categoryId;
+        if (!in_array($ppmCategoryId, $selectedCategories)) {
+            $selectedCategories[] = $ppmCategoryId;
         }
 
         // Set as primary
         $this->setCurrentContextCategories([
             'selected' => $selectedCategories,
-            'primary' => $categoryId,
+            'primary' => $ppmCategoryId,
         ]);
 
         // Mark form as changed to track in pending changes
         $this->markFormAsChanged();
 
+        // FIX #1 2025-11-21: Invalidate category validation cache to update badge
+        $this->invalidateCategoryValidationCache();
+
         Log::info('Primary category set with context isolation', [
-            'category_id' => $categoryId,
+            'received_category_id' => $categoryId,
+            'ppm_category_id' => $ppmCategoryId,
             'shop_id' => $this->activeShopId,
             'context' => $this->activeShopId === null ? 'default' : "shop_{$this->activeShopId}",
             'selected_categories' => $selectedCategories,
-            'primary_category_id' => $categoryId,
+            'primary_category_id' => $ppmCategoryId,
         ]);
     }
 
@@ -2092,6 +2351,9 @@ class ProductForm extends Component
                 'total_pending_contexts' => count($this->pendingChanges),
             ]);
 
+            // FIX 2025-11-21 v5: Calculate expanded category IDs after switching shops
+            $this->expandedCategoryIds = $this->calculateExpandedCategoryIds();
+
         } catch (\Exception $e) {
             Log::error('Error switching to shop tab', [
                 'error' => $e->getMessage(),
@@ -2146,6 +2408,86 @@ class ProductForm extends Component
         } elseif ($this->product) {
             // Fallback: load from product if defaultData is not available
             $this->loadProductData();
+        }
+    }
+
+    /**
+     * Pull fresh data from PrestaShop instantly (synchronous, no JOB dispatch)
+     *
+     * FIX 2025-11-21: Instant pull after sync completion
+     * User Request: "Pull data z presty instant, bez tworzenia JOB-a, w tle automatycznie"
+     *
+     * @param int $shopId Shop ID to pull data from
+     * @return void
+     */
+    private function pullShopDataInstant(int $shopId): void
+    {
+        try {
+            // Find shop data
+            $shopData = $this->product->shopData->where('shop_id', $shopId)->first();
+
+            if (!$shopData || !$shopData->prestashop_product_id) {
+                Log::warning('[INSTANT PULL] Product not linked or missing PrestaShop ID', [
+                    'product_id' => $this->product->id,
+                    'shop_id' => $shopId,
+                ]);
+                return;
+            }
+
+            Log::info('[INSTANT PULL] Pulling fresh data from PrestaShop (synchronous)', [
+                'product_id' => $this->product->id,
+                'shop_id' => $shopId,
+                'prestashop_product_id' => $shopData->prestashop_product_id,
+            ]);
+
+            // Create API client
+            $client = \App\Services\PrestaShop\PrestaShopClientFactory::create($shopData->shop);
+
+            // Fetch product from PrestaShop
+            $psData = $client->getProduct($shopData->prestashop_product_id);
+
+            if (isset($psData['product'])) {
+                $psData = $psData['product'];
+            }
+
+            // Apply conflict resolution strategy
+            $conflictResolver = app(\App\Services\PrestaShop\ConflictResolver::class);
+            $resolution = $conflictResolver->resolve($shopData, $psData);
+
+            if ($resolution['should_update']) {
+                // Update allowed - apply PrestaShop data
+                $shopData->update(array_merge($resolution['data'], [
+                    'last_pulled_at' => now(),
+                    'sync_status' => 'synced',
+                    'has_conflicts' => false,
+                    'conflict_log' => null,
+                    'conflicts_detected_at' => null,
+                ]));
+
+                Log::info('[INSTANT PULL] Product updated from PrestaShop', [
+                    'product_id' => $this->product->id,
+                    'shop_id' => $shopId,
+                    'reason' => $resolution['reason'],
+                ]);
+
+                // Reload form data to reflect changes
+                $this->product->refresh();
+                $this->loadShopDataToForm($shopId);
+
+            } else {
+                Log::warning('[INSTANT PULL] Update blocked by conflict resolver', [
+                    'product_id' => $this->product->id,
+                    'shop_id' => $shopId,
+                    'reason' => $resolution['reason'],
+                ]);
+            }
+
+        } catch (\Exception $e) {
+            Log::error('[INSTANT PULL] Failed to pull data from PrestaShop', [
+                'product_id' => $this->product->id,
+                'shop_id' => $shopId,
+                'error' => $e->getMessage(),
+            ]);
         }
     }
 
@@ -2221,18 +2563,38 @@ class ProductForm extends Component
 
         // === CATEGORIES ===
         // BUG FIX 2025-11-19: Reload categories from database after save
-        // CRITICAL: When user saves changes and switches shops, categories MUST be reloaded
-        // Otherwise UI shows stale in-memory data instead of saved database state
+        // FIX 2025-11-21 (Fix #12): SKIP category reload when sync_status === 'pending'
+        // REASON: Race condition - if user saves and immediately re-enters during JOB execution,
+        // loadCategories() would pull OLD data from PrestaShop (before JOB finishes sync)
+        // This would overwrite the NEW categories that user just saved
+        // SOLUTION: Keep in-memory categories when JOB is pending, reload only when sync completes
         if ($this->product && $this->product->exists && $this->categoryManager) {
-            // Reload ALL shop categories from database (including current shop)
-            $this->categoryManager->loadCategories();
+            // Check if sync is pending for this shop (use already loaded $shopData from line 2325)
+            if ($shopData && $shopData->sync_status === \App\Models\ProductShopData::STATUS_PENDING) {
+                // JOB is running - SKIP category reload (keep in-memory data)
+                // Category checkboxes will be disabled via blade template (isPendingSyncForShop)
+                Log::info('[FIX #12] Categories NOT reloaded - sync pending (preventing race condition)', [
+                    'shop_id' => $shopId,
+                    'product_id' => $this->product->id,
+                    'sync_status' => 'pending',
+                    'reason' => 'Waiting for JOB to complete before reloading from DB',
+                    'current_categories_in_memory' => $this->shopCategories[$shopId] ?? 'NOT_SET',
+                ]);
+            } else {
+                // Normal flow - sync complete, safe to reload from DB
+                $this->categoryManager->loadCategories();
 
-            Log::debug('[BUG FIX] Categories reloaded after loadShopDataToForm', [
-                'shop_id' => $shopId,
-                'product_id' => $this->product->id,
-                'shopCategories_after_reload' => $this->shopCategories[$shopId] ?? 'NOT_SET',
-            ]);
+                Log::debug('[FIX #12] Categories reloaded from DB (sync complete)', [
+                    'shop_id' => $shopId,
+                    'product_id' => $this->product->id,
+                    'shopCategories_after_reload' => $this->shopCategories[$shopId] ?? 'NOT_SET',
+                ]);
+            }
         }
+
+        // FIX #13: Update category editing disabled state for reactive Alpine.js binding
+        // Call method to refresh $categoryEditingDisabled property based on sync_status
+        $this->isCategoryEditingDisabled();
 
         // Force update of computed properties for UI reactivity
         $this->updateCategoryColorCoding();
@@ -2472,6 +2834,16 @@ class ProductForm extends Component
             '_fullDefaultCategories' => $this->defaultCategories,
             '_fullShopCategories' => $this->shopCategories,
         ];
+
+        // DIAGNOSIS 2025-11-21: Debug category data flow
+        Log::debug('[CATEGORY SYNC DEBUG] savePendingChanges: Category data captured', [
+            'product_id' => $this->product->id,
+            'active_shop_id' => $this->activeShopId,
+            'key' => $currentKey,
+            'raw_shopCategories' => $this->activeShopId !== null ? ($this->shopCategories[$this->activeShopId] ?? 'NOT_SET') : 'N/A (default context)',
+            'captured_contextCategories' => $this->pendingChanges[$currentKey]['contextCategories'],
+            'default_categories' => $this->defaultCategories,
+        ]);
 
         Log::info('Pending changes saved', [
             'key' => $currentKey,
@@ -2905,6 +3277,15 @@ class ProductForm extends Component
      */
     public function getCategoryStatusIndicator(): array
     {
+        // PRIORITY 0: Hard pending sync flag on ProductShopData (DB) - overrides everything
+        if ($this->activeShopId !== null && $this->isPendingSyncForShop($this->activeShopId, 'categories')) {
+            return [
+                'show' => true,
+                'text' => 'Oczekuje na synchronizacj�',
+                'class' => 'status-label-pending'
+            ];
+        }
+
         // PRIORITY 1: Check if categories have pending sync (highest priority)
         if ($this->activeShopId !== null) {
             $pendingChanges = $this->getPendingChangesForShop($this->activeShopId);
@@ -2914,7 +3295,8 @@ class ProductForm extends Component
                 return [
                     'show' => true,
                     'text' => 'Oczekuje na synchronizację',
-                    'class' => 'pending-sync-badge'
+                    // FIX #4 2025-11-21: Use user-requested class name
+                    'class' => 'status-label-pending'
                 ];
             }
         }
@@ -2938,13 +3320,15 @@ class ProductForm extends Component
                 return [
                     'show' => true,
                     'text' => '(takie same jak domyślne)',
-                    'class' => 'text-green-600 dark:text-green-400 text-xs'
+                    // FIX #4 2025-11-21: User-requested class (already correct!)
+                    'class' => 'text-green-600 dark:text-green-400 text-xs category-status-same'
                 ];
             case 'different':
                 return [
                     'show' => true,
                     'text' => '(unikalne dla tego sklepu)',
-                    'class' => 'text-orange-600 dark:text-orange-400 text-xs font-medium'
+                    // FIX #4 2025-11-21: User-requested class (already correct!)
+                    'class' => 'text-orange-600 dark:text-orange-400 text-xs font-medium category-status-different'
                 ];
             default:
                 return [
@@ -2956,12 +3340,48 @@ class ProductForm extends Component
     }
 
     /**
+     * FIX #4 2025-11-21: Check if category editing should be disabled
+     * FIX #6 2025-11-21: Use sync_status instead of pending changes detection
+     * FIX #7 2025-11-21: Remove sync_status check to prevent race condition
+     *
+     * Block category editing when:
+     * - Form is currently saving (isSaving = true)
+     *
+     * REMOVED: sync_status check (caused race condition)
+     * Problem: savePendingChangesToShop() sets sync_status='pending' → save() → Livewire re-render
+     *          → isCategoryEditingDisabled() queries DB → gets 'pending' → disables checkboxes
+     * Solution: Only block during $this->isSaving (actual form save operation)
+     *          Ignore sync_status (Job queue status - user can edit while Job processes)
+     *
+     * @return bool True if category editing should be disabled
+     */
+    public function isCategoryEditingDisabled(): bool
+    {
+        // FIX 2025-11-22 (CATEGORY PANEL REGRESSION FIX):
+        // SIMPLIFIED to check ONLY $this->isSaving (removed sync_status check)
+        // REASON: sync_status check caused race condition - categories permanently disabled
+        // when Job is pending. User should be able to edit categories immediately after
+        // save completes, even if background Job is still processing.
+        //
+        // Related: FIX #7 (category_checkbox_flash_fix_2025-11-21.md)
+        // Architecture: Form submission state ($this->isSaving) controls UI disabled state
+        // Background job state (sync_status in DB) tracks async processing separately
+
+        return $this->isSaving;
+    }
+
+    /**
      * Get CSS classes for categories section based on status
      */
     public function getCategoryClasses(): string
     {
         $status = $this->getCategoryStatus();
         $baseClasses = 'p-4 rounded-lg transition-all duration-200';
+
+        // FIX #4 2025-11-21: Add pending state styling
+        if ($this->isCategoryEditingDisabled()) {
+            return $baseClasses . ' category-status-pending border-yellow-600 bg-yellow-900/20 opacity-75 cursor-not-allowed';
+        }
 
         switch ($status) {
             case 'default':
@@ -3791,15 +4211,16 @@ class ProductForm extends Component
                     ]);
 
                     // FIX 2025-11-20: Auto-refresh categories after job completion
-                    // User Request: "Po wykonaniu JOB autorefresh, ponowne pobranie kategorii"
+                    // FIX 2025-11-21: Changed to instant pull (no JOB dispatch) for faster UI updates
+                    // User Request: "Pull data z presty instant, bez tworzenia JOB-a, w tle automatycznie"
                     if ($this->activeJobType === 'pull' && $this->activeShopId) {
-                        // Pull job completed - reload fresh data including categories
-                        $this->pullShopData($this->activeShopId);
+                        // Pull job completed - reload fresh data including categories (instant)
+                        $this->pullShopDataInstant($this->activeShopId);
                     }
 
                     if ($this->activeJobType === 'sync' && $this->activeShopId) {
-                        // Sync job completed - pull fresh data from PrestaShop to verify sync
-                        $this->pullShopData($this->activeShopId);
+                        // Sync job completed - pull fresh data from PrestaShop to verify sync (instant)
+                        $this->pullShopDataInstant($this->activeShopId);
                     }
                 }
 
@@ -4834,21 +5255,33 @@ class ProductForm extends Component
     }
 
     /**
-     * Save all pending changes from all tabs/shops and close form
-     * CRITICAL: This saves changes from ALL contexts, not just current tab
+     * FIX #5 2025-11-21: Save only CURRENT context and close form
+     *
+     * Changed from saving ALL contexts to only current context to prevent
+     * dispatching Jobs with stale data from inactive tabs.
+     *
+     * User edited categories in Shop A → save ONLY Shop A (not Shop B/C/default from memory)
      */
     public function saveAndClose()
     {
-        Log::info('saveAndClose called', [
+        $currentContext = $this->activeShopId ?? 'default';
+
+        Log::info('[FIX #5 2025-11-21] saveAndClose: Saving ONLY current context', [
+            'active_context' => $currentContext,
             'defaultCategories' => $this->defaultCategories,
             'hasUnsavedChanges' => $this->hasUnsavedChanges,
-            'pendingChanges_keys' => array_keys($this->pendingChanges),
-            'pendingChanges_default_categories' => $this->pendingChanges['default']['defaultCategories'] ?? 'NOT_SET',
+            'all_pending_contexts' => array_keys($this->pendingChanges),
         ]);
 
-        $this->saveAllPendingChanges();
+        // FIX #5 2025-11-21: Save only current context (not all contexts)
+        $this->saveCurrentContextOnly();
 
         if (empty($this->getErrorBag()->all())) {
+            // FIX 2025-11-21 (Fix #10): Force reset hasUnsavedChanges before redirect
+            // Prevents beforeunload dialog when saveAndClose() redirects to product list
+            // Even if other shop contexts have pending changes, we're leaving the form anyway
+            $this->hasUnsavedChanges = false;
+
             // FIX 2025-11-20 (ETAP_07b Fix #7): Use event-based JavaScript redirect instead of Livewire redirect
             // Livewire $this->redirect() was being canceled by property updates from saveAllPendingChanges()
             // Event-based redirect happens on frontend and survives Livewire request cycles
@@ -4857,7 +5290,84 @@ class ProductForm extends Component
 
             Log::info('saveAndClose dispatched redirect-to-product-list event', [
                 'product_id' => $this->product?->id,
+                'hasUnsavedChanges_reset' => true,
             ]);
+        }
+    }
+
+    /**
+     * FIX #5 2025-11-21: Save only current context (default OR active shop)
+     *
+     * This prevents dispatching Jobs with stale category data from inactive tabs.
+     * Only the active context is saved to ensure fresh data goes to PrestaShop.
+     */
+    private function saveCurrentContextOnly(): void
+    {
+        $this->isSaving = true;
+        $this->successMessage = '';
+
+        try {
+            // Check for active sync job
+            if ($this->hasActiveSyncJob()) {
+                $this->dispatch('warning', message: 'Synchronizacja już w trakcie. Poczekaj na zakończenie.');
+                $this->isSaving = false;
+                return;
+            }
+
+            // Save current form state to pending changes
+            $this->savePendingChanges();
+
+            $currentKey = $this->activeShopId ?? 'default';
+
+            if (!isset($this->pendingChanges[$currentKey])) {
+                Log::warning('[FIX #5 2025-11-21] No pending changes for current context', [
+                    'current_key' => $currentKey,
+                ]);
+                $this->isSaving = false;
+                return;
+            }
+
+            $changes = $this->pendingChanges[$currentKey];
+
+            // Save to appropriate target (default product or specific shop)
+            if ($currentKey === 'default') {
+                $this->savePendingChangesToProduct($changes);
+                Log::info('[FIX #5 2025-11-21] Saved ONLY default context', [
+                    'product_id' => $this->product->id,
+                ]);
+            } else {
+                $this->savePendingChangesToShop((int)$currentKey, $changes);
+                Log::info('[FIX #5 2025-11-21] Saved ONLY shop context', [
+                    'product_id' => $this->product->id,
+                    'shop_id' => $currentKey,
+                ]);
+            }
+
+            // Clear ONLY current context from pending changes
+            unset($this->pendingChanges[$currentKey]);
+            $this->hasUnsavedChanges = !empty($this->pendingChanges);
+
+            // Update stored data structures
+            $this->storeDefaultData();
+            $this->updateStoredShopData();
+
+            // Refresh form with current context data
+            if ($this->activeShopId === null) {
+                $this->loadDefaultDataToForm();
+            } else {
+                $this->loadShopDataToForm($this->activeShopId);
+            }
+
+            $this->dispatch('success', message: 'Zmiany zostały zapisane pomyślnie');
+        } catch (\Exception $e) {
+            Log::error('[FIX #5 2025-11-21] Error saving current context', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            $this->addError('general', 'Wystąpił błąd podczas zapisywania zmian: ' . $e->getMessage());
+        } finally {
+            $this->isSaving = false;
         }
     }
 
@@ -5268,37 +5778,127 @@ class ProductForm extends Component
             }
         }
 
-        // FIX 2025-11-20 (ETAP_07b): Handle category_mappings BEFORE save
-        // Convert PrestaShop IDs → canonical format (Option A) if categories changed
+        // FIX 2025-11-21: Handle category_mappings BEFORE save
+        // Create canonical Option A format from UI data (PPM ID + primary preserved)
         $categoryMappings = $productShopData->category_mappings; // Keep existing if no changes
 
         if (isset($changes['contextCategories'])) {
             $shop = \App\Models\PrestaShopShop::find($shopId);
 
             if ($shop) {
-                $converter = app(CategoryMappingsConverter::class);
                 $shopCategoryData = $changes['contextCategories'];
                 $selectedCategories = $shopCategoryData['selected'] ?? [];
+                $primaryCategory = $shopCategoryData['primary'] ?? null;
 
-                // Auto-inject PrestaShop roots (1 "Baza", 2 "Wszystko")
-                $requiredRoots = [1, 2];
-                foreach ($requiredRoots as $rootId) {
-                    if (!in_array($rootId, $selectedCategories)) {
-                        $selectedCategories[] = $rootId;
-                        Log::debug('[ETAP_07b] savePendingChangesToShop: Auto-injected PrestaShop root', [
-                            'shop_id' => $shopId,
-                            'root_id' => $rootId,
-                        ]);
+                Log::debug('[FIX 2025-11-21] savePendingChangesToShop: Processing categories', [
+                    'product_id' => $this->product->id,
+                    'shop_id' => $shopId,
+                    'received_contextCategories' => $shopCategoryData,
+                    'extracted_selected' => $selectedCategories,
+                    'extracted_primary' => $primaryCategory,
+                ]);
+
+                // STEP 1: Ensure all IDs are PPM IDs (map PrestaShop → PPM if needed)
+                $categoryMapper = app(\App\Services\PrestaShop\CategoryMapper::class);
+                $ppmCategoryIds = [];
+                $mappings = [];
+
+                foreach ($selectedCategories as $categoryId) {
+                    // Check if this is already a PPM category ID
+                    $ppmCategory = \App\Models\Category::find($categoryId);
+
+                    if ($ppmCategory) {
+                        // Already PPM ID - use directly
+                        $ppmId = $categoryId;
+                        Log::debug('[FIX 2025-11-21] Category is PPM ID', ['id' => $categoryId, 'name' => $ppmCategory->name]);
+                    } else {
+                        // Might be PrestaShop ID - map to PPM (or create if missing)
+                        try {
+                            $ppmId = $categoryMapper->mapOrCreateFromPrestaShop($categoryId, $shop);
+                            Log::info('[FIX 2025-11-21] Mapped PS→PPM', ['ps_id' => $categoryId, 'ppm_id' => $ppmId]);
+                        } catch (\Exception $e) {
+                            Log::warning('[FIX 2025-11-21] Failed to map category, skipping', [
+                                'id' => $categoryId,
+                                'error' => $e->getMessage(),
+                            ]);
+                            continue; // Skip unmappable categories
+                        }
                     }
+
+                    // Get PrestaShop ID for this PPM category
+                    $prestashopId = $categoryMapper->mapToPrestaShop($ppmId, $shop);
+
+                    if ($prestashopId === null) {
+                        Log::warning('[FIX 2025-11-21] PPM category has no PS mapping, skipping', [
+                            'ppm_id' => $ppmId,
+                        ]);
+                        continue;
+                    }
+
+                    $ppmCategoryIds[] = $ppmId;
+                    $mappings[(string)$ppmId] = $prestashopId;
                 }
 
-                // Convert PrestaShop IDs → PPM IDs + mappings (Option A canonical format)
-                $categoryMappings = $converter->fromPrestaShopFormat($selectedCategories, $shop);
-
-                Log::debug('[ETAP_07b] savePendingChangesToShop: Converted PrestaShop IDs to Option A', [
-                    'shop_id' => $shopId,
+                // FIX 2025-11-21 (Fix #11): REMOVED auto-injection of root categories
+                // Previous code ALWAYS added "Baza" + "Wszystko" even when user explicitly unchecked them
+                // This caused category changes to NOT persist (roots would re-appear after save)
+                // Now we respect user's selection - if they unchecked roots, don't add them back!
+                Log::info('[FIX #11 2025-11-21] Respecting user category selection (no auto-injection)', [
                     'product_id' => $this->product->id,
-                    'prestashop_ids' => $selectedCategories,
+                    'shop_id' => $shopId,
+                    'user_selected_categories' => $ppmCategoryIds,
+                ]);
+
+                // STEP 2: Determine primary category (preserve from UI, or use first if not set)
+                $primaryPpmId = null;
+
+                if ($primaryCategory !== null) {
+                    // Primary specified in UI - ensure it's a PPM ID
+                    $primaryPpmCategory = \App\Models\Category::find($primaryCategory);
+
+                    if ($primaryPpmCategory) {
+                        $primaryPpmId = $primaryCategory; // Already PPM ID
+                    } else {
+                        // Might be PS ID - map to PPM
+                        try {
+                            $primaryPpmId = $categoryMapper->mapOrCreateFromPrestaShop($primaryCategory, $shop);
+                            Log::info('[FIX 2025-11-21] Mapped primary PS→PPM', [
+                                'ps_id' => $primaryCategory,
+                                'ppm_id' => $primaryPpmId,
+                            ]);
+                        } catch (\Exception $e) {
+                            Log::warning('[FIX 2025-11-21] Failed to map primary, using first category', [
+                                'primary_id' => $primaryCategory,
+                                'error' => $e->getMessage(),
+                            ]);
+                            $primaryPpmId = $ppmCategoryIds[0] ?? null;
+                        }
+                    }
+                } else {
+                    // No primary specified - use first category
+                    $primaryPpmId = $ppmCategoryIds[0] ?? null;
+                }
+
+                // STEP 4: Build canonical Option A format
+                $categoryMappings = [
+                    'ui' => [
+                        'selected' => $ppmCategoryIds,
+                        'primary' => $primaryPpmId,
+                    ],
+                    'mappings' => $mappings,
+                    'metadata' => [
+                        'last_updated' => now()->toIso8601String(),
+                        'source' => 'manual', // User edited via form (manual edit)
+                        'notes' => 'FIX 2025-11-21: Canonical Option A with preserved primary',
+                    ],
+                ];
+
+                Log::info('[FIX 2025-11-21] Created canonical Option A', [
+                    'product_id' => $this->product->id,
+                    'shop_id' => $shopId,
+                    'ppm_category_ids' => $ppmCategoryIds,
+                    'primary_ppm_id' => $primaryPpmId,
+                    'mappings_count' => count($mappings),
                     'canonical_format' => $categoryMappings,
                 ]);
             }
@@ -5707,34 +6307,63 @@ class ProductForm extends Component
             return null;
         }
 
-        // Check cache first
-        if (isset($this->categoryValidationStatus[$this->activeShopId])) {
-            return $this->categoryValidationStatus[$this->activeShopId];
-        }
+        // FIX 2025-11-21: DON'T use cache - we need REAL-TIME comparison with current Livewire properties
+        // OLD: Check cache first (showed "Dziedziczone" even when categories selected in UI)
+        // NEW: Always compare current Livewire properties (real-time reactive badge)
 
         try {
-            // Get category validator service
-            $validator = app(\App\Services\CategoryValidatorService::class);
+            // FIX 2025-11-21: Compare CURRENT Livewire properties, NOT database data
+            // Root Cause: CategoryValidatorService reads from DB (old data), but user just selected categories in UI (new data)
+            // Solution: Compare $this->defaultCategories vs $this->shopCategories directly
 
-            // Compare shop categories with default
-            $comparison = $validator->compareWithDefault($this->product, $this->activeShopId);
+            // Get current Livewire properties (what user sees in UI right now)
+            $defaultCategories = $this->defaultCategories['selected'] ?? [];
+            $defaultPrimary = $this->defaultCategories['primary'] ?? null;
+
+            $shopCategories = $this->shopCategories[$this->activeShopId]['selected'] ?? [];
+            $shopPrimary = $this->shopCategories[$this->activeShopId]['primary'] ?? null;
+
+            // Determine status (same logic as CategoryValidatorService)
+            if (empty($shopCategories)) {
+                // No shop-specific categories → inherits from default
+                $status = 'dziedziczone';
+                $diff = [];
+            } elseif ($this->areCategoriesIdenticalForBadge($defaultCategories, $shopCategories, $defaultPrimary, $shopPrimary)) {
+                // Shop categories identical to default
+                $status = 'zgodne';
+                $diff = [];
+            } else {
+                // Shop has custom categories
+                $status = 'własne';
+                $diff = $this->generateDiffReportForBadge($defaultCategories, $shopCategories, $defaultPrimary, $shopPrimary);
+            }
 
             // Get badge configuration
-            $badge = $validator->getStatusBadge($comparison['status']);
+            $validator = app(\App\Services\CategoryValidatorService::class);
+            $badge = $validator->getStatusBadge($status);
 
-            // Get tooltip text
-            $tooltip = $validator->getDiffTooltip($comparison['diff'], $this->product);
+            // Get tooltip text (simplified for real-time)
+            $tooltip = match($status) {
+                'zgodne' => 'Kategorie w tym sklepie są identyczne z domyślnymi kategoriami PPM',
+                'własne' => 'Sklep używa własnych kategorii, różniących się od kategorii domyślnych PPM',
+                'dziedziczone' => 'Sklep dziedziczy kategorie z kategorii domyślnych PPM (brak własnych kategorii)',
+                default => null,
+            };
 
-            // Cache result
-            $this->categoryValidationStatus[$this->activeShopId] = [
-                'status' => $comparison['status'],
+            // DON'T cache - we need real-time reactivity
+            return [
+                'status' => $status,
                 'badge' => $badge,
                 'tooltip' => $tooltip,
-                'diff' => $comparison['diff'],
-                'metadata' => $comparison['metadata'],
+                'diff' => $diff,
+                'metadata' => [
+                    'default_count' => count($defaultCategories),
+                    'shop_count' => count($shopCategories),
+                    'default_primary' => $defaultPrimary,
+                    'shop_primary' => $shopPrimary,
+                    'realtime' => true, // Flag to indicate this is real-time comparison
+                ],
             ];
-
-            return $this->categoryValidationStatus[$this->activeShopId];
 
         } catch (\Exception $e) {
             Log::error('Failed to get category validation status', [
@@ -5745,6 +6374,52 @@ class ProductForm extends Component
 
             return null;
         }
+    }
+
+    /**
+     * Check if categories are identical (for badge real-time comparison)
+     *
+     * @param array $defaultCategories
+     * @param array $shopCategories
+     * @param int|null $defaultPrimary
+     * @param int|null $shopPrimary
+     * @return bool
+     */
+    private function areCategoriesIdenticalForBadge(array $defaultCategories, array $shopCategories, ?int $defaultPrimary, ?int $shopPrimary): bool
+    {
+        // Sort for comparison (order doesn't matter)
+        sort($defaultCategories);
+        sort($shopCategories);
+
+        // Check if arrays are identical
+        if ($defaultCategories !== $shopCategories) {
+            return false;
+        }
+
+        // Check if primary categories match
+        if ($defaultPrimary !== $shopPrimary) {
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * Generate diff report for badge (simplified)
+     *
+     * @param array $defaultCategories
+     * @param array $shopCategories
+     * @param int|null $defaultPrimary
+     * @param int|null $shopPrimary
+     * @return array
+     */
+    private function generateDiffReportForBadge(array $defaultCategories, array $shopCategories, ?int $defaultPrimary, ?int $shopPrimary): array
+    {
+        return [
+            'added' => array_values(array_diff($shopCategories, $defaultCategories)),
+            'removed' => array_values(array_diff($defaultCategories, $shopCategories)),
+            'primary_changed' => $defaultPrimary !== $shopPrimary,
+        ];
     }
 
     /**

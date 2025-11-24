@@ -49,9 +49,12 @@
     align-self: flex-start !important; /* Align to top of parent */
     height: fit-content !important;
     max-height: calc(100vh - 40px) !important; /* Prevent overflow beyond viewport */
+    overflow-y: auto !important; /* Enable scrolling for long content */
+    overflow-x: hidden !important; /* Prevent horizontal scroll */
     display: flex !important;
     flex-direction: column !important;
     gap: 1.5rem !important;
+    padding-right: 0.5rem !important; /* Space for scrollbar */
 }
 
 @media (max-width: 1024px) {

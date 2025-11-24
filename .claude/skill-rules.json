@@ -1,8 +1,8 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "description": "PPM Project - Skills Auto-Activation Configuration",
-  "version": "1.1.0",
-  "lastUpdated": "2025-11-19",
+  "version": "1.2.0",
+  "lastUpdated": "2025-11-21",
 
   "skills": {
     "ppm-styling-guidelines": {
@@ -510,6 +510,48 @@
       "description": "Livewire troubleshooting: Existing skill, 9 known Livewire issues and solutions"
     },
 
+    "chrome-devtools-verification": {
+      "type": "workflow",
+      "enforcement": "require",
+      "priority": "critical",
+      "promptTriggers": {
+        "keywords": [
+          "deployment",
+          "deploy",
+          "verification",
+          "verify",
+          "ui change",
+          "frontend change",
+          "livewire update",
+          "css change",
+          "blade change",
+          "screenshot",
+          "console errors",
+          "production test",
+          "after upload",
+          "chrome devtools"
+        ],
+        "intentPatterns": [
+          "(deploy|upload|wdróż).*?(completed|finished|done|ukończone)",
+          "(verify|check|test|sprawdź).*?(deployment|ui|frontend|livewire)",
+          "after.*?(deploy|upload|change|update)",
+          "(ui|frontend|livewire|css|blade).*?(change|update|modify)",
+          "screenshot.*?(test|verification)",
+          "console.*?(error|check|verify)",
+          "production.*?(test|verify|check)"
+        ]
+      },
+      "criticalRules": [
+        "⚠️ TOKEN OPTIMIZATION: Use evaluate_script() instead of full snapshot (85-95% reduction)",
+        "MANDATORY: snapshot → file + Grep (nie wczytuj snapshot do context!)",
+        "MANDATORY: JPEG screenshots (format: 'jpeg', quality: 85)",
+        "MANDATORY: filePath parameter dla wszystkich snapshots",
+        "MANDATORY: Chrome DevTools verification BEFORE reporting completion",
+        "Reference: _DOCS/CHROME_DEVTOOLS_OPTIMIZED_QUERIES.md"
+      ],
+      "description": "Chrome DevTools MCP verification (v1.1.0 OPTIMIZED): Post-deployment, Livewire, Frontend verification - 85-95% token reduction via evaluate_script() + snapshot→file patterns"
+    },
+
     "frontend-verification": {
       "type": "workflow",
       "enforcement": "require",
@@ -529,7 +571,7 @@
           "visual.*?regression"
         ]
       },
-      "description": "Frontend verification: MANDATORY screenshot testing after UI changes, console monitoring"
+      "description": "Frontend verification: MANDATORY screenshot testing after UI changes, console monitoring (use chrome-devtools-verification skill)"
     },
 
     "hostido-deployment": {

@@ -178,6 +178,110 @@ PPM-CC-Laravel/
 | **app/Http/Livewire/Dashboard/** | Dashboard główny | ✅ COMPLETED | Widgets, Analytics + **7 wersji role-based** (Admin, Menadżer, Redaktor, Magazynier, Handlowiec, Reklamacje, Użytkownik) |
 | **resources/views/livewire/** | Templates Blade | ✅ COMPLETED | Odpowiadające pliki .blade.php |
 
+#### 📋 ProductForm - Refactoring Modular (2025-11-21)
+
+**STATUS:** ✅ COMPLETED - Refactoring z monolitycznego pliku (2200 linii) → Modularny system **TABS + PARTIALS**
+
+**ARCHITEKTURA:** Conditional tab rendering (performance) + Reusable partials (DRY principle)
+
+**📖 DOKUMENTACJA:** [`_DOCS/Site_Rules/ProductForm_REFACTORING_2025-11-22.md`](Site_Rules/ProductForm_REFACTORING_2025-11-22.md) - Pełna dokumentacja refactoringu + Critical bug case study
+
+**STRUKTURA KATALOGÓW:**
+
+```
+resources/views/livewire/products/management/
+├── product-form.blade.php              # ✅ Main orchestrator (~100 linii)
+├── tabs/                               # ✅ CONDITIONAL RENDERING (tylko 1 tab w DOM)
+│   ├── basic-tab.blade.php             # ✅ 53KB - SKU, Name, Slug, Manufacturer, Categories
+│   ├── description-tab.blade.php       # ✅ 8KB  - Short/Full/Meta descriptions
+│   ├── physical-tab.blade.php          # ✅ 8KB  - Weight, Width, Height, Depth
+│   ├── attributes-tab.blade.php        # ✅ 4KB  - Product attributes system
+│   ├── prices-tab.blade.php            # ✅ 8KB  - Price groups (7 grup cenowych)
+│   └── stock-tab.blade.php             # ✅ 8KB  - Warehouse stock levels
+└── partials/                           # ✅ ALWAYS INCLUDED (reusable components)
+    ├── form-header.blade.php           # ✅ 2KB  - Breadcrumbs + Status badge + Unsaved badge
+    ├── form-messages.blade.php         # ✅ 1KB  - Success/Error messages
+    ├── tab-navigation.blade.php        # ✅ 2KB  - 6 tab buttons
+    ├── shop-management.blade.php       # ✅ 10KB - Shop dropdown + Sync status badge
+    ├── quick-actions.blade.php         # ✅ 6KB  - Sidebar: Zapisz/Aktualizuj/Wczytaj/Anuluj
+    ├── product-info.blade.php          # ✅ 2KB  - Sidebar: SKU/Status/Shops info
+    ├── category-tree-item.blade.php    # ✅ 5KB  - Recursive category tree node
+    ├── category-browser.blade.php      # ✅ 1KB  - Category browser wrapper
+    └── product-shop-tab.blade.php      # ✅ 19KB - Shop-specific data panel (legacy)
+```
+
+**ARCHITEKTURA TABS (Conditional Rendering):**
+
+| Tab | File | Size | Odpowiedzialność |
+|-----|------|------|------------------|
+| **Basic** | `basic-tab.blade.php` | 53KB | SKU, Name, Slug, Manufacturer, Supplier, EAN, Tax Rate, Active/Featured checkboxes, **CATEGORIES SECTION** |
+| **Description** | `description-tab.blade.php` | 8KB | Short description, Full description, Meta description |
+| **Physical** | `physical-tab.blade.php` | 8KB | Weight, Width, Height, Depth (dimensions) |
+| **Attributes** | `attributes-tab.blade.php` | 4KB | Product attributes (attribute system) |
+| **Prices** | `prices-tab.blade.php` | 8KB | Price groups (Detaliczna, Dealer, Warsztat, etc.) |
+| **Stock** | `stock-tab.blade.php` | 8KB | Warehouse stock levels (MPPTRADE, Pitbike, etc.) |
+
+**ARCHITEKTURA PARTIALS (Always Included - Reusable):**
+
+| Partial | File | Size | Odpowiedzialność |
+|---------|------|------|------------------|
+| **Form Header** | `form-header.blade.php` | 2KB | Breadcrumbs, Page title, Status badge (Aktywny/Nieaktywny), "Niezapisane zmiany" badge |
+| **Form Messages** | `form-messages.blade.php` | 1KB | Success messages, Error messages, Validation errors |
+| **Tab Navigation** | `tab-navigation.blade.php` | 2KB | 6 tab buttons (Basic, Description, Physical, Attributes, Prices, Stock) |
+| **Shop Management** | `shop-management.blade.php` | 10KB | Dropdown wyboru sklepu (Default / B2B Test DEV / etc.), Badge sync status |
+| **Quick Actions** | `quick-actions.blade.php` | 6KB | Sidebar buttons: "Zapisz zmiany", "Aktualizuj sklepy", "Wczytaj ze sklepów", "Anuluj i wróć" |
+| **Product Info** | `product-info.blade.php` | 2KB | Sidebar info box: SKU, Status, Liczba sklepów |
+| **Category Tree Item** | `category-tree-item.blade.php` | 5KB | Recursive category tree node (checkbox + "Ustaw główną" button + children) |
+| **Category Browser** | `category-browser.blade.php` | 1KB | Category browser wrapper (if needed) |
+| **Shop Tab** | `product-shop-tab.blade.php` | 19KB | Shop-specific data panel (legacy - may be deprecated) |
+
+**KORZYŚCI REFACTORINGU:**
+- ✅ **Performance:** Tylko 1 tab w DOM równocześnie (conditional rendering)
+- ✅ **Maintainability:** Separation of concerns - każdy tab = 1 odpowiedzialność
+- ✅ **Reusability:** Partials używane across all tabs (header, messages, actions)
+- ✅ **Testability:** Łatwiejsze testowanie individual tabs
+- ✅ **Code organization:** 15 plików zamiast 1 monolitycznego (2200 linii)
+
+**LAYOUT STRUCTURE:**
+```blade
+<div class="category-form-main-container">  <!-- Flexbox container -->
+  <div class="category-form-left-column">   <!-- flex: 1 -->
+    <div class="enterprise-card p-8">
+      @include('partials.tab-navigation')
+      @include('partials.shop-management')
+
+      {{-- CONDITIONAL TAB CONTENT (only 1 in DOM) --}}
+      @if($activeTab === 'basic') @include('tabs.basic-tab') @endif
+      @elseif($activeTab === 'description') @include('tabs.description-tab') @endif
+      ...
+    </div>
+  </div>
+
+  <div class="category-form-right-column">  <!-- width: 350px, sticky -->
+    @include('partials.quick-actions')
+    @include('partials.product-info')
+  </div>
+</div>
+```
+
+**⚠️ CRITICAL BUG CASE STUDY (2025-11-22):**
+Refactoring wprowadził dodatkowe linie kodu w Categories Section (`basic-tab.blade.php`):
+- Dodano: `$expandedCategoryIds = $this->calculateExpandedCategoryIds();`
+- Dodano: Parameter `'expandedCategoryIds' => $expandedCategoryIds` w @include
+
+**EFEKT:** 0 category checkboxes, sidepanel na dole zamiast po prawej
+
+**ROZWIĄZANIE:** Przywrócenie DOKŁADNIE działającej wersji z commit `bdfcd42` (bez extra parametrów)
+
+**LEKCJE:**
+1. Git history is gold - ZAWSZE sprawdzaj last working commit
+2. Refactoring = TYLKO structural changes (NO "improvements"!)
+3. Test IMMEDIATELY po refactoringu
+4. Compare parameters EXACTLY (working vs refactored)
+5. Chrome DevTools MCP verification MANDATORY po deployment
+
+**📖 SZCZEGÓŁY:** [`_DOCS/Site_Rules/ProductForm_REFACTORING_2025-11-22.md`](Site_Rules/ProductForm_REFACTORING_2025-11-22.md)
+
 ### 🗄️ BAZA DANYCH
 
 | Folder | Przeznaczenie | Status | Liczba plików |
@@ -416,12 +520,20 @@ App\Services\PrestaShop\ProductSync
 3. Po ukończeniu ETAP → zaktualizuj tę dokumentację
 4. Potwierdź zgodność z planem ETAP
 
-**OSTATNIA AKTUALIZACJA:** 2025-10-22
-- ✅ Dodano referencję do modułowej dokumentacji ARCHITEKTURA_PPM/ (21 modułów)
-- ✅ Zaktualizowano ETAP_06 → COMPLETED (Unified Import System w PRODUKTY)
-- ✅ Zaktualizowano ETAP_07 → FAZA 1+2 COMPLETED, FAZA 3 @ 75% (15 Services + 9 Jobs + 5 Livewire)
-- ✅ Dodano informację o Role-Based Dashboards (7 wersji)
-- ✅ Dodano szczegóły systemu CSV (6 serwisów + 9 route'ów)
+**OSTATNIA AKTUALIZACJA:** 2025-11-22
+- ✅ Dodano sekcję ProductForm - Refactoring Modular (2025-11-21) - TABS + PARTIALS architecture
+- ✅ Udokumentowano critical bug case study (categories not rendering) + 5 lessons learned
+- ✅ Dodano strukturę katalogów tabs/ (6 plików) + partials/ (9 plików)
+- ✅ Dodano tabele odpowiedzialności TABS vs PARTIALS
+- ✅ Dodano layout structure pattern + korzyści refactoringu
+- 📖 Cross-reference do [`ProductForm_REFACTORING_2025-11-22.md`](Site_Rules/ProductForm_REFACTORING_2025-11-22.md)
+
+**POPRZEDNIE AKTUALIZACJE:**
+- 2025-10-22: Referencja do ARCHITEKTURA_PPM/ (21 modułów)
+- 2025-10-22: ETAP_06 → COMPLETED (Unified Import System)
+- 2025-10-22: ETAP_07 → FAZA 1+2 COMPLETED, FAZA 3 @ 75%
+- 2025-10-22: Role-Based Dashboards (7 wersji)
+- 2025-10-22: System CSV (6 serwisów + 9 route'ów)
 - ⚠️ **AKTUALNY STATUS:** ETAP_04 ✅, ETAP_05 ✅, ETAP_06 ✅, ETAP_07 @ 75% 🔄, ETAP_08 ⏳
 
 ---

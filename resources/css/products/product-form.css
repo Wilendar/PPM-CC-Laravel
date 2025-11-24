@@ -1,6 +1,76 @@
 ﻿/* PPM Enterprise UI - Product Form Styling */
 
 /* ========================================
+   LAYOUT CONTAINERS (FORM + SIDEPANEL)
+   ======================================== */
+
+.category-form-container {
+    background: transparent;
+    color: #fff;
+    width: 100%;
+    max-width: 100%;
+    padding: 0;
+    margin: 0 auto;
+}
+
+.category-form-main-container {
+    display: flex;
+    flex-direction: row;
+    gap: 2rem;
+    padding: 0 2rem;
+    max-width: 1600px;
+    width: 100%;
+    margin: 0 auto;
+    position: relative;
+    overflow: visible;
+    min-height: calc(100vh - 200px);
+}
+
+.category-form-left-column {
+    flex: 1 1 auto;
+    min-width: 600px;
+    max-width: calc(100% - 370px - 2rem);
+    overflow: visible;
+}
+
+.category-form-right-column {
+    width: 350px;
+    min-width: 350px;
+    flex: 0 0 350px;
+    flex-shrink: 0;
+    position: sticky;
+    top: 20px;
+    align-self: flex-start;
+    height: fit-content;
+    max-height: calc(100vh - 40px);
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+@media (max-width: 1280px) {
+    .category-form-main-container {
+        flex-direction: column;
+        padding: 0 1rem;
+    }
+
+    .category-form-left-column {
+        flex: 1 1 100%;
+        max-width: 100%;
+    }
+
+    .category-form-right-column {
+        width: 100%;
+        min-width: 100%;
+        max-width: 100%;
+        flex: 1 1 100%;
+        margin-top: 1.5rem;
+        position: relative;
+        top: 0;
+    }
+}
+
+/* ========================================
    PENDING SYNC VISUAL INDICATORS
    ======================================== */
 
@@ -88,6 +158,15 @@
 .category-status-different {
     border-color: rgba(224, 172, 126, 0.5);
     background: linear-gradient(145deg, rgba(224, 172, 126, 0.08), rgba(224, 172, 126, 0.04));
+}
+
+.category-status-pending {
+    border-color: rgba(251, 191, 36, 0.6);
+    background: linear-gradient(145deg, rgba(251, 191, 36, 0.12), rgba(251, 191, 36, 0.06));
+    box-shadow:
+        0 0 0 1px rgba(251, 191, 36, 0.35),
+        inset 0 1px 0 rgba(251, 191, 36, 0.25),
+        0 2px 12px rgba(251, 191, 36, 0.25);
 }
 
 /* ========================================

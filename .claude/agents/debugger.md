@@ -245,3 +245,132 @@ This agent should use the following Claude Code Skills when applicable:
 - **Phase 5 - Documentation**: Use issue-documenter if new issue (>2h to debug)
 - **Phase 6 - Cleanup**: Use debug-log-cleanup after user confirmation
 - **Phase 7 - Report**: Generate debugging session report with agent-report-writer
+
+---
+
+## 🚀 MANDATORY: Chrome DevTools MCP for Diagnostics
+
+**⚠️ CRITICAL TOOL:** Chrome DevTools MCP is PRIMARY diagnostic tool for production debugging!
+
+**ZASADA:** Error Report → Chrome DevTools Diagnostics → Root Cause → Fix
+
+**DIAGNOSTIC WORKFLOW:**
+
+```javascript
+// 1. Navigate to problematic page
+mcp__chrome-devtools__navigate_page({
+  type: "url",
+  url: "https://ppm.mpptrade.pl/admin/products"
+})
+
+// 2. Take snapshot to inspect current DOM state
+const snapshot = mcp__chrome-devtools__take_snapshot()
+// Look for: wire:snapshot issues, missing elements, unexpected content
+
+// 3. Check console for errors (PRIMARY for Livewire issues!)
+const consoleErrors = mcp__chrome-devtools__list_console_messages({
+  types: ["error", "warn"]
+})
+// Analyze: Livewire errors, JS errors, API failures
+
+// 4. Check network requests (API/asset failures)
+const networkRequests = mcp__chrome-devtools__list_network_requests()
+// Look for: HTTP 404/500, slow requests, failed API calls
+
+// 5. Inspect Livewire component state (if Livewire issue)
+const livewireState = mcp__chrome-devtools__evaluate_script({
+  function: "() => window.Livewire?.components?.componentsByName('product-form')?.[0]?.data"
+})
+// Diagnose: State corruption, missing properties, type mismatches
+
+// 6. Check disabled states (if interaction issue)
+const disabledCheck = mcp__chrome-devtools__evaluate_script({
+  function: "() => ({ total: document.querySelectorAll('input').length, disabled: document.querySelectorAll('input[disabled]').length })"
+})
+// Diagnose: wire:loading conflicts, race conditions
+
+// 7. Reproduce issue with interactions
+mcp__chrome-devtools__click({uid: "[ELEMENT_UID]"})
+mcp__chrome-devtools__wait_for({text: "[Expected result]", timeout: 5000})
+// Observe: Livewire updates, console errors, state changes
+
+// 8. Screenshot current state for evidence
+mcp__chrome-devtools__take_screenshot({
+  filePath: "_TOOLS/screenshots/debug_[issue]_[timestamp].png"
+})
+```
+
+**USE CHROME DEVTOOLS FOR:**
+
+1. **Livewire Component Issues:**
+   - wire:snapshot rendering (snapshot search)
+   - Component state corruption (Livewire state inspection)
+   - Event dispatch failures (console monitoring)
+   - wire:poll conflicts (disabled state timing)
+
+2. **Frontend/CSS Issues:**
+   - Layout problems (DOM inspection + screenshot)
+   - Missing styles (network HTTP 404 check)
+   - Z-index conflicts (evaluate_script for inline styles)
+   - Responsive issues (resize_page + screenshot)
+
+3. **API Integration Failures:**
+   - Network request monitoring (list_network_requests)
+   - HTTP status analysis (get_network_request details)
+   - Response payload inspection (request body/headers)
+
+4. **JavaScript Errors:**
+   - Console error tracking (list_console_messages)
+   - Runtime exception analysis (error stack traces)
+   - Alpine.js/Livewire errors (console filtering)
+
+**WHY CHROME DEVTOOLS IS CRITICAL FOR DEBUGGING:**
+- ✅ Real production environment (not local simulation)
+- ✅ Actual browser state (not theoretical)
+- ✅ Livewire component inspection (window.Livewire access)
+- ✅ Network timing analysis (identifies slow/failed requests)
+- ✅ Console error patterns (catches intermittent issues)
+- ❌ Logs alone miss browser-specific issues
+- ❌ Local testing doesn't reproduce production state
+
+**DIAGNOSTIC PATTERNS:**
+
+```javascript
+// Pattern 1: Livewire wire:snapshot issue
+const hasWireSnapshot = snapshot.includes('wire:snapshot')
+// If true: Livewire render failure (check DI, nullable properties)
+
+// Pattern 2: wire:poll + wire:loading conflict (FIX #7/#8)
+await new Promise(resolve => setTimeout(resolve, 6000)) // Wait for poll
+const disabledAfterPoll = mcp__chrome-devtools__evaluate_script({
+  function: "() => document.querySelectorAll('input[disabled]').length"
+})
+// If > 0: wire:loading.attr conflict detected
+
+// Pattern 3: Missing CSS (incomplete deployment)
+const cssRequests = networkRequests.filter(r => r.url.includes('.css'))
+const css404s = cssRequests.filter(r => r.statusCode === 404)
+// If length > 0: Incomplete asset deployment
+
+// Pattern 4: API failure
+const apiRequests = networkRequests.filter(r => r.url.includes('/api/'))
+const failedApis = apiRequests.filter(r => r.statusCode >= 400)
+// Analyze: Response bodies for error messages
+```
+
+**📖 RESOURCES:**
+- Full Guide: `_DOCS/CHROME_DEVTOOLS_MCP_GUIDE.md`
+- Known Issues: `_ISSUES_FIXES/` directory
+- Livewire Troubleshooting: Use `livewire-troubleshooting` skill
+
+**✅ SUCCESS PATTERN:**
+```
+1. User reports issue
+2. Chrome DevTools: Navigate + Snapshot
+3. Chrome DevTools: Console errors analysis
+4. Chrome DevTools: Network requests inspection
+5. Chrome DevTools: Component state diagnosis
+6. ROOT CAUSE identified → Implement fix
+7. Chrome DevTools: Verify fix deployed
+8. Document issue in _ISSUES_FIXES/ if complex
+```

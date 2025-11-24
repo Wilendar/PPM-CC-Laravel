@@ -74,11 +74,26 @@ const { chromium } = require('playwright');
             const selected = [];
             const checkboxes = document.querySelectorAll('input[type="checkbox"]');
             checkboxes.forEach(cb => {
+                // Check both wire:model and x-model (Alpine.js)
                 const wireModel = cb.getAttribute('wire:model') || '';
-                if (wireModel.includes('shopCategories') && cb.checked) {
-                    const label = cb.closest('label') || cb.parentElement;
-                    const text = label ? label.textContent.trim() : '';
-                    selected.push(text);
+                const xModel = cb.getAttribute('x-model') || '';
+
+                if ((wireModel.includes('shopCategories') || xModel.includes('isSelected')) && cb.checked) {
+                    // Find label text from parent or next sibling
+                    let text = '';
+                    const parent = cb.parentElement;
+                    if (parent) {
+                        // Get all text content but clean up
+                        text = parent.textContent.replace(/└─/g, '').trim();
+                        // If too long (includes extra text), try to find just the category name
+                        const labelElement = parent.querySelector('label');
+                        if (labelElement) {
+                            text = labelElement.textContent.replace(/└─/g, '').trim();
+                        }
+                    }
+                    if (text && !text.includes('Ustaw główną')) {
+                        selected.push(text);
+                    }
                 }
             });
             return selected;
@@ -98,15 +113,26 @@ const { chromium } = require('playwright');
 
             for (const cb of checkboxes) {
                 // Check both wire:model and x-model (Alpine.js)
-                const wireModel = cb.getAttribute('wire:model') || cb.getAttribute('x-model') || '';
+                const wireModel = cb.getAttribute('wire:model') || '';
+                const xModel = cb.getAttribute('x-model') || '';
 
-                // Look for category-related models (shopCategories, shopData, selected, etc.)
+                // Look for category-related models (shopCategories, isSelected, etc.)
                 if (wireModel.includes('shopCategories') ||
-                    wireModel.includes('selected') ||
-                    wireModel.includes('categories')) {
+                    xModel.includes('isSelected')) {
 
-                    const label = cb.closest('label') || cb.parentElement;
-                    const text = label ? label.textContent.trim() : '';
+                    // Get clean category name
+                    let text = '';
+                    const parent = cb.parentElement;
+                    if (parent) {
+                        text = parent.textContent.replace(/└─/g, '').trim();
+                        const labelElement = parent.querySelector('label');
+                        if (labelElement) {
+                            text = labelElement.textContent.replace(/└─/g, '').trim();
+                        }
+                    }
+
+                    // Skip if text includes button text
+                    if (text.includes('Ustaw główną')) continue;
 
                     // Toggle first category checkbox
                     const wasBefore = cb.checked;
@@ -142,10 +168,21 @@ const { chromium } = require('playwright');
             const checkboxes = document.querySelectorAll('input[type="checkbox"]');
             checkboxes.forEach(cb => {
                 const wireModel = cb.getAttribute('wire:model') || '';
-                if (wireModel.includes('shopCategories') && cb.checked) {
-                    const label = cb.closest('label') || cb.parentElement;
-                    const text = label ? label.textContent.trim() : '';
-                    selected.push(text);
+                const xModel = cb.getAttribute('x-model') || '';
+
+                if ((wireModel.includes('shopCategories') || xModel.includes('isSelected')) && cb.checked) {
+                    let text = '';
+                    const parent = cb.parentElement;
+                    if (parent) {
+                        text = parent.textContent.replace(/└─/g, '').trim();
+                        const labelElement = parent.querySelector('label');
+                        if (labelElement) {
+                            text = labelElement.textContent.replace(/└─/g, '').trim();
+                        }
+                    }
+                    if (text && !text.includes('Ustaw główną')) {
+                        selected.push(text);
+                    }
                 }
             });
             return selected;
@@ -239,10 +276,21 @@ const { chromium } = require('playwright');
             const checkboxes = document.querySelectorAll('input[type="checkbox"]');
             checkboxes.forEach(cb => {
                 const wireModel = cb.getAttribute('wire:model') || '';
-                if (wireModel.includes('shopCategories') && cb.checked) {
-                    const label = cb.closest('label') || cb.parentElement;
-                    const text = label ? label.textContent.trim() : '';
-                    selected.push(text);
+                const xModel = cb.getAttribute('x-model') || '';
+
+                if ((wireModel.includes('shopCategories') || xModel.includes('isSelected')) && cb.checked) {
+                    let text = '';
+                    const parent = cb.parentElement;
+                    if (parent) {
+                        text = parent.textContent.replace(/└─/g, '').trim();
+                        const labelElement = parent.querySelector('label');
+                        if (labelElement) {
+                            text = labelElement.textContent.replace(/└─/g, '').trim();
+                        }
+                    }
+                    if (text && !text.includes('Ustaw główną')) {
+                        selected.push(text);
+                    }
                 }
             });
             return selected;

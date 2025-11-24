@@ -1,11 +1,20 @@
 {{-- Recursive Category Tree Item --}}
-{{-- Parameters: $category, $level, $context (activeShopId ?? 'default') --}}
+{{-- Parameters: $category, $level, $context (activeShopId ?? 'default'), $expandedCategoryIds --}}
 
 @php
     $hasChildren = $category->children && $category->children->count() > 0;
+    // FIX #2 2025-11-21: Track category selection for reactive button visibility
+    $isSelected = in_array($category->id, $this->getPrestaShopCategoryIdsForContext($activeShopId));
+    $isPrimary = $this->getPrimaryPrestaShopCategoryIdForContext($activeShopId) == $category->id;
+    // FIX #14 2025-11-21: Performance - expand ONLY if in expandedCategoryIds list
+    $shouldExpand = in_array($category->id, $expandedCategoryIds ?? []);
 @endphp
 
-<div x-data="{ collapsed: false }" wire:key="category-tree-{{ $context }}-{{ $category->id }}">
+<div x-data="{
+    collapsed: {{ $shouldExpand ? 'false' : 'true' }},
+    isSelected: {{ $isSelected ? 'true' : 'false' }},
+    isPrimary: {{ $isPrimary ? 'true' : 'false' }}
+}" wire:key="category-tree-{{ $context }}-{{ $category->id }}">
     <div class="flex items-center space-x-2 py-1"
          wire:key="category-row-{{ $context }}-{{ $category->id }}"
          style="padding-left: {{ $level * 1.5 }}rem;">
@@ -27,32 +36,45 @@
             <span class="w-4"></span>
         @endif
 
+        {{-- FIX #4 2025-11-21: Disable checkbox during save/pending --}}
+        {{-- FIX #8 2025-11-21: REMOVED wire:loading.attr="disabled" (conflicts with wire:poll.5s) --}}
+        {{-- FIX #13 2025-11-21: Use Alpine.js :disabled binding with REACTIVE PROPERTY (not method!) --}}
         <input
-            wire:click="toggleCategory({{ $category->id }})"
             type="checkbox"
             id="category_{{ $context }}_{{ $category->id }}"
-            {{-- ETAP_07b FIZA 1 FIX: Use getPrestaShopCategoryIdsForContext() for correct ID space --}}
-            {{ in_array($category->id, $this->getPrestaShopCategoryIdsForContext($activeShopId)) ? 'checked' : '' }}
-            class="rounded border-gray-300 dark:border-gray-600 text-blue-600 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+            x-model="isSelected"
+            @change="$wire.toggleCategory({{ $category->id }})"
+            class="rounded border-gray-300 dark:border-gray-600 text-blue-600 shadow-sm focus:border-blue-500 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+            :disabled="$wire.categoryEditingDisabled"
         >
 
-        <label for="category_{{ $context }}_{{ $category->id }}" class="flex-1 category-tree-label">
+        {{-- FIX #13 2025-11-21: Use Alpine.js :class binding with REACTIVE PROPERTY --}}
+        <label for="category_{{ $context }}_{{ $category->id }}"
+               class="flex-1 category-tree-label"
+               :class="$wire.categoryEditingDisabled ? 'opacity-50 cursor-not-allowed' : ''">
             <span class="category-tree-icon mr-1">{{ $level > 0 ? '└─' : '' }}</span>
             {{ $category->name }}
         </label>
 
-        {{-- ETAP_07b FIZA 1 FIX: Use getPrestaShopCategoryIdsForContext() for correct ID space --}}
-        @if(in_array($category->id, $this->getPrestaShopCategoryIdsForContext($activeShopId)))
-            <button
-                wire:click="setPrimaryCategory({{ $category->id }})"
-                type="button"
-                {{-- ETAP_07b FIX: Use getPrimaryPrestaShopCategoryIdForContext() for correct ID comparison --}}
-                class="px-2 py-1 text-xs rounded {{ $this->getPrimaryPrestaShopCategoryIdForContext($activeShopId) == $category->id ? 'category-primary-btn' : 'category-set-primary-btn' }}"
-            >
-                {{-- ETAP_07b FIX: Use getPrimaryPrestaShopCategoryIdForContext() for correct ID comparison --}}
-                {{ $this->getPrimaryPrestaShopCategoryIdForContext($activeShopId) == $category->id ? 'Główna' : 'Ustaw główną' }}
-            </button>
-        @endif
+        {{-- FIX #2 2025-11-21: Use Alpine.js x-show for reactive button visibility --}}
+        {{-- FIX #4 2025-11-21: Disable button during save/pending --}}
+        {{-- FIX #8 2025-11-21: REMOVED wire:loading.attr="disabled" (conflicts with wire:poll.5s) --}}
+        {{-- FIX #13 2025-11-21: Use Alpine.js :disabled binding with REACTIVE PROPERTY --}}
+        <button
+            x-show="isSelected"
+            @click="isPrimary = !isPrimary; $wire.setPrimaryCategory({{ $category->id }})"
+            type="button"
+            :class="isPrimary ? 'category-primary-btn' : 'category-set-primary-btn'"
+            class="px-2 py-1 text-xs rounded disabled:opacity-50 disabled:cursor-not-allowed"
+            x-text="isPrimary ? 'Główna' : 'Ustaw główną'"
+            :disabled="$wire.categoryEditingDisabled"
+            x-transition:enter="transition ease-out duration-150"
+            x-transition:enter-start="opacity-0 transform scale-95"
+            x-transition:enter-end="opacity-100 transform scale-100"
+            x-transition:leave="transition ease-in duration-100"
+            x-transition:leave-start="opacity-100"
+            x-transition:leave-end="opacity-0 transform scale-95"
+        ></button>
     </div>
 
     {{-- Recursively render children with collapse/expand animation --}}
@@ -68,7 +90,8 @@
                 @include('livewire.products.management.partials.category-tree-item', [
                     'category' => $child,
                     'level' => $level + 1,
-                    'context' => $context
+                    'context' => $context,
+                    'expandedCategoryIds' => $expandedCategoryIds
                 ])
             @endforeach
         </div>

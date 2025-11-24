@@ -564,3 +564,142 @@ This agent should use the following Claude Code Skills when applicable:
 - **Phase 4 - Testing**: Deploy and verify functionality with user
 - **Phase 5 - Cleanup**: Use debug-log-cleanup after user confirmation
 - **Phase 6 - Documentation**: Use agent-report-writer + issue-documenter (if new issue discovered)
+
+---
+
+## 🚀 MANDATORY: Chrome DevTools MCP Verification
+
+**⚠️ CRITICAL REQUIREMENT:** ALL Livewire components MUST be verified with Chrome DevTools MCP BEFORE reporting completion!
+
+**ZASADA:** Code → Deploy → Chrome DevTools Verify → (jeśli OK) Report to User
+
+**LIVEWIRE COMPONENT VERIFICATION WORKFLOW:**
+
+```javascript
+// 1. Navigate to component page
+mcp__chrome-devtools__navigate_page({
+  type: "url",
+  url: "https://ppm.mpptrade.pl/admin/products"
+})
+
+// 2. Interact with component (trigger Livewire update)
+const snapshot1 = mcp__chrome-devtools__take_snapshot()
+// Find tab/button UID from snapshot
+mcp__chrome-devtools__click({uid: "[TAB_UID_FROM_SNAPSHOT]"})
+
+// Wait for Livewire update
+mcp__chrome-devtools__wait_for({
+  text: "[Expected text after update]",
+  timeout: 5000
+})
+
+// 3. CRITICAL: Check for wire:snapshot issues (PRIMARY CHECK!)
+const snapshot2 = mcp__chrome-devtools__take_snapshot()
+// Search output for literal "wire:snapshot" string
+// ✅ PASS if: NOT found
+// ❌ FAIL if: found (Livewire render issue!)
+
+// 4. Evaluate Livewire component state
+const livewireState = mcp__chrome-devtools__evaluate_script({
+  function: "() => window.Livewire?.components?.componentsByName('product-form')?.[0]?.data"
+})
+// Verify: Component properties correct
+
+// 5. Check console for Livewire errors
+const consoleCheck = mcp__chrome-devtools__list_console_messages({
+  types: ["error"]
+})
+// Expected: 0 errors
+
+// 6. CRITICAL: Verify disabled states (prevent FIX #7/#8 repeat!)
+// WAIT 6 seconds for wire:poll.5s to settle!
+await new Promise(resolve => setTimeout(resolve, 6000))
+
+const disabledCheck = mcp__chrome-devtools__evaluate_script({
+  function: "() => ({ total: document.querySelectorAll('input').length, disabled: document.querySelectorAll('input[disabled]').length })"
+})
+// Expected: {disabled: 0} (all enabled)
+
+// 7. Screenshot final state
+mcp__chrome-devtools__take_screenshot({
+  filePath: "_TOOLS/screenshots/livewire_verification_[timestamp].png"
+})
+```
+
+**MANDATORY FOR:**
+- Livewire component creation/updates
+- wire:model changes
+- Event system modifications (dispatch/listen)
+- Component state management changes
+- wire:poll implementations
+
+**WHY CHROME DEVTOOLS IS PRIMARY:**
+- ✅ Detects wire:snapshot rendering (literal code in DOM!)
+- ✅ Catches wire:poll + wire:loading conflicts (FIX #7/#8)
+- ✅ Verifies disabled state flashing (6-second wait pattern)
+- ✅ Monitors Livewire events (dispatch/listen verification)
+- ✅ Inspects component state (window.Livewire access)
+- ❌ Node.js scripts can't detect wire:snapshot
+- ❌ Screenshots alone miss console errors
+
+**FIX #7/#8 PREVENTION (MANDATORY!):**
+
+```javascript
+// CRITICAL: After deploying Livewire components with wire:poll
+// WAIT 6 seconds for wire:poll.5s to complete cycle!
+await new Promise(resolve => setTimeout(resolve, 6000))
+
+// Then check disabled states
+const disabledCheck = mcp__chrome-devtools__evaluate_script({
+  function: "() => ({ total: document.querySelectorAll('input').length, disabled: document.querySelectorAll('input[disabled]').length })"
+})
+
+// Expected: {total: 1176, disabled: 0}
+// If disabled > 0: wire:loading conflict detected! (FIX #8 pattern)
+```
+
+**KNOWN LIVEWIRE ISSUES DETECTION:**
+
+```javascript
+// 1. wire:snapshot check (most critical!)
+const wireSnapshotIssue = snapshot.includes('wire:snapshot')
+// Should be: false
+
+// 2. wire:poll conflict check
+const wirePollElements = mcp__chrome-devtools__evaluate_script({
+  function: "() => document.querySelectorAll('[wire\\\\:poll]').length"
+})
+
+const wireLoadingElements = mcp__chrome-devtools__evaluate_script({
+  function: "() => document.querySelectorAll('[wire\\\\:loading]').length"
+})
+// If both > 0: Potential conflict!
+
+// 3. x-teleport + wire:id check
+const teleportWithoutWireId = mcp__chrome-devtools__evaluate_script({
+  function: "() => Array.from(document.querySelectorAll('[x-teleport]')).filter(el => !el.closest('[wire\\\\:id]')).length"
+})
+// Should be: 0
+```
+
+**📖 RESOURCES:**
+- Full Guide: `_DOCS/CHROME_DEVTOOLS_MCP_GUIDE.md`
+- Skill: Use `chrome-devtools-verification` for guided workflow
+- Troubleshooting: Use `livewire-troubleshooting` skill for known issues
+
+**❌ ANTI-PATTERNS:**
+- Reporting completion WITHOUT Chrome DevTools check
+- Skipping wire:snapshot verification (most critical check!)
+- Not waiting 6 seconds for wire:poll (misses FIX #7/#8 pattern)
+- Assuming "user clicks work" WITHOUT state inspection
+
+**✅ SUCCESS PATTERN:**
+```
+1. Deploy Livewire component
+2. Chrome DevTools: Navigate + Interact
+3. Chrome DevTools: wire:snapshot check (PRIMARY!)
+4. Chrome DevTools: Wait 6s + disabled states check
+5. Chrome DevTools: Component state inspection
+6. Chrome DevTools: Console/Screenshot
+7. ALL PASSED → THEN report to user
+```

@@ -1,0 +1,172 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(Select-Object -First 10)",
+      "Bash(Select-String -Pattern \"saveAndClose|redirect\" -Context 3)",
+      "Bash(Select-String -Pattern \"saveAndClose|All pending changes saved|savePendingChangesToShop|category\" -Context 2)",
+      "Bash(Select-Object -Last 50)",
+      "Bash(Select-Object -Last 100)",
+      "Skill(skill-creator)",
+      "Skill(product-form-category-test)",
+      "Bash(pwsh -NoProfile -Command:*)",
+      "Bash(Select-Object -Last 5)",
+      "Bash(Select-String -Pattern \"CATEGORY SYNC\" -Context 0,20)",
+      "Bash(_TEMP/recent_logs.txt)",
+      "Bash(_TEMP/recent_logs_2.txt)",
+      "Skill(context7-docs-lookup)",
+      "Skill(project-plan-manager)",
+      "Skill(prestashop-api-integration)",
+      "Skill(prestashop-database-structure)",
+      "Skill(prestashop-xml-integration)",
+      "Bash(php:*)",
+      "Bash($HostidoKey = \"D:\\OneDrive - MPP TRADE\\SSH\\Hostido\\HostidoSSHNoPass.ppk\")",
+      "Bash($RemoteBase = \"domains/ppm.mpptrade.pl/public_html\")",
+      "Bash(pscp:*)",
+      "Bash(plink:*)",
+      "Bash(node _TOOLS/full_console_test.cjs:*)",
+      "Skill(livewire-troubleshooting)",
+      "Bash(pwsh -NoProfile -ExecutionPolicy Bypass -File \"D:\\OneDrive - MPP TRADE\\AI Instrukcje\\claude-config\\.claude\\hooks\\wrapper_list_reports.ps1\" \"Zadania zakończone sukcesem\")",
+      "Bash(pwsh -NoProfile -ExecutionPolicy Bypass -File \"D:\\OneDrive - MPP TRADE\\AI Instrukcje\\claude-config\\.claude\\hooks\\wrapper_list_reports.ps1\")",
+      "Bash(Get-Date -Format \"yyyy-MM-dd HH:mm:ss\")",
+      "Bash(pwsh:*)",
+      "Skill(agent-report-writer)",
+      "Bash(npm run build:*)",
+      "Skill(issue-documenter)",
+      "Bash(__NEW_LINE__ pscp -i $HostidoKey -P 64321 \"D:\\OneDrive - MPP TRADE\\Skrypty\\PPM-CC-Laravel\\app\\Http\\Livewire\\Products\\Management\\ProductForm.php\" \"host379076@host379076.hostido.net.pl:$RemoteBase/app/Http/Livewire/Products/Management/ProductForm.php\")",
+      "Bash(})",
+      "Bash(Select-String -Pattern \"CATEGORY SYNC DEBUG\" -Context 3)",
+      "Skill(hostido-deployment)",
+      "Bash(node:*)",
+      "Bash(__NEW_LINE__ $script)",
+      "Bash(Out-File -Encoding UTF8 \"_TEMP/check_db.php\")",
+      "Bash(__NEW_LINE__ $HostidoKey = \"D:\\OneDrive - MPP TRADE\\SSH\\Hostido\\HostidoSSHNoPass.ppk\")",
+      "Bash(__NEW_LINE__ pscp -i $HostidoKey -P 64321 \"_TEMP/check_db.php\" \"host379076@host379076.hostido.net.pl:domains/ppm.mpptrade.pl/public_html/check_db.php\")",
+      "Bash(__NEW_LINE__ plink -ssh host379076@host379076.hostido.net.pl -P 64321 -i $HostidoKey -batch \"cd domains/ppm.mpptrade.pl/public_html && php check_db.php\" })",
+      "Bash(Select-Object -First 5})",
+      "WebSearch",
+      "Bash(Select-Object -First 30)",
+      "mcp__chrome-devtools__list_pages",
+      "mcp__chrome-devtools__new_page",
+      "mcp__chrome-devtools__take_snapshot",
+      "mcp__chrome-devtools__click",
+      "mcp__chrome-devtools__list_console_messages",
+      "mcp__chrome-devtools__list_network_requests",
+      "mcp__chrome-devtools__get_network_request",
+      "mcp__chrome-devtools__evaluate_script",
+      "mcp__chrome-devtools__navigate_page",
+      "mcp__chrome-devtools__take_screenshot",
+      "mcp__chrome-devtools__handle_dialog",
+      "mcp__chrome-devtools__wait_for",
+      "Skill(hook-creator)",
+      "Skill(chrome-devtools-verification)",
+      "mcp__chrome-devtools__get_console_message",
+      "Bash(Select-String -Pattern \"FIX #12\" -Context 0,3)",
+      "Bash(Get-ChildItem \"D:\\OneDrive - MPP TRADE\\Skrypty\\PPM-CC-Laravel\\public\\build\\assets\")",
+      "Bash(Select-Object -First 10 Name)",
+      "Bash(__NEW_LINE__ Write-Host \"Uploading ProductForm.php...\" -ForegroundColor Yellow)",
+      "Bash(Start-Sleep -Seconds 7)",
+      "Bash(__NEW_LINE__ Write-Host \"Uploading ROLLBACK version of product-form.blade.php...\" -ForegroundColor Yellow)",
+      "Bash($LocalFile = \"resources\\views\\livewire\\products\\management\\product-form.blade.php\")",
+      "Bash($RemoteFile = \"host379076@host379076.hostido.net.pl:$RemoteBase/resources/views/livewire/products/management/product-form.blade.php\")",
+      "Bash(__NEW_LINE__ Write-Host \"Uploading ROLLBACK version...\" -ForegroundColor Yellow)",
+      "Bash(Start-Sleep -Seconds 3)",
+      "Bash(Select-Object -Last 50 })",
+      "SlashCommand(/cc)",
+      "Bash(taskkill:*)",
+      "Bash($null)",
+      "Bash(Start-Sleep -Seconds 2)"
+    ],
+    "deny": [],
+    "ask": []
+  },
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "pwsh -NoProfile -ExecutionPolicy Bypass -File \".claude\\scripts\\prompt-context-reminder-with-recovery.ps1\"",
+            "timeout": 3000
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "(Write|Edit).*\\.(php|blade\\.php)$",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "pwsh -NoProfile -ExecutionPolicy Bypass -File \".claude\\scripts\\enforce-context7.ps1\"",
+            "timeout": 2000
+          }
+        ]
+      },
+      {
+        "matcher": "Task",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "pwsh -NoProfile -ExecutionPolicy Bypass -File \".claude\\scripts\\agent-report-reminder.ps1\"",
+            "timeout": 2000
+          }
+        ]
+      },
+      {
+        "matcher": "mcp__context7__.*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "pwsh -Command \"Write-Host '✅ Context7 MCP - EXCELLENT!' -ForegroundColor Green\"",
+            "timeout": 1000
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "(Write|Edit).*\\.php",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "pwsh -Command \"Write-Host '✅ PHP CODE MODIFIED' -ForegroundColor Green; Write-Host '• Consider: php artisan test' -ForegroundColor Yellow\"",
+            "timeout": 1000
+          }
+        ]
+      },
+      {
+        "matcher": "Bash.*composer.*install",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "pwsh -Command \"Write-Host '📦 COMPOSER INSTALL COMPLETED' -ForegroundColor Green; Write-Host '• Consider: php artisan migrate, cache:clear' -ForegroundColor Yellow\"",
+            "timeout": 1000
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "pwsh -Command \"Write-Host '📦 CONTEXT COMPACTION' -ForegroundColor Cyan; Write-Host '• Context7 MANDATORY for code generation' -ForegroundColor Red; Write-Host '• NO HARDCODING, NO MOCK DATA' -ForegroundColor Red\"",
+            "timeout": 1000
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "matcher": "compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python _TOOLS/post_autocompact_recovery.py",
+            "timeout": 5000
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -361,6 +361,15 @@ class ProductSyncStrategy implements ISyncStrategy
         // - Changes in PPM → PrestaShop mapping MUST trigger sync
         // - Backward compatible: ProductShopDataCast auto-converts legacy formats
         //
+        // DIAGNOSIS 2025-11-21: Debug category data read from DB
+        Log::debug('[CATEGORY SYNC DEBUG] ProductSyncStrategy: Reading category data from DB', [
+            'product_id' => $model->id,
+            'shop_id' => $shop->id,
+            'shopData_exists' => $shopData !== null,
+            'raw_category_mappings' => $shopData ? $shopData->category_mappings : 'NO_SHOP_DATA',
+            'hasCategoryMappings' => $shopData ? $shopData->hasCategoryMappings() : false,
+        ]);
+
         // Include categories, prices, stock
         if ($shopData && $shopData->hasCategoryMappings()) {
             // Extract PrestaShop IDs from mappings (values only)
@@ -371,6 +380,13 @@ class ProductSyncStrategy implements ISyncStrategy
                 ->values()
                 ->toArray();
 
+            Log::debug('[CATEGORY SYNC DEBUG] ProductSyncStrategy: Using shop-specific mappings', [
+                'product_id' => $model->id,
+                'shop_id' => $shop->id,
+                'mappings' => $mappings,
+                'prestashop_ids' => $data['categories'],
+            ]);
+
             Log::debug('[FIX #12] Checksum using Option A mappings', [
                 'product_id' => $model->id,
                 'shop_id' => $shop->id,
@@ -379,6 +395,14 @@ class ProductSyncStrategy implements ISyncStrategy
         } else {
             // Fallback: global categories (PPM category IDs)
             $data['categories'] = $model->categories->pluck('id')->sort()->values()->toArray();
+
+            Log::debug('[CATEGORY SYNC DEBUG] ProductSyncStrategy: Using FALLBACK (default categories)', [
+                'product_id' => $model->id,
+                'shop_id' => $shop->id,
+                'reason' => $shopData ? 'hasCategoryMappings() = false' : 'shopData = null',
+                'default_categories_count' => count($data['categories']),
+                'default_category_ids' => $data['categories'],
+            ]);
         }
 
         // CRITICAL FIX (2025-11-12): Include prices in checksum

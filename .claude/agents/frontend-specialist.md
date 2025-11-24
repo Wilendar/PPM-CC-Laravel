@@ -1044,3 +1044,111 @@ FAZA 5: HTTP Status Verification (ADDED 2025-10-24)
 - **Impact:** CRITICAL - affects entire application, not just changed pages
 
 ---
+
+## 🚀 MANDATORY: Chrome DevTools MCP Verification
+
+**⚠️ CRITICAL REQUIREMENT:** ALL frontend changes MUST be verified with Chrome DevTools MCP BEFORE reporting completion!
+
+**ZASADA:** Code → Deploy → Chrome DevTools Verify → (jeśli OK) Report to User
+
+**FRONTEND VERIFICATION WORKFLOW:**
+
+```javascript
+// 1. Navigate to page with UI changes
+mcp__chrome-devtools__navigate_page({
+  type: "url",
+  url: "https://ppm.mpptrade.pl/admin/products"
+})
+
+// 2. Take snapshot (PRIMARY - faster, searchable)
+const snapshot = mcp__chrome-devtools__take_snapshot()
+// Verify: No "wire:snapshot" literal text
+// Verify: Expected UI elements rendered correctly
+
+// 3. Check for anti-patterns (inline styles, z-index conflicts)
+const inlineStylesCheck = mcp__chrome-devtools__evaluate_script({
+  function: "() => document.querySelectorAll('[style]').length"
+})
+// Expected: 0 (NO inline styles!)
+
+const zIndexConflicts = mcp__chrome-devtools__evaluate_script({
+  function: "() => Array.from(document.querySelectorAll('[style*=\"z-index\"]')).map(el => ({tag: el.tagName, z: el.style.zIndex}))"
+})
+// Expected: [] (NO inline z-index!)
+
+// 4. Check console for errors
+const consoleCheck = mcp__chrome-devtools__list_console_messages({
+  types: ["error", "warn"]
+})
+// Expected: 0 errors
+
+// 5. Verify network (CSS/JS HTTP 200)
+const networkCheck = mcp__chrome-devtools__list_network_requests({
+  resourceTypes: ["stylesheet", "script"]
+})
+// Expected: All HTTP 200
+
+// 6. Screenshot for visual confirmation
+mcp__chrome-devtools__take_screenshot({
+  filePath: "_TOOLS/screenshots/frontend_verification_[timestamp].png"
+})
+```
+
+**MANDATORY FOR:**
+- CSS file changes
+- Blade template updates
+- Alpine.js components
+- UI/UX modifications
+- Responsive design changes
+
+**WHY CHROME DEVTOOLS IS PRIMARY:**
+- ✅ Detects inline style violations (ZAKAZ enforcement!)
+- ✅ Catches z-index conflicts (stacking context issues)
+- ✅ Verifies CSS file HTTP 200 (prevents incomplete deployment)
+- ✅ Monitors console for JS/Alpine errors (runtime issues)
+- ✅ Inspects actual DOM state (not theoretical render)
+- ❌ Node.js scripts can't detect CSS anti-patterns
+- ❌ Screenshots alone miss console errors/network 404s
+
+**ANTI-PATTERN DETECTION:**
+
+```javascript
+// Check for FORBIDDEN patterns
+const antiPatterns = mcp__chrome-devtools__evaluate_script({
+  function: `() => ({
+    inlineStyles: document.querySelectorAll('[style]').length,
+    arbitraryTailwind: Array.from(document.querySelectorAll('[class*="z-["]')).length,
+    hoverTransforms: Array.from(document.styleSheets).flatMap(sheet =>
+      Array.from(sheet.cssRules || []).filter(rule =>
+        rule.selectorText?.includes(':hover') && rule.style?.transform?.includes('translate')
+      ).length
+    )
+  })`
+})
+
+// All must be 0!
+// If any > 0: STOP and fix anti-patterns BEFORE reporting completion
+```
+
+**📖 RESOURCES:**
+- Full Guide: `_DOCS/CHROME_DEVTOOLS_MCP_GUIDE.md`
+- Skill: Use `chrome-devtools-verification` for guided workflow
+- Hook: `post-deployment-verification` auto-triggers after deployment
+
+**❌ ANTI-PATTERNS:**
+- Reporting completion WITHOUT Chrome DevTools check
+- Using screenshot_page.cjs INSTEAD OF Chrome DevTools MCP (legacy tool!)
+- Assuming "layout looks OK" WITHOUT anti-pattern detection
+- Skipping console/network verification
+
+**✅ SUCCESS PATTERN:**
+```
+1. Deploy CSS/Blade changes
+2. Chrome DevTools: Navigate + Snapshot
+3. Chrome DevTools: Anti-pattern detection
+4. Chrome DevTools: Console/Network check
+5. Chrome DevTools: Screenshot
+6. ALL PASSED → THEN report to user
+```
+
+---
