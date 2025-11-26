@@ -65,6 +65,7 @@ class ProductForm extends Component
      */
     protected $listeners = [
         'shop-categories-reloaded' => 'handleCategoriesReloaded',
+        'delayed-reset-unsaved-changes' => 'forceResetUnsavedChanges',
     ];
 
     /*
@@ -198,6 +199,7 @@ class ProductForm extends Component
     // === PENDING CHANGES SYSTEM ===
     public array $pendingChanges = [];     // [shopId => [field => value]] or ['default' => [field => value]]
     public bool $hasUnsavedChanges = false; // Track if there are any pending changes
+    public bool $isLoadingData = false;    // FIX 2025-11-25: Flag to skip updated() hook during data loading
     public array $originalFormData = [];   // Backup of original form data for reset functionality
     public array $shopsToRemove = [];      // Shop IDs pending removal (deleted on save)
     public array $removedShopsCache = [];   // Cache of removed shop data (for undo/re-add)
@@ -308,6 +310,10 @@ class ProductForm extends Component
 
                 // FAZA 5.2: Load shop tax rate overrides in edit mode
                 $this->loadShopTaxRateOverrides();
+
+                // FIX 2025-11-25: Detect active sync job on mount (for re-entry during sync)
+                // If user re-enters product while sync is running, restore job tracking state
+                $this->detectActiveJobOnMount();
             } else {
                 $this->isEditMode = false;
                 $this->setDefaults();
@@ -538,6 +544,11 @@ class ProductForm extends Component
      */
     public function updatedSelectedTaxRateOption(string $value): void
     {
+        // FIX 2025-11-25: Skip during data loading (prevents false hasUnsavedChanges after job completion)
+        if ($this->isLoadingData) {
+            return;
+        }
+
         // [FAZA 5.2 DEBUG SAVE 2025-11-14] Layer 1: UI Binding Successful
         Log::debug('[FAZA 5.2 DEBUG SAVE] Tax rate option changed', [
             'new_value' => $value,
@@ -663,7 +674,8 @@ class ProductForm extends Component
      */
     public function updatedCustomTaxRate(?float $value): void
     {
-        if ($value === null) {
+        // FIX 2025-11-25: Skip during data loading
+        if ($this->isLoadingData || $value === null) {
             return;
         }
 
@@ -1328,6 +1340,12 @@ class ProductForm extends Component
             $category = \App\Models\Category::find($selectedId);
 
             if ($category) {
+                // FIX 2025-11-24: Add selected category itself if it has children
+                $hasChildren = $category->children()->count() > 0;
+                if ($hasChildren) {
+                    $expandedIds[] = $selectedId; // Add selected category to expand its children
+                }
+
                 // Add all parents to expanded list (recursive)
                 $parentIds = [];
                 $parent = $category->parent;
@@ -1341,6 +1359,7 @@ class ProductForm extends Component
                 Log::info('[calculateExpandedCategoryIds] Category parents', [
                     'selected_id' => $selectedId,
                     'category_name' => $category->name,
+                    'has_children' => $hasChildren,
                     'parent_ids' => $parentIds,
                     'parent_count' => count($parentIds),
                 ]);
@@ -1353,55 +1372,50 @@ class ProductForm extends Component
 
         $expandedIds = array_unique($expandedIds);
 
-        // FIX 2025-11-21 v2: For shop context, convert PPM IDs → PrestaShop IDs
-        // Root Cause: Blade tree uses PrestaShop IDs ($category->id from PrestaShop tree),
-        // but $expandedIds contains PPM IDs → comparison fails → categories not expanded
+        // For shop context: convert PPM IDs → PrestaShop IDs
+        // For default context: keep PPM IDs as-is
         if ($this->activeShopId !== null) {
-            $shop = \App\Models\PrestaShopShop::find($this->activeShopId);
+            // Shop context - convert PPM → PrestaShop
+            $mappings = $this->shopCategories[$this->activeShopId]['mappings'] ?? [];
 
-            if ($shop) {
-                try {
-                    $categoryMapper = app(\App\Services\PrestaShop\CategoryMapper::class);
-                    $prestashopExpandedIds = [];
+            // Lazy load mappings if missing
+            if (empty($mappings)) {
+                $productShopData = \App\Models\ProductShopData::where('product_id', $this->product->id)
+                    ->where('shop_id', $this->activeShopId)
+                    ->first();
 
-                    foreach ($expandedIds as $ppmId) {
-                        // Map PPM ID → PrestaShop ID
-                        $prestashopId = $categoryMapper->mapToPrestaShop($ppmId, $shop);
-
-                        if ($prestashopId) {
-                            $prestashopExpandedIds[] = $prestashopId;
-                        } else {
-                            // FIX 2025-11-21 v5: Info logging for unmapped parents
-                            Log::info('[calculateExpandedCategoryIds] Parent not mapped to PrestaShop', [
-                                'ppm_id' => $ppmId,
-                            ]);
-                        }
-                    }
-
-                    // FIX 2025-11-21 v5: Info logging with final result
-                    Log::info('[calculateExpandedCategoryIds] RESULT', [
-                        'ppm_expanded_ids' => $expandedIds,
-                        'ppm_count' => count($expandedIds),
-                        'prestashop_expanded_ids' => $prestashopExpandedIds,
-                        'prestashop_count' => count($prestashopExpandedIds),
-                    ]);
-
-                    return $prestashopExpandedIds;
-
-                } catch (\Exception $e) {
-                    Log::error('[calculateExpandedCategoryIds] Failed to map PPM IDs to PrestaShop IDs', [
-                        'shop_id' => $this->activeShopId,
-                        'ppm_ids' => $expandedIds,
-                        'error' => $e->getMessage(),
-                    ]);
-
-                    // Fallback: return PPM IDs (better than nothing)
-                    return $expandedIds;
+                if ($productShopData && !empty($productShopData->category_mappings)) {
+                    $categoryMappings = $productShopData->category_mappings;
+                    $mappings = $categoryMappings['mappings'] ?? [];
+                    $this->shopCategories[$this->activeShopId]['mappings'] = $mappings;
                 }
             }
+
+            // Convert PPM IDs to PrestaShop IDs
+            $prestashopExpandedIds = [];
+            foreach ($expandedIds as $ppmId) {
+                $mappingKey = (string) $ppmId;
+                if (isset($mappings[$mappingKey])) {
+                    $prestashopExpandedIds[] = (int) $mappings[$mappingKey];
+                }
+            }
+
+            Log::info('[calculateExpandedCategoryIds] RESULT (Shop context - converted to PrestaShop IDs)', [
+                'active_shop_id' => $this->activeShopId,
+                'ppm_expanded_ids' => $expandedIds,
+                'prestashop_expanded_ids' => $prestashopExpandedIds,
+                'conversion_count' => count($prestashopExpandedIds),
+            ]);
+
+            return $prestashopExpandedIds;
         }
 
-        // Default context: return PPM IDs (correct for PPM category tree)
+        // Default context - return PPM IDs
+        Log::info('[calculateExpandedCategoryIds] RESULT (Default context - PPM IDs)', [
+            'ppm_expanded_ids' => $expandedIds,
+            'ppm_count' => count($expandedIds),
+        ]);
+
         return $expandedIds;
     }
 
@@ -1566,39 +1580,14 @@ class ProductForm extends Component
         // Invalidate category validation cache for current shop
         $this->invalidateCategoryValidationCache();
 
-        // Force Livewire component refresh for real-time updates
-        $this->dispatch('categories-updated', [
-            'shop_id' => $this->activeShopId,
-            'context' => $this->activeShopId === null ? 'default' : "shop_{$this->activeShopId}",
-            'categories' => $categories
-        ]);
-
-        // Update UI color coding in real-time
-        $this->updateCategoryColorCoding();
+        // REMOVED 2025-11-24: dispatch('categories-updated') - dead code (no listeners)
+        // REMOVED 2025-11-24: updateCategoryColorCoding() - dead code causing race conditions
+        // Livewire automatically re-renders on property changes, no manual dispatch needed
     }
 
-    /**
-     * Update category color coding in real-time
-     */
-    private function updateCategoryColorCoding(): void
-    {
-        // Force re-evaluation of computed properties for UI
-        $currentStatus = $this->getCategoryStatus();
-
-        // Dispatch event to frontend for real-time UI updates
-        $this->dispatch('category-status-changed', [
-            'status' => $currentStatus,
-            'shop_id' => $this->activeShopId,
-            'classes' => $this->getCategoryClasses(),
-            'indicator' => $this->getCategoryStatusIndicator()
-        ]);
-
-        Log::info('Category color coding updated', [
-            'shop_id' => $this->activeShopId,
-            'status' => $currentStatus,
-            'context' => $this->activeShopId === null ? 'default' : "shop_{$this->activeShopId}"
-        ]);
-    }
+    // REMOVED 2025-11-24: updateCategoryColorCoding() method - dead code causing race conditions
+    // dispatch('category-status-changed') had no listeners and was triggering unnecessary re-renders
+    // Livewire automatically re-renders on property changes, manual dispatch not needed
 
     /**
      * Getter for selected categories (for blade templates compatibility)
@@ -1745,8 +1734,20 @@ class ProductForm extends Component
             $mappingKey = (string) $ppmId;
             if (isset($mappings[$mappingKey])) {
                 $prestashopIds[] = (int) $mappings[$mappingKey];
+            } else {
+                Log::debug('[ETAP_07b] PPM category has no PrestaShop mapping', [
+                    'shop_id' => $contextShopId,
+                    'ppm_id' => $ppmId,
+                ]);
             }
         }
+
+        Log::debug('[ETAP_07b] Converted PPM IDs to PrestaShop IDs', [
+            'shop_id' => $contextShopId,
+            'ppm_ids' => $ppmIds,
+            'prestashop_ids' => $prestashopIds,
+            'mappings_used' => $mappings,
+        ]);
 
         return $prestashopIds;
     }
@@ -1939,6 +1940,9 @@ class ProductForm extends Component
         // FIX #1 2025-11-21: Badge now uses real-time comparison, no cache invalidation needed
         // REMOVED: $this->invalidateCategoryValidationCache();
 
+        // FIX 2025-11-24: Recalculate expanded categories after toggle
+        $this->expandedCategoryIds = $this->calculateExpandedCategoryIds();
+
         // FIX 2025-11-21 v2: Reduced logging for better responsiveness (removed verbose log)
     }
 
@@ -2020,6 +2024,20 @@ class ProductForm extends Component
         // FIX #1 2025-11-21: Invalidate category validation cache to update badge
         $this->invalidateCategoryValidationCache();
 
+        // FIX 2025-11-24 (v4): Dispatch event for Alpine.js isPrimary synchronization
+        // Prevents conflict between Fix #1 (PHP expression) and Fix #3 (static wire:key)
+        // Alpine.js event listener will update isPrimary property across all category buttons
+        // FIX 2025-11-25: Send correct ID type based on context:
+        // - Shop context: send PrestaShop ID (categories in tree are from PrestaShop)
+        // - Default context: send PPM ID (categories in tree are from PPM)
+        $eventCategoryId = $ppmCategoryId;
+        if ($this->activeShopId !== null) {
+            // Shop context - convert PPM ID back to PrestaShop ID for Alpine comparison
+            $mappings = $this->shopCategories[$this->activeShopId]['mappings'] ?? [];
+            $eventCategoryId = $mappings[(string)$ppmCategoryId] ?? $categoryId;
+        }
+        $this->dispatch('primary-category-changed', categoryId: $eventCategoryId);
+
         Log::info('Primary category set with context isolation', [
             'received_category_id' => $categoryId,
             'ppm_category_id' => $ppmCategoryId,
@@ -2028,6 +2046,9 @@ class ProductForm extends Component
             'selected_categories' => $selectedCategories,
             'primary_category_id' => $ppmCategoryId,
         ]);
+
+        // FIX 2025-11-24: Recalculate expanded categories after setting primary
+        $this->expandedCategoryIds = $this->calculateExpandedCategoryIds();
     }
 
     /*
@@ -2403,8 +2424,8 @@ class ProductForm extends Component
             // === CATEGORIES (NEW CONTEXT-AWARE SYSTEM) ===
             $this->defaultCategories = $this->defaultData['defaultCategories'] ?? $this->defaultCategories;
 
-            // Force update of computed properties for UI reactivity
-            $this->updateCategoryColorCoding();
+            // REMOVED 2025-11-25: updateCategoryColorCoding() - method was deleted, call caused error
+            // Livewire automatically re-renders on property changes, no manual update needed
         } elseif ($this->product) {
             // Fallback: load from product if defaultData is not available
             $this->loadProductData();
@@ -2464,6 +2485,10 @@ class ProductForm extends Component
                     'conflicts_detected_at' => null,
                 ]));
 
+                // FIX 2025-11-25: Ensure root categories are ALWAYS in category_mappings after pull
+                // PrestaShop doesn't have PPM root categories (Baza=1, Wszystko=2)
+                $this->ensureRootCategoriesInCategoryMappings($shopData);
+
                 Log::info('[INSTANT PULL] Product updated from PrestaShop', [
                     'product_id' => $this->product->id,
                     'shop_id' => $shopId,
@@ -2471,8 +2496,19 @@ class ProductForm extends Component
                 ]);
 
                 // Reload form data to reflect changes
-                $this->product->refresh();
-                $this->loadShopDataToForm($shopId);
+                // FIX 2025-11-25: Set flag to skip updated() hook during data loading
+                // Prevents false positive hasUnsavedChanges after job completion
+                $this->isLoadingData = true;
+                try {
+                    $this->product->refresh();
+                    $this->loadShopDataToForm($shopId);
+
+                    // FIX 2025-11-25: Update $this->shopData array for UI sync status badges
+                    // Without this, sync_status in UI remains stale after job completion
+                    $this->updateStoredShopData();
+                } finally {
+                    $this->isLoadingData = false;
+                }
 
             } else {
                 Log::warning('[INSTANT PULL] Update blocked by conflict resolver', [
@@ -2552,7 +2588,10 @@ class ProductForm extends Component
             }
 
             // Force Livewire to sync property changes to UI
-            $this->dispatch('$refresh');
+            // FIX 2025-11-25: Skip dispatch during data loading to prevent hook cascade
+            if (!$this->isLoadingData) {
+                $this->dispatch('$refresh');
+            }
         }
 
         // === STATUS & SETTINGS ===
@@ -2596,8 +2635,60 @@ class ProductForm extends Component
         // Call method to refresh $categoryEditingDisabled property based on sync_status
         $this->isCategoryEditingDisabled();
 
-        // Force update of computed properties for UI reactivity
-        $this->updateCategoryColorCoding();
+        // REMOVED 2025-11-25: updateCategoryColorCoding() - method was deleted, call caused error
+        // Livewire automatically re-renders on property changes, no manual update needed
+    }
+
+    /**
+     * Ensure root categories (Baza, Wszystko) are in category_mappings
+     *
+     * FIX 2025-11-25: PrestaShop pull doesn't include PPM-only root categories
+     * This method adds them to category_mappings.ui.selected after each pull
+     *
+     * @param \App\Models\ProductShopData $shopData
+     * @return void
+     */
+    private function ensureRootCategoriesInCategoryMappings(\App\Models\ProductShopData $shopData): void
+    {
+        $rootCategoryIds = [1, 2]; // Baza, Wszystko
+
+        $categoryMappings = $shopData->category_mappings;
+
+        // Skip if no mappings or empty structure
+        if (empty($categoryMappings) || !isset($categoryMappings['ui']['selected']) || empty($categoryMappings['mappings'])) {
+            Log::debug('[ROOT CATEGORIES] Skipping - empty category_mappings', [
+                'product_id' => $shopData->product_id,
+                'shop_id' => $shopData->shop_id,
+            ]);
+            return;
+        }
+
+        $selected = $categoryMappings['ui']['selected'];
+        $updated = false;
+
+        foreach ($rootCategoryIds as $rootId) {
+            if (!in_array($rootId, $selected)) {
+                $selected[] = $rootId;
+                // Also add to mappings (PPM-only categories map to themselves)
+                $categoryMappings['mappings'][(string)$rootId] = $rootId;
+                $updated = true;
+            }
+        }
+
+        if ($updated) {
+            $categoryMappings['ui']['selected'] = $selected;
+            $categoryMappings['metadata']['last_updated'] = now()->toIso8601String();
+            $categoryMappings['metadata']['source'] = 'pull'; // Keep source as pull
+
+            $shopData->category_mappings = $categoryMappings;
+            $shopData->save();
+
+            Log::info('[ROOT CATEGORIES] Added root categories after pull', [
+                'product_id' => $shopData->product_id,
+                'shop_id' => $shopData->shop_id,
+                'selected_count' => count($selected),
+            ]);
+        }
     }
 
     /**
@@ -2623,6 +2714,41 @@ class ProductForm extends Component
             // CategoryMappingsCast automatically deserializes JSON to Option A structure:
             // ['ui' => ['selected' => [1, 36, 2], 'primary' => 1], 'mappings' => [...]]
             $categoryMappings = $productShopData->category_mappings;
+
+            // FIX 2025-11-25: Auto-repair missing root categories (Baza=1, Wszystko=2)
+            // These are PPM-only categories that don't exist in PrestaShop
+            // If PULL from PrestaShop removed them, add them back automatically
+            $selectedCategories = $categoryMappings['ui']['selected'] ?? [];
+            $rootCategoryIds = [1, 2];
+            $needsRepair = false;
+
+            foreach ($rootCategoryIds as $rootId) {
+                if (!in_array($rootId, $selectedCategories)) {
+                    $needsRepair = true;
+                    break;
+                }
+            }
+
+            if ($needsRepair) {
+                Log::info('[loadShopCategories] ROOT CATEGORIES MISSING - auto-repairing', [
+                    'product_id' => $this->product->id,
+                    'shop_id' => $shopId,
+                    'before_selected' => $selectedCategories,
+                ]);
+
+                // Use ensureRootCategoriesInCategoryMappings to repair DB
+                $this->ensureRootCategoriesInCategoryMappings($productShopData);
+
+                // Refresh category_mappings after repair
+                $productShopData->refresh();
+                $categoryMappings = $productShopData->category_mappings;
+
+                Log::info('[loadShopCategories] ROOT CATEGORIES REPAIRED', [
+                    'product_id' => $this->product->id,
+                    'shop_id' => $shopId,
+                    'after_selected' => $categoryMappings['ui']['selected'] ?? [],
+                ]);
+            }
 
             $this->shopCategories[$shopId] = [
                 'selected' => $categoryMappings['ui']['selected'] ?? [],
@@ -2657,10 +2783,8 @@ class ProductForm extends Component
             'source' => ($productShopData && !empty($productShopData->category_mappings)) ? 'shop_specific' : 'inherited_from_default'
         ]);
 
-        // Force UI update for loaded categories if this is the current active shop
-        if ($this->activeShopId === $shopId) {
-            $this->updateCategoryColorCoding();
-        }
+        // REMOVED 2025-11-25: updateCategoryColorCoding() - method was deleted, call caused error
+        // Livewire automatically re-renders on property changes, no manual update needed
     }
 
     /**
@@ -2937,6 +3061,21 @@ class ProductForm extends Component
 
         // Update pending changes automatically when any field changes
         $this->savePendingChanges();
+    }
+
+    /**
+     * Force reset unsaved changes flag (called via delayed dispatch after job completion)
+     * FIX 2025-11-25: Handles async Livewire hooks that may re-set hasUnsavedChanges
+     */
+    public function forceResetUnsavedChanges(): void
+    {
+        $this->hasUnsavedChanges = false;
+        $this->pendingChanges = [];
+
+        Log::info('[JOB COMPLETION] Force reset unsaved changes via delayed dispatch', [
+            'product_id' => $this->product?->id,
+            'active_shop_id' => $this->activeShopId,
+        ]);
     }
 
     /**
@@ -3375,6 +3514,8 @@ class ProductForm extends Component
      */
     public function getCategoryClasses(): string
     {
+        // ROLLBACK 2025-11-24: Use getCategoryStatus() (same as Badge for synchronization)
+        // This makes CSS class react the SAME WAY as badge indicator
         $status = $this->getCategoryStatus();
         $baseClasses = 'p-4 rounded-lg transition-all duration-200';
 
@@ -3558,6 +3699,12 @@ class ProductForm extends Component
      */
     public function updated($propertyName): void
     {
+        // FIX 2025-11-25: Skip during data loading (pullShopDataInstant, loadShopDataToForm)
+        // Prevents false positive hasUnsavedChanges after job completion
+        if ($this->isLoadingData) {
+            return;
+        }
+
         // Skip internal properties and already handled fields
         $skipProperties = [
             'shortDescriptionCount',
@@ -3571,7 +3718,14 @@ class ProductForm extends Component
             'selectedShopsToAdd',
             'pendingChanges',
             'hasUnsavedChanges',
-            'originalFormData'
+            'originalFormData',
+            'isLoadingData',
+            // FIX 2025-11-25: Job tracking properties (changed by Alpine.js clearJob())
+            'activeJobId',
+            'activeJobStatus',
+            'activeJobType',
+            'jobResult',
+            'jobCreatedAt'
         ];
 
         if (!in_array($propertyName, $skipProperties)) {
@@ -4052,7 +4206,8 @@ class ProductForm extends Component
             }
 
             if ($syncResults['success'] > 0) {
-                $this->dispatch('success', message: "Zaplanowano synchronizację produktu na {$syncResults['success']} sklepach");
+                // FIX 2025-11-25: Use 'info' not 'success' - actual success shown by Alpine panel after job completes
+                $this->dispatch('info', message: "Zaplanowano synchronizację produktu na {$syncResults['success']} sklepach");
             }
 
             if ($syncResults['failed'] > 0) {
@@ -4113,7 +4268,8 @@ class ProductForm extends Component
             // USER_ID FIX (2025-11-07): Pass auth()->id() to capture user who triggered sync
             SyncProductToPrestaShop::dispatch($this->product, $shop, auth()->id());
 
-            $this->dispatch('success', message: "Zaplanowano synchronizację produktu ze sklepem: {$shop->name}");
+            // FIX 2025-11-25: Use 'info' not 'success' - actual success shown by Alpine panel after job completes
+            $this->dispatch('info', message: "Zaplanowano synchronizację produktu ze sklepem: {$shop->name}");
 
             Log::info('Single shop sync job dispatched', [
                 'product_id' => $this->product->id,
@@ -4130,6 +4286,55 @@ class ProductForm extends Component
             ]);
 
             $this->dispatch('error', message: 'Błąd podczas planowania synchronizacji ze sklepem');
+        }
+    }
+
+    /**
+     * Detect active sync job on mount (FIX 2025-11-25)
+     *
+     * When user re-enters product form while sync job is running,
+     * this method restores the job tracking state from database.
+     *
+     * Checks product_shop_data.sync_status = 'pending' for any linked shop
+     * and sets activeJobStatus, activeJobType, jobCreatedAt accordingly.
+     *
+     * @return void
+     */
+    private function detectActiveJobOnMount(): void
+    {
+        if (!$this->product || !$this->product->exists) {
+            return;
+        }
+
+        try {
+            // Find any shop with pending sync status for this product
+            $pendingShopData = $this->product->shopData()
+                ->where('sync_status', 'pending')
+                ->orderBy('updated_at', 'desc')
+                ->first();
+
+            if ($pendingShopData) {
+                // Active sync job found - restore job tracking state
+                $this->activeJobStatus = 'pending';
+                $this->activeJobType = 'sync';
+                $this->activeShopId = $pendingShopData->shop_id;
+
+                // Use updated_at as job start time (when sync_status was set to pending)
+                $this->jobCreatedAt = $pendingShopData->updated_at->toIso8601String();
+
+                Log::info('[MOUNT] Detected active sync job - restoring job tracking state', [
+                    'product_id' => $this->product->id,
+                    'shop_id' => $pendingShopData->shop_id,
+                    'sync_status' => $pendingShopData->sync_status,
+                    'jobCreatedAt' => $this->jobCreatedAt,
+                    'activeJobStatus' => $this->activeJobStatus,
+                ]);
+            }
+        } catch (\Exception $e) {
+            Log::error('[MOUNT] Failed to detect active job', [
+                'product_id' => $this->product->id,
+                'error' => $e->getMessage(),
+            ]);
         }
     }
 
@@ -4222,6 +4427,14 @@ class ProductForm extends Component
                         // Sync job completed - pull fresh data from PrestaShop to verify sync (instant)
                         $this->pullShopDataInstant($this->activeShopId);
                     }
+
+                    // FIX 2025-11-25: Reset hasUnsavedChanges after successful job completion
+                    // CRITICAL: Use delayed dispatch to ensure reset happens AFTER all Livewire hooks
+                    $this->hasUnsavedChanges = false;
+                    $this->pendingChanges = [];
+
+                    // Schedule delayed reset to catch any async hook side-effects
+                    $this->dispatch('delayed-reset-unsaved-changes');
                 }
 
                 // Auto-clear job status after 5s (dispatch to Alpine.js)
@@ -4297,10 +4510,21 @@ class ProductForm extends Component
 
                 // FIX 2025-11-20: Auto-refresh categories after bulk sync completion
                 // User Request: "Po wykonaniu JOB autorefresh, ponowne pobranie kategorii"
+                // FIX 2025-11-25: Use pullShopDataInstant() NOT pullShopData()!
+                // pullShopData() calls savePendingChangesToShop() which dispatches ANOTHER JOB!
                 if ($this->activeShopId) {
-                    // Pull fresh data from PrestaShop to verify sync and update categories
-                    $this->pullShopData($this->activeShopId);
+                    // Pull fresh data from PrestaShop INSTANTLY (no new job)
+                    $this->pullShopDataInstant($this->activeShopId);
                 }
+
+                // FIX 2025-11-25: Reset hasUnsavedChanges after successful bulk sync completion
+                // CRITICAL: Use delayed dispatch to ensure reset happens AFTER all Livewire hooks
+                // (Livewire Client may send follow-up requests that re-set hasUnsavedChanges)
+                $this->hasUnsavedChanges = false;
+                $this->pendingChanges = [];
+
+                // Schedule delayed reset to catch any async hook side-effects
+                $this->dispatch('delayed-reset-unsaved-changes');
 
                 Log::info('[ETAP_13 BULK SYNC] All shops synchronized with auto-refresh', [
                     'product_id' => $this->product->id,
@@ -4376,6 +4600,14 @@ class ProductForm extends Component
                 // All shops pulled - mark as completed
                 $this->activeJobStatus = 'completed';
                 $this->jobResult = 'success';
+
+                // FIX 2025-11-25: Reset hasUnsavedChanges after successful bulk pull completion
+                // CRITICAL: Use delayed dispatch to ensure reset happens AFTER all Livewire hooks
+                $this->hasUnsavedChanges = false;
+                $this->pendingChanges = [];
+
+                // Schedule delayed reset to catch any async hook side-effects
+                $this->dispatch('delayed-reset-unsaved-changes');
 
                 Log::info('[ETAP_13 BULK PULL] All shops pulled', [
                     'product_id' => $this->product->id,
@@ -4486,7 +4718,8 @@ class ProductForm extends Component
             $this->jobCreatedAt = now()->toIso8601String();
             $this->activeJobStatus = 'pending';
 
-            $this->dispatch('success', message: "Rozpoczęto aktualizację produktu na sklepie {$shop->name}");
+            // FIX 2025-11-25: Use 'info' not 'success' - actual success shown by Alpine panel after job completes
+            $this->dispatch('info', message: "Rozpoczęto aktualizację produktu na sklepie {$shop->name}");
 
             Log::info('[ETAP_13 SINGLE SHOP SYNC] Sync job dispatched', [
                 'product_id' => $this->product->id,
@@ -4824,7 +5057,8 @@ class ProductForm extends Component
             $this->activeJobStatus = 'pending';
             // NOTE: activeJobId would require batch tracking - deferred to future enhancement
 
-            $this->dispatch('success', message: "Rozpoczęto aktualizację produktu na {$shops->count()} sklepach");
+            // FIX 2025-11-25: Use 'info' not 'success' - actual success shown by Alpine panel after job completes
+            $this->dispatch('info', message: "Rozpoczęto aktualizację produktu na {$shops->count()} sklepach");
 
             Log::info('Bulk update shops initiated', [
                 'product_id' => $this->product->id,
@@ -4916,7 +5150,8 @@ class ProductForm extends Component
             $this->jobCreatedAt = now()->toIso8601String();
             $this->activeJobStatus = 'pending';
 
-            $this->dispatch('success', message: "Rozpoczęto wczytywanie danych ze {$shops->count()} sklepów");
+            // FIX 2025-11-25: Use 'info' not 'success' - actual success shown by Alpine panel after job completes
+            $this->dispatch('info', message: "Rozpoczęto wczytywanie danych ze {$shops->count()} sklepów");
 
             Log::info('Bulk pull from shops initiated', [
                 'product_id' => $this->product->id,
@@ -5274,23 +5509,32 @@ class ProductForm extends Component
         ]);
 
         // FIX #5 2025-11-21: Save only current context (not all contexts)
-        $this->saveCurrentContextOnly();
+        // FIX 2025-11-25: Skip job tracking - we're redirecting immediately, job runs in background
+        $this->saveCurrentContextOnly(skipJobTracking: true);
 
         if (empty($this->getErrorBag()->all())) {
             // FIX 2025-11-21 (Fix #10): Force reset hasUnsavedChanges before redirect
             // Prevents beforeunload dialog when saveAndClose() redirects to product list
             // Even if other shop contexts have pending changes, we're leaving the form anyway
             $this->hasUnsavedChanges = false;
+            $this->pendingChanges = [];
 
-            // FIX 2025-11-20 (ETAP_07b Fix #7): Use event-based JavaScript redirect instead of Livewire redirect
-            // Livewire $this->redirect() was being canceled by property updates from saveAllPendingChanges()
-            // Event-based redirect happens on frontend and survives Livewire request cycles
-            // FIX 2025-11-20 (Fix #8): Use kebab-case event name to match Alpine listener @redirect-to-product-list.window
-            $this->dispatch('redirect-to-product-list');
+            // FIX 2025-11-25: Clear any job tracking that might have been set
+            // This ensures UI shows "Zapisz zmiany" not "Wróć do listy" during redirect
+            $this->activeJobStatus = null;
+            $this->activeJobType = null;
+            $this->activeJobId = null;
+            $this->jobResult = null;
 
-            Log::info('saveAndClose dispatched redirect-to-product-list event', [
+            // FIX 2025-11-25: Use Livewire 3.x $this->js() for synchronous JavaScript execution
+            // This executes BEFORE re-render, ensuring redirect happens immediately
+            // Previous event-based redirect was being overridden by component re-render
+            $this->js("window.skipBeforeUnload = true; window.location.href = '/admin/products';");
+
+            Log::info('saveAndClose: Executing immediate JS redirect', [
                 'product_id' => $this->product?->id,
                 'hasUnsavedChanges_reset' => true,
+                'job_tracking_cleared' => true,
             ]);
         }
     }
@@ -5300,8 +5544,11 @@ class ProductForm extends Component
      *
      * This prevents dispatching Jobs with stale category data from inactive tabs.
      * Only the active context is saved to ensure fresh data goes to PrestaShop.
+     *
+     * @param bool $skipJobTracking FIX 2025-11-25: When true, skip job tracking UI
+     *             (used by saveAndClose to redirect immediately while job runs in background)
      */
-    private function saveCurrentContextOnly(): void
+    private function saveCurrentContextOnly(bool $skipJobTracking = false): void
     {
         $this->isSaving = true;
         $this->successMessage = '';
@@ -5336,10 +5583,12 @@ class ProductForm extends Component
                     'product_id' => $this->product->id,
                 ]);
             } else {
-                $this->savePendingChangesToShop((int)$currentKey, $changes);
+                // FIX 2025-11-25: Pass skipJobTracking to prevent UI from showing job status
+                $this->savePendingChangesToShop((int)$currentKey, $changes, $skipJobTracking);
                 Log::info('[FIX #5 2025-11-21] Saved ONLY shop context', [
                     'product_id' => $this->product->id,
                     'shop_id' => $currentKey,
+                    'skip_job_tracking' => $skipJobTracking,
                 ]);
             }
 
@@ -5704,8 +5953,11 @@ class ProductForm extends Component
     /**
      * Save pending changes to specific shop data
      * CRITICAL FIX (2025-11-07): Added sync_status='pending' + auto-dispatch
+     *
+     * @param bool $skipJobTracking FIX 2025-11-25: When true, skip job tracking UI
+     *             (job still dispatches but UI doesn't show progress - used for saveAndClose redirect)
      */
-    private function savePendingChangesToShop(int $shopId, array $changes): void
+    private function savePendingChangesToShop(int $shopId, array $changes, bool $skipJobTracking = false): void
     {
         if (!$this->product) {
             Log::warning('Cannot save shop data - no product exists', ['shop_id' => $shopId]);
@@ -5967,11 +6219,22 @@ class ProductForm extends Component
             if ($shop && $shop->connection_status === 'connected' && $shop->is_active) {
                 \App\Jobs\PrestaShop\SyncProductToPrestaShop::dispatch($this->product, $shop, auth()->id());
 
+                // FIX 2025-11-25: Set job tracking variables ONLY if not skipping
+                // When skipJobTracking=true (from saveAndClose), job runs in background
+                // but UI doesn't show progress - allows immediate redirect to product list
+                if (!$skipJobTracking) {
+                    $this->activeJobType = 'sync';
+                    $this->jobCreatedAt = now()->toIso8601String();
+                    $this->activeJobStatus = 'pending';
+                }
+
                 Log::info('Auto-dispatched sync job after shop data save (from pending changes)', [
                     'product_id' => $this->product->id,
                     'shop_id' => $shopId,
                     'shop_name' => $shop->name,
                     'trigger' => 'savePendingChangesToShop',
+                    'job_tracking_enabled' => !$skipJobTracking,
+                    'skip_job_tracking' => $skipJobTracking,
                 ]);
             } else {
                 Log::warning('Sync job NOT dispatched - shop not connected or inactive', [
@@ -6254,8 +6517,6 @@ class ProductForm extends Component
                 'shop_id' => $this->activeShopId,
                 'error' => $e->getMessage(),
             ]);
-
-            // Fallback to PPM categories
             return $this->getDefaultCategories();
         }
     }
@@ -6268,8 +6529,9 @@ class ProductForm extends Component
     protected function getDefaultCategories(): array
     {
         // Load PPM categories from database
+        // FIX 2025-11-24: Eager-load 5 levels deep (zgodnie z CLAUDE.md - 5 poziomów zagnieżdżenia)
         $categories = Category::whereNull('parent_id')
-            ->with('children')
+            ->with('children.children.children.children.children')
             ->orderBy('sort_order')
             ->get();
 
@@ -6557,30 +6819,58 @@ class ProductForm extends Component
                 throw new \Exception("Produkt nie ma ID w PrestaShop. Wykonaj najpierw synchronizację (przycisk 'Aktualizuj sklep') aby utworzyć produkt w PrestaShop.");
             }
 
-            // FIX 2025-11-20: ALLOW loading categories even during pending sync
-            // User Request: "celowo zmieniam kategorie w prestashop aby weryfikowac czy PPM wykryje"
+            // FIX 2025-11-25: SKIP PrestaShop API fetch when sync job is pending
+            // Problem: User saves categories → Job dispatches → User re-enters product
+            //          → loadProductDataFromPrestaShop() fetches OLD data from PrestaShop
+            //          → Overwrites user's saved categories with stale PrestaShop data
             //
-            // CHANGED LOGIC:
-            // - Categories are READ-ONLY data - always safe to fetch from PrestaShop
-            // - During pending sync: Load categories only (no overwrite of other fields)
-            // - Other fields (name, description, price) stay as pending changes
-            //
-            // Benefits:
-            // - User sees CURRENT PrestaShop categories even with pending changes in other fields
-            // - No data loss (pending changes stay in pendingChanges array)
-            // - Categories auto-refresh on every tab switch
-            $loadCategoriesOnly = ($shopData->sync_status === 'pending');
+            // Solution: When sync_status === 'pending':
+            // - DON'T fetch from PrestaShop API (job hasn't updated PS yet!)
+            // - Load categories from LOCAL database (what user saved)
+            // - DON'T save anything back to DB
+            // - Pull only AFTER job completes (in checkBackgroundJobStatus)
+            $isPendingSync = ($shopData->sync_status === 'pending');
 
-            if ($loadCategoriesOnly) {
-                Log::info('[LOAD CATEGORIES ONLY] Loading categories from PrestaShop (pending sync - other fields unchanged)', [
+            if ($isPendingSync) {
+                Log::info('[SKIP PRESTASHOP FETCH] Sync job pending - using LOCAL database categories', [
                     'shop_id' => $shopId,
                     'product_id' => $this->product?->id,
                     'sync_status' => $shopData->sync_status,
-                    'reason' => 'Categories are READ-ONLY data - safe to load even during pending sync',
+                    'reason' => 'Job not completed yet - PrestaShop has stale data',
                 ]);
+
+                // Load categories from LOCAL database (Option A format)
+                $localMappings = $shopData->category_mappings;
+                if ($localMappings && isset($localMappings['ui'])) {
+                    $this->shopCategories[$shopId] = [
+                        'selected' => $localMappings['ui']['selected'] ?? [],
+                        'primary' => $localMappings['ui']['primary'] ?? null,
+                    ];
+
+                    Log::info('[LOCAL CATEGORIES LOADED] Using saved categories from PPM database', [
+                        'shop_id' => $shopId,
+                        'selected_count' => count($this->shopCategories[$shopId]['selected']),
+                        'primary' => $this->shopCategories[$shopId]['primary'],
+                    ]);
+                }
+
+                // Mark as loaded (but from local DB, not PrestaShop)
+                $this->loadedShopData[$shopId] = [
+                    'prestashop_id' => $shopData->prestashop_product_id,
+                    'categories' => [], // Empty - we used local data
+                    'id_category_default' => null,
+                    'loaded_from' => 'local_db_pending_sync',
+                ];
+
+                // Load form data from local DB
+                $this->loadShopDataToForm($shopId);
+
+                $this->isLoadingShopData = false;
+                session()->flash('message', 'Oczekiwanie na synchronizacje - pokazano zapisane dane');
+                return; // SKIP PrestaShop API call entirely
             }
 
-            // 3. Fetch from PrestaShop API
+            // 3. Fetch from PrestaShop API (only when NOT pending)
             $client = PrestaShopClientFactory::create($shop);
             $prestashopData = $client->getProduct($shopData->prestashop_product_id);
 
@@ -6589,37 +6879,25 @@ class ProductForm extends Component
                 $prestashopData = $prestashopData['product'];
             }
 
-            // 4. Extract essential data for UI
-            // FIX 2025-11-20: Conditional loading based on sync status
-
-            // ALWAYS load categories (READ-ONLY data)
+            // 4. Extract essential data for UI (only executed when NOT pending - see early return above)
+            // FIX 2025-11-25: Simplified - pending sync handled above with early return
             $this->loadedShopData[$shopId] = [
                 'prestashop_id' => $shopData->prestashop_product_id,
                 'categories' => $prestashopData['associations']['categories'] ?? [],
                 'id_category_default' => $prestashopData['id_category_default'] ?? null,
+                'link_rewrite' => data_get($prestashopData, 'link_rewrite.0.value') ?? data_get($prestashopData, 'link_rewrite'),
+                'name' => data_get($prestashopData, 'name.0.value') ?? data_get($prestashopData, 'name'),
+                'description_short' => data_get($prestashopData, 'description_short.0.value') ?? data_get($prestashopData, 'description_short'),
+                'description' => data_get($prestashopData, 'description.0.value') ?? data_get($prestashopData, 'description'),
+                'weight' => $prestashopData['weight'] ?? null,
+                'ean13' => $prestashopData['ean13'] ?? null,
+                'reference' => $prestashopData['reference'] ?? null,
+                'price' => $prestashopData['price'] ?? null,
+                'active' => $prestashopData['active'] ?? null,
+                'loaded_from' => 'prestashop_api',
             ];
 
-            // Load other fields ONLY if not pending sync
-            if (!$loadCategoriesOnly) {
-                $this->loadedShopData[$shopId] = array_merge($this->loadedShopData[$shopId], [
-                    'link_rewrite' => data_get($prestashopData, 'link_rewrite.0.value') ?? data_get($prestashopData, 'link_rewrite'),
-                    'name' => data_get($prestashopData, 'name.0.value') ?? data_get($prestashopData, 'name'),
-                    'description_short' => data_get($prestashopData, 'description_short.0.value') ?? data_get($prestashopData, 'description_short'),
-                    'description' => data_get($prestashopData, 'description.0.value') ?? data_get($prestashopData, 'description'),
-                    'weight' => $prestashopData['weight'] ?? null,
-                    'ean13' => $prestashopData['ean13'] ?? null,
-                    'reference' => $prestashopData['reference'] ?? null,
-                    'price' => $prestashopData['price'] ?? null,
-                    'active' => $prestashopData['active'] ?? null,
-                ]);
-            }
-
-            // Flash message based on what was loaded
-            if ($loadCategoriesOnly) {
-                session()->flash('message', 'Kategorie pobrane z PrestaShop (inne dane pozostają niezapisane)');
-            } else {
-                session()->flash('message', 'Dane produktu wczytane z PrestaShop');
-            }
+            session()->flash('message', 'Dane produktu wczytane z PrestaShop');
 
             // FIX 2025-11-20: Convert PrestaShop category IDs → PPM category IDs and update UI
             // User Request: "celowo zmieniam kategorie w prestashop aby weryfikowac czy PPM wykryje"
@@ -6732,7 +7010,6 @@ class ProductForm extends Component
                     'ppm_ids' => $ppmCategoryIds,
                     'prestashop_default' => $prestashopDefaultCategory,
                     'ppm_primary' => $ppmPrimaryId,
-                    'categories_only_mode' => $loadCategoriesOnly,
                     'saved_to_db' => true,
                     'mappings_count' => count($mappings),
                 ]);
@@ -6742,7 +7019,7 @@ class ProductForm extends Component
                 'shop_id' => $shopId,
                 'product_id' => $this->product?->id,
                 'prestashop_id' => $shopData->prestashop_product_id,
-                'categories_only' => $loadCategoriesOnly,
+                'loaded_from' => 'prestashop_api',
                 'categories_count' => count($this->loadedShopData[$shopId]['categories']),
                 'link_rewrite' => $this->loadedShopData[$shopId]['link_rewrite'] ?? 'N/A',
             ]);
@@ -6861,6 +7138,11 @@ class ProductForm extends Component
     public function render()
     {
         try {
+            // FIX 2025-11-24: Calculate expanded categories on every render
+            // This ensures categories are expanded when switching between shop tabs
+            // or when component is first loaded
+            $this->expandedCategoryIds = $this->calculateExpandedCategoryIds();
+
             $pageTitle = $this->isEditMode
                 ? "Edytuj produkt: {$this->name}"
                 : 'Dodaj nowy produkt';

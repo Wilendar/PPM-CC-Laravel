@@ -10,6 +10,7 @@ use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
 use App\Models\PrestaShopShop;
 use App\Models\Product;
+use App\Models\SyncJob;
 use App\Services\PrestaShop\PrestaShopClientFactory;
 use App\Services\PrestaShop\PrestaShopImportService;
 use App\Services\JobProgressService;
@@ -75,6 +76,14 @@ class BulkImportProducts implements ShouldQueue
     protected ?string $jobId;
 
     /**
+     * SyncJob ID for tracking in /admin/shops/sync
+     * FIX 2025-11-25: Store only ID to avoid SerializesModels issues
+     *
+     * @var int|null
+     */
+    protected ?int $syncJobId = null;
+
+    /**
      * Number of tries for the job
      *
      * @var int
@@ -91,6 +100,8 @@ class BulkImportProducts implements ShouldQueue
     /**
      * Create a new job instance
      *
+     * FIX 2025-11-25: Create SyncJob for visibility in /admin/shops/sync
+     *
      * @param PrestaShopShop $shop
      * @param string $mode all|category|individual
      * @param array $options
@@ -102,6 +113,66 @@ class BulkImportProducts implements ShouldQueue
         $this->mode = $mode;
         $this->options = $options;
         $this->jobId = $jobId;
+
+        // FIX 2025-11-25 #2: Use firstOrCreate to avoid Duplicate entry error
+        // When job is re-dispatched with same jobId (e.g., from BulkCreateCategories)
+        $syncJobUuid = $jobId ?? \Str::uuid()->toString();
+        $syncJob = SyncJob::firstOrCreate(
+            ['job_id' => $syncJobUuid],
+            [
+                'job_type' => 'import_products',
+                'job_name' => "Import Products from {$shop->name} ({$mode})",
+                'source_type' => SyncJob::TYPE_PRESTASHOP,
+                'source_id' => $shop->id,
+                'target_type' => SyncJob::TYPE_PPM,
+                'target_id' => null, // Multiple products
+                'status' => SyncJob::STATUS_PENDING,
+                'trigger_type' => SyncJob::TRIGGER_MANUAL,
+                'user_id' => auth()->id() ?? 1, // Fallback to admin
+                'queue_name' => 'default',
+                'total_items' => 0, // Will be updated after fetching products
+                'processed_items' => 0,
+                'successful_items' => 0,
+                'failed_items' => 0,
+                'scheduled_at' => now(),
+                'job_config' => [
+                    'mode' => $mode,
+                    'options' => $options,
+                ],
+            ]
+        );
+
+        // Store only ID (not model instance) to avoid serialization issues
+        $this->syncJobId = $syncJob->id;
+
+        Log::info('BulkImportProducts: SyncJob created', [
+            'sync_job_id' => $syncJob->id,
+            'job_id' => $syncJob->job_id,
+            'shop_id' => $shop->id,
+            'mode' => $mode,
+        ]);
+    }
+
+    /**
+     * Get SyncJob instance (gracefully handles deleted jobs)
+     *
+     * @return SyncJob|null
+     */
+    protected function getSyncJob(): ?SyncJob
+    {
+        if (!$this->syncJobId) {
+            return null;
+        }
+
+        try {
+            return SyncJob::find($this->syncJobId);
+        } catch (\Exception $e) {
+            Log::warning('Failed to load SyncJob (may have been deleted by cleanup)', [
+                'sync_job_id' => $this->syncJobId,
+                'error' => $e->getMessage(),
+            ]);
+            return null;
+        }
     }
 
     /**
@@ -111,6 +182,7 @@ class BulkImportProducts implements ShouldQueue
     {
         $startTime = microtime(true);
         $progressId = null;
+        $syncJob = $this->getSyncJob();
 
         Log::info('BulkImportProducts job started', [
             'shop_id' => $this->shop->id,
@@ -118,9 +190,12 @@ class BulkImportProducts implements ShouldQueue
             'mode' => $this->mode,
             'options' => $this->options,
             'pre_generated_job_id' => $this->jobId,
+            'sync_job_id' => $syncJob?->id,
         ]);
 
         try {
+            // FIX 2025-11-25: Update SyncJob status to running
+            $syncJob?->start();
             // 🔧 FIX: Fetch products FIRST to know total count for JobProgress
             $client = app(PrestaShopClientFactory::class)->create($this->shop);
             $productsToImport = $this->getProductsToImport($client);
@@ -132,6 +207,9 @@ class BulkImportProducts implements ShouldQueue
                 'total_products' => $total,
                 'mode' => $this->mode,
             ]);
+
+            // FIX 2025-11-25: Update SyncJob with total items
+            $syncJob?->update(['total_items' => $total]);
 
             // 🆕 ETAP_07 FAZA 3D: Check if category analysis needed AFTER knowing total count
             if ($this->shouldAnalyzeCategories()) {
@@ -331,6 +409,20 @@ class BulkImportProducts implements ShouldQueue
                 $progressService->markCompleted($progressId, $summary);
             }
 
+            // FIX 2025-11-25: Update SyncJob progress and complete
+            $syncJob?->updateProgress(
+                processedItems: $total,
+                successfulItems: $imported + $updated,
+                failedItems: $skipped + count($errors)
+            );
+            $syncJob?->complete([
+                'imported' => $imported,
+                'updated' => $updated,
+                'skipped' => $skipped,
+                'errors_count' => count($errors),
+                'execution_time_ms' => $executionTime,
+            ]);
+
             Log::info('BulkImportProducts job completed', [
                 'shop_id' => $this->shop->id,
                 'shop_name' => $this->shop->name,
@@ -354,6 +446,13 @@ class BulkImportProducts implements ShouldQueue
                 ]);
             }
 
+            // FIX 2025-11-25: Mark SyncJob as failed
+            $syncJob?->fail(
+                errorMessage: $e->getMessage(),
+                errorDetails: $e->getFile() . ':' . $e->getLine(),
+                stackTrace: $e->getTraceAsString()
+            );
+
             Log::error('BulkImportProducts job failed', [
                 'shop_id' => $this->shop->id,
                 'shop_name' => $this->shop->name,
@@ -361,6 +460,7 @@ class BulkImportProducts implements ShouldQueue
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
                 'progress_id' => $progressId,
+                'sync_job_id' => $syncJob?->id,
             ]);
 
             throw $e;

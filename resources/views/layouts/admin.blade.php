@@ -14,15 +14,14 @@
     <!-- Livewire Styles -->
     @livewireStyles
 
-    <!-- Application CSS & JS -->
+    <!-- Application CSS (JS moved to end of body AFTER Livewire) -->
     @vite([
         'resources/css/app.css',
         'resources/css/admin/layout.css',
         'resources/css/admin/components.css',
         'resources/css/products/category-form.css',
         'resources/css/products/product-form.css',
-        'resources/css/components/category-picker.css',
-        'resources/js/app.js'
+        'resources/css/components/category-picker.css'
     ])
 
     {{-- Alpine.js is included with Livewire 3.x - no need to load separately --}}
@@ -889,8 +888,29 @@
     <livewire:components.error-details-modal />
     <livewire:products.category-conflict-modal />
 
+    <!-- FIX 2025-11-25: Patch $persist redefine error in Livewire 3.x -->
+    <!-- Root cause: livewire.min.js defines $persist, then Livewire.start() tries to redefine -->
+    <!-- Solution: Skip $persist redefinition if already exists -->
+    <script>
+    (function() {
+        const originalDefineProperty = Object.defineProperty;
+        Object.defineProperty = function(obj, prop, descriptor) {
+            if (prop === '$persist') {
+                const existing = Object.getOwnPropertyDescriptor(obj, prop);
+                if (existing && !existing.configurable) {
+                    return obj; // Skip - already defined
+                }
+            }
+            return originalDefineProperty.call(this, obj, prop, descriptor);
+        };
+    })();
+    </script>
+
     <!-- Livewire Scripts (includes Alpine.js 3.x built-in) -->
     @livewireScripts
+
+    {{-- Application JS (AFTER Livewire so window.Alpine is available) --}}
+    @vite(['resources/js/app.js'])
 
     <!-- Global Notification System Script -->
     <script>

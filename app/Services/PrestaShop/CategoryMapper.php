@@ -176,10 +176,14 @@ class CategoryMapper
         $ppmCategory = Category::whereRaw('LOWER(name) = ?', [strtolower($categoryName)])->first();
 
         if (!$ppmCategory) {
+            // FIX 2025-11-25: Default parent to "Wszystko" (id=2) if no parent found
+            // This ensures all imported categories have proper PPM hierarchy
+            $effectiveParentId = $ppmParentId ?? 2; // Wszystko (id=2) as fallback
+
             // Create new PPM category WITH HIERARCHY
             $ppmCategory = Category::create([
                 'name' => $categoryName,
-                'parent_id' => $ppmParentId, // NULL for root, or parent PPM ID
+                'parent_id' => $effectiveParentId,
                 'is_active' => true,
             ]);
 

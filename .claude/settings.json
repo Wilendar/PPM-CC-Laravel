@@ -1,3 +1,29 @@
 {
-  "spinnerTipsEnabled": false
-}
+  "permissions": {
+    "allow": [
+      "mcp__chrome-devtools__*"
+    ]
+  },
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "pwsh -NoProfile -ExecutionPolicy Bypass -File \".claude\\scripts\\analyze-prompt.ps1\""
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "pwsh -NoProfile -ExecutionPolicy Bypass -File \".claude\\scripts\\check-agent-compliance.ps1\""
+          }
+        ]
+      }
+    ]
+  }
+} 

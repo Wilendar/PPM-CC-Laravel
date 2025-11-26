@@ -79,7 +79,22 @@
       "Bash(codex --version:*)",
       "Bash(codex models:*)",
       "Bash(codex config:*)",
-      "Skill(product-form-category-test)"
+      "Skill(product-form-category-test)",
+      "Skill(chrome-devtools-verification)",
+      "Bash(Select-String -Pattern \"has_children\" -Context 0,1)",
+      "Bash($RemoteCmd = \"tail -500 domains/ppm.mpptrade.pl/public_html/storage/logs/laravel.log | grep -E ''(buildCategoryTree|Specific categories check)'' -A 3\")",
+      "Bash(Write-Host \"Fetching buildCategoryTree logs...\" -ForegroundColor Cyan)",
+      "Bash(php:*)",
+      "Bash(Write-Host \"Uploading check script...\" -ForegroundColor Cyan)",
+      "Bash(Write-Host \"Running check on PRODUCTION...\" -ForegroundColor Yellow)",
+      "mcp__chrome-devtools__*",
+      "Bash(Select-String -Pattern \"public function getShopCategories\" -Context 0,30)",
+      "Bash(Start-Sleep -Seconds 6)",
+      "Bash(Select-String -Pattern \"x-text\" -Path \"resources/views/livewire/products/management/partials/category-tree-item.blade.php\" -Context 2,3)",
+      "Bash(Write-Host \"Uploading admin.blade.php...\" -ForegroundColor Cyan)",
+      "Bash(Write-Host \"Clearing cache...\" -ForegroundColor Cyan)",
+      "Bash(Start-Sleep -Seconds 4)",
+      "Skill(project-plan-manager)"
     ],
     "deny": [],
     "ask": []

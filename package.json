@@ -9,8 +9,6 @@
         "preview": "vite preview"
     },
     "devDependencies": {
-        "@alpinejs/persist": "^3.13.0",
-        "alpinejs": "^3.13.0",
         "autoprefixer": "^10.4.21",
         "axios": "^1.6.4",
         "laravel-vite-plugin": "^1.0.0",
@@ -21,7 +19,6 @@
         "vite": "^5.0.0"
     },
     "dependencies": {
-        "alpinejs": "^3.13.0",
         "vanilla-colorful": "^0.7.2"
     }
 }

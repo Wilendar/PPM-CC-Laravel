@@ -260,6 +260,10 @@ class PrestaShopImportService
                 // CRITICAL FIX: Products MUST have categories assigned!
                 $this->syncProductCategories($product, $prestashopData, $shop);
 
+                // 11. FIX 2025-11-25: Build category_mappings from product_categories
+                // CRITICAL: ProductForm reads from category_mappings, not product_categories!
+                $this->buildCategoryMappingsFromProductCategories($product, $shop);
+
                 return $product;
             });
 
@@ -433,6 +437,12 @@ class PrestaShopImportService
 
                     $category->update($categoryData);
                 } else {
+                    // FIX 2025-11-25: Default parent to "Wszystko" (id=2) if no parent
+                    // This ensures all imported categories have proper PPM hierarchy
+                    if (empty($categoryData['parent_id'])) {
+                        $categoryData['parent_id'] = 2; // Wszystko as default parent
+                    }
+
                     // Create new category
                     Log::info('Creating new category', [
                         'name' => $categoryData['name'],
@@ -1063,6 +1073,272 @@ class PrestaShopImportService
                     'category_ids' => $defaultCategoryIds,
                 ]);
             }
+        }
+
+        // FIX 2025-11-25: Ensure PPM base category "Baza" (id=1) is always assigned
+        // "Baza" is PPM-only category (not in PrestaShop) required for category tree visibility
+        $this->ensureBaseCategoryAssigned($product, $shop);
+    }
+
+    /**
+     * Ensure PPM base categories "Baza" and "Wszystko" are assigned to product
+     *
+     * FIX 2025-11-25 v2: PrestaShop imports lack PPM root categories
+     * Both Baza (id=1) AND Wszystko (id=2) are required for category tree expansion
+     *
+     * @param Product $product
+     * @param PrestaShopShop $shop
+     * @return void
+     */
+    protected function ensureBaseCategoryAssigned(Product $product, PrestaShopShop $shop): void
+    {
+        // PPM root category IDs - Baza (id=1) and Wszystko (id=2)
+        $rootCategoryIds = [
+            1, // Baza - root category
+            2, // Wszystko - child of Baza, parent of all product categories
+        ];
+
+        foreach ($rootCategoryIds as $categoryId) {
+            $category = Category::find($categoryId);
+            if (!$category) {
+                Log::warning('PPM root category not found', [
+                    'product_id' => $product->id,
+                    'category_id' => $categoryId,
+                ]);
+                continue;
+            }
+
+            // Check and add to DEFAULT categories (shop_id=NULL)
+            $hasDefault = DB::table('product_categories')
+                ->where('product_id', $product->id)
+                ->where('category_id', $categoryId)
+                ->whereNull('shop_id')
+                ->exists();
+
+            if (!$hasDefault) {
+                DB::table('product_categories')->insert([
+                    'product_id' => $product->id,
+                    'category_id' => $categoryId,
+                    'shop_id' => null,
+                    'is_primary' => false,
+                    'sort_order' => 0,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+
+                Log::info('PPM root category assigned (default)', [
+                    'product_id' => $product->id,
+                    'category_id' => $categoryId,
+                    'category_name' => $category->name,
+                ]);
+            }
+
+            // Check and add to PER-SHOP categories
+            $hasPerShop = DB::table('product_categories')
+                ->where('product_id', $product->id)
+                ->where('category_id', $categoryId)
+                ->where('shop_id', $shop->id)
+                ->exists();
+
+            if (!$hasPerShop) {
+                DB::table('product_categories')->insert([
+                    'product_id' => $product->id,
+                    'category_id' => $categoryId,
+                    'shop_id' => $shop->id,
+                    'is_primary' => false,
+                    'sort_order' => 0,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+
+                Log::info('PPM root category assigned (per-shop)', [
+                    'product_id' => $product->id,
+                    'shop_id' => $shop->id,
+                    'category_id' => $categoryId,
+                    'category_name' => $category->name,
+                ]);
+            }
+        }
+
+        // FIX 2025-11-25 v3: ALSO update ProductShopData.category_mappings.ui.selected
+        // ProductForm reads from category_mappings, not product_categories table!
+        $this->syncRootCategoriesToProductShopData($product, $shop, $rootCategoryIds);
+    }
+
+    /**
+     * Build category_mappings from product_categories table
+     *
+     * FIX 2025-11-25: Main fix for UI/DB mismatch
+     * ProductForm reads from ProductShopData.category_mappings, NOT product_categories table
+     * This method builds the category_mappings structure after syncProductCategories()
+     *
+     * @param Product $product
+     * @param PrestaShopShop $shop
+     * @return void
+     */
+    protected function buildCategoryMappingsFromProductCategories(Product $product, PrestaShopShop $shop): void
+    {
+        // Get per-shop categories first, fallback to default
+        $categories = DB::table('product_categories')
+            ->where('product_id', $product->id)
+            ->where('shop_id', $shop->id)
+            ->get();
+
+        if ($categories->isEmpty()) {
+            // Fallback to default categories (shop_id=NULL)
+            $categories = DB::table('product_categories')
+                ->where('product_id', $product->id)
+                ->whereNull('shop_id')
+                ->get();
+        }
+
+        if ($categories->isEmpty()) {
+            Log::warning('No categories found for product - cannot build category_mappings', [
+                'product_id' => $product->id,
+                'shop_id' => $shop->id,
+            ]);
+            return;
+        }
+
+        // Build ui.selected - all category IDs
+        $selectedIds = $categories->pluck('category_id')->toArray();
+
+        // Find primary category
+        $primaryCategory = $categories->firstWhere('is_primary', true);
+        $primaryId = $primaryCategory ? $primaryCategory->category_id : $selectedIds[0];
+
+        // Build mappings - category_id => prestashop_id
+        $mappings = [];
+        foreach ($selectedIds as $categoryId) {
+            // Get PrestaShop mapping
+            $shopMapping = ShopMapping::where('shop_id', $shop->id)
+                ->where('mapping_type', ShopMapping::TYPE_CATEGORY)
+                ->where('ppm_value', $categoryId)
+                ->where('is_active', true)
+                ->first();
+
+            if ($shopMapping) {
+                $mappings[(string)$categoryId] = $shopMapping->prestashop_id;
+            } else {
+                // No mapping - use category_id as prestashop_id (auto-created categories)
+                $mappings[(string)$categoryId] = $categoryId;
+            }
+        }
+
+        // Root categories (1, 2) are PPM-only, don't need PrestaShop mapping
+        // But they MUST be in ui.selected for tree visibility
+        $rootCategoryIds = [1, 2];
+        foreach ($rootCategoryIds as $rootId) {
+            if (!in_array($rootId, $selectedIds)) {
+                $selectedIds[] = $rootId;
+            }
+        }
+
+        // Build complete category_mappings structure
+        $categoryMappings = [
+            'ui' => [
+                'selected' => $selectedIds,
+                'primary' => $primaryId,
+            ],
+            'mappings' => $mappings,
+            'metadata' => [
+                'last_updated' => now()->toIso8601String(),
+                'source' => 'import_build',
+            ],
+        ];
+
+        // Update ProductShopData
+        $productShopData = ProductShopData::where('product_id', $product->id)
+            ->where('shop_id', $shop->id)
+            ->first();
+
+        if ($productShopData) {
+            $productShopData->category_mappings = $categoryMappings;
+            $productShopData->save();
+
+            Log::info('Built category_mappings from product_categories', [
+                'product_id' => $product->id,
+                'shop_id' => $shop->id,
+                'selected_count' => count($selectedIds),
+                'selected_ids' => $selectedIds,
+                'primary_id' => $primaryId,
+                'mappings_count' => count($mappings),
+            ]);
+        } else {
+            Log::warning('ProductShopData not found - cannot save category_mappings', [
+                'product_id' => $product->id,
+                'shop_id' => $shop->id,
+            ]);
+        }
+    }
+
+    /**
+     * Sync root categories (Baza, Wszystko) to ProductShopData.category_mappings
+     *
+     * FIX 2025-11-25 v3: ProductForm uses category_mappings.ui.selected, not product_categories table
+     * This ensures UI shows correct checkboxes for root categories
+     *
+     * @param Product $product
+     * @param PrestaShopShop $shop
+     * @param array $rootCategoryIds
+     * @return void
+     */
+    protected function syncRootCategoriesToProductShopData(Product $product, PrestaShopShop $shop, array $rootCategoryIds): void
+    {
+        $productShopData = \App\Models\ProductShopData::where('product_id', $product->id)
+            ->where('shop_id', $shop->id)
+            ->first();
+
+        if (!$productShopData) {
+            Log::debug('No ProductShopData to sync root categories', [
+                'product_id' => $product->id,
+                'shop_id' => $shop->id,
+            ]);
+            return;
+        }
+
+        $categoryMappings = $productShopData->category_mappings;
+
+        // FIX 2025-11-25 v4: Don't modify if mappings is empty
+        // CategoryMappingsCast returns empty structure for NULL, validation requires min:1 mappings
+        if (empty($categoryMappings) || !isset($categoryMappings['ui']['selected']) || empty($categoryMappings['mappings'])) {
+            Log::debug('ProductShopData has empty/invalid category_mappings - skipping root sync', [
+                'product_id' => $product->id,
+                'shop_id' => $shop->id,
+                'has_mappings' => !empty($categoryMappings['mappings']),
+            ]);
+            return;
+        }
+
+        $selected = $categoryMappings['ui']['selected'];
+        $updated = false;
+
+        foreach ($rootCategoryIds as $categoryId) {
+            if (!in_array($categoryId, $selected)) {
+                $selected[] = $categoryId;
+                $updated = true;
+
+                Log::info('Added root category to ProductShopData.category_mappings', [
+                    'product_id' => $product->id,
+                    'shop_id' => $shop->id,
+                    'category_id' => $categoryId,
+                ]);
+            }
+        }
+
+        if ($updated) {
+            $categoryMappings['ui']['selected'] = $selected;
+            $categoryMappings['metadata']['last_updated'] = now()->toIso8601String();
+            $categoryMappings['metadata']['source'] = 'import_root_sync';
+
+            $productShopData->category_mappings = $categoryMappings;
+            $productShopData->save();
+
+            Log::info('ProductShopData.category_mappings updated with root categories', [
+                'product_id' => $product->id,
+                'shop_id' => $shop->id,
+                'selected_count' => count($selected),
+            ]);
         }
     }
 }

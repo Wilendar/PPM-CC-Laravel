@@ -296,6 +296,27 @@ class PrestaShopCategoryService
             ]);
         }
 
+        // DEBUG 2025-11-24: Count categories by parent + check specific categories
+        $parentCounts = [];
+        $specificCategories = [];
+        foreach ($flatCategories as $category) {
+            $parentId = (int) ($category['id_parent'] ?? 0);
+            $parentCounts[$parentId] = ($parentCounts[$parentId] ?? 0) + 1;
+
+            // Log specific categories (PITGANG, KAYO, Pojazdy)
+            if (in_array($category['name'], ['PITGANG', 'KAYO', 'Pojazdy', 'Wszystko'])) {
+                $specificCategories[] = [
+                    'id' => $category['id'],
+                    'name' => $category['name'],
+                    'id_parent' => $category['id_parent'] ?? null,
+                ];
+            }
+        }
+
+        Log::info('[buildCategoryTree] Specific categories check', [
+            'specific_categories' => $specificCategories
+        ]);
+
         // Build parent-child relationships
         $tree = [];
         foreach ($categoriesById as $id => $category) {
@@ -309,6 +330,19 @@ class PrestaShopCategoryService
                 $categoriesById[$parentId]['children'][$id] = &$categoriesById[$id];
             }
         }
+
+        // DEBUG 2025-11-24: Log tree structure
+        Log::info('[buildCategoryTree] Structure', [
+            'total_categories' => count($flatCategories),
+            'tree_roots' => count($tree),
+            'categories_with_parent_0' => $parentCounts[0] ?? 0,
+            'categories_with_parent_1' => $parentCounts[1] ?? 0,
+            'categories_with_parent_2' => $parentCounts[2] ?? 0,
+            'baza_actual_children' => isset($categoriesById[1]) ? count($categoriesById[1]['children']) : 0,
+            'wszystko_actual_children' => isset($categoriesById[2]) ? count($categoriesById[2]['children']) : 0,
+            'baza_exists' => isset($categoriesById[1]),
+            'wszystko_exists' => isset($categoriesById[2]),
+        ]);
 
         // Sort children by position and calculate levels
         $this->sortAndCalculateLevels($tree, 1);

@@ -38,7 +38,7 @@ class CategoryMappingsValidator
 
             'metadata' => 'nullable|array',
             'metadata.last_updated' => 'nullable|date_format:Y-m-d\TH:i:sP',
-            'metadata.source' => 'nullable|in:manual,pull,sync,migration',
+            'metadata.source' => 'nullable|in:manual,pull,sync,migration,import,import_build,import_root_sync',
         ]);
 
         if ($validator->fails()) {

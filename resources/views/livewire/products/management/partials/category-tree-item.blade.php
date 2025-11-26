@@ -14,7 +14,11 @@
     collapsed: {{ $shouldExpand ? 'false' : 'true' }},
     isSelected: {{ $isSelected ? 'true' : 'false' }},
     isPrimary: {{ $isPrimary ? 'true' : 'false' }}
-}" wire:key="category-tree-{{ $context }}-{{ $category->id }}">
+}"
+x-on:primary-category-changed.window="
+    isPrimary = ($event.detail.categoryId === {{ $category->id }})
+"
+wire:key="category-tree-{{ $context }}-{{ $category->id }}">
     <div class="flex items-center space-x-2 py-1"
          wire:key="category-row-{{ $context }}-{{ $category->id }}"
          style="padding-left: {{ $level * 1.5 }}rem;">
@@ -60,14 +64,16 @@
         {{-- FIX #4 2025-11-21: Disable button during save/pending --}}
         {{-- FIX #8 2025-11-21: REMOVED wire:loading.attr="disabled" (conflicts with wire:poll.5s) --}}
         {{-- FIX #13 2025-11-21: Use Alpine.js :disabled binding with REACTIVE PROPERTY --}}
+        {{-- FIX 2025-11-24 (v4): Alpine.js reactive isPrimary synced via Livewire dispatch event --}}
+        {{-- Resolves conflict: Fix #1 (PHP expression needs re-render) vs Fix #3 (static wire:key prevents re-render) --}}
         <button
             x-show="isSelected"
-            @click="isPrimary = !isPrimary; $wire.setPrimaryCategory({{ $category->id }})"
+            @click="$wire.setPrimaryCategory({{ $category->id }})"
             type="button"
             :class="isPrimary ? 'category-primary-btn' : 'category-set-primary-btn'"
             class="px-2 py-1 text-xs rounded disabled:opacity-50 disabled:cursor-not-allowed"
-            x-text="isPrimary ? 'Główna' : 'Ustaw główną'"
             :disabled="$wire.categoryEditingDisabled"
+            x-text="isPrimary ? 'Główna' : 'Ustaw główną'"
             x-transition:enter="transition ease-out duration-150"
             x-transition:enter-start="opacity-0 transform scale-95"
             x-transition:enter-end="opacity-100 transform scale-100"

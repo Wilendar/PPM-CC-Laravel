@@ -1,7 +1,9 @@
 # ProductForm – Refactoring & Critical Lessons (2025-11-22)
 
 **Data refactoringu:** 2025-11-21
-**Status:** ✅ **COMPLETED** (kategorie przywrócone 2025-11-22)
+**Status:** ✅ **COMPLETED**
+- ✅ Fix #1: Kategorie przywrócone (2025-11-22)
+- ✅ Fix #2: Category loading architecture rollback (2025-11-24)
 **Refactoring type:** Monolithic → Modular (TABS + PARTIALS pattern)
 
 ---
@@ -393,6 +395,126 @@ php artisan view:clear && cache:clear && config:clear
 - ⚠️ Increased complexity (15 files vs 1)
 - ⚠️ More places where bugs can hide
 - ⚠️ Requires discipline w utrzymaniu consistency
+
+---
+
+## 🔧 POST-REFACTORING FIX #2: Category Loading Architecture (2025-11-24)
+
+**STATUS:** ✅ **COMPLETED**
+
+### PROBLEM
+Po poprzednim fix'ie (#1 z 2025-11-22) wprowadzono **błędną architekturę**: `getShopCategories()` zostało zmienione na ZAWSZE zwracanie PPM categories, co uniemożliwiło użytkownikom wybór nowych kategorii PrestaShop.
+
+### SYMPTOMY
+- ❌ B2B Test DEV tab pokazywał tylko 8 kategorii (już przypisane do produktu)
+- ❌ User nie mógł wybrać pozostałych 1168 kategorii z PrestaShop
+- ❌ MRF, TEST PPM Category, RXF wyświetlały się na ROOT level (jak "Baza") zamiast pod "Wszystko"
+
+### ROOT CAUSE
+
+**1. Architectural Error:**
+```php
+// ❌ BROKEN (FIX #1 - 2025-11-24):
+public function getShopCategories(): array
+{
+    return $this->getDefaultCategories(); // Always PPM!
+}
+```
+
+**Dlaczego to złe?**
+- PPM categories = własna hierarchia organizacji (Baza → Wszystko → brands)
+- PrestaShop categories = COMPLETE API tree (1176+ kategorii)
+- Shop tabs MUSZĄ pokazywać ALL PrestaShop categories (żeby user mógł wybrać nowe)
+
+**2. Database Structure:**
+- MRF (id=12), TEST PPM Category (id=13), RXF (id=15) miały `parent_id=NULL` zamiast `parent_id=2`
+
+### FIX APPLIED
+
+**1. ROLLBACK getShopCategories() (ProductForm.php:6163-6197)**
+```php
+// ✅ CORRECT:
+public function getShopCategories(): array
+{
+    if (!$this->activeShopId) {
+        return $this->getDefaultCategories(); // Default TAB = PPM
+    }
+
+    try {
+        $shop = PrestaShopShop::find($this->activeShopId);
+        $categoryService = app(\App\Services\PrestaShop\PrestaShopCategoryService::class);
+        $tree = $categoryService->getCachedCategoryTree($shop); // ALL PrestaShop!
+        return array_map([$this, 'convertCategoryArrayToObject'], $tree);
+    } catch (\Exception $e) {
+        return $this->getDefaultCategories(); // Fallback
+    }
+}
+```
+
+**2. RESTORED ID Conversion:**
+- `getPrestaShopCategoryIdsForContext()`: PPM IDs → PrestaShop IDs (lines 1663-1732)
+- `getPrimaryPrestaShopCategoryIdForContext()`: PPM primary → PrestaShop (lines 1759-1792)
+- `calculateExpandedCategoryIds()`: Added PPM → PrestaShop conversion for shop context (lines 1365-1407)
+
+**3. DATABASE FIX:**
+```php
+// Script: _TEMP/fix_root_level_categories.php
+UPDATE categories SET parent_id = 2 WHERE id IN (12, 13, 15);
+```
+
+### VERIFICATION (Chrome DevTools MCP)
+- ✅ Default TAB: Hierarchia PPM (Baza → Wszystko → 6 brands)
+- ✅ B2B Test DEV TAB: 1179 total checkboxes (ALL PrestaShop categories)
+- ✅ 9 checked (przypisane), 1170 unchecked (dostępne do wyboru)
+- ✅ Expansion works: 5 parent categories expanded correctly
+
+### LESSON #6: Architecture Constraints
+
+**CRITICAL RULE:**
+```
+DEFAULT TAB      = PPM categories (own hierarchy)
+SHOP TABS        = PrestaShop categories (ALL from API)
+getShopCategories() = CONTEXT-DEPENDENT (not PPM-only!)
+```
+
+**WHY?**
+- User musi móc wybrać NOWE kategorie z PrestaShop (nie tylko już przypisane)
+- PPM categories = fallback/organizacja wewnętrzna
+- PrestaShop categories = source of truth dla sklepów
+
+**ANTI-PATTERN:**
+```php
+// ❌ NEVER:
+public function getShopCategories(): array {
+    return $this->getDefaultCategories(); // Breaks shop tabs!
+}
+```
+
+**CORRECT PATTERN:**
+```php
+// ✅ ALWAYS:
+public function getShopCategories(): array {
+    if (!$this->activeShopId) return $this->getDefaultCategories();
+    return $this->loadPrestaShopCategories($this->activeShopId);
+}
+```
+
+### TIME INVESTMENT
+- Debugging: ~3h (2025-11-24)
+- Rollback + Database fix: ~1h
+- Testing + Verification: ~1h
+- **Total: ~5h**
+
+### FILES MODIFIED
+- `app/Http/Livewire/Products/Management/ProductForm.php` (3 sections)
+- Database: `categories` table (parent_id fix)
+
+### SCRIPTS
+- `_TEMP/fix_root_level_categories.php` - DB fix
+- `_TEMP/deploy_productform_rollback_fix.ps1` - Deployment
+
+### SCREENSHOTS
+- `_TOOLS/screenshots/b2b_test_dev_categories_fixed.jpg`
 
 ---
 

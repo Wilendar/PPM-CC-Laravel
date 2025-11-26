@@ -816,12 +816,23 @@
             @endphp
 
             @if($availableCategories && count($availableCategories) > 0)
-                <div class="{{ $this->getCategoryClasses() }} max-h-64 overflow-y-auto" wire:key="categories-ctx-{{ $activeShopId ?? 'default' }}">
+                {{-- FIX 2025-11-24 (v3 - FINAL): Static wire:key to PREVENT forced re-renders --}}
+                {{-- wire:key includes ONLY activeShopId (to distinguish shop contexts) --}}
+                {{-- REMOVED: $primaryCatId from wire:key (was causing Alpine.js state reset!) --}}
+                {{-- Livewire automatically re-renders on property changes, no force re-render needed --}}
+                @php
+                    $categoryContainerClasses = $this->getCategoryClasses();
+                @endphp
+                {{-- FIX 2025-11-25: Add frozen state when sync job is running for current shop --}}
+                <div class="{{ $categoryContainerClasses }} max-h-64 overflow-y-auto"
+                     wire:key="categories-ctx-{{ $activeShopId ?? 'default' }}"
+                     :class="{ 'category-tree-frozen': $wire.activeShopId !== null && ($wire.activeJobStatus === 'pending' || $wire.activeJobStatus === 'processing') }">
                     @foreach($availableCategories as $rootCategory)
                         @include('livewire.products.management.partials.category-tree-item', [
                             'category' => $rootCategory,
                             'level' => 0,
-                            'context' => $activeShopId ?? 'default'
+                            'context' => $activeShopId ?? 'default',
+                            'expandedCategoryIds' => $this->expandedCategoryIds
                         ])
                     @endforeach
                 </div>

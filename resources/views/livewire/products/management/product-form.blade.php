@@ -5,13 +5,11 @@
 {{-- FIX 2025-11-18: Poll based on activeJobStatus (not activeJobId) to support bulk jobs --}}
 {{-- FIX 2025-11-20 (ETAP_07b Fix #7): Event listener for JavaScript redirect after save --}}
 {{-- FIX 2025-11-21 (ETAP_07b Fix #9): Disable beforeunload before redirect to prevent dialog --}}
-{{-- FIX 2025-11-21 v2 (ETAP_07b Fix #15): Conditional wire:poll to prevent constant re-renders --}}
-{{-- Root Cause: wire:poll.stop on same element doesn't work → renders every 5s even when no job --}}
-{{-- Solution: Conditional wrapper div with wire:poll ONLY when job is active --}}
-@if($activeJobStatus && $activeJobStatus !== 'completed' && $activeJobStatus !== 'failed')
-    {{-- Polling wrapper - ONLY when job is active --}}
-    <div wire:poll.5s="checkJobStatus">
-@endif
+{{-- FIX 2025-11-25: ALWAYS have wire:poll wrapper (not conditional!) --}}
+{{-- Root Cause (ETAP_07b Fix #15 REVERTED): wire:poll inside @if doesn't activate on dynamic changes --}}
+{{-- Livewire troubleshooting skill ISSUE #3: wire:poll must be OUTSIDE @if conditional --}}
+{{-- checkJobStatus() already returns early when no job active - no performance impact --}}
+<div wire:poll.5s="checkJobStatus">
 <div
     class="category-form-container"
     @redirect-to-product-list.window="window.skipBeforeUnload = true; window.location.href = '/admin/products'">
@@ -179,9 +177,7 @@
     @endif
 </div> {{-- Close w-full py-4 ROOT ELEMENT --}}
 </div> {{-- Close category-form-container --}}
-@if($activeJobStatus && $activeJobStatus !== 'completed' && $activeJobStatus !== 'failed')
-    </div> {{-- Close polling wrapper --}}
-@endif
+</div> {{-- Close wire:poll wrapper (FIX 2025-11-25: always present, not conditional) --}}
 
 {{-- JavaScript section - moved outside root element like CategoryForm --}}
 @push('scripts')

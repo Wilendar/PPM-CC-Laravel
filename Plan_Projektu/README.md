@@ -3,7 +3,7 @@
 
 **UWAGA** WYŁĄCZ autoryzację AdminMiddleware na czas developmentu! PRZED OSTATECZNYM DEPLOY UPEWNIJ SIĘ ŻE AUTORYZACJA JEST WSZĘDZIE WŁĄCZONA !
 
-**Ostatnia aktualizacja:** 2025-09-05  
+**Ostatnia aktualizacja:** 2025-11-18  
 **Status projektu:** 🛠️ W TRAKCIE OPRACOWANIA  
 **Szacowany czas realizacji:** 20 tygodni  
 
@@ -43,37 +43,40 @@ Prestashop Product Manager (PPM) to zaawansowany system PIM (Product Information
 
 ---
 
-## 📚 STRUKTURA PLANU - 12 ETAPÓW
+## 📚 STRUKTURA PLANU - 13 ETAPÓW
 
 ### 🔵 FAZA 1: FUNDAMENT (Tygodnie 1-4)
 | Etap | Nazwa | Status | Czas | Priorytet |
 |------|-------|---------|------|-----------|
-| [01](ETAP_01_Fundament.md) | Fundament i Architektura Projektu | ❌ | 40h | 🔴 KRYTYCZNY |
-| [02](ETAP_02_Modele_Bazy.md) | Modele i Struktura Bazy Danych | ❌ | 35h | 🔴 KRYTYCZNY |
-| [03](ETAP_03_Autoryzacja.md) | System Autoryzacji i Uprawnień | ❌ | 30h | 🟡 WYSOKI |
+| [01](ETAP_01_Fundament.md) | Fundament i Architektura Projektu | ✅ UKOŃCZONY | 40h | 🔴 KRYTYCZNY |
+| [02](ETAP_02_Modele_Bazy.md) | Modele i Struktura Bazy Danych | ✅ UKOŃCZONY | 35h | 🔴 KRYTYCZNY |
+| [03](ETAP_03_Autoryzacja.md) | System Autoryzacji i Uprawnień | ✅ UKOŃCZONY | 30h | 🟡 WYSOKI |
 
 ### 🟢 FAZA 2: CORE FUNKCJONALNOŚCI (Tygodnie 5-10)
 | Etap | Nazwa | Status | Czas | Priorytet |
 |------|-------|---------|------|-----------|
-| [04](ETAP_04_Panel_Admin.md) | Panel Administracyjny | ❌ | 45h | 🟡 WYSOKI |
-| [05](ETAP_05_Produkty.md) | Moduł Produktów - Rdzeń Aplikacji | ❌ | 60h | 🔴 KRYTYCZNY |
-| [06](ETAP_06_Import_Export.md) | System Import/Export XLSX | ❌ | 40h | 🟡 WYSOKI |
+| [04](ETAP_04_Panel_Admin.md) | Panel Administracyjny (zob. ETAP_04a_Panel_Admin_CC.md) | ✅ UKOŃCZONY (FAZA A-E wdrożone) | 45h | 🟡 WYSOKI |
+| [05](ETAP_05_Produkty.md) | Moduł Produktów - Rdzeń Aplikacji (statusy w pod-ETAPach 05a-05d) | 🛠️ W TRAKCIE (~50%: 05a 77%, 05b 52%, 05c po FAZIE 3, 05d 25%) | 60h | 🔴 KRYTYCZNY |
+| [06](ETAP_06_Import_Export.md) | System Import/Export XLSX | ❌ NIE ROZPOCZĘTE | 40h | 🟡 WYSOKI |
+
+**Uwaga ETAP 05:** szczegółowe statusy i zakres znajdują się w `ETAP_05a_Produkty.md`, `ETAP_05b_Produkty_Warianty.md`, `ETAP_05c_Produkty_Cechy.md` oraz `ETAP_05d_Produkty_Dopasowania.md`.
 
 ### 🟡 FAZA 3: INTEGRACJE (Tygodnie 11-15)
 | Etap | Nazwa | Status | Czas | Priorytet |
 |------|-------|---------|------|-----------|
-| [07](ETAP_07_Prestashop_API.md) | Integracja PrestaShop API | ❌ | 50h | 🔴 KRYTYCZNY |
-| [08](ETAP_08_ERP_Integracje.md) | Integracje z Systemami ERP | ❌ | 45h | 🟡 WYSOKI |
-| [09](ETAP_09_Wyszukiwanie.md) | System Wyszukiwania | ❌ | 35h | 🟢 ŚREDNI |
+| [07](ETAP_07_Prestashop_API.md) | Integracja PrestaShop API | 🛠️ W TRAKCIE (FAZY 1-3 ukończone; FAZA 5 w toku; FAZA 9 ~40%) | 50h | 🔴 KRYTYCZNY |
+| [08](ETAP_08_ERP_Integracje.md) | Integracje z Systemami ERP | ❌ NIE ROZPOCZĘTE | 45h | 🟡 WYSOKI |
+| [09](ETAP_09_Wyszukiwanie.md) | System Wyszukiwania | ❌ NIE ROZPOCZĘTY | 35h | 🟢 ŚREDNI |
 
 ### 🔴 FAZA 4: ZAAWANSOWANE FUNKCJE (Tygodnie 16-20)
 | Etap | Nazwa | Status | Czas | Priorytet |
 |------|-------|---------|------|-----------|
-| [10](ETAP_10_Dostawy.md) | System Dostaw i Kontenerów | ❌ | 50h | 🟡 WYSOKI |
-| [11](ETAP_11_Dopasowania.md) | System Dopasowań i Wariantów | ❌ | 40h | 🟢 ŚREDNI |
-| [12](ETAP_12_UI_Deploy.md) | UI/UX, Testy i Deploy Produkcyjny | ❌ | 45h | 🔴 KRYTYCZNY |
+| [10](ETAP_10_Dostawy.md) | System Dostaw i Kontenerów | ❌ NIE ROZPOCZĘTY | 50h | 🟡 WYSOKI |
+| [11](ETAP_11_Dopasowania.md) | System Dopasowań i Wariantów | ❌ NIE ROZPOCZĘTY | 40h | 🟢 ŚREDNI |
+| [12](ETAP_12_UI_Deploy.md) | UI/UX, Testy i Deploy Produkcyjny | ❌ NIE ROZPOCZĘTY | 45h | 🔴 KRYTYCZNY |
+| [13](ETAP_13_Sync_Panel_UX_Refactoring.md) | Sync Panel UX Refactoring | ✅ UKOŃCZONY (2025-11-18) | 68h (1h real) | 🟡 WYSOKI |
 
-**TOTAL:** ~515 godzin (≈ 20 tygodni przy 25h/tydzień)
+**TOTAL:** ~583 godzin (≈ 23 tygodnie przy 25h/tydzień)
 
 ---
 
@@ -160,5 +163,5 @@ Każdy etap uznawany jest za ukończony gdy:
 ---
 
 **Stworzony:** 2025-09-05 przez Claude Code AI  
-**Ostatnia aktualizacja:** 2025-09-05  
+**Ostatnia aktualizacja:** 2025-11-18  
 **Wersja planu:** 1.0  
