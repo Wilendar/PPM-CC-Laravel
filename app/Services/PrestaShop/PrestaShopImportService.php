@@ -13,6 +13,11 @@ use App\Services\PrestaShop\PrestaShopClientFactory;
 use App\Services\PrestaShop\ProductTransformer;
 use App\Services\PrestaShop\CategoryTransformer;
 use App\Exceptions\PrestaShopAPIException;
+use App\Models\FeatureType;
+use App\Models\FeatureGroup;
+use App\Models\ProductFeature;
+use App\Models\PrestashopFeatureMapping;
+use App\Services\PrestaShop\VehicleCompatibilitySyncService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use InvalidArgumentException;
@@ -94,7 +99,8 @@ class PrestaShopImportService
      */
     public function importProductFromPrestaShop(
         int $prestashopProductId,
-        PrestaShopShop $shop
+        PrestaShopShop $shop,
+        bool $importWithVariants = false
     ): Product
     {
         $startTime = microtime(true);
@@ -103,6 +109,7 @@ class PrestaShopImportService
             'prestashop_product_id' => $prestashopProductId,
             'shop_id' => $shop->id,
             'shop_name' => $shop->name,
+            'import_with_variants' => $importWithVariants,
         ]);
 
         try {
@@ -131,7 +138,9 @@ class PrestaShopImportService
                 $stockData,
                 $prestashopProductId,
                 $prestashopData,  // 🔧 FIX: Add $prestashopData for syncProductCategories()
-                $shop
+                $shop,
+                $client,  // 🔧 ETAP_07e FIX: Add $client for syncProductFeatures()
+                $importWithVariants  // 🔧 FIX: Add for variant import
             ) {
                 // 5. Check if product exists (by SKU)
                 $existingProduct = Product::where('sku', $productData['sku'])->first();
@@ -263,6 +272,46 @@ class PrestaShopImportService
                 // 11. FIX 2025-11-25: Build category_mappings from product_categories
                 // CRITICAL: ProductForm reads from category_mappings, not product_categories!
                 $this->buildCategoryMappingsFromProductCategories($product, $shop);
+
+                // 12. ETAP_07e FIX 2025-12-03: Import product features from PrestaShop
+                // CRITICAL: Features must be imported for products to have technical specifications!
+                $this->syncProductFeatures($product, $prestashopData, $shop, $client);
+
+                // 13. ETAP_05d FIX 2025-12-22: Import vehicle compatibilities from PrestaShop features
+                // Only for spare parts (czesc-zamienna) that have compatibility features (431 Oryginal, 433 Zamiennik)
+                if ($product->productType?->slug === 'czesc-zamienna') {
+                    try {
+                        $compatService = new VehicleCompatibilitySyncService();
+                        $compatService->setClient($client);
+                        $compatService->setShop($shop);
+
+                        $importedCompat = $compatService->importFromPrestaShopFeatures(
+                            $prestashopData,
+                            $product,
+                            $shop->id
+                        );
+
+                        if ($importedCompat->isNotEmpty()) {
+                            Log::info('Compatibility imported during bulk import', [
+                                'product_id' => $product->id,
+                                'sku' => $product->sku,
+                                'compatibility_count' => $importedCompat->count(),
+                            ]);
+                        }
+                    } catch (\Exception $compatError) {
+                        // Non-blocking: log but continue
+                        Log::warning('Failed to import compatibility during bulk import', [
+                            'product_id' => $product->id,
+                            'sku' => $product->sku,
+                            'error' => $compatError->getMessage(),
+                        ]);
+                    }
+                }
+
+                // 14. FIX 2025-12-10: Import product variants (combinations) from PrestaShop
+                if ($importWithVariants) {
+                    $this->syncProductVariants($product, $prestashopData, $shop, $client);
+                }
 
                 return $product;
             });
@@ -427,26 +476,75 @@ class PrestaShopImportService
                     ->first();
 
                 if ($mapping) {
-                    // Update existing category
-                    $category = Category::findOrFail($mapping->ppm_value);
+                    // FIX 2025-12-08: Check if category actually exists (handle orphaned mappings)
+                    // Orphaned mapping = ShopMapping exists but Category was deleted from PPM
+                    $category = Category::find($mapping->ppm_value);
 
-                    Log::info('Updating existing category', [
-                        'category_id' => $category->id,
-                        'name' => $categoryData['name'],
-                    ]);
+                    if ($category) {
+                        // Update existing category
+                        Log::info('Updating existing category', [
+                            'category_id' => $category->id,
+                            'name' => $categoryData['name'],
+                        ]);
 
-                    $category->update($categoryData);
-                } else {
-                    // FIX 2025-11-25: Default parent to "Wszystko" (id=2) if no parent
-                    // This ensures all imported categories have proper PPM hierarchy
+                        $category->update($categoryData);
+                    } else {
+                        // Orphaned mapping detected - category doesn't exist in PPM
+                        Log::warning('Orphaned mapping detected - category deleted from PPM, will recreate', [
+                            'mapping_id' => $mapping->id,
+                            'prestashop_id' => $prestashopCategoryId,
+                            'orphaned_ppm_value' => $mapping->ppm_value,
+                        ]);
+
+                        // Delete orphaned mapping
+                        $mapping->delete();
+
+                        // Treat as new category (fall through to else block logic)
+                        $mapping = null;
+                    }
+                }
+
+                if (!$mapping) {
+                    // FIX 2025-12-09: Improved parent category handling for imports
+                    // - Root categories (PrestaShop id_parent ≤ 2) should have parent_id = null
+                    // - Only set parent_id = 2 if "Wszystko" category exists AND this is not a root category
+                    $prestashopParentId = (int) data_get($categoryData, 'prestashop_parent_id', 0);
+
                     if (empty($categoryData['parent_id'])) {
-                        $categoryData['parent_id'] = 2; // Wszystko as default parent
+                        // Check if this is PrestaShop's root category (id=2, "Wszystko")
+                        // Root categories should not have a parent (parent_id = null)
+                        if ($prestashopCategoryId === 2 || $prestashopParentId <= 1) {
+                            // This is the root category - leave parent_id as null
+                            $categoryData['parent_id'] = null;
+
+                            Log::info('Root category detected - no parent', [
+                                'prestashop_category_id' => $prestashopCategoryId,
+                                'name' => $categoryData['name'],
+                            ]);
+                        } else {
+                            // Non-root category: try to set parent to "Wszystko" (id=2)
+                            // But only if "Wszystko" exists in PPM
+                            $wszystkoExists = Category::where('id', 2)->exists();
+
+                            if ($wszystkoExists) {
+                                $categoryData['parent_id'] = 2; // Wszystko as default parent
+                            } else {
+                                // Wszystko doesn't exist - create as root category
+                                $categoryData['parent_id'] = null;
+
+                                Log::warning('Wszystko (id=2) not found - creating as root category', [
+                                    'prestashop_category_id' => $prestashopCategoryId,
+                                    'name' => $categoryData['name'],
+                                ]);
+                            }
+                        }
                     }
 
                     // Create new category
                     Log::info('Creating new category', [
                         'name' => $categoryData['name'],
                         'parent_id' => $categoryData['parent_id'],
+                        'prestashop_category_id' => $prestashopCategoryId,
                     ]);
 
                     $category = Category::create($categoryData);
@@ -802,11 +900,66 @@ class PrestaShopImportService
                 ->first();
 
             if ($mapping) {
-                // Mapping exists - use it
-                $ppmCategoryIds[$mapping->ppm_value] = [
-                    'is_primary' => ($prestashopCategoryId === $defaultCategoryId),
-                    'sort_order' => $index,
-                ];
+                // 🔧 FIX 2025-12-15: Validate category exists before using mapping
+                // Prevents FK constraint violation if category was deleted but mapping remains
+                $categoryId = (int) $mapping->ppm_value;
+                $categoryExists = Category::where('id', $categoryId)->exists();
+
+                if ($categoryExists) {
+                    // Category exists - safe to use mapping
+                    $ppmCategoryIds[$categoryId] = [
+                        'is_primary' => ($prestashopCategoryId === $defaultCategoryId),
+                        'sort_order' => $index,
+                    ];
+                } else {
+                    // ORPHAN MAPPING DETECTED - category was deleted but mapping remains
+                    Log::warning('Orphan shop_mapping detected - category does not exist', [
+                        'mapping_id' => $mapping->id,
+                        'ppm_value' => $mapping->ppm_value,
+                        'prestashop_id' => $prestashopCategoryId,
+                        'shop_id' => $shop->id,
+                        'product_id' => $product->id,
+                    ]);
+
+                    // Deactivate orphan mapping
+                    $mapping->update(['is_active' => false]);
+
+                    // Try auto-import category as fallback
+                    try {
+                        $category = $this->importCategoryFromPrestaShop(
+                            $prestashopCategoryId,
+                            $shop,
+                            true // recursive
+                        );
+
+                        // Update mapping with correct ppm_value and reactivate
+                        $mapping->update([
+                            'ppm_value' => $category->id,
+                            'prestashop_value' => $category->name,
+                            'is_active' => true,
+                        ]);
+
+                        $ppmCategoryIds[$category->id] = [
+                            'is_primary' => ($prestashopCategoryId === $defaultCategoryId),
+                            'sort_order' => $index,
+                        ];
+
+                        Log::info('Orphan mapping repaired - category auto-imported', [
+                            'mapping_id' => $mapping->id,
+                            'new_category_id' => $category->id,
+                            'category_name' => $category->name,
+                            'prestashop_id' => $prestashopCategoryId,
+                        ]);
+                    } catch (\Exception $e) {
+                        // Skip this category entirely - cannot repair
+                        Log::error('Failed to auto-repair orphan mapping', [
+                            'mapping_id' => $mapping->id,
+                            'prestashop_id' => $prestashopCategoryId,
+                            'error' => $e->getMessage(),
+                        ]);
+                        // Continue to next category - don't fail entire product import
+                    }
+                }
             } else {
                 // 🔧 FIX 2025-10-14: No mapping exists - check if category already exists in PPM
                 // SCENARIO: AnalyzeMissingCategories auto-created categories WITHOUT shop_mappings
@@ -1227,10 +1380,13 @@ class PrestaShopImportService
 
         // Root categories (1, 2) are PPM-only, don't need PrestaShop mapping
         // But they MUST be in ui.selected for tree visibility
+        // FIX 2025-12-08: ALSO add to mappings with value 0 (no PrestaShop mapping)
+        // Without this, validator fails: "Mappings keys must match selected categories"
         $rootCategoryIds = [1, 2];
         foreach ($rootCategoryIds as $rootId) {
             if (!in_array($rootId, $selectedIds)) {
                 $selectedIds[] = $rootId;
+                $mappings[(string)$rootId] = 0; // 0 = PPM-only, no PrestaShop mapping
             }
         }
 
@@ -1340,5 +1496,1150 @@ class PrestaShopImportService
                 'selected_count' => count($selected),
             ]);
         }
+    }
+
+    /**
+     * Import product features from PrestaShop associations
+     *
+     * ETAP_07e FIX 2025-12-03 - Feature import during product import
+     *
+     * Workflow:
+     * 1. Extract product_features from PrestaShop associations
+     * 2. For each feature, find PrestashopFeatureMapping
+     * 3. Fetch feature value text from PrestaShop API
+     * 4. Create/update ProductFeature records in PPM
+     *
+     * PrestaShop structure:
+     * associations.product_features = [
+     *   {id: 5, id_feature_value: 42},  // id = feature type, id_feature_value = value
+     *   {id: 8, id_feature_value: 103},
+     *   ...
+     * ]
+     *
+     * @param Product $product PPM Product
+     * @param array $prestashopData Raw PrestaShop product data
+     * @param PrestaShopShop $shop Shop instance
+     * @param mixed $client PrestaShop API client
+     * @return void
+     */
+    protected function syncProductFeatures(
+        Product $product,
+        array $prestashopData,
+        PrestaShopShop $shop,
+        $client
+    ): void {
+        // Extract features from PrestaShop associations
+        $prestashopFeatures = data_get($prestashopData, 'associations.product_features', []);
+
+        if (empty($prestashopFeatures)) {
+            Log::debug('[FEATURE IMPORT] No features in PrestaShop product', [
+                'product_id' => $product->id,
+                'prestashop_product_id' => data_get($prestashopData, 'id'),
+            ]);
+            return;
+        }
+
+        Log::info('[FEATURE IMPORT] Starting feature import', [
+            'product_id' => $product->id,
+            'shop_id' => $shop->id,
+            'feature_count' => count($prestashopFeatures),
+        ]);
+
+        $importedCount = 0;
+        $skippedCount = 0;
+        $errorCount = 0;
+
+        foreach ($prestashopFeatures as $psFeature) {
+            $psFeatureId = (int) data_get($psFeature, 'id', 0);
+            $psFeatureValueId = (int) data_get($psFeature, 'id_feature_value', 0);
+
+            if ($psFeatureId <= 0 || $psFeatureValueId <= 0) {
+                $skippedCount++;
+                continue;
+            }
+
+            try {
+                // Find mapping: PrestaShop feature ID -> PPM FeatureType
+                $mapping = PrestashopFeatureMapping::where('shop_id', $shop->id)
+                    ->where('prestashop_feature_id', $psFeatureId)
+                    ->where('is_active', true)
+                    ->first();
+
+                if (!$mapping) {
+                    // No mapping - try to auto-create one by matching feature name
+                    $mapping = $this->autoCreateFeatureMapping($psFeatureId, $shop, $client);
+
+                    if (!$mapping) {
+                        Log::debug('[FEATURE IMPORT] No mapping for PS feature', [
+                            'prestashop_feature_id' => $psFeatureId,
+                            'shop_id' => $shop->id,
+                        ]);
+                        $skippedCount++;
+                        continue;
+                    }
+                }
+
+                // Check if mapping allows import (sync_direction)
+                if (!$mapping->canPullFromPrestaShop()) {
+                    Log::debug('[FEATURE IMPORT] Mapping does not allow import', [
+                        'mapping_id' => $mapping->id,
+                        'sync_direction' => $mapping->sync_direction,
+                    ]);
+                    $skippedCount++;
+                    continue;
+                }
+
+                // Fetch feature value text from PrestaShop API
+                $featureValueText = $this->getFeatureValueText($psFeatureValueId, $shop, $client);
+
+                if ($featureValueText === null) {
+                    Log::warning('[FEATURE IMPORT] Could not get feature value text', [
+                        'prestashop_feature_value_id' => $psFeatureValueId,
+                    ]);
+                    $skippedCount++;
+                    continue;
+                }
+
+                // Create/update ProductFeature in PPM
+                ProductFeature::updateOrCreate(
+                    [
+                        'product_id' => $product->id,
+                        'feature_type_id' => $mapping->feature_type_id,
+                    ],
+                    [
+                        'custom_value' => $featureValueText,
+                        'feature_value_id' => null, // Using custom_value, not predefined
+                    ]
+                );
+
+                $importedCount++;
+
+                Log::debug('[FEATURE IMPORT] Feature imported', [
+                    'product_id' => $product->id,
+                    'feature_type_id' => $mapping->feature_type_id,
+                    'prestashop_feature_id' => $psFeatureId,
+                    'value' => $featureValueText,
+                ]);
+
+            } catch (\Exception $e) {
+                $errorCount++;
+                Log::error('[FEATURE IMPORT] Error importing feature', [
+                    'product_id' => $product->id,
+                    'prestashop_feature_id' => $psFeatureId,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        Log::info('[FEATURE IMPORT] Completed', [
+            'product_id' => $product->id,
+            'shop_id' => $shop->id,
+            'imported' => $importedCount,
+            'skipped' => $skippedCount,
+            'errors' => $errorCount,
+        ]);
+    }
+
+    /**
+     * Get feature value text from PrestaShop API
+     *
+     * @param int $featureValueId PrestaShop feature_value ID
+     * @param PrestaShopShop $shop Shop instance
+     * @param mixed $client PrestaShop API client
+     * @return string|null Feature value text or null if not found
+     */
+    protected function getFeatureValueText(int $featureValueId, PrestaShopShop $shop, $client): ?string
+    {
+        try {
+            // Use getProductFeatureValue method (PrestaShop8Client)
+            $valueData = $client->getProductFeatureValue($featureValueId);
+
+            // Unwrap if nested
+            if (isset($valueData['product_feature_value'])) {
+                $valueData = $valueData['product_feature_value'];
+            }
+
+            // Extract value text (multilang structure)
+            // Structure: {value: [{id: 1, value: "Text PL"}, {id: 2, value: "Text EN"}]}
+            $valueText = data_get($valueData, 'value');
+
+            if (is_array($valueText)) {
+                // Multilang - get first language value
+                $firstLang = reset($valueText);
+                return is_array($firstLang) ? data_get($firstLang, 'value') : $firstLang;
+            }
+
+            return $valueText;
+
+        } catch (\Exception $e) {
+            Log::warning('[FEATURE IMPORT] Failed to fetch feature value', [
+                'feature_value_id' => $featureValueId,
+                'error' => $e->getMessage(),
+            ]);
+            return null;
+        }
+    }
+
+    /**
+     * Auto-create feature mapping by matching PrestaShop feature name to PPM FeatureType
+     * If no matching FeatureType exists, creates a new one automatically
+     *
+     * @param int $psFeatureId PrestaShop feature ID
+     * @param PrestaShopShop $shop Shop instance
+     * @param mixed $client PrestaShop API client
+     * @return PrestashopFeatureMapping|null Created mapping or null
+     */
+    protected function autoCreateFeatureMapping(int $psFeatureId, PrestaShopShop $shop, $client): ?PrestashopFeatureMapping
+    {
+        try {
+            // Fetch feature details from PrestaShop using getProductFeature()
+            $featureData = $client->getProductFeature($psFeatureId);
+
+            // Unwrap if nested
+            if (isset($featureData['product_feature'])) {
+                $featureData = $featureData['product_feature'];
+            }
+
+            if (!$featureData) {
+                return null;
+            }
+
+            // Extract feature name (multilang)
+            $featureName = data_get($featureData, 'name');
+            if (is_array($featureName)) {
+                $firstLang = reset($featureName);
+                $featureName = is_array($firstLang) ? data_get($firstLang, 'value') : $firstLang;
+            }
+
+            if (!$featureName) {
+                return null;
+            }
+
+            // Find matching PPM FeatureType by name or prestashop_name
+            $featureType = FeatureType::where('prestashop_name', $featureName)
+                ->orWhere('name', $featureName)
+                ->first();
+
+            // FIX 2025-12-03: Auto-create FeatureType if not found
+            if (!$featureType) {
+                // Generate code from name (lowercase, underscores, no special chars)
+                $code = $this->generateFeatureTypeCode($featureName);
+
+                // FIX 2025-12-03 v2: Get or create "Importowane z PrestaShop" FeatureGroup
+                $importedGroup = $this->getOrCreateImportedFeatureGroup();
+
+                // Create new FeatureType with feature_group_id for UI display
+                $featureType = FeatureType::create([
+                    'code' => $code,
+                    'name' => $featureName,
+                    'value_type' => FeatureType::VALUE_TYPE_TEXT, // Default to text
+                    'prestashop_name' => $featureName,
+                    'is_active' => true,
+                    'feature_group_id' => $importedGroup->id, // CRITICAL: UI filters by this!
+                    'group' => 'Importowane z PrestaShop', // Legacy field
+                ]);
+
+                Log::info('[FEATURE IMPORT] Auto-created FeatureType', [
+                    'feature_type_id' => $featureType->id,
+                    'code' => $featureType->code,
+                    'name' => $featureType->name,
+                    'prestashop_feature_id' => $psFeatureId,
+                    'prestashop_feature_name' => $featureName,
+                ]);
+            }
+
+            // Create mapping
+            $mapping = PrestashopFeatureMapping::create([
+                'feature_type_id' => $featureType->id,
+                'shop_id' => $shop->id,
+                'prestashop_feature_id' => $psFeatureId,
+                'prestashop_feature_name' => $featureName,
+                'sync_direction' => PrestashopFeatureMapping::SYNC_BOTH,
+                'auto_create_values' => true,
+                'is_active' => true,
+            ]);
+
+            Log::info('[FEATURE IMPORT] Auto-created feature mapping', [
+                'mapping_id' => $mapping->id,
+                'feature_type_id' => $featureType->id,
+                'feature_type_name' => $featureType->name,
+                'prestashop_feature_id' => $psFeatureId,
+                'prestashop_feature_name' => $featureName,
+                'shop_id' => $shop->id,
+            ]);
+
+            return $mapping;
+
+        } catch (\Exception $e) {
+            Log::warning('[FEATURE IMPORT] Failed to auto-create mapping', [
+                'prestashop_feature_id' => $psFeatureId,
+                'error' => $e->getMessage(),
+            ]);
+            return null;
+        }
+    }
+
+    /**
+     * Generate a unique code for FeatureType from name
+     *
+     * @param string $name Feature name
+     * @return string Generated code
+     */
+    protected function generateFeatureTypeCode(string $name): string
+    {
+        // Convert to lowercase, replace spaces with underscores, remove special chars
+        $code = strtolower($name);
+        $code = preg_replace('/[^a-z0-9_\s]/', '', $code);
+        $code = preg_replace('/\s+/', '_', $code);
+        $code = trim($code, '_');
+
+        // Ensure unique code
+        $baseCode = $code;
+        $counter = 1;
+        while (FeatureType::where('code', $code)->exists()) {
+            $code = $baseCode . '_' . $counter;
+            $counter++;
+        }
+
+        return $code;
+    }
+
+    /**
+     * Get or create the "Nieprzydzielone" FeatureGroup
+     *
+     * FIX 2025-12-03: Required for UI to display imported features
+     * The UI filters by feature_group_id, not the legacy 'group' string field
+     * UPDATE 2025-12-03: Renamed to "Nieprzydzielone" (Unassigned)
+     *
+     * @return FeatureGroup
+     */
+    protected function getOrCreateImportedFeatureGroup(): FeatureGroup
+    {
+        // Try new code first, then legacy code for backward compatibility
+        $group = FeatureGroup::where('code', 'unassigned')
+            ->orWhere('code', 'imported_prestashop')
+            ->first();
+
+        if (!$group) {
+            $group = FeatureGroup::create([
+                'code' => 'unassigned',
+                'name' => 'Unassigned',
+                'name_pl' => 'Nieprzydzielone',
+                'icon' => 'info',
+                'color' => 'gray',
+                'sort_order' => 999, // At the end
+                'description' => 'Cechy bez przypisanej grupy - do przydzielenia',
+                'is_active' => true,
+                'is_collapsible' => true,
+            ]);
+
+            Log::info('[FEATURE IMPORT] Auto-created FeatureGroup for unassigned features', [
+                'group_id' => $group->id,
+                'code' => $group->code,
+            ]);
+        }
+
+        return $group;
+    }
+
+    /**
+     * Import product variants (combinations) from PrestaShop to PPM
+     *
+     * FIX 2025-12-10: Import variants from PrestaShop combinations API
+     *
+     * Workflow:
+     * 1. Fetch combinations from PrestaShop API
+     * 2. For each combination:
+     *    - Create/Update ProductVariant
+     *    - Create/Update VariantAttribute (link to AttributeValue)
+     *    - Create/Update VariantPrice
+     *    - Create/Update VariantStock
+     *
+     * PrestaShop combination structure:
+     * - id: combination ID
+     * - reference: SKU
+     * - ean13: EAN code
+     * - price: price impact (modifier)
+     * - weight: weight modifier
+     * - quantity: stock quantity
+     * - default_on: is default variant (1 or empty)
+     * - associations.product_option_values: array of attribute values
+     *
+     * @param Product $product PPM Product
+     * @param array $prestashopData Raw PrestaShop product data
+     * @param PrestaShopShop $shop Shop instance
+     * @param mixed $client PrestaShop API client
+     * @return void
+     */
+    protected function syncProductVariants(
+        Product $product,
+        array $prestashopData,
+        PrestaShopShop $shop,
+        $client
+    ): void {
+        $prestashopProductId = (int) data_get($prestashopData, 'id', 0);
+
+        if ($prestashopProductId <= 0) {
+            Log::warning('[VARIANT IMPORT] No PrestaShop product ID', [
+                'product_id' => $product->id,
+            ]);
+            return;
+        }
+
+        Log::info('[VARIANT IMPORT] Starting variant import', [
+            'product_id' => $product->id,
+            'prestashop_product_id' => $prestashopProductId,
+            'shop_id' => $shop->id,
+        ]);
+
+        try {
+            // Fetch all combinations for this product
+            $combinations = $client->getCombinations($prestashopProductId);
+
+            if (empty($combinations)) {
+                Log::info('[VARIANT IMPORT] No combinations found', [
+                    'product_id' => $product->id,
+                    'prestashop_product_id' => $prestashopProductId,
+                ]);
+                return;
+            }
+
+            Log::info('[VARIANT IMPORT] Found combinations', [
+                'product_id' => $product->id,
+                'combination_count' => count($combinations),
+            ]);
+
+            $importedCount = 0;
+            $skippedCount = 0;
+            $errorCount = 0;
+
+            foreach ($combinations as $combination) {
+                try {
+                    $result = $this->importSingleVariant($product, $combination, $shop, $client);
+
+                    if ($result === 'imported' || $result === 'updated') {
+                        $importedCount++;
+                    } else {
+                        $skippedCount++;
+                    }
+
+                } catch (\Exception $e) {
+                    $errorCount++;
+                    Log::error('[VARIANT IMPORT] Error importing variant', [
+                        'product_id' => $product->id,
+                        'combination_id' => data_get($combination, 'id'),
+                        'error' => $e->getMessage(),
+                    ]);
+                }
+            }
+
+            Log::info('[VARIANT IMPORT] Completed', [
+                'product_id' => $product->id,
+                'shop_id' => $shop->id,
+                'imported' => $importedCount,
+                'skipped' => $skippedCount,
+                'errors' => $errorCount,
+            ]);
+
+            // FIX: Mark product as variant master if variants were imported
+            if ($importedCount > 0 && !$product->is_variant_master) {
+                $product->update(['is_variant_master' => true]);
+                Log::info('[VARIANT IMPORT] Product marked as variant master', [
+                    'product_id' => $product->id,
+                ]);
+            }
+
+        } catch (\Exception $e) {
+            Log::error('[VARIANT IMPORT] Failed to fetch combinations', [
+                'product_id' => $product->id,
+                'prestashop_product_id' => $prestashopProductId,
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    /**
+     * Import single variant (combination) from PrestaShop
+     *
+     * @param Product $product PPM Product
+     * @param array $combination PrestaShop combination data
+     * @param PrestaShopShop $shop Shop instance
+     * @param mixed $client PrestaShop API client
+     * @return string 'imported'|'updated'|'skipped'
+     */
+    protected function importSingleVariant(
+        Product $product,
+        array $combination,
+        PrestaShopShop $shop,
+        $client
+    ): string {
+        $combinationId = (int) data_get($combination, 'id', 0);
+        $variantSku = data_get($combination, 'reference', '');
+
+        // Generate SKU if not provided
+        if (empty($variantSku)) {
+            $variantSku = $product->sku . '-V' . $combinationId;
+            Log::debug('[VARIANT IMPORT] Generated variant SKU', [
+                'generated_sku' => $variantSku,
+                'combination_id' => $combinationId,
+            ]);
+        }
+
+        // Build variant name from attribute values
+        $variantName = $this->buildVariantName($combination, $client);
+        if (empty($variantName)) {
+            $variantName = "Wariant #{$combinationId}";
+        }
+
+        // Check if variant exists (by SKU)
+        $existingVariant = \App\Models\ProductVariant::where('sku', $variantSku)->first();
+        $isUpdate = (bool) $existingVariant;
+
+        // Prepare variant data
+        $variantData = [
+            'product_id' => $product->id,
+            'sku' => $variantSku,
+            'name' => $variantName,
+            'is_active' => true,
+            'is_default' => data_get($combination, 'default_on') == '1',
+            'position' => (int) data_get($combination, 'position', 0),
+        ];
+
+        // Create or update variant
+        if ($existingVariant) {
+            $existingVariant->update($variantData);
+            $variant = $existingVariant;
+        } else {
+            $variant = \App\Models\ProductVariant::create($variantData);
+        }
+
+        // Import variant attributes (color, size, etc.)
+        $this->importVariantAttributes($variant, $combination, $shop, $client);
+
+        // Import variant price (price modifier)
+        $this->importVariantPrice($variant, $combination, $product);
+
+        // Import variant stock
+        $this->importVariantStock($variant, $combination);
+
+        // Import variant images from PrestaShop combination
+        $this->importVariantImages($variant, $combination, $product, $shop);
+
+        Log::debug('[VARIANT IMPORT] Variant ' . ($isUpdate ? 'updated' : 'imported'), [
+            'variant_id' => $variant->id,
+            'sku' => $variantSku,
+            'name' => $variantName,
+            'combination_id' => $combinationId,
+        ]);
+
+        return $isUpdate ? 'updated' : 'imported';
+    }
+
+    /**
+     * Build variant name from attribute values
+     *
+     * @param array $combination PrestaShop combination data
+     * @param mixed $client PrestaShop API client
+     * @return string Variant name (e.g., "Czerwony / XL")
+     */
+    protected function buildVariantName(array $combination, $client): string
+    {
+        $attributeNames = [];
+
+        // Get product_option_values from associations
+        $optionValues = data_get($combination, 'associations.product_option_values', []);
+
+        if (empty($optionValues)) {
+            return '';
+        }
+
+        foreach ($optionValues as $optionValue) {
+            $optionValueId = (int) data_get($optionValue, 'id', 0);
+
+            if ($optionValueId <= 0) {
+                continue;
+            }
+
+            try {
+                // Fetch attribute value name from PrestaShop
+                $valueData = $client->getProductOptionValue($optionValueId);
+
+                if (isset($valueData['product_option_value'])) {
+                    $valueData = $valueData['product_option_value'];
+                }
+
+                // Extract name (multilang structure)
+                $name = data_get($valueData, 'name');
+
+                if (is_array($name)) {
+                    // Use first language value
+                    $name = data_get($name, '0.value', data_get($name, 'language.value', ''));
+                }
+
+                if (!empty($name)) {
+                    $attributeNames[] = $name;
+                }
+
+            } catch (\Exception $e) {
+                Log::debug('[VARIANT IMPORT] Could not get option value name', [
+                    'option_value_id' => $optionValueId,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        return implode(' / ', $attributeNames);
+    }
+
+    /**
+     * Import variant attributes from PrestaShop combination
+     *
+     * Maps PrestaShop product_option_values to PPM VariantAttribute
+     *
+     * @param \App\Models\ProductVariant $variant PPM Variant
+     * @param array $combination PrestaShop combination data
+     * @param PrestaShopShop $shop Shop instance
+     * @param mixed $client PrestaShop API client
+     * @return void
+     */
+    protected function importVariantAttributes(
+        \App\Models\ProductVariant $variant,
+        array $combination,
+        PrestaShopShop $shop,
+        $client
+    ): void {
+        $optionValues = data_get($combination, 'associations.product_option_values', []);
+
+        if (empty($optionValues)) {
+            return;
+        }
+
+        // Clear existing attributes for this variant (replace strategy)
+        $variant->attributes()->delete();
+
+        foreach ($optionValues as $optionValue) {
+            $optionValueId = (int) data_get($optionValue, 'id', 0);
+
+            if ($optionValueId <= 0) {
+                continue;
+            }
+
+            try {
+                // Fetch full attribute value data from PrestaShop
+                $valueData = $client->getProductOptionValue($optionValueId);
+
+                if (isset($valueData['product_option_value'])) {
+                    $valueData = $valueData['product_option_value'];
+                }
+
+                $optionId = (int) data_get($valueData, 'id_attribute_group', 0);
+                $valueName = $this->extractMultilangValue(data_get($valueData, 'name'));
+                $colorHex = data_get($valueData, 'color', null);
+
+                if ($optionId <= 0 || empty($valueName)) {
+                    continue;
+                }
+
+                // Find or create PPM AttributeType
+                $attributeType = $this->findOrCreateAttributeType($optionId, $shop, $client);
+
+                if (!$attributeType) {
+                    continue;
+                }
+
+                // Find or create PPM AttributeValue
+                $attributeValue = $this->findOrCreateAttributeValue(
+                    $attributeType,
+                    $valueName,
+                    $colorHex,
+                    $shop,           // FIX: Pass shop for mapping creation
+                    $optionValueId   // FIX: Pass PS attribute value ID for mapping
+                );
+
+                if (!$attributeValue) {
+                    continue;
+                }
+
+                // Create VariantAttribute link
+                // Note: color_hex is stored in AttributeValue, not VariantAttribute
+                \App\Models\VariantAttribute::create([
+                    'variant_id' => $variant->id,
+                    'attribute_type_id' => $attributeType->id,
+                    'value_id' => $attributeValue->id,
+                ]);
+
+                Log::debug('[VARIANT IMPORT] Attribute imported', [
+                    'variant_id' => $variant->id,
+                    'attribute_type' => $attributeType->name,
+                    'value' => $valueName,
+                ]);
+
+            } catch (\Exception $e) {
+                Log::warning('[VARIANT IMPORT] Could not import attribute', [
+                    'variant_id' => $variant->id,
+                    'option_value_id' => $optionValueId,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+    }
+
+    /**
+     * Find or create PPM AttributeType from PrestaShop attribute group
+     *
+     * @param int $psAttributeGroupId PrestaShop attribute group ID
+     * @param PrestaShopShop $shop Shop instance
+     * @param mixed $client PrestaShop API client
+     * @return \App\Models\AttributeType|null
+     */
+    protected function findOrCreateAttributeType(
+        int $psAttributeGroupId,
+        PrestaShopShop $shop,
+        $client
+    ): ?\App\Models\AttributeType {
+        try {
+            // Fetch attribute group from PrestaShop
+            $groupData = $client->getProductOption($psAttributeGroupId);
+
+            if (isset($groupData['product_option'])) {
+                $groupData = $groupData['product_option'];
+            }
+
+            $groupName = $this->extractMultilangValue(data_get($groupData, 'name'));
+            $groupType = data_get($groupData, 'group_type', 'select'); // select, color, radio
+
+            if (empty($groupName)) {
+                return null;
+            }
+
+            // FIX 2025-12-15: First try to find by name (case-insensitive)
+            $existingByName = \App\Models\AttributeType::whereRaw('LOWER(name) = ?', [strtolower($groupName)])->first();
+            if ($existingByName) {
+                Log::debug('[VARIANT IMPORT] Found existing AttributeType by name', [
+                    'name' => $groupName,
+                    'existing_id' => $existingByName->id,
+                    'existing_code' => $existingByName->code,
+                ]);
+                return $existingByName;
+            }
+
+            // Generate code from name - FIX: strtolower FIRST, then regex
+            $code = preg_replace('/[^a-z0-9]/', '_', strtolower($groupName));
+            $code = trim(preg_replace('/_+/', '_', $code), '_');
+
+            // Determine display type
+            $displayType = match ($groupType) {
+                'color' => \App\Models\AttributeType::DISPLAY_TYPE_COLOR,
+                'radio' => \App\Models\AttributeType::DISPLAY_TYPE_RADIO,
+                default => \App\Models\AttributeType::DISPLAY_TYPE_DROPDOWN,
+            };
+
+            // Find or create AttributeType
+            $attributeType = \App\Models\AttributeType::firstOrCreate(
+                ['code' => $code],
+                [
+                    'name' => $groupName,
+                    'display_type' => $displayType,
+                    'is_active' => true,
+                    'position' => 0,
+                ]
+            );
+
+            return $attributeType;
+
+        } catch (\Exception $e) {
+            Log::warning('[VARIANT IMPORT] Could not get/create attribute type', [
+                'prestashop_group_id' => $psAttributeGroupId,
+                'error' => $e->getMessage(),
+            ]);
+            return null;
+        }
+    }
+
+    /**
+     * Find or create PPM AttributeValue with PrestaShop mapping
+     *
+     * FIX 2025-12-11: Create AttributeValuePsMapping for shop synchronization tracking
+     *
+     * @param \App\Models\AttributeType $attributeType PPM AttributeType
+     * @param string $valueName Value name
+     * @param string|null $colorHex Color hex code
+     * @param PrestaShopShop|null $shop PrestaShop shop instance (for mapping)
+     * @param int|null $psAttributeValueId PrestaShop attribute value ID (for mapping)
+     * @return \App\Models\AttributeValue|null
+     */
+    protected function findOrCreateAttributeValue(
+        \App\Models\AttributeType $attributeType,
+        string $valueName,
+        ?string $colorHex,
+        ?PrestaShopShop $shop = null,
+        ?int $psAttributeValueId = null
+    ): ?\App\Models\AttributeValue {
+        // Generate code from name (with Polish character conversion)
+        $polishMap = [
+            'ą' => 'a', 'ć' => 'c', 'ę' => 'e', 'ł' => 'l', 'ń' => 'n',
+            'ó' => 'o', 'ś' => 's', 'ź' => 'z', 'ż' => 'z',
+            'Ą' => 'a', 'Ć' => 'c', 'Ę' => 'e', 'Ł' => 'l', 'Ń' => 'n',
+            'Ó' => 'o', 'Ś' => 's', 'Ź' => 'z', 'Ż' => 'z',
+        ];
+        $transliterated = strtr($valueName, $polishMap);
+        $code = strtolower(preg_replace('/[^a-z0-9]/', '_', $transliterated));
+        $code = trim(preg_replace('/_+/', '_', $code), '_');
+
+        // Find or create AttributeValue
+        $attributeValue = \App\Models\AttributeValue::firstOrCreate(
+            [
+                'attribute_type_id' => $attributeType->id,
+                'code' => $code,
+            ],
+            [
+                'label' => $valueName,
+                'color_hex' => $colorHex,
+                'position' => 0,
+                'is_active' => true,
+            ]
+        );
+
+        // FIX 2025-12-11: Create PrestaShop mapping for this attribute value
+        if ($shop && $psAttributeValueId && $attributeValue) {
+            \App\Models\AttributeValuePsMapping::updateOrCreate(
+                [
+                    'attribute_value_id' => $attributeValue->id,
+                    'prestashop_shop_id' => $shop->id,
+                ],
+                [
+                    'prestashop_attribute_id' => $psAttributeValueId,
+                    'prestashop_label' => $valueName,
+                    'prestashop_color' => $colorHex,
+                    'is_synced' => true,
+                    'sync_status' => 'synced',
+                    'last_synced_at' => now(),
+                    'sync_notes' => 'Auto-created during product import',
+                ]
+            );
+
+            Log::debug('[VARIANT IMPORT] Created/Updated AttributeValue PS mapping', [
+                'attribute_value_id' => $attributeValue->id,
+                'shop_id' => $shop->id,
+                'prestashop_attribute_id' => $psAttributeValueId,
+            ]);
+        }
+
+        return $attributeValue;
+    }
+
+    /**
+     * Import variant price from PrestaShop combination
+     *
+     * @param \App\Models\ProductVariant $variant PPM Variant
+     * @param array $combination PrestaShop combination data
+     * @param Product $product Parent product
+     * @return void
+     */
+    protected function importVariantPrice(
+        \App\Models\ProductVariant $variant,
+        array $combination,
+        Product $product
+    ): void {
+        // PrestaShop stores price modifier, not absolute price
+        $priceModifier = (float) data_get($combination, 'price', 0);
+
+        // Get default price group
+        $defaultPriceGroup = \App\Models\PriceGroup::where('code', 'retail')->first();
+
+        if (!$defaultPriceGroup) {
+            return;
+        }
+
+        // Get parent product base price
+        $basePrice = $product->prices()
+            ->where('price_group_id', $defaultPriceGroup->id)
+            ->first();
+
+        $basePriceNet = $basePrice ? $basePrice->price_net : 0;
+        $variantPriceNet = $basePriceNet + $priceModifier;
+
+        // Create/update VariantPrice
+        // Note: variant_prices table has: price, special_price, special_price_from, special_price_to
+        \App\Models\VariantPrice::updateOrCreate(
+            [
+                'variant_id' => $variant->id,
+                'price_group_id' => $defaultPriceGroup->id,
+            ],
+            [
+                'price' => $variantPriceNet,
+            ]
+        );
+    }
+
+    /**
+     * Import variant stock from PrestaShop combination
+     *
+     * @param \App\Models\ProductVariant $variant PPM Variant
+     * @param array $combination PrestaShop combination data
+     * @return void
+     */
+    protected function importVariantStock(
+        \App\Models\ProductVariant $variant,
+        array $combination
+    ): void {
+        $quantity = (int) data_get($combination, 'quantity', 0);
+
+        // Get default warehouse
+        $defaultWarehouse = \App\Models\Warehouse::where('code', 'MPPTRADE')
+            ->orWhere('is_default', true)
+            ->first();
+
+        if (!$defaultWarehouse) {
+            return;
+        }
+
+        // Create/update VariantStock
+        \App\Models\VariantStock::updateOrCreate(
+            [
+                'variant_id' => $variant->id,
+                'warehouse_id' => $defaultWarehouse->id,
+            ],
+            [
+                'quantity' => $quantity,
+                'reserved' => 0,
+            ]
+        );
+    }
+
+    /**
+     * Import variant images from PrestaShop combination
+     *
+     * Downloads and stores variant images from PrestaShop API.
+     * Strategy:
+     * 1. Try to match existing Media with PS image ID
+     * 2. Download from PrestaShop API and store locally
+     * 3. Fallback to first product image if no combination images
+     *
+     * PrestaShop API structure:
+     * combination.associations.images = [{id: 123}, {id: 456}]
+     *
+     * @param \App\Models\ProductVariant $variant PPM Variant
+     * @param array $combination PrestaShop combination data
+     * @param Product $product PPM Product (for fallback images)
+     * @param PrestaShopShop $shop Shop instance (for API access)
+     * @return void
+     */
+    protected function importVariantImages(
+        \App\Models\ProductVariant $variant,
+        array $combination,
+        Product $product,
+        PrestaShopShop $shop
+    ): void {
+        // Get image IDs from combination associations
+        $combinationImages = data_get($combination, 'associations.images', []);
+
+        // Normalize format: can be [{id: 123}] or [{'id': '123'}] or single {id: 123}
+        if (isset($combinationImages['id'])) {
+            $combinationImages = [$combinationImages];
+        }
+
+        $imageIds = [];
+        foreach ($combinationImages as $img) {
+            $imageId = (int) data_get($img, 'id', 0);
+            if ($imageId > 0) {
+                $imageIds[] = $imageId;
+            }
+        }
+
+        // If no combination images, try to use first product image as fallback
+        if (empty($imageIds)) {
+            $firstMedia = $product->media()->first();
+            if ($firstMedia) {
+                // Create VariantImage from existing product media
+                \App\Models\VariantImage::updateOrCreate(
+                    [
+                        'variant_id' => $variant->id,
+                        'image_path' => $firstMedia->file_path,
+                    ],
+                    [
+                        'image_thumb_path' => $firstMedia->thumbnail_path,
+                        'image_url' => $firstMedia->original_url,
+                        'is_cover' => true,
+                        'position' => 0,
+                    ]
+                );
+
+                Log::debug('[VARIANT IMPORT] Used product fallback image', [
+                    'variant_id' => $variant->id,
+                    'media_id' => $firstMedia->id,
+                ]);
+            }
+            return;
+        }
+
+        // Clear existing variant images (replace strategy)
+        $variant->images()->delete();
+
+        // Get PrestaShop product ID
+        $productPsId = (int) data_get($combination, 'id_product', 0);
+
+        // Get existing product media for matching
+        $productMedia = $product->media()->orderBy('sort_order')->get();
+
+        // Import each combination image
+        $position = 0;
+        $downloadedCount = 0;
+        $linkedCount = 0;
+
+        foreach ($imageIds as $psImageId) {
+            try {
+                $existingMedia = null;
+                $isCover = ($position === 0);
+
+                // Strategy 1: Try to find media with this PS image ID in prestashop_mapping JSON
+                foreach ($productMedia as $media) {
+                    $mapping = $media->prestashop_mapping ?? [];
+                    foreach ($mapping as $shopKey => $shopData) {
+                        $mappedImageId = $shopData['ps_image_id'] ?? $shopData['image_id'] ?? null;
+                        if ($mappedImageId !== null && (int)$mappedImageId === $psImageId) {
+                            $existingMedia = $media;
+                            break 2;
+                        }
+                    }
+                }
+
+                // Strategy 2: Use product media by position (if PS image positions match PPM)
+                if (!$existingMedia && isset($productMedia[$position])) {
+                    $existingMedia = $productMedia[$position];
+                }
+
+                if ($existingMedia) {
+                    // Link to existing Media record
+                    \App\Models\VariantImage::create([
+                        'variant_id' => $variant->id,
+                        'image_path' => $existingMedia->file_path ?? '',
+                        'image_thumb_path' => $existingMedia->thumbnail_path ?? '',
+                        'image_url' => $existingMedia->url ?? '',
+                        'is_cover' => $isCover,
+                        'position' => $position,
+                    ]);
+                    $linkedCount++;
+                } else {
+                    // Strategy 3: Download image from PrestaShop API and store locally
+                    $variantImage = $this->downloadVariantImageFromPrestaShop(
+                        $variant,
+                        $productPsId,
+                        $psImageId,
+                        $shop,
+                        $position,
+                        $isCover
+                    );
+
+                    if ($variantImage) {
+                        $downloadedCount++;
+                    } else {
+                        // Strategy 4: Create record with URL only (fallback)
+                        $shopUrl = rtrim($shop->shop_url ?? '', '/');
+                        $imageUrl = !empty($shopUrl) && $productPsId > 0
+                            ? "{$shopUrl}/api/images/products/{$productPsId}/{$psImageId}"
+                            : '';
+
+                        \App\Models\VariantImage::create([
+                            'variant_id' => $variant->id,
+                            'image_path' => '',
+                            'image_url' => $imageUrl,
+                            'is_cover' => $isCover,
+                            'position' => $position,
+                        ]);
+
+                        Log::warning('[VARIANT IMPORT] Could not download image, saved URL only', [
+                            'variant_id' => $variant->id,
+                            'ps_image_id' => $psImageId,
+                        ]);
+                    }
+                }
+
+                $position++;
+
+            } catch (\Exception $e) {
+                Log::warning('[VARIANT IMPORT] Could not import variant image', [
+                    'variant_id' => $variant->id,
+                    'prestashop_image_id' => $psImageId,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        Log::info('[VARIANT IMPORT] Variant images imported', [
+            'variant_id' => $variant->id,
+            'total_images' => $position,
+            'linked_from_media' => $linkedCount,
+            'downloaded_from_api' => $downloadedCount,
+            'prestashop_image_ids' => $imageIds,
+        ]);
+    }
+
+    /**
+     * Download single variant image from PrestaShop API and store locally
+     *
+     * @param \App\Models\ProductVariant $variant PPM Variant
+     * @param int $psProductId PrestaShop product ID
+     * @param int $psImageId PrestaShop image ID
+     * @param PrestaShopShop $shop Shop instance
+     * @param int $position Image position
+     * @param bool $isCover Is cover image
+     * @return \App\Models\VariantImage|null Created VariantImage or null on failure
+     */
+    protected function downloadVariantImageFromPrestaShop(
+        \App\Models\ProductVariant $variant,
+        int $psProductId,
+        int $psImageId,
+        PrestaShopShop $shop,
+        int $position,
+        bool $isCover
+    ): ?\App\Models\VariantImage {
+        // Use dedicated service for downloading
+        $downloadService = app(\App\Services\Media\VariantImageDownloadService::class);
+
+        return $downloadService->downloadAndStore(
+            $variant,
+            $psProductId,
+            $psImageId,
+            $shop,
+            $position,
+            $isCover
+        );
+    }
+
+    /**
+     * Extract value from multilang PrestaShop field
+     *
+     * @param mixed $value Multilang value or string
+     * @return string Extracted value
+     */
+    protected function extractMultilangValue($value): string
+    {
+        if (empty($value)) {
+            return '';
+        }
+
+        if (is_string($value)) {
+            return $value;
+        }
+
+        if (is_array($value)) {
+            // Format: [{id: 1, value: "PL"}, {id: 2, value: "EN"}]
+            if (isset($value[0]['value'])) {
+                return (string) $value[0]['value'];
+            }
+
+            // Format: {language: {value: "Text"}}
+            if (isset($value['language']['value'])) {
+                return (string) $value['language']['value'];
+            }
+
+            // Format: {language: [{id: 1, value: "PL"}]}
+            if (isset($value['language'][0]['value'])) {
+                return (string) $value['language'][0]['value'];
+            }
+        }
+
+        return '';
     }
 }
