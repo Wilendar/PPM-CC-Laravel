@@ -3,6 +3,7 @@
 namespace App\Models\Concerns\Product;
 
 use App\Models\ProductShopData;
+use App\Models\ShopVariant;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Collection;
 
@@ -270,5 +271,139 @@ trait HasMultiStore
         return $shopData && $shopData->long_description
             ? $shopData->long_description
             : $this->long_description;
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | PER-SHOP VARIANTS SYSTEM (ETAP_05c)
+    |--------------------------------------------------------------------------
+    | Each shop can have different variants of the same product.
+    | Shops inherit from product_variants by default, but can have:
+    | - ADD: Shop-only variants (not in product_variants)
+    | - OVERRIDE: Modified existing variants
+    | - DELETE: Hidden variants (exist but not synced)
+    */
+
+    /**
+     * Shop-specific variants relationship
+     *
+     * @return \Illuminate\Database\Eloquent\Relations\HasMany
+     */
+    public function shopVariants(): HasMany
+    {
+        return $this->hasMany(ShopVariant::class, 'product_id');
+    }
+
+    /**
+     * Shop variants for specific shop
+     *
+     * @param int $shopId
+     * @return \Illuminate\Database\Eloquent\Relations\HasMany
+     */
+    public function shopVariantsForShop(int $shopId): HasMany
+    {
+        return $this->shopVariants()->where('shop_id', $shopId);
+    }
+
+    /**
+     * Get all variants for specific shop (base + shop-specific)
+     *
+     * Logic:
+     * 1. Get base variants from product_variants (not deleted in shop)
+     * 2. Apply overrides for variants with OVERRIDE operation
+     * 3. Add shop-only variants (ADD operation)
+     * 4. Return merged collection
+     *
+     * @param int $shopId
+     * @return \Illuminate\Support\Collection
+     */
+    public function getVariantsForShop(int $shopId): Collection
+    {
+        $result = collect();
+
+        // Get shop overrides indexed by variant_id
+        $shopOverrides = $this->shopVariantsForShop($shopId)
+            ->get()
+            ->keyBy('variant_id');
+
+        // 1. Process base variants (from product_variants)
+        $baseVariants = $this->variants ?? collect();
+
+        foreach ($baseVariants as $variant) {
+            $override = $shopOverrides->get($variant->id);
+
+            if ($override) {
+                if ($override->isDeleteOperation()) {
+                    // Skip - variant is hidden in this shop
+                    continue;
+                }
+
+                if ($override->isOverrideOperation()) {
+                    // Apply override - merge base with shop-specific data
+                    $mergedData = $override->getEffectiveVariantData();
+                    $mergedData['id'] = $variant->id;
+                    $mergedData['shop_variant_id'] = $override->id;
+                    $mergedData['operation_type'] = 'OVERRIDE';
+                    $mergedData['sync_status'] = $override->sync_status;
+                    $result->push((object) $mergedData);
+                    continue;
+                }
+            }
+
+            // INHERIT - use base variant as-is
+            $variantData = [
+                'id' => $variant->id,
+                'sku' => $variant->sku,
+                'name' => $variant->name,
+                'is_active' => $variant->is_active,
+                'is_default' => $variant->is_default,
+                'position' => $variant->position,
+                'attributes' => $variant->attributes,
+                'images' => $variant->images,
+                'operation_type' => 'INHERIT',
+                'sync_status' => 'synced',
+            ];
+            $result->push((object) $variantData);
+        }
+
+        // 2. Add shop-only variants (ADD operation)
+        $shopOnlyVariants = $shopOverrides->filter(fn($sv) => $sv->isAddOperation());
+
+        foreach ($shopOnlyVariants as $shopVariant) {
+            $variantData = $shopVariant->getEffectiveVariantData();
+            $variantData['id'] = 'shop_' . $shopVariant->id; // Prefix to distinguish from base
+            $variantData['shop_variant_id'] = $shopVariant->id;
+            $variantData['operation_type'] = 'ADD';
+            $variantData['sync_status'] = $shopVariant->sync_status;
+            $result->push((object) $variantData);
+        }
+
+        return $result->sortBy('position');
+    }
+
+    /**
+     * Check if shop has any variant overrides
+     *
+     * @param int $shopId
+     * @return bool
+     */
+    public function hasShopVariantOverrides(int $shopId): bool
+    {
+        return $this->shopVariantsForShop($shopId)
+            ->where('operation_type', '!=', 'INHERIT')
+            ->exists();
+    }
+
+    /**
+     * Get count of pending variant syncs for shop
+     *
+     * @param int $shopId
+     * @return int
+     */
+    public function getPendingVariantSyncsCount(int $shopId): int
+    {
+        return $this->shopVariantsForShop($shopId)
+            ->where('sync_status', 'pending')
+            ->count();
     }
 }

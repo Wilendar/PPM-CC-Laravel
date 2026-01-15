@@ -143,15 +143,18 @@ class ProductType extends Model
 
     /**
      * Get default product types for seeding
+     *
+     * FIX 2025-12-22: Added missing types (Akcesoria, Oleje i chemia, Outlet)
+     * and renamed "Część zamiennicza" to "Części Zamienne" for consistency
      */
     public static function getDefaultTypes(): array
     {
         return [
             [
-                'name' => 'Pojazd',
-                'slug' => 'pojazd',
-                'description' => 'Kompletne pojazdy - samochody, motocykle, skutery',
-                'icon' => 'fas fa-car',
+                'name' => 'Pojazdy',
+                'slug' => 'pojazdy',
+                'description' => 'Kompletne pojazdy - motocykle, quady, skutery, pitbike',
+                'icon' => 'fas fa-motorcycle',
                 'is_active' => true,
                 'sort_order' => 1,
                 'default_attributes' => [
@@ -162,8 +165,8 @@ class ProductType extends Model
                 ]
             ],
             [
-                'name' => 'Część zamiennicza',
-                'slug' => 'czesc-zamiennicza',
+                'name' => 'Części Zamienne',
+                'slug' => 'czesci-zamienne',
                 'description' => 'Części zamienne do pojazdów - silnik, zawieszenie, hamulce',
                 'icon' => 'fas fa-cog',
                 'is_active' => true,
@@ -175,17 +178,47 @@ class ProductType extends Model
                 ]
             ],
             [
-                'name' => 'Odzież',
-                'slug' => 'odziez',
-                'description' => 'Odzież motocyklowa i akcesoria',
-                'icon' => 'fas fa-tshirt',
+                'name' => 'Akcesoria',
+                'slug' => 'akcesoria',
+                'description' => 'Akcesoria do pojazdów i motocykli',
+                'icon' => 'fas fa-puzzle-piece',
                 'is_active' => true,
                 'sort_order' => 3,
+                'default_attributes' => []
+            ],
+            [
+                'name' => 'Oleje i chemia',
+                'slug' => 'oleje-i-chemia',
+                'description' => 'Oleje silnikowe, płyny eksploatacyjne, chemia motocyklowa',
+                'icon' => 'fas fa-oil-can',
+                'is_active' => true,
+                'sort_order' => 4,
+                'default_attributes' => [
+                    'volume' => null,
+                    'viscosity' => null,
+                ]
+            ],
+            [
+                'name' => 'Odzież',
+                'slug' => 'odziez',
+                'description' => 'Odzież motocyklowa - kurtki, spodnie, buty, kaski',
+                'icon' => 'fas fa-tshirt',
+                'is_active' => true,
+                'sort_order' => 5,
                 'default_attributes' => [
                     'sizes' => [],
                     'colors' => [],
                     'material' => null,
                 ]
+            ],
+            [
+                'name' => 'Outlet',
+                'slug' => 'outlet',
+                'description' => 'Produkty przecenione, końcówki kolekcji',
+                'icon' => 'fas fa-tags',
+                'is_active' => true,
+                'sort_order' => 6,
+                'default_attributes' => []
             ],
             [
                 'name' => 'Inne',
@@ -197,6 +230,99 @@ class ProductType extends Model
                 'default_attributes' => []
             ],
         ];
+    }
+
+    /**
+     * Category name to ProductType slug mapping
+     *
+     * Maps level-2 category names (children of "Wszystko") to ProductType slugs
+     * Used for auto-detecting product type during import
+     *
+     * @var array<string, string>
+     */
+    public const CATEGORY_TYPE_MAP = [
+        'Pojazdy' => 'pojazdy',
+        'Części Zamienne' => 'czesci-zamienne',
+        'Części zamienne' => 'czesci-zamienne',  // Alternative spelling
+        'Akcesoria' => 'akcesoria',
+        'Oleje i chemia' => 'oleje-i-chemia',
+        'Odzież' => 'odziez',
+        'Outlet' => 'outlet',
+    ];
+
+    /**
+     * Auto-detect ProductType from category hierarchy
+     *
+     * Finds the level-2 (main) category and maps it to ProductType
+     * Level structure: Baza (0) -> Wszystko (1) -> Main Category (2) -> Subcategories (3+)
+     *
+     * @param Category $category The product's primary category
+     * @return ProductType|null Detected ProductType or null if not found
+     */
+    public static function detectFromCategory(Category $category): ?self
+    {
+        // Find the level-2 ancestor (main category under "Wszystko")
+        $level2Category = self::findLevel2Ancestor($category);
+
+        if (!$level2Category) {
+            \Illuminate\Support\Facades\Log::debug('ProductType::detectFromCategory - No level-2 ancestor found', [
+                'category_id' => $category->id,
+                'category_name' => $category->name,
+                'category_level' => $category->level,
+            ]);
+            return null;
+        }
+
+        // Map category name to ProductType slug
+        $typeSlug = self::CATEGORY_TYPE_MAP[$level2Category->name] ?? null;
+
+        if (!$typeSlug) {
+            \Illuminate\Support\Facades\Log::debug('ProductType::detectFromCategory - Category not in mapping', [
+                'level2_category_name' => $level2Category->name,
+                'available_mappings' => array_keys(self::CATEGORY_TYPE_MAP),
+            ]);
+            return null;
+        }
+
+        // Find ProductType by slug
+        $productType = self::where('slug', $typeSlug)->first();
+
+        \Illuminate\Support\Facades\Log::info('ProductType::detectFromCategory - Type detected', [
+            'category_id' => $category->id,
+            'category_name' => $category->name,
+            'level2_category' => $level2Category->name,
+            'detected_type' => $productType?->name,
+            'type_slug' => $typeSlug,
+        ]);
+
+        return $productType;
+    }
+
+    /**
+     * Find the level-2 ancestor of a category
+     *
+     * @param Category $category
+     * @return Category|null
+     */
+    protected static function findLevel2Ancestor(Category $category): ?Category
+    {
+        // If category is level 2, return it
+        if ($category->level === 2) {
+            return $category;
+        }
+
+        // If category is level 1 or 0, no level-2 ancestor
+        if ($category->level < 2) {
+            return null;
+        }
+
+        // Walk up the tree until we find level 2
+        $current = $category;
+        while ($current && $current->level > 2) {
+            $current = $current->parent;
+        }
+
+        return ($current && $current->level === 2) ? $current : null;
     }
 
     /**

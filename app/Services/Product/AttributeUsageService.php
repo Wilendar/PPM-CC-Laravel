@@ -161,4 +161,82 @@ class AttributeUsageService
     {
         return $this->countVariantsUsingValue($valueId) === 0;
     }
+
+    /**
+     * Get usage stats for ALL values of a type in ONE query
+     *
+     * ETAP_05b FAZA 5 - Replaces N+1 queries with single aggregated query
+     *
+     * @param int $typeId Attribute type ID
+     * @return Collection [value_id => ['variants_count' => X, 'products_count' => Y]]
+     */
+    public function getUsageStatsForType(int $typeId): Collection
+    {
+        return \DB::table('attribute_values')
+            ->select([
+                'attribute_values.id',
+                \DB::raw('COUNT(DISTINCT variant_attributes.id) as variants_count'),
+                \DB::raw('COUNT(DISTINCT product_variants.product_id) as products_count'),
+            ])
+            ->leftJoin('variant_attributes', 'attribute_values.id', '=', 'variant_attributes.value_id')
+            ->leftJoin('product_variants', 'variant_attributes.variant_id', '=', 'product_variants.id')
+            ->where('attribute_values.attribute_type_id', $typeId)
+            ->groupBy('attribute_values.id')
+            ->get()
+            ->keyBy('id')
+            ->map(fn($row) => [
+                'variants_count' => (int) $row->variants_count,
+                'products_count' => (int) $row->products_count,
+            ]);
+    }
+
+    /**
+     * Get detailed products for attribute value with pagination
+     *
+     * ETAP_05b FAZA 5 - For Products Modal
+     *
+     * @param int $valueId Attribute value ID
+     * @param int $perPage Items per page
+     * @return \Illuminate\Contracts\Pagination\LengthAwarePaginator
+     */
+    public function getProductsUsingValuePaginated(int $valueId, int $perPage = 15)
+    {
+        return \App\Models\Product::query()
+            ->select(['products.id', 'products.sku', 'products.name'])
+            ->join('product_variants', 'products.id', '=', 'product_variants.product_id')
+            ->join('variant_attributes', 'product_variants.id', '=', 'variant_attributes.variant_id')
+            ->where('variant_attributes.value_id', $valueId)
+            ->distinct()
+            ->withCount(['variants as variants_with_value_count' => function ($q) use ($valueId) {
+                $q->whereHas('attributes', fn($a) => $a->where('value_id', $valueId));
+            }])
+            ->orderBy('products.sku')
+            ->paginate($perPage);
+    }
+
+    /**
+     * Get all unused values for a type (no variants assigned)
+     *
+     * @param int $typeId Attribute type ID
+     * @return Collection
+     */
+    public function getUnusedValuesForType(int $typeId): Collection
+    {
+        return AttributeValue::where('attribute_type_id', $typeId)
+            ->whereDoesntHave('variantAttributes')
+            ->get();
+    }
+
+    /**
+     * Count unused values for a type
+     *
+     * @param int $typeId Attribute type ID
+     * @return int
+     */
+    public function countUnusedValuesForType(int $typeId): int
+    {
+        return AttributeValue::where('attribute_type_id', $typeId)
+            ->whereDoesntHave('variantAttributes')
+            ->count();
+    }
 }

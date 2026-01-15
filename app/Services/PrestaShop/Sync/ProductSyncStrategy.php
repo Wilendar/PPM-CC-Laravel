@@ -11,7 +11,9 @@ use App\Services\PrestaShop\CategoryMapper;
 use App\Services\PrestaShop\PriceGroupMapper;
 use App\Services\PrestaShop\WarehouseMapper;
 use App\Services\PrestaShop\PrestaShopPriceExporter;
+use App\Services\PrestaShop\CategoryAssociationService;
 use App\Models\Product;
+use App\Models\ProductDescription;
 use App\Models\PrestaShopShop;
 use App\Models\ProductShopData;
 use App\Models\SyncLog;
@@ -39,22 +41,28 @@ class ProductSyncStrategy implements ISyncStrategy
      * Constructor with dependency injection
      *
      * UPDATED (2025-11-14): Added PrestaShopPriceExporter for specific_prices sync
+     * UPDATED (2025-11-27): Added CategoryAssociationService for direct DB category sync
      */
     public function __construct(
         private ProductTransformer $transformer,
         private CategoryMapper $categoryMapper,
         private PriceGroupMapper $priceMapper,
         private WarehouseMapper $warehouseMapper,
-        private PrestaShopPriceExporter $priceExporter
+        private PrestaShopPriceExporter $priceExporter,
+        private CategoryAssociationService $categoryAssociationService
     ) {}
 
     /**
      * Synchronize product to PrestaShop
+     * ETAP_07d (2025-12-02): Added pendingMediaChanges for media sync
+     *
+     * @param array $pendingMediaChanges Pending media changes from session (passed via job)
      */
     public function syncToPrestaShop(
         Model $model,
         BasePrestaShopClient $client,
-        PrestaShopShop $shop
+        PrestaShopShop $shop,
+        array $pendingMediaChanges = []
     ): array {
         if (!$model instanceof Product) {
             throw new \InvalidArgumentException('Model must be instance of Product');
@@ -101,6 +109,14 @@ class ProductSyncStrategy implements ISyncStrategy
                 'shop_id' => $shop->id,
                 'checksum' => $syncStatus->checksum,
             ]);
+
+            // ETAP_05d FIX: Still sync compatibilities even if product checksum unchanged
+            // This allows compatibility changes to be pushed without product changes
+            if ($syncStatus->prestashop_product_id) {
+                Log::debug('[SYNC DEBUG] Checking for compatibility sync despite skipped product sync');
+                $this->syncCompatibilitiesIfEnabled($model, $shop, $syncStatus->prestashop_product_id, $client);
+            }
+
             return [
                 'success' => true,
                 'external_id' => $syncStatus->prestashop_product_id,
@@ -252,6 +268,41 @@ class ProductSyncStrategy implements ISyncStrategy
             DB::commit();
             Log::debug('[SYNC DEBUG] Transaction committed');
 
+            // FIX 2025-11-27: Ensure category associations via direct DB
+            // WORKAROUND: PrestaShop API ignores associations.categories
+            Log::debug('[SYNC DEBUG] Starting category association sync');
+            try {
+                // Extract PrestaShop category IDs from product data
+                $prestashopCategoryIds = [];
+                if (isset($productData['product']['associations']['categories'])) {
+                    $prestashopCategoryIds = collect($productData['product']['associations']['categories'])
+                        ->pluck('id')
+                        ->map(fn($id) => (int) $id)
+                        ->toArray();
+                }
+
+                if (!empty($prestashopCategoryIds)) {
+                    $this->categoryAssociationService->ensureProductCategories(
+                        $model,
+                        $externalId,
+                        $prestashopCategoryIds,
+                        $shop
+                    );
+                    Log::info('[SYNC DEBUG] Category association sync completed', [
+                        'product_id' => $model->id,
+                        'prestashop_id' => $externalId,
+                        'category_count' => count($prestashopCategoryIds),
+                    ]);
+                }
+            } catch (\Exception $e) {
+                // Log error but don't fail entire sync
+                Log::error('[SYNC DEBUG] Category association sync failed (non-fatal)', [
+                    'product_id' => $model->id,
+                    'shop_id' => $shop->id,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+
             // NEW (2025-11-14): Export specific_prices for product
             // ISSUE FIX: PRESTASHOP_PRICE_SYNC_ISSUE.md
             Log::debug('[SYNC DEBUG] Starting price export');
@@ -270,6 +321,23 @@ class ProductSyncStrategy implements ISyncStrategy
                     'error' => $e->getMessage(),
                 ]);
             }
+
+            // NEW (2025-12-01): ETAP_07d Phase 4.4 - Sync media if enabled
+            // ETAP_07d (2025-12-02): Pass pendingMediaChanges from job
+            Log::debug('[SYNC DEBUG] Checking media sync');
+            $this->syncMediaIfEnabled($model, $shop, $externalId, $pendingMediaChanges);
+
+            // NEW (2025-12-03): ETAP_07e FAZA 4.4 - Sync product features
+            Log::debug('[SYNC DEBUG] Starting feature sync');
+            $this->syncFeaturesIfEnabled($model, $shop, $externalId, $client);
+
+            // NEW (2025-12-09): ETAP_05d FAZA 4.5 - Sync vehicle compatibilities
+            Log::debug('[SYNC DEBUG] Starting compatibility sync');
+            $this->syncCompatibilitiesIfEnabled($model, $shop, $externalId, $client);
+
+            // NEW (2025-12-11): ETAP_07f FAZA 8.2 - Mark visual description as synced
+            Log::debug('[SYNC DEBUG] Marking visual description as synced');
+            $this->markVisualDescriptionAsSynced($model, $shop);
 
             Log::info('Product synced successfully to PrestaShop', [
                 'product_id' => $model->id,
@@ -426,6 +494,21 @@ class ProductSyncStrategy implements ISyncStrategy
                 'error' => $e->getMessage(),
             ]);
             $data['stock_quantity'] = 0;
+        }
+
+        // ETAP_07h FIX (2026-01-12): Include visual description in checksum
+        // Without this, CSS/style changes in UVE don't trigger sync because
+        // ProductDescription changes weren't included in checksum calculation
+        $visualDescription = ProductDescription::where('product_id', $model->id)
+            ->where('shop_id', $shop->id)
+            ->where('sync_to_prestashop', true)
+            ->first();
+
+        if ($visualDescription) {
+            // Include hash of rendered_html to detect visual description changes
+            $data['visual_description_hash'] = md5($visualDescription->rendered_html ?? '');
+            // Include cssRules hash to detect style changes
+            $data['css_rules_hash'] = md5(json_encode($visualDescription->css_rules ?? []));
         }
 
         ksort($data);
@@ -722,5 +805,586 @@ class ProductSyncStrategy implements ISyncStrategy
         }
 
         return $value;
+    }
+
+    /**
+     * Sync media to PrestaShop if enabled (ETAP_07d Phase 4.4)
+     *
+     * Processes pending media shop changes from session:
+     * - 'sync' actions: Push image to PrestaShop
+     * - 'unsync' actions: Delete image from PrestaShop
+     *
+     * Called synchronously during product sync to ensure images are synced
+     * TOGETHER with product data (not as separate Job).
+     *
+     * Respects checkbox assignments from GalleryTab.
+     *
+     * @param Product $product PPM Product
+     * @param PrestaShopShop $shop Target shop
+     * @param int $externalId PrestaShop product ID
+     * @param array $pendingMediaChanges Pending media changes passed from job (2025-12-02)
+     */
+    protected function syncMediaIfEnabled(Product $product, PrestaShopShop $shop, int $externalId, array $pendingMediaChanges = []): void
+    {
+        try {
+            // Check if auto-sync is enabled in SystemSettings
+            $autoSyncEnabled = \App\Models\SystemSetting::get('media.auto_sync_on_product_sync', false);
+
+            if (!$autoSyncEnabled) {
+                Log::debug('[MEDIA SYNC] Auto-sync disabled, skipping media push', [
+                    'product_id' => $product->id,
+                    'shop_id' => $shop->id,
+                ]);
+                return;
+            }
+
+            // ETAP_07d (2025-12-02): Use pendingMediaChanges from job parameter
+            // Session is NOT available in queue context!
+            $pendingChanges = $pendingMediaChanges;
+
+            Log::info('[MEDIA SYNC] Processing media sync for shop (REPLACE ALL STRATEGY)', [
+                'product_id' => $product->id,
+                'shop_id' => $shop->id,
+                'shop_name' => $shop->name,
+                'pending_changes_count' => count($pendingChanges),
+            ]);
+
+            // Filter pending changes for THIS shop only
+            $shopChanges = [];
+            foreach ($pendingChanges as $key => $action) {
+                [$mediaId, $changeShopId] = explode(':', $key);
+                if ((int) $changeShopId === $shop->id) {
+                    $shopChanges[(int) $mediaId] = $action;
+                }
+            }
+
+            if (empty($shopChanges)) {
+                Log::debug('[MEDIA SYNC] No pending checkbox changes, checking cover image sync', [
+                    'product_id' => $product->id,
+                    'shop_id' => $shop->id,
+                ]);
+
+                // ETAP_07d (2025-12-02): Even without checkbox changes, sync cover image
+                // This handles case when user changes primary image without checkbox changes
+                $this->syncCoverImageIfNeeded($product, $shop, $externalId);
+                return;
+            }
+
+            Log::info('[MEDIA SYNC] Shop-specific changes found', [
+                'product_id' => $product->id,
+                'shop_id' => $shop->id,
+                'changes' => $shopChanges,
+            ]);
+
+            // =================================================================
+            // REPLACE ALL STRATEGY (ETAP_07d)
+            // - Delete ALL images from PrestaShop
+            // - Upload ONLY the selected images
+            // - Set correct cover image based on is_primary
+            // =================================================================
+
+            // Get ALL media for this product
+            $allMedia = \App\Models\Media::where('mediable_type', Product::class)
+                ->where('mediable_id', $product->id)
+                ->active()
+                ->orderBy('is_primary', 'desc')
+                ->orderBy('sort_order', 'asc')
+                ->get();
+
+            // Calculate FINAL desired state: which media SHOULD be on PrestaShop
+            // Logic:
+            // - If has 'sync' action → INCLUDE (user checked the checkbox)
+            // - If has 'unsync' action → EXCLUDE (user unchecked the checkbox)
+            // - If no action → keep current state (synced = include, not synced = exclude)
+            $storeKey = "store_{$shop->id}";
+            $selectedMedia = $allMedia->filter(function($media) use ($storeKey, $shopChanges) {
+                $mediaId = $media->id;
+                $mapping = $media->prestashop_mapping[$storeKey] ?? [];
+                $isCurrentlySynced = !empty($mapping['ps_image_id']);
+
+                if (isset($shopChanges[$mediaId])) {
+                    // Explicit user action - respect it
+                    return $shopChanges[$mediaId] === 'sync';
+                }
+
+                // No change - keep if currently synced
+                return $isCurrentlySynced;
+            });
+
+            Log::info('[MEDIA SYNC] Calculated final desired state', [
+                'product_id' => $product->id,
+                'shop_id' => $shop->id,
+                'total_media' => $allMedia->count(),
+                'selected_count' => $selectedMedia->count(),
+                'selected_ids' => $selectedMedia->pluck('id')->toArray(),
+            ]);
+
+            // Get MediaSyncService
+            $syncService = app(\App\Services\Media\MediaSyncService::class);
+
+            // Execute REPLACE ALL strategy
+            $result = $syncService->replaceAllImages($product, $shop, $selectedMedia);
+
+            Log::info('[MEDIA SYNC] REPLACE ALL strategy completed', [
+                'product_id' => $product->id,
+                'shop_id' => $shop->id,
+                'deleted' => $result['deleted'],
+                'uploaded' => $result['uploaded'],
+                'errors_count' => count($result['errors']),
+                'cover_set' => $result['cover_set'],
+            ]);
+
+            // ETAP_07d (2025-12-02): Session cleanup moved to ProductForm::dispatchSyncJobsForAllShops()
+            // Session is not available in queue context, so we don't try to update it here
+
+            Log::info('[MEDIA SYNC] Media sync completed for shop', [
+                'product_id' => $product->id,
+                'shop_id' => $shop->id,
+                'strategy' => 'replace_all',
+                'result' => $result,
+            ]);
+
+        } catch (\Exception $e) {
+            // Log error but don't fail product sync
+            Log::error('[MEDIA SYNC] Failed during media sync (non-fatal)', [
+                'product_id' => $product->id,
+                'shop_id' => $shop->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    /**
+     * Sync cover image to PrestaShop if PPM primary differs from PS cover
+     *
+     * ETAP_07d (2025-12-02): Called when no pending checkbox changes exist
+     * but cover image may have changed (user clicked "Ustaw jako glowne")
+     *
+     * @param Product $product PPM Product
+     * @param PrestaShopShop $shop Target shop
+     * @param int $psProductId PrestaShop product ID
+     */
+    protected function syncCoverImageIfNeeded(Product $product, PrestaShopShop $shop, int $psProductId): void
+    {
+        try {
+            // Get primary media from PPM
+            $primaryMedia = \App\Models\Media::where('mediable_type', Product::class)
+                ->where('mediable_id', $product->id)
+                ->where('is_primary', true)
+                ->active()
+                ->first();
+
+            if (!$primaryMedia) {
+                Log::debug('[MEDIA SYNC] No primary media in PPM, skipping cover sync', [
+                    'product_id' => $product->id,
+                    'shop_id' => $shop->id,
+                ]);
+                return;
+            }
+
+            // Check if primary media is mapped to PrestaShop
+            $storeKey = "store_{$shop->id}";
+            $mapping = $primaryMedia->prestashop_mapping[$storeKey] ?? [];
+            $psImageId = $mapping['ps_image_id'] ?? null;
+
+            if (!$psImageId) {
+                Log::debug('[MEDIA SYNC] Primary media not mapped to PrestaShop, skipping cover sync', [
+                    'product_id' => $product->id,
+                    'shop_id' => $shop->id,
+                    'media_id' => $primaryMedia->id,
+                ]);
+                return;
+            }
+
+            // Check if already set as cover
+            $isCover = $mapping['is_cover'] ?? false;
+
+            Log::info('[MEDIA SYNC] Checking cover image sync', [
+                'product_id' => $product->id,
+                'shop_id' => $shop->id,
+                'media_id' => $primaryMedia->id,
+                'ps_image_id' => $psImageId,
+                'is_cover_in_mapping' => $isCover,
+            ]);
+
+            // Always try to set cover - PrestaShop API will handle if already set
+            $client = new \App\Services\PrestaShop\PrestaShop8Client($shop);
+            $coverSet = $client->setProductImageCover($psProductId, (int) $psImageId);
+
+            // Update mapping
+            if ($coverSet) {
+                $primaryMedia->setPrestaShopMapping($shop->id, array_merge($mapping, [
+                    'is_cover' => true,
+                    'cover_synced_at' => now()->toIso8601String(),
+                ]));
+
+                Log::info('[MEDIA SYNC] Cover image synced successfully', [
+                    'product_id' => $product->id,
+                    'shop_id' => $shop->id,
+                    'media_id' => $primaryMedia->id,
+                    'ps_image_id' => $psImageId,
+                ]);
+            } else {
+                Log::warning('[MEDIA SYNC] Failed to set cover image', [
+                    'product_id' => $product->id,
+                    'shop_id' => $shop->id,
+                    'media_id' => $primaryMedia->id,
+                    'ps_image_id' => $psImageId,
+                ]);
+            }
+
+        } catch (\Exception $e) {
+            Log::error('[MEDIA SYNC] Cover image sync failed (non-fatal)', [
+                'product_id' => $product->id,
+                'shop_id' => $shop->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    /**
+     * Sync product features to PrestaShop if enabled (ETAP_07e FAZA 4.4)
+     *
+     * Synchronizes product features (technical specifications) to PrestaShop:
+     * - Maps PPM feature types to PrestaShop features
+     * - Creates/updates feature values with multilang support
+     * - Updates product associations with feature values
+     *
+     * Called synchronously during product sync for consistency.
+     * Non-blocking: errors are logged but don't fail the product sync.
+     *
+     * @param Product $product PPM Product
+     * @param PrestaShopShop $shop Target shop
+     * @param int $externalId PrestaShop product ID
+     * @param BasePrestaShopClient $client PrestaShop API client
+     */
+    protected function syncFeaturesIfEnabled(Product $product, PrestaShopShop $shop, int $externalId, BasePrestaShopClient $client): void
+    {
+        try {
+            // Check if feature sync is enabled in SystemSettings
+            $featureSyncEnabled = \App\Models\SystemSetting::get('features.auto_sync_on_product_sync', true);
+
+            if (!$featureSyncEnabled) {
+                Log::debug('[FEATURE SYNC] Auto-sync disabled, skipping feature push', [
+                    'product_id' => $product->id,
+                    'shop_id' => $shop->id,
+                ]);
+                return;
+            }
+
+            // Load product features
+            $productFeatures = $product->productFeatures()
+                ->with('featureType')
+                ->get();
+
+            if ($productFeatures->isEmpty()) {
+                Log::debug('[FEATURE SYNC] No features to sync for product', [
+                    'product_id' => $product->id,
+                    'shop_id' => $shop->id,
+                ]);
+                return;
+            }
+
+            Log::info('[FEATURE SYNC] Starting feature sync for product', [
+                'product_id' => $product->id,
+                'shop_id' => $shop->id,
+                'shop_name' => $shop->name,
+                'features_count' => $productFeatures->count(),
+            ]);
+
+            // Create PrestaShopFeatureSyncService with EXISTING client
+            // CRITICAL FIX: Don't use app() DI - it creates new client with empty shop!
+            $transformer = new \App\Services\PrestaShop\Transformers\FeatureTransformer();
+            $featureSyncService = new \App\Services\PrestaShop\PrestaShopFeatureSyncService($client, $transformer);
+
+            // Sync product features
+            $result = $featureSyncService->syncProductFeatures($product, $shop, $externalId);
+
+            Log::info('[FEATURE SYNC] Feature sync completed', [
+                'product_id' => $product->id,
+                'shop_id' => $shop->id,
+                'success' => empty($result['errors']),
+                'synced_count' => $result['synced'] ?? 0,
+                'skipped_count' => $result['skipped'] ?? 0,
+                'errors_count' => count($result['errors'] ?? []),
+            ]);
+
+        } catch (\Exception $e) {
+            // Log error but don't fail product sync (non-blocking)
+            Log::error('[FEATURE SYNC] Failed during feature sync (non-fatal)', [
+                'product_id' => $product->id,
+                'shop_id' => $shop->id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+        }
+    }
+
+    /**
+     * Sync vehicle compatibilities to PrestaShop if enabled (ETAP_05d FAZA 4.5)
+     *
+     * Synchronizes vehicle compatibility data to PrestaShop features:
+     * - Feature 431 (Oryginal): Original vehicles
+     * - Feature 433 (Zamiennik): Replacement vehicles
+     * - Feature 432 (Model): Computed union of Original + Replacement
+     *
+     * Only applies to spare parts (product_type = 'czesc-zamienna').
+     * Non-blocking: errors are logged but don't fail the product sync.
+     *
+     * @param Product $product PPM Product
+     * @param PrestaShopShop $shop Target shop
+     * @param int $externalId PrestaShop product ID
+     * @param BasePrestaShopClient $client PrestaShop API client
+     */
+    protected function syncCompatibilitiesIfEnabled(
+        Product $product,
+        PrestaShopShop $shop,
+        int $externalId,
+        BasePrestaShopClient $client
+    ): void {
+        try {
+            // Check if compatibility sync is enabled in SystemSettings
+            $compatSyncEnabled = \App\Models\SystemSetting::get(
+                'compatibility.auto_sync_on_product_sync',
+                true
+            );
+
+            if (!$compatSyncEnabled) {
+                Log::debug('[COMPAT SYNC] Auto-sync disabled, skipping compatibility push', [
+                    'product_id' => $product->id,
+                    'shop_id' => $shop->id,
+                ]);
+                return;
+            }
+
+            // Check if product has any compatibilities (works for any product type)
+            $compatCount = \App\Models\VehicleCompatibility::byProduct($product->id)
+                ->where(function ($query) use ($shop) {
+                    $query->where('shop_id', $shop->id)
+                        ->orWhereNull('shop_id');
+                })
+                ->count();
+
+            if ($compatCount === 0) {
+                Log::debug('[COMPAT SYNC] No compatibilities to sync for product', [
+                    'product_id' => $product->id,
+                    'shop_id' => $shop->id,
+                ]);
+                return;
+            }
+
+            Log::info('[COMPAT SYNC] Starting compatibility sync for product', [
+                'product_id' => $product->id,
+                'shop_id' => $shop->id,
+                'shop_name' => $shop->name,
+                'compat_count' => $compatCount,
+            ]);
+
+            // Create VehicleCompatibilitySyncService with client
+            $compatService = new \App\Services\PrestaShop\VehicleCompatibilitySyncService();
+            $compatService->setClient($client);
+            $compatService->setShop($shop);
+
+            // Transform compatibilities to PrestaShop features
+            $featureAssociations = $compatService->transformToPrestaShopFeatures(
+                $product,
+                $shop->id
+            );
+
+            if (empty($featureAssociations)) {
+                Log::debug('[COMPAT SYNC] No feature associations generated', [
+                    'product_id' => $product->id,
+                ]);
+                return;
+            }
+
+            // Get current product data from PrestaShop
+            $productData = $client->getProduct($externalId);
+
+            if (!$productData) {
+                Log::warning('[COMPAT SYNC] Could not fetch product from PrestaShop', [
+                    'product_id' => $product->id,
+                    'external_id' => $externalId,
+                ]);
+                return;
+            }
+
+            // Merge compatibility features with existing product_features
+            $existingFeatures = $productData['product']['associations']['product_features'] ?? [];
+
+            // Remove old compatibility features (431, 432, 433)
+            $compatFeatureIds = [
+                \App\Services\PrestaShop\VehicleCompatibilitySyncService::FEATURE_ORYGINAL,
+                \App\Services\PrestaShop\VehicleCompatibilitySyncService::FEATURE_MODEL,
+                \App\Services\PrestaShop\VehicleCompatibilitySyncService::FEATURE_ZAMIENNIK,
+            ];
+
+            $filteredFeatures = array_filter($existingFeatures, function ($f) use ($compatFeatureIds) {
+                return !in_array((int) $f['id'], $compatFeatureIds);
+            });
+
+            // Add new compatibility features
+            $mergedFeatures = array_merge($filteredFeatures, $featureAssociations);
+
+            // GET-MODIFY-PUT Pattern: Modify existing product data and PUT back everything
+            // PrestaShop PUT REPLACES entire resource - missing fields = EMPTY values!
+            //
+            // CRITICAL (2025-12-09): Must transform multilang fields from GET format to PUT format!
+            // GET returns: 'name' => ['language' => [['@attributes' => ['id' => 1], 'value' => '...']]]
+            // PUT expects: 'name' => [['@attributes' => ['id' => 1], 'value' => '...']]
+            // (without 'language' wrapper)
+
+            $updateData = $productData['product'];
+
+            // Update ONLY the associations.product_features
+            $updateData['associations']['product_features'] = array_values($mergedFeatures);
+
+            // Remove READONLY fields that PrestaShop doesn't accept in PUT
+            $readonlyFields = [
+                'manufacturer_name',
+                'quantity',          // Managed via /stock_availables
+                'cache_is_pack',
+                'cache_has_attachments',
+                'cache_default_attribute',
+                'date_add',
+                'date_upd',
+                'indexed',
+                'position_in_category',
+                'type',
+                'id_shop_default',
+                'pack_stock_type',
+            ];
+
+            foreach ($readonlyFields as $field) {
+                unset($updateData[$field]);
+            }
+
+            // CRITICAL: Transform multilang fields to PUT format
+            // PrestaShop GET returns: STRING directly (xmlToArray extracts value)
+            // PrestaShop PUT expects: [['id' => 1, 'value' => 'Text']] for arrayToXml
+            $multilangFields = [
+                'name', 'description', 'description_short', 'link_rewrite',
+                'meta_title', 'meta_description', 'meta_keywords',
+                'available_now', 'available_later', 'delivery_in_stock', 'delivery_out_stock',
+            ];
+            $defaultLangId = 1; // Polish language ID
+
+            foreach ($multilangFields as $field) {
+                if (isset($updateData[$field])) {
+                    $value = $updateData[$field];
+
+                    // If already array with 'language' wrapper, extract it
+                    if (is_array($value) && isset($value['language'])) {
+                        $value = $value['language'];
+                    }
+
+                    // If still array (proper format), leave as is
+                    if (is_array($value) && isset($value[0]['id']) && isset($value[0]['value'])) {
+                        continue; // Already in correct format
+                    }
+
+                    // If string (from GET), convert to proper multilang array format
+                    if (is_string($value)) {
+                        $updateData[$field] = [
+                            ['id' => $defaultLangId, 'value' => $value]
+                        ];
+                    }
+                }
+            }
+
+            // Clean associations - remove readonly nested data
+            if (isset($updateData['associations']['images'])) {
+                // Images are managed via separate /images/products/{id} endpoint
+                unset($updateData['associations']['images']);
+            }
+            if (isset($updateData['associations']['stock_availables'])) {
+                // Stock is managed via /stock_availables endpoint
+                unset($updateData['associations']['stock_availables']);
+            }
+
+            // Ensure ID is set
+            $updateData['id'] = $externalId;
+
+            $result = $client->updateProduct($externalId, ['product' => $updateData]);
+
+            Log::info('[COMPAT SYNC] Compatibility sync completed', [
+                'product_id' => $product->id,
+                'shop_id' => $shop->id,
+                'external_id' => $externalId,
+                'features_synced' => count($featureAssociations),
+                'total_features' => count($mergedFeatures),
+            ]);
+
+        } catch (\Exception $e) {
+            // Log error but don't fail product sync (non-blocking)
+            Log::error('[COMPAT SYNC] Failed during compatibility sync (non-fatal)', [
+                'product_id' => $product->id,
+                'shop_id' => $shop->id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+        }
+    }
+
+    /**
+     * Mark visual description as synced to PrestaShop (ETAP_07f FAZA 8.2)
+     *
+     * Updates ProductDescription sync tracking fields after successful product sync.
+     * This method is called AFTER the product is synced (including description field).
+     *
+     * The visual description HTML is already included in the product sync via
+     * ProductTransformer::getVisualDescription(), this method just marks it as synced.
+     *
+     * Non-blocking: errors are logged but don't fail the product sync.
+     *
+     * @param Product $product PPM Product
+     * @param PrestaShopShop $shop Target shop
+     */
+    protected function markVisualDescriptionAsSynced(Product $product, PrestaShopShop $shop): void
+    {
+        try {
+            // Find visual description for this product-shop pair
+            $visualDescription = ProductDescription::where('product_id', $product->id)
+                ->where('shop_id', $shop->id)
+                ->where('sync_to_prestashop', true)
+                ->first();
+
+            // No visual description or sync disabled - nothing to mark
+            if (!$visualDescription) {
+                Log::debug('[VISUAL DESC SYNC] No visual description to mark as synced', [
+                    'product_id' => $product->id,
+                    'shop_id' => $shop->id,
+                ]);
+                return;
+            }
+
+            // Check if there were any changes to sync
+            if (!$visualDescription->needsSync()) {
+                Log::debug('[VISUAL DESC SYNC] Visual description already synced (no changes)', [
+                    'product_id' => $product->id,
+                    'shop_id' => $shop->id,
+                    'last_synced_at' => $visualDescription->last_synced_at,
+                ]);
+                return;
+            }
+
+            // Mark as synced (updates last_synced_at and sync_checksum)
+            $visualDescription->markAsSynced();
+
+            Log::info('[VISUAL DESC SYNC] Visual description marked as synced', [
+                'product_id' => $product->id,
+                'shop_id' => $shop->id,
+                'target_field' => $visualDescription->target_field,
+                'include_inline_css' => $visualDescription->include_inline_css,
+            ]);
+
+        } catch (\Exception $e) {
+            // Log error but don't fail product sync (non-blocking)
+            Log::error('[VISUAL DESC SYNC] Failed to mark visual description as synced (non-fatal)', [
+                'product_id' => $product->id,
+                'shop_id' => $shop->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 }

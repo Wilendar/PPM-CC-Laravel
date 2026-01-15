@@ -1,14 +1,6 @@
 ---
-name: hook-creator
-description: Create Claude Code hooks with best practices and standards. Use when creating SessionStart, PreCompact, PostToolUse, or PreToolUse hooks for automation and rule enforcement.
-version: 1.0.0
-author: Kamil Wilinski
-created: 2024-10-31
-updated: 2025-11-05
-tags: [hooks, automation, python, claude-code, session-start, pre-compact, post-tool, enforcement]
-scope: global
-category: workflow
-status: active
+name: "hook-creator"
+description: "Create Claude Code hooks with best practices and standards."
 ---
 
 # Hook Creator Skill
@@ -35,13 +27,27 @@ Użyj `hook-creator` gdy:
 - ✅ Chcesz **save context przed compaction** (PreCompact)
 - ✅ Musisz **enforce rules przed tool execution** (PreToolUse)
 - ✅ Chcesz **run action po tool execution** (PostToolUse)
+- ✅ **NEW 2.1.0:** Automation przy **starcie subagenta** (SubagentStart)
+- ✅ **NEW 2.1.0:** Automation przy **zakonczeniu subagenta** (SubagentStop)
 - ✅ Naprawiasz **istniejący hook** który nie działa
 - ✅ Dodajesz **custom functionality** do Claude Code workflow
+
+**Hook Events (Claude Code 2.1.1):**
+| Event | Kiedy | Parametry |
+|-------|-------|-----------|
+| UserPromptSubmit | Przed przetworzeniem promptu | userPrompt |
+| PreToolUse | Przed wywolaniem narzedzia | tool_name, tool_input |
+| PostToolUse | Po wywolaniu narzedzia | tool_name, tool_output |
+| Stop | Zakonczenie main conversation | - |
+| PreCompact | Przed kompresja kontekstu | - |
+| SubagentStart | **NEW!** Start subagenta | agent_name, agent_type, session_id |
+| SubagentStop | Zakonczenie subagenta | agent_id, agent_transcript_path |
 
 **Trigger Phrases:**
 - "create a hook for..."
 - "generate hook that..."
 - "make a SessionStart/PreCompact/PostToolUse hook..."
+- "create SubagentStart/SubagentStop hook..."
 - "build custom hook..."
 - "stwórz hook który..."
 

@@ -56,6 +56,19 @@ class SyncProductToPrestaShop implements ShouldQueue, ShouldBeUnique
     public ?int $userId = null;
 
     /**
+     * Pending media changes from session (2025-12-02)
+     * Format: ['mediaId:shopId' => 'sync'|'unsync', ...]
+     * Session is not available in queue context, so we pass it explicitly
+     */
+    public array $pendingMediaChanges = [];
+
+    /**
+     * Pre-generated job progress ID for tracking (2025-12-09)
+     * Used by CompatibilityManagement to track sync status
+     */
+    public ?string $preGeneratedJobId = null;
+
+    /**
      * Number of times job may be attempted
      */
     public int $tries = 3;
@@ -82,16 +95,27 @@ class SyncProductToPrestaShop implements ShouldQueue, ShouldBeUnique
     /**
      * Create new job instance
      * ETAP_07 FAZA 9.2: Load dynamic settings (2025-11-13)
+     * ETAP_07d (2025-12-02): Added pendingMediaChanges for media sync
+     * ETAP_05d (2025-12-09): Added preGeneratedJobId for compat sync tracking
      *
      * @param Product $product Product to sync
      * @param PrestaShopShop $shop Target shop
      * @param int|null $userId User who triggered sync (NULL = SYSTEM)
+     * @param array $pendingMediaChanges Pending media changes from session
+     * @param string|null $preGeneratedJobId Pre-generated job ID for tracking
      */
-    public function __construct(Product $product, PrestaShopShop $shop, ?int $userId = null)
-    {
+    public function __construct(
+        Product $product,
+        PrestaShopShop $shop,
+        ?int $userId = null,
+        array $pendingMediaChanges = [],
+        ?string $preGeneratedJobId = null
+    ) {
         $this->product = $product;
         $this->shop = $shop;
         $this->userId = $userId;
+        $this->pendingMediaChanges = $pendingMediaChanges;
+        $this->preGeneratedJobId = $preGeneratedJobId;
 
         // Load timeout from system settings
         $this->timeout = \App\Models\SystemSetting::get('sync.timeout', 300);
@@ -143,6 +167,11 @@ class SyncProductToPrestaShop implements ShouldQueue, ShouldBeUnique
         // Start job tracking
         $syncJob->start();
 
+        // Update pre-generated JobProgress if exists (CompatibilityManagement tracking)
+        if ($this->preGeneratedJobId) {
+            $this->updateJobProgress('running');
+        }
+
         Log::info('Product sync job started', [
             'job_id' => $this->job->getJobId(),
             'sync_job_id' => $syncJob->id,
@@ -163,7 +192,8 @@ class SyncProductToPrestaShop implements ShouldQueue, ShouldBeUnique
             $client = $factory->create($this->shop);
 
             // Execute sync through strategy
-            $result = $strategy->syncToPrestaShop($this->product, $client, $this->shop);
+            // ETAP_07d (2025-12-02): Pass pendingMediaChanges for media sync
+            $result = $strategy->syncToPrestaShop($this->product, $client, $this->shop, $this->pendingMediaChanges);
 
             // Calculate performance metrics
             $duration = microtime(true) - $startTime;
@@ -179,6 +209,11 @@ class SyncProductToPrestaShop implements ShouldQueue, ShouldBeUnique
 
             // Pass full $result to complete() including synced_data and changed_fields (2025-11-07)
             $syncJob->complete($result);
+
+            // Update pre-generated JobProgress if exists (CompatibilityManagement tracking)
+            if ($this->preGeneratedJobId) {
+                $this->updateJobProgress('completed');
+            }
 
             Log::info('Product sync job completed successfully', [
                 'job_id' => $this->job->getJobId(),
@@ -208,6 +243,11 @@ class SyncProductToPrestaShop implements ShouldQueue, ShouldBeUnique
                 stackTrace: $e->getTraceAsString()
             );
 
+            // Update pre-generated JobProgress if exists (CompatibilityManagement tracking)
+            if ($this->preGeneratedJobId) {
+                $this->updateJobProgress('failed');
+            }
+
             Log::error('Product sync job failed', [
                 'job_id' => $this->job->getJobId(),
                 'sync_job_id' => $syncJob->id,
@@ -220,6 +260,31 @@ class SyncProductToPrestaShop implements ShouldQueue, ShouldBeUnique
 
             // Re-throw to trigger Laravel retry mechanism
             throw $e;
+        }
+    }
+
+    /**
+     * Update pre-generated JobProgress record (for CompatibilityManagement tracking)
+     */
+    protected function updateJobProgress(string $status): void
+    {
+        if (!$this->preGeneratedJobId) {
+            return;
+        }
+
+        try {
+            \App\Models\JobProgress::where('job_id', $this->preGeneratedJobId)
+                ->update([
+                    'status' => $status,
+                    'current_count' => $status === 'completed' ? 1 : 0,
+                    'completed_at' => in_array($status, ['completed', 'failed']) ? now() : null,
+                ]);
+        } catch (\Exception $e) {
+            Log::warning('Failed to update JobProgress', [
+                'job_id' => $this->preGeneratedJobId,
+                'status' => $status,
+                'error' => $e->getMessage(),
+            ]);
         }
     }
 

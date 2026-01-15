@@ -211,6 +211,10 @@ abstract class BasePrestaShopClient
                     'execution_time_ms' => $executionTime,
                 ]
             );
+        } catch (PrestaShopAPIException $e) {
+            // FIX 2025-12-16: Don't wrap PrestaShopAPIException again - re-throw as-is
+            // This allows deprecation warnings and other API errors to propagate correctly
+            throw $e;
         } catch (\Exception $e) {
             $executionTime = (microtime(true) - $startTime) * 1000;
 
@@ -250,6 +254,11 @@ abstract class BasePrestaShopClient
         $basePath = $this->getApiBasePath();
         $endpoint = ltrim($endpoint, '/');
 
+        // FIX (2025-12-02): Ensure basePath has leading slash
+        if (!str_starts_with($basePath, '/')) {
+            $basePath = '/' . $basePath;
+        }
+
         return "{$baseUrl}{$basePath}/{$endpoint}";
     }
 
@@ -276,6 +285,37 @@ abstract class BasePrestaShopClient
 
         // Parse error message from response
         $errorMessage = $this->parseErrorMessage($response);
+
+        // FIX (2025-12-05): Handle deprecation warnings gracefully
+        // PrestaShop modules using deprecated hooks cause 500 errors even when operation succeeds
+        // Error #16384 = E_USER_DEPRECATED
+        if ($this->isDeprecationWarning($responseBody, $errorMessage)) {
+            Log::warning('[PrestaShop API] Deprecation warning detected (operation may have succeeded)', [
+                'shop_id' => $this->shop->id,
+                'method' => $method,
+                'url' => $url,
+                'deprecation_message' => $errorMessage,
+            ]);
+
+            // For PUT/POST operations, the data might have been saved despite the warning
+            // We'll throw a special exception that can be caught and handled
+            throw new PrestaShopAPIException(
+                "PrestaShop deprecation warning (operation may have succeeded): {$errorMessage}",
+                $statusCode,
+                null,
+                [
+                    'shop_id' => $this->shop->id,
+                    'shop_name' => $this->shop->name,
+                    'error_category' => 'deprecation_warning',
+                    'is_deprecation' => true,
+                    'method' => $method,
+                    'url' => $url,
+                    'request_data' => $data,
+                    'response_body' => $responseBody,
+                    'execution_time_ms' => $executionTime,
+                ]
+            );
+        }
 
         // Log failed request
         $this->logRequest($method, $url, $data, $response, $executionTime, 'error');
@@ -304,6 +344,36 @@ abstract class BasePrestaShopClient
                 'execution_time_ms' => $executionTime,
             ]
         );
+    }
+
+    /**
+     * Check if error is a deprecation warning (not a real failure)
+     * PrestaShop modules using deprecated hooks cause 500 errors but operation may succeed
+     *
+     * @param string $responseBody Response body
+     * @param string $errorMessage Parsed error message
+     * @return bool True if this is a deprecation warning
+     */
+    protected function isDeprecationWarning(string $responseBody, string $errorMessage): bool
+    {
+        // Error #16384 is E_USER_DEPRECATED in PHP
+        $deprecationPatterns = [
+            'error #16384',
+            'E_USER_DEPRECATED',
+            'is deprecated',
+            'please use',
+            'deprecated, please use',
+        ];
+
+        $combined = strtolower($responseBody . ' ' . $errorMessage);
+
+        foreach ($deprecationPatterns as $pattern) {
+            if (str_contains($combined, strtolower($pattern))) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

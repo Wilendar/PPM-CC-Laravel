@@ -11,8 +11,10 @@
             </h4>
 
             {{-- Default Data Toggle --}}
+            {{-- FIX 2025-11-28 v2: Use Alpine x-on:click with $wire for reliable triggering --}}
             <button type="button"
-                    wire:click="switchToShop(null)"
+                    x-on:click="$wire.switchToShop(null)"
+                    wire:loading.attr="disabled"
                     class="inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-full transition-colors duration-200 {{ $activeShopId === null ? 'bg-gradient-to-r from-orange-500 to-orange-600 text-white shadow-md' : 'bg-gray-700 text-gray-300 hover:bg-gray-600' }}">
                 <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2-2z" />
@@ -51,8 +53,15 @@
                             @endphp
 
                             {{-- Shop Button - ETAP_07 FIX: Auto-load data on click --}}
+                            {{-- FIX 2025-11-28 v2: Use Alpine x-on:click with $wire for reliable triggering --}}
+                            {{-- wire:click doesn't always trigger from native browser clicks --}}
                             <button type="button"
-                                    wire:click="switchToShop({{ $shop['id'] }})"
+                                    x-on:click="
+                                        @if(!isset($loadedShopData[$shop['id']]))
+                                            $dispatch('prestashop-loading-start');
+                                        @endif
+                                        $wire.switchToShop({{ $shop['id'] }})
+                                    "
                                     wire:loading.attr="disabled"
                                     wire:key="shop-btn-{{ $shop['id'] }}"
                                     class="inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-l-lg transition-all duration-200 {{ $activeShopId === $shop['id'] ? 'shop-tab-active' : 'shop-tab-inactive' }}">

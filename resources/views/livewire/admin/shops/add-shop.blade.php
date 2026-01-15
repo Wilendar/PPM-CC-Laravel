@@ -797,20 +797,279 @@
                         </div>
                     </div>
 
+                    <!-- ETAP_07f: CSS/JS Sync Configuration -->
+                    <div class="bg-gray-800 bg-opacity-30 border border-gray-600 rounded-lg p-6 backdrop-blur-sm">
+                        <h4 class="font-medium text-white mb-4 flex items-center">
+                            <svg class="w-5 h-5 text-[#e0ac7e] mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path>
+                            </svg>
+                            Synchronizacja CSS/JS (Opis Wizualny)
+                        </h4>
+                        <p class="text-gray-400 text-sm mb-4">
+                            Skanuj pliki CSS/JS ze sklepu PrestaShop przez FTP.
+                            Wybrane pliki beda uzywane do wyswietlania opisow produktow w PPM.
+                        </p>
+
+                        <!-- FTP/SFTP Configuration (FIRST - required for scanning) -->
+                        <div class="mb-6">
+                            <label class="flex items-center mb-4">
+                                <input type="checkbox"
+                                       wire:model.live="enableFtpSync"
+                                       class="rounded border-gray-600 bg-gray-800 bg-opacity-60 text-[#e0ac7e] focus:ring-[#e0ac7e]">
+                                <span class="ml-3 text-sm text-white font-medium">
+                                    Konfiguracja FTP/SFTP
+                                    <span class="text-yellow-400 text-xs ml-2">(wymagane do skanowania i edycji CSS/JS)</span>
+                                </span>
+                            </label>
+
+                            @if ($enableFtpSync)
+                                <div class="space-y-4 pl-6 border-l-2 border-[#e0ac7e] border-opacity-50 mb-6">
+                                    <!-- Protocol & Host -->
+                                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                        <div>
+                                            <label for="ftpProtocol" class="block text-sm font-medium text-white mb-2">
+                                                Protokol
+                                            </label>
+                                            <select id="ftpProtocol"
+                                                    wire:model.defer="ftpProtocol"
+                                                    class="w-full px-4 py-3 bg-gray-800 bg-opacity-60 border border-gray-600 text-white rounded-lg focus:ring-2 focus:ring-[#e0ac7e] focus:border-[#e0ac7e] transition-all duration-200">
+                                                <option value="ftp">FTP</option>
+                                                <option value="sftp">SFTP</option>
+                                            </select>
+                                        </div>
+                                        <div class="md:col-span-2">
+                                            <label for="ftpHost" class="block text-sm font-medium text-white mb-2">
+                                                Host FTP
+                                            </label>
+                                            <input type="text"
+                                                   id="ftpHost"
+                                                   wire:model.defer="ftpHost"
+                                                   class="w-full px-4 py-3 bg-gray-800 bg-opacity-60 border border-gray-600 text-white rounded-lg focus:ring-2 focus:ring-[#e0ac7e] focus:border-[#e0ac7e] transition-all duration-200 placeholder-gray-400"
+                                                   placeholder="ftp.sklep.pl">
+                                        </div>
+                                    </div>
+
+                                    <!-- Port & User & Password -->
+                                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                        <div>
+                                            <label for="ftpPort" class="block text-sm font-medium text-white mb-2">
+                                                Port
+                                            </label>
+                                            <input type="number"
+                                                   id="ftpPort"
+                                                   wire:model.defer="ftpPort"
+                                                   class="w-full px-4 py-3 bg-gray-800 bg-opacity-60 border border-gray-600 text-white rounded-lg focus:ring-2 focus:ring-[#e0ac7e] focus:border-[#e0ac7e] transition-all duration-200"
+                                                   placeholder="21">
+                                        </div>
+                                        <div>
+                                            <label for="ftpUser" class="block text-sm font-medium text-white mb-2">
+                                                Uzytkownik
+                                            </label>
+                                            <input type="text"
+                                                   id="ftpUser"
+                                                   wire:model.defer="ftpUser"
+                                                   class="w-full px-4 py-3 bg-gray-800 bg-opacity-60 border border-gray-600 text-white rounded-lg focus:ring-2 focus:ring-[#e0ac7e] focus:border-[#e0ac7e] transition-all duration-200 placeholder-gray-400"
+                                                   placeholder="username">
+                                        </div>
+                                        <div>
+                                            <label for="ftpPassword" class="block text-sm font-medium text-white mb-2">
+                                                Haslo
+                                            </label>
+                                            <input type="password"
+                                                   id="ftpPassword"
+                                                   wire:model.defer="ftpPassword"
+                                                   class="w-full px-4 py-3 bg-gray-800 bg-opacity-60 border border-gray-600 text-white rounded-lg focus:ring-2 focus:ring-[#e0ac7e] focus:border-[#e0ac7e] transition-all duration-200 placeholder-gray-400"
+                                                   placeholder="********">
+                                            @if ($isEditing)
+                                                <p class="text-yellow-400 text-xs mt-1">Pozostaw puste aby zachowac aktualne haslo</p>
+                                            @endif
+                                        </div>
+                                    </div>
+
+                                    <!-- Test FTP Connection Button -->
+                                    <div class="flex items-center space-x-4">
+                                        <button type="button"
+                                                wire:click="testFtpConnection"
+                                                wire:loading.attr="disabled"
+                                                wire:target="testFtpConnection"
+                                                class="px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600 transition-colors duration-200 flex items-center text-sm">
+                                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" wire:loading.remove wire:target="testFtpConnection">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0"></path>
+                                            </svg>
+                                            <svg class="animate-spin w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" wire:loading wire:target="testFtpConnection">
+                                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                            </svg>
+                                            Testuj polaczenie FTP
+                                        </button>
+
+                                        @if ($ftpConnectionStatus)
+                                            <div class="flex items-center">
+                                                @if ($ftpConnectionStatus === 'success')
+                                                    <svg class="w-5 h-5 text-green-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                                                    </svg>
+                                                    <span class="text-green-400 text-sm">{{ $ftpConnectionMessage }}</span>
+                                                @elseif ($ftpConnectionStatus === 'error')
+                                                    <svg class="w-5 h-5 text-red-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                                                    </svg>
+                                                    <span class="text-red-400 text-sm">{{ $ftpConnectionMessage }}</span>
+                                                @elseif ($ftpConnectionStatus === 'testing')
+                                                    <span class="text-yellow-400 text-sm">{{ $ftpConnectionMessage }}</span>
+                                                @endif
+                                            </div>
+                                        @endif
+                                    </div>
+                                </div>
+                            @endif
+                        </div>
+
+                        <!-- Scan Button (requires FTP config) -->
+                        <div class="mb-6 border-t border-gray-600 pt-4">
+                            <div class="flex flex-wrap items-center gap-3">
+                                <button type="button"
+                                        wire:click="scanCssJsFiles"
+                                        wire:loading.attr="disabled"
+                                        wire:target="scanCssJsFiles"
+                                        class="px-5 py-2.5 bg-[#e0ac7e] text-white rounded-lg hover:bg-[#d1975a] transition-colors duration-200 flex items-center text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                                        @if(!$enableFtpSync || empty($ftpHost) || empty($ftpUser) || empty($ftpPassword)) disabled @endif>
+                                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" wire:loading.remove wire:target="scanCssJsFiles">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                                    </svg>
+                                    <svg class="animate-spin w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" wire:loading wire:target="scanCssJsFiles">
+                                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                    </svg>
+                                    <span wire:loading.remove wire:target="scanCssJsFiles">Skanuj pliki CSS/JS ze sklepu</span>
+                                    <span wire:loading wire:target="scanCssJsFiles">Skanowanie...</span>
+                                </button>
+
+                                {{-- CSS Editor Button (ETAP_07h FAZA 8) - only in edit mode with FTP configured --}}
+                                @if($isEditing && $editingShopId && $enableFtpSync && !empty($ftpHost) && !empty($ftpUser))
+                                    <a href="{{ route('admin.shops.css-editor', ['shopId' => $editingShopId]) }}"
+                                       class="px-5 py-2.5 bg-gray-700 text-white rounded-lg hover:bg-gray-600 transition-colors duration-200 flex items-center text-sm font-medium border border-gray-600">
+                                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"></path>
+                                        </svg>
+                                        Edytuj CSS
+                                    </a>
+                                @endif
+                            </div>
+                            @if(!$enableFtpSync || empty($ftpHost) || empty($ftpUser) || empty($ftpPassword))
+                                <p class="text-yellow-400 text-xs mt-2">Wypelnij dane FTP powyzej aby skanowac pliki CSS/JS.</p>
+                            @endif
+                        </div>
+
+                        <!-- Scan Status Message -->
+                        @if($scanStatus)
+                            <div class="mb-4 p-3 rounded-lg @if($scanStatus === 'success') bg-green-900 bg-opacity-20 border border-green-500 border-opacity-30 @elseif($scanStatus === 'error') bg-red-900 bg-opacity-20 border border-red-500 border-opacity-30 @else bg-blue-900 bg-opacity-20 border border-blue-500 border-opacity-30 @endif">
+                                <div class="flex items-center">
+                                    @if($scanStatus === 'success')
+                                        <svg class="w-5 h-5 text-green-400 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                                        </svg>
+                                        <span class="text-green-300 text-sm">{{ $scanMessage }}</span>
+                                    @elseif($scanStatus === 'error')
+                                        <svg class="w-5 h-5 text-red-400 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                                        </svg>
+                                        <span class="text-red-300 text-sm">{{ $scanMessage }}</span>
+                                    @else
+                                        <svg class="w-5 h-5 text-blue-400 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                        </svg>
+                                        <span class="text-blue-300 text-sm">{{ $scanMessage }}</span>
+                                    @endif
+                                </div>
+                            </div>
+                        @endif
+
+                        <!-- Scanned CSS Files List -->
+                        @if(count($scannedCssFiles) > 0)
+                            <div class="mb-6">
+                                <h5 class="text-sm font-medium text-white mb-3 flex items-center">
+                                    <svg class="w-4 h-4 text-blue-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                                    </svg>
+                                    Pliki CSS ({{ count(array_filter($scannedCssFiles, fn($f) => $f['enabled'] ?? false)) }}/{{ count($scannedCssFiles) }} wlaczonych)
+                                </h5>
+                                <div class="space-y-2 max-h-48 overflow-y-auto pr-2 custom-scrollbar">
+                                    @foreach($scannedCssFiles as $index => $file)
+                                        <label class="flex items-start p-3 rounded-lg bg-gray-700 bg-opacity-40 hover:bg-opacity-60 transition-colors cursor-pointer border border-transparent hover:border-gray-500">
+                                            <input type="checkbox"
+                                                   wire:click="toggleCssFile('{{ $file['url'] }}')"
+                                                   @if($file['enabled'] ?? false) checked @endif
+                                                   class="rounded border-gray-500 bg-gray-800 text-[#e0ac7e] focus:ring-[#e0ac7e] mt-0.5">
+                                            <div class="ml-3 flex-1 min-w-0">
+                                                <span class="text-white text-sm block truncate">{{ $file['filename'] ?? basename($file['url']) }}</span>
+                                                <span class="text-gray-400 text-xs block truncate">{{ $file['url'] }}</span>
+                                                <div class="flex items-center mt-1 space-x-2">
+                                                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium
+                                                        @if(($file['category'] ?? 'other') === 'theme') bg-purple-900 bg-opacity-50 text-purple-300
+                                                        @elseif(($file['category'] ?? 'other') === 'custom') bg-green-900 bg-opacity-50 text-green-300
+                                                        @elseif(($file['category'] ?? 'other') === 'module') bg-blue-900 bg-opacity-50 text-blue-300
+                                                        @else bg-gray-700 text-gray-300 @endif">
+                                                        {{ ucfirst($file['category'] ?? 'other') }}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </label>
+                                    @endforeach
+                                </div>
+                            </div>
+                        @endif
+
+                        <!-- Scanned JS Files List -->
+                        @if(count($scannedJsFiles) > 0)
+                            <div class="mb-6">
+                                <h5 class="text-sm font-medium text-white mb-3 flex items-center">
+                                    <svg class="w-4 h-4 text-yellow-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"></path>
+                                    </svg>
+                                    Pliki JS ({{ count(array_filter($scannedJsFiles, fn($f) => $f['enabled'] ?? false)) }}/{{ count($scannedJsFiles) }} wlaczonych)
+                                </h5>
+                                <div class="space-y-2 max-h-48 overflow-y-auto pr-2 custom-scrollbar">
+                                    @foreach($scannedJsFiles as $index => $file)
+                                        <label class="flex items-start p-3 rounded-lg bg-gray-700 bg-opacity-40 hover:bg-opacity-60 transition-colors cursor-pointer border border-transparent hover:border-gray-500">
+                                            <input type="checkbox"
+                                                   wire:click="toggleJsFile('{{ $file['url'] }}')"
+                                                   @if($file['enabled'] ?? false) checked @endif
+                                                   class="rounded border-gray-500 bg-gray-800 text-[#e0ac7e] focus:ring-[#e0ac7e] mt-0.5">
+                                            <div class="ml-3 flex-1 min-w-0">
+                                                <span class="text-white text-sm block truncate">{{ $file['filename'] ?? basename($file['url']) }}</span>
+                                                <span class="text-gray-400 text-xs block truncate">{{ $file['url'] }}</span>
+                                                <div class="flex items-center mt-1 space-x-2">
+                                                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium
+                                                        @if(($file['category'] ?? 'other') === 'theme') bg-purple-900 bg-opacity-50 text-purple-300
+                                                        @elseif(($file['category'] ?? 'other') === 'custom') bg-green-900 bg-opacity-50 text-green-300
+                                                        @elseif(($file['category'] ?? 'other') === 'module') bg-blue-900 bg-opacity-50 text-blue-300
+                                                        @else bg-gray-700 text-gray-300 @endif">
+                                                        {{ ucfirst($file['category'] ?? 'other') }}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </label>
+                                    @endforeach
+                                </div>
+                            </div>
+                        @endif
+                    </div>
+
                     <!-- Performance & Reliability -->
                     <div class="bg-gray-800 bg-opacity-30 border border-gray-600 rounded-lg p-6 backdrop-blur-sm">
                         <h4 class="font-medium text-white mb-4 flex items-center">
                             <svg class="w-5 h-5 text-[#e0ac7e] mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
                             </svg>
-                            Wydajność i niezawodność
+                            Wydajnosc i niezawodnosc
                         </h4>
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <div>
                                 <label for="syncBatchSize" class="block text-sm font-medium text-white mb-2">
-                                    Wielkość paczki synchronizacji
+                                    Wielkosc paczki synchronizacji
                                 </label>
-                                <input type="number" 
+                                <input type="number"
                                        id="syncBatchSize"
                                        wire:model.defer="syncBatchSize" 
                                        min="1" max="500"

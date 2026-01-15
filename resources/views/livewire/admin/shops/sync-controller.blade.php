@@ -1766,7 +1766,7 @@
                                     </div>
                                 </div>
 
-                                {{-- Result Summary (JSON) - Collapsible (2025-11-07) --}}
+                                {{-- Result Summary - Enhanced Display (FIX 2025-12-22) --}}
                                 @if($job->result_summary)
                                 <div x-data="{ resultSummaryExpanded: false }">
                                     <h4 @click="resultSummaryExpanded = !resultSummaryExpanded"
@@ -1789,8 +1789,104 @@
                                          x-transition:leave="transition ease-in duration-150"
                                          x-transition:leave-start="opacity-100 transform scale-100"
                                          x-transition:leave-end="opacity-0 transform scale-95"
-                                         class="bg-gray-800 bg-opacity-60 rounded border border-gray-700 p-3">
-                                        <pre class="text-xs text-gray-300 font-mono overflow-x-auto">{{ json_encode($job->result_summary, JSON_PRETTY_PRINT) }}</pre>
+                                         class="bg-gray-800 bg-opacity-60 rounded border border-gray-700 p-3 space-y-3">
+
+                                        {{-- Primary Stats Grid --}}
+                                        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                                            @if(isset($job->result_summary['imported']))
+                                            <div class="bg-green-900 bg-opacity-30 rounded p-2 border border-green-700">
+                                                <div class="text-xs text-green-400">Zaimportowano</div>
+                                                <div class="text-lg font-bold text-green-300">{{ $job->result_summary['imported'] }}</div>
+                                            </div>
+                                            @endif
+                                            @if(isset($job->result_summary['updated']))
+                                            <div class="bg-blue-900 bg-opacity-30 rounded p-2 border border-blue-700">
+                                                <div class="text-xs text-blue-400">Zaktualizowano</div>
+                                                <div class="text-lg font-bold text-blue-300">{{ $job->result_summary['updated'] }}</div>
+                                            </div>
+                                            @endif
+                                            @if(isset($job->result_summary['skipped']))
+                                            <div class="bg-yellow-900 bg-opacity-30 rounded p-2 border border-yellow-700">
+                                                <div class="text-xs text-yellow-400">Pominięto</div>
+                                                <div class="text-lg font-bold text-yellow-300">{{ $job->result_summary['skipped'] }}</div>
+                                            </div>
+                                            @endif
+                                            @if(isset($job->result_summary['errors_count']))
+                                            <div class="bg-red-900 bg-opacity-30 rounded p-2 border border-red-700">
+                                                <div class="text-xs text-red-400">Błędy</div>
+                                                <div class="text-lg font-bold text-red-300">{{ $job->result_summary['errors_count'] }}</div>
+                                            </div>
+                                            @endif
+                                        </div>
+
+                                        {{-- Extended Stats (FIX 2025-12-22) --}}
+                                        @if(
+                                            isset($job->result_summary['categories_assigned']) ||
+                                            isset($job->result_summary['features_imported']) ||
+                                            isset($job->result_summary['variants_imported']) ||
+                                            isset($job->result_summary['types_detected']) ||
+                                            isset($job->result_summary['compatibilities_imported']) ||
+                                            isset($job->result_summary['media_synced'])
+                                        )
+                                        <div class="border-t border-gray-700 pt-3">
+                                            <div class="text-xs text-gray-400 mb-2 uppercase tracking-wide">Szczegółowe dane importu</div>
+                                            <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                                                @if(isset($job->result_summary['categories_assigned']) && $job->result_summary['categories_assigned'] > 0)
+                                                <div class="bg-gray-800 bg-opacity-40 rounded p-2 border border-gray-700">
+                                                    <div class="text-xs text-gray-400">Kategorie</div>
+                                                    <div class="text-sm font-medium text-white">{{ $job->result_summary['categories_assigned'] }}</div>
+                                                </div>
+                                                @endif
+                                                @if(isset($job->result_summary['features_imported']) && $job->result_summary['features_imported'] > 0)
+                                                <div class="bg-gray-800 bg-opacity-40 rounded p-2 border border-gray-700">
+                                                    <div class="text-xs text-gray-400">Cechy produktów</div>
+                                                    <div class="text-sm font-medium text-white">{{ $job->result_summary['features_imported'] }}</div>
+                                                </div>
+                                                @endif
+                                                @if(isset($job->result_summary['variants_imported']) && $job->result_summary['variants_imported'] > 0)
+                                                <div class="bg-gray-800 bg-opacity-40 rounded p-2 border border-gray-700">
+                                                    <div class="text-xs text-gray-400">Warianty</div>
+                                                    <div class="text-sm font-medium text-white">{{ $job->result_summary['variants_imported'] }}</div>
+                                                </div>
+                                                @endif
+                                                @if(isset($job->result_summary['types_detected']) && $job->result_summary['types_detected'] > 0)
+                                                <div class="bg-purple-900 bg-opacity-30 rounded p-2 border border-purple-700">
+                                                    <div class="text-xs text-purple-400">Typy autowykryte</div>
+                                                    <div class="text-sm font-medium text-purple-300">{{ $job->result_summary['types_detected'] }}</div>
+                                                </div>
+                                                @endif
+                                                @if(isset($job->result_summary['compatibilities_imported']) && $job->result_summary['compatibilities_imported'] > 0)
+                                                <div class="bg-gray-800 bg-opacity-40 rounded p-2 border border-gray-700">
+                                                    <div class="text-xs text-gray-400">Dopasowania pojazdów</div>
+                                                    <div class="text-sm font-medium text-white">{{ $job->result_summary['compatibilities_imported'] }}</div>
+                                                </div>
+                                                @endif
+                                                @if(isset($job->result_summary['media_synced']) && $job->result_summary['media_synced'] > 0)
+                                                <div class="bg-gray-800 bg-opacity-40 rounded p-2 border border-gray-700">
+                                                    <div class="text-xs text-gray-400">Media zsync.</div>
+                                                    <div class="text-sm font-medium text-white">{{ $job->result_summary['media_synced'] }}</div>
+                                                </div>
+                                                @endif
+                                            </div>
+                                        </div>
+                                        @endif
+
+                                        {{-- Execution Time --}}
+                                        @if(isset($job->result_summary['execution_time_ms']))
+                                        <div class="text-xs text-gray-500 pt-2 border-t border-gray-700">
+                                            Czas wykonania: {{ number_format($job->result_summary['execution_time_ms'] / 1000, 2) }}s
+                                        </div>
+                                        @endif
+
+                                        {{-- Raw JSON (collapsible for debugging) --}}
+                                        <div x-data="{ showRawJson: false }" class="pt-2">
+                                            <button @click="showRawJson = !showRawJson" class="text-xs text-gray-500 hover:text-gray-400">
+                                                <span x-text="showRawJson ? 'Ukryj JSON' : 'Pokaż JSON'"></span>
+                                            </button>
+                                            <div x-show="showRawJson" x-cloak class="mt-2">
+                                                <pre class="text-xs text-gray-400 font-mono overflow-x-auto bg-gray-900 p-2 rounded">{{ json_encode($job->result_summary, JSON_PRETTY_PRINT) }}</pre>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                                 @endif

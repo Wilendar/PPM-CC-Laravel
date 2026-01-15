@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Carbon\Carbon;
+use Cron\CronExpression;
 
 class MaintenanceTask extends Model
 {
@@ -285,21 +286,80 @@ class MaintenanceTask extends Model
     }
 
     /**
-     * Parsowanie zaawansowanych reguł cron (uproszczona wersja)
+     * Parsowanie zaawansowanych regul cron
+     * Obsluguje standardowy format cron: "* * * * *" (minuta, godzina, dzien, miesiac, dzien_tygodnia)
+     * oraz aliasy: @hourly, @daily, @weekly, @monthly, @yearly
      */
     private function parseRecurrenceRule(): ?Carbon
     {
-        // TODO: Implementacja pełnego parsera cron
-        // Na razie zwracamy null dla nieznanych reguł
-        return null;
+        if (!$this->recurrence_rule) {
+            return null;
+        }
+
+        try {
+            $cron = new CronExpression($this->recurrence_rule);
+            $nextRun = $cron->getNextRunDate();
+
+            return Carbon::instance($nextRun);
+        } catch (\Exception $e) {
+            \Log::warning('MaintenanceTask: Nieprawidlowa regula cron', [
+                'task_id' => $this->id,
+                'rule' => $this->recurrence_rule,
+                'error' => $e->getMessage(),
+            ]);
+
+            return null;
+        }
     }
 
     /**
-     * Sprawdź czy zadanie można wykonać teraz
+     * Walidacja reguly cron
+     */
+    public static function isValidCronExpression(string $expression): bool
+    {
+        try {
+            new CronExpression($expression);
+            return true;
+        } catch (\Exception $e) {
+            return false;
+        }
+    }
+
+    /**
+     * Pobierz czytelny opis reguly cron
+     */
+    public static function describeCronExpression(string $expression): string
+    {
+        $presets = [
+            '@yearly' => 'Raz w roku (1 stycznia o polnocy)',
+            '@annually' => 'Raz w roku (1 stycznia o polnocy)',
+            '@monthly' => 'Raz w miesiacu (1. dnia o polnocy)',
+            '@weekly' => 'Raz w tygodniu (niedziela o polnocy)',
+            '@daily' => 'Codziennie o polnocy',
+            '@midnight' => 'Codziennie o polnocy',
+            '@hourly' => 'Co godzine',
+            'daily' => 'Codziennie',
+            'weekly' => 'Co tydzien',
+            'monthly' => 'Co miesiac',
+        ];
+
+        if (isset($presets[$expression])) {
+            return $presets[$expression];
+        }
+
+        if (!self::isValidCronExpression($expression)) {
+            return 'Nieprawidlowa regula';
+        }
+
+        return "Cron: {$expression}";
+    }
+
+    /**
+     * Sprawdz czy zadanie mozna wykonac teraz
      */
     public function canRun(): bool
     {
-        return $this->status === self::STATUS_PENDING && 
+        return $this->status === self::STATUS_PENDING &&
                $this->scheduled_at <= now();
     }
 

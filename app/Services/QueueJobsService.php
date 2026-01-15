@@ -98,11 +98,22 @@ class QueueJobsService
         $payload = json_decode($job->payload, true);
         $commandName = $payload['displayName'] ?? 'Unknown';
 
-        // Extract command data
+        // Extract command data (with error handling for missing dependencies)
         $data = [];
         if (isset($payload['data']['command'])) {
-            $command = unserialize($payload['data']['command']);
-            $data = $this->extractJobData($command);
+            try {
+                $command = unserialize($payload['data']['command']);
+                $data = $this->extractJobData($command);
+            } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+                // Job references a deleted model - gracefully handle
+                $data['error'] = 'Referenced model no longer exists';
+                if (preg_match('/model \[(.+?)\]/', $e->getMessage(), $matches)) {
+                    $data['missing_model'] = $matches[1];
+                }
+            } catch (\Exception $e) {
+                // Other deserialization errors
+                $data['error'] = 'Failed to parse job data: ' . $e->getMessage();
+            }
         }
 
         return [

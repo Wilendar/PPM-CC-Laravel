@@ -285,15 +285,120 @@ class ConflictResolver
      */
     private function normalizePrestaShopData(array $psData): array
     {
+        return $this->normalizeFullProductData($psData);
+    }
+
+    /**
+     * Normalize ALL PrestaShop product fields for validation
+     *
+     * ENHANCEMENT 2025-12-22: Full product data extraction for validator
+     * Cykliczny job needs ALL data to calculate % compatibility between PPM and PrestaShop
+     *
+     * @param array $psData Raw PrestaShop API response
+     * @return array Normalized data for ProductShopData update
+     */
+    public function normalizeFullProductData(array $psData): array
+    {
         return [
-            'name' => data_get($psData, 'name.0.value') ?? data_get($psData, 'name'),
-            'slug' => data_get($psData, 'link_rewrite.0.value') ?? data_get($psData, 'link_rewrite'),
-            'short_description' => data_get($psData, 'description_short.0.value') ?? data_get($psData, 'description_short'),
-            'long_description' => data_get($psData, 'description.0.value') ?? data_get($psData, 'description'),
+            // Basic text fields (with language handling)
+            'name' => $this->extractLangValue($psData, 'name'),
+            'slug' => $this->extractLangValue($psData, 'link_rewrite'),
+            'short_description' => $this->extractLangValue($psData, 'description_short'),
+            'long_description' => $this->extractLangValue($psData, 'description'),
+            'meta_title' => $this->extractLangValue($psData, 'meta_title'),
+            'meta_description' => $this->extractLangValue($psData, 'meta_description'),
+
+            // Product status
             'is_active' => data_get($psData, 'active') === '1' || data_get($psData, 'active') === 1,
-            'weight' => data_get($psData, 'weight'),
+
+            // Physical properties
+            'weight' => $this->parseDecimal(data_get($psData, 'weight')),
+            'height' => $this->parseDecimal(data_get($psData, 'height')),
+            'width' => $this->parseDecimal(data_get($psData, 'width')),
+            'length' => $this->parseDecimal(data_get($psData, 'depth')), // PrestaShop uses 'depth' for length
+
+            // Identifiers
             'ean' => data_get($psData, 'ean13') ?? data_get($psData, 'ean'),
+            'sku' => data_get($psData, 'reference'),
+
+            // Manufacturer (name will be resolved separately if needed)
+            'manufacturer' => data_get($psData, 'id_manufacturer'),
+
+            // Sort order / position
+            'sort_order' => (int) data_get($psData, 'position', 0),
+
+            // Sync timestamp
             'last_pulled_at' => now(),
         ];
+    }
+
+    /**
+     * Extract language-aware value from PrestaShop data
+     *
+     * PrestaShop returns multi-lang fields in two possible formats:
+     * 1. Direct string: "name" => "Product Name"
+     * 2. Language array: "name" => [{"id" => 1, "value" => "Product Name"}, ...]
+     *
+     * @param array $data PrestaShop data
+     * @param string $field Field name
+     * @param int $langId Target language ID (default: 1 = Polish)
+     * @return string|null Extracted value
+     */
+    private function extractLangValue(array $data, string $field, int $langId = 1): ?string
+    {
+        $value = data_get($data, $field);
+
+        if ($value === null) {
+            return null;
+        }
+
+        // Direct string
+        if (is_string($value)) {
+            return $value;
+        }
+
+        // Language array format
+        if (is_array($value)) {
+            // Try to find matching language
+            foreach ($value as $langValue) {
+                if (is_array($langValue) && isset($langValue['value'])) {
+                    // Check if specific language ID matches
+                    if (isset($langValue['id']) && (int)$langValue['id'] === $langId) {
+                        return $langValue['value'];
+                    }
+                }
+            }
+
+            // Fallback: return first value
+            $firstValue = data_get($value, '0.value');
+            if ($firstValue !== null) {
+                return $firstValue;
+            }
+
+            // Another fallback: direct array with 'value' key
+            if (isset($value['value'])) {
+                return $value['value'];
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Parse decimal value from PrestaShop
+     *
+     * @param mixed $value Input value
+     * @return float|null Parsed decimal
+     */
+    private function parseDecimal($value): ?float
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        $parsed = (float) $value;
+
+        // Return null for zero values (PrestaShop often returns 0 for empty fields)
+        return $parsed > 0 ? $parsed : null;
     }
 }

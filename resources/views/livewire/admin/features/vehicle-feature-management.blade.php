@@ -1,128 +1,57 @@
 <div class="space-y-6">
-    {{-- LIVEWIRE TEST PANEL - Remove after diagnosis --}}
-    <div class="enterprise-card bg-yellow-900/20 border-yellow-600">
-        <div class="p-4">
-            <h3 class="text-yellow-400 font-bold mb-2">🔧 LIVEWIRE DIAGNOSTIC TEST</h3>
-            <div class="space-y-2">
-                <div>Counter: <span class="text-white font-bold text-xl">{{ $testCounter }}</span></div>
-                <div>
-                    <button wire:click="incrementTest" class="bg-green-600 hover:bg-green-700 px-4 py-2 rounded">
-                        TEST: Increment Counter
-                        <span wire:loading wire:target="incrementTest" class="ml-2">⏳</span>
-                    </button>
-                </div>
-                <div>showTemplateEditor: <span class="text-white">{{ $showTemplateEditor ? 'TRUE' : 'FALSE' }}</span></div>
-                <div>
-                    <button wire:click="openTemplateEditor" class="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded">
-                        TEST: Open Modal (set true)
-                        <span wire:loading wire:target="openTemplateEditor" class="ml-2">⏳</span>
-                    </button>
-                </div>
-            </div>
-        </div>
-    </div>
-
     {{-- HEADER --}}
     <div class="enterprise-card">
-        <div class="flex justify-between items-center mb-6">
+        <div class="flex justify-between items-center">
             <div>
                 <h2 class="text-h2">Cechy Pojazdow</h2>
-                <p class="text-gray-400 mt-1">Zarzadzanie szablonami cech dla produktow typu pojazd</p>
+                <p class="text-gray-400 mt-1">Zarzadzanie cechami i szablonami dla produktow</p>
             </div>
-            <button wire:click="openTemplateEditor" class="btn-enterprise-primary">
-                Dodaj Template
-            </button>
-        </div>
-
-        {{-- TEMPLATE CARDS GRID --}}
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
-            {{-- Predefined Templates (database-backed) --}}
-            @foreach($predefinedTemplates as $template)
-                <div wire:key="predefined-{{ $template->id }}" class="template-card">
-                    <div class="template-icon {{ $template->id == 1 ? 'electric' : 'combustion' }}">
-                        {{ $template->id == 1 ? '⚡' : '🚗' }}
-                    </div>
-                    <h3 class="template-title">{{ $template->name }}</h3>
-                    <div class="template-stats">
-                        <span class="stat-item">{{ count($template->features) }} cech</span>
-                        <span class="stat-item">Uzywany: {{ $template->usage_count ?? 0 }} razy</span>
-                    </div>
-                    <div class="template-actions">
-                        <button wire:click="editTemplate({{ $template->id }})" class="btn-template-action">
-                            ⚙ Edit
-                        </button>
-                        <button wire:click="deleteTemplate({{ $template->id }})" class="btn-template-action delete">
-                            🗑 Del
-                        </button>
-                    </div>
-                </div>
-            @endforeach
-
-            {{-- Custom Templates (database-backed) --}}
-            @foreach($customTemplates as $template)
-                <div wire:key="template-{{ $template->id }}" class="template-card">
-                    <div class="template-icon custom">&#128220;</div>
-                    <h3 class="template-title">{{ $template->name }}</h3>
-                    <div class="template-stats">
-                        <span class="stat-item">{{ count($template->features) }} cech</span>
-                        <span class="stat-item">Uzywany: {{ $template->usage_count ?? 0 }} razy</span>
-                    </div>
-                    <div class="template-actions">
-                        <button wire:click="editTemplate({{ $template->id }})" class="btn-template-action">
-                            &#9881; Edit
-                        </button>
-                        <button wire:click="deleteTemplate({{ $template->id }})" class="btn-template-action delete">
-                            &#128465; Del
-                        </button>
-                    </div>
-                </div>
-            @endforeach
-        </div>
-
-        {{-- BULK ASSIGN BUTTON --}}
-        <div class="text-center">
-            <button wire:click="openBulkAssignModal" class="btn-enterprise-secondary">
-                &#128640; Zastosuj Template do Produktow
-            </button>
         </div>
     </div>
 
-    {{-- FEATURE LIBRARY SIDEBAR --}}
-    <div x-data="{ showLibrary: true }" class="enterprise-card">
-        <button @click="showLibrary = !showLibrary" class="btn-enterprise-secondary mb-4">
-            <span x-show="showLibrary">&#9660;</span>
-            <span x-show="!showLibrary">&#9654;</span>
-            Biblioteka Cech (50+)
+    {{-- TAB NAVIGATION --}}
+    <div class="feature-tabs">
+        <button wire:click="setTab('library')"
+                class="feature-tabs__tab {{ $activeTab === 'library' ? 'active' : '' }}">
+            <span class="feature-tabs__tab-icon">📚</span>
+            <span>Biblioteka Cech</span>
         </button>
-
-        <div x-show="showLibrary" x-transition class="feature-library">
-            {{-- Search Input --}}
-            <input type="text"
-                   wire:model.live.debounce.300ms="searchFeature"
-                   class="form-input mb-4"
-                   placeholder="Szukaj cechy">
-
-            {{-- Grouped Features --}}
-            <div class="space-y-4">
-                @foreach($this->filteredFeatureLibrary as $group)
-                    <div wire:key="group-{{ $group['group'] }}" class="feature-group">
-                        <h4 class="feature-group-title">{{ $group['group'] }}</h4>
-                        <ul class="feature-list">
-                            @foreach($group['features'] as $feature)
-                                <li wire:key="feature-{{ $feature['name'] }}"
-                                    wire:click="addFeatureToTemplate('{{ $feature['name'] }}')"
-                                    class="feature-list-item">
-                                    <span class="feature-bullet">&#8226;</span>
-                                    <span class="feature-name">{{ $feature['name'] }}</span>
-                                    <span class="feature-type-badge">{{ $feature['type'] }}</span>
-                                </li>
-                            @endforeach
-                        </ul>
-                    </div>
-                @endforeach
-            </div>
-        </div>
+        <button wire:click="setTab('templates')"
+                class="feature-tabs__tab {{ $activeTab === 'templates' ? 'active' : '' }}">
+            <span class="feature-tabs__tab-icon">📋</span>
+            <span>Szablony Cech</span>
+        </button>
+        <button wire:click="setTab('browser')"
+                class="feature-tabs__tab {{ $activeTab === 'browser' ? 'active' : '' }}">
+            <span class="feature-tabs__tab-icon">🔍</span>
+            <span>Przegladarka Cech</span>
+        </button>
     </div>
+
+    {{-- ============================================
+        TAB: TEMPLATES (Szablony Cech)
+        ============================================ --}}
+    @if($activeTab === 'templates')
+        <livewire:admin.features.tabs.feature-templates-tab />
+    @endif
+
+    {{-- ============================================
+        TAB: LIBRARY (Biblioteka Cech)
+        ============================================ --}}
+    @if($activeTab === 'library')
+        <livewire:admin.features.tabs.feature-library-tab />
+    @endif
+
+    {{-- ============================================
+        TAB: BROWSER (Przegladarka Cech)
+        ============================================ --}}
+    @if($activeTab === 'browser')
+        <livewire:admin.features.tabs.feature-browser-tab />
+    @endif
+
+    {{-- ============================================
+        MODALS (zawsze renderowane)
+        ============================================ --}}
 
     {{-- TEMPLATE EDITOR MODAL --}}
     <div class="modal-overlay {{ $showTemplateEditor ? 'show' : '' }}" wire:click.self="closeTemplateEditor">
@@ -284,17 +213,55 @@
             {{-- Template Selection --}}
             <div class="mb-4">
                 <label class="form-label">Wybierz template:</label>
-                <select wire:model="selectedTemplateId" class="form-input">
+                <select wire:model.live="selectedTemplateId" class="form-input">
                     <option value="">Wybierz template...</option>
-                    <option value="1">Pojazdy Elektryczne</option>
-                    <option value="2">Pojazdy Spalinowe</option>
-                    @foreach($customTemplates as $template)
-                        <option value="{{ $template->id }}">{{ $template->name }}</option>
-                    @endforeach
+                    @if($predefinedTemplates->count() > 0)
+                        <optgroup label="Predefiniowane">
+                            @foreach($predefinedTemplates as $template)
+                                <option value="{{ $template->id }}">
+                                    {{ $template->name }} ({{ count($template->features ?? []) }} cech)
+                                </option>
+                            @endforeach
+                        </optgroup>
+                    @endif
+                    @if($customTemplates->count() > 0)
+                        <optgroup label="Wlasne szablony">
+                            @foreach($customTemplates as $template)
+                                <option value="{{ $template->id }}">
+                                    {{ $template->name }} ({{ count($template->features ?? []) }} cech)
+                                </option>
+                            @endforeach
+                        </optgroup>
+                    @endif
                 </select>
                 @error('selectedTemplateId')
                     <span class="error-message">{{ $message }}</span>
                 @enderror
+
+                {{-- Template Preview --}}
+                @if($selectedTemplateId)
+                    @php
+                        $selectedTemplate = $predefinedTemplates->firstWhere('id', $selectedTemplateId)
+                                          ?? $customTemplates->firstWhere('id', $selectedTemplateId);
+                    @endphp
+                    @if($selectedTemplate)
+                        <div class="mt-3 p-3 bg-gray-800 rounded-lg border border-gray-700">
+                            <div class="text-sm text-gray-400 mb-2">Cechy w szablonie:</div>
+                            <div class="flex flex-wrap gap-2">
+                                @foreach(array_slice($selectedTemplate->features ?? [], 0, 10) as $feature)
+                                    <span class="text-xs px-2 py-1 bg-gray-700 rounded">
+                                        {{ $feature['name'] ?? 'N/A' }}
+                                    </span>
+                                @endforeach
+                                @if(count($selectedTemplate->features ?? []) > 10)
+                                    <span class="text-xs px-2 py-1 bg-gray-600 rounded text-gray-400">
+                                        +{{ count($selectedTemplate->features) - 10 }} wiecej...
+                                    </span>
+                                @endif
+                            </div>
+                        </div>
+                    @endif
+                @endif
             </div>
 
             {{-- Action Selection --}}
@@ -338,6 +305,276 @@
             </div>
         </div>
     </div>
+
+    {{-- FEATURE TYPE EDITOR MODAL --}}
+    <div class="modal-overlay {{ $showFeatureTypeEditor ? 'show' : '' }}" wire:click.self="closeFeatureTypeEditor">
+        <div class="modal-content max-w-xl">
+            {{-- Modal Header --}}
+            <div class="modal-header">
+                <h3 class="text-h3">
+                    {{ $editingFeatureTypeId ? 'Edytuj' : 'Nowa' }} Cecha
+                </h3>
+                <button wire:click="closeFeatureTypeEditor" class="modal-close">&#10005;</button>
+            </div>
+
+            {{-- Form --}}
+            <div class="space-y-4">
+                {{-- Name --}}
+                <div>
+                    <label class="form-label">Nazwa cechy *</label>
+                    <input type="text"
+                           wire:model="featureTypeName"
+                           class="form-input"
+                           placeholder="np. Moc silnika">
+                    @error('featureTypeName')
+                        <span class="error-message">{{ $message }}</span>
+                    @enderror
+                </div>
+
+                {{-- Code --}}
+                <div>
+                    <label class="form-label">Kod (unikatowy) *</label>
+                    <input type="text"
+                           wire:model="featureTypeCode"
+                           class="form-input"
+                           placeholder="np. engine_power">
+                    @error('featureTypeCode')
+                        <span class="error-message">{{ $message }}</span>
+                    @enderror
+                </div>
+
+                {{-- Value Type --}}
+                <div>
+                    <label class="form-label">Typ wartosci *</label>
+                    <select wire:model="featureTypeValueType" class="form-input">
+                        <option value="text">Tekst</option>
+                        <option value="number">Liczba</option>
+                        <option value="bool">Tak/Nie</option>
+                        <option value="select">Lista wyboru</option>
+                    </select>
+                </div>
+
+                {{-- Unit --}}
+                <div>
+                    <label class="form-label">Jednostka (opcjonalnie)</label>
+                    <input type="text"
+                           wire:model="featureTypeUnit"
+                           class="form-input"
+                           placeholder="np. W, kg, cm">
+                </div>
+
+                {{-- Group --}}
+                <div>
+                    <label class="form-label">Grupa</label>
+                    <select wire:model="featureTypeGroupId" class="form-input">
+                        <option value="">-- Bez grupy --</option>
+                        @foreach($this->featureGroups as $group)
+                            <option value="{{ $group->id }}">{{ $group->getDisplayName() }}</option>
+                        @endforeach
+                    </select>
+                </div>
+
+                {{-- Placeholder --}}
+                <div>
+                    <label class="form-label">Placeholder (podpowiedz)</label>
+                    <input type="text"
+                           wire:model="featureTypePlaceholder"
+                           class="form-input"
+                           placeholder="np. Wprowadz wartosc...">
+                </div>
+
+                {{-- Conditional Group --}}
+                <div>
+                    <label class="form-label">Warunkowa (typ pojazdu)</label>
+                    <select wire:model="featureTypeConditional" class="form-input">
+                        <option value="">-- Dla wszystkich --</option>
+                        <option value="elektryczne">Tylko elektryczne</option>
+                        <option value="spalinowe">Tylko spalinowe</option>
+                    </select>
+                </div>
+            </div>
+
+            {{-- Modal Actions --}}
+            <div class="modal-actions mt-6">
+                <button wire:click="saveFeatureType"
+                        wire:loading.attr="disabled"
+                        class="btn-enterprise-primary">
+                    <span wire:loading.remove wire:target="saveFeatureType">&#128190; Zapisz</span>
+                    <span wire:loading wire:target="saveFeatureType">Zapisywanie...</span>
+                </button>
+                <button wire:click="closeFeatureTypeEditor" class="btn-enterprise-secondary">
+                    &#10005; Anuluj
+                </button>
+            </div>
+        </div>
+    </div>
+
+    {{-- FEATURE GROUP EDITOR MODAL --}}
+    <div class="modal-overlay {{ $showFeatureGroupEditor ? 'show' : '' }}" wire:click.self="closeFeatureGroupEditor">
+        <div class="modal-content max-w-xl">
+            {{-- Modal Header --}}
+            <div class="modal-header">
+                <h3 class="text-h3">
+                    {{ $editingFeatureGroupId ? 'Edytuj' : 'Nowa' }} Grupa
+                </h3>
+                <button wire:click="closeFeatureGroupEditor" class="modal-close">&#10005;</button>
+            </div>
+
+            {{-- Form --}}
+            <div class="space-y-4">
+                {{-- Name --}}
+                <div>
+                    <label class="form-label">Nazwa grupy *</label>
+                    <input type="text"
+                           wire:model="featureGroupName"
+                           class="form-input"
+                           placeholder="np. Silnik">
+                    @error('featureGroupName')
+                        <span class="error-message">{{ $message }}</span>
+                    @enderror
+                </div>
+
+                {{-- Code --}}
+                <div>
+                    <label class="form-label">Kod (unikatowy) *</label>
+                    <input type="text"
+                           wire:model="featureGroupCode"
+                           class="form-input"
+                           placeholder="np. engine">
+                    @error('featureGroupCode')
+                        <span class="error-message">{{ $message }}</span>
+                    @enderror
+                </div>
+
+                {{-- Icon --}}
+                <div>
+                    <label class="form-label">Ikona</label>
+                    <select wire:model="featureGroupIcon" class="form-input">
+                        <option value="">-- Brak --</option>
+                        <option value="engine">&#9881; Silnik</option>
+                        <option value="ruler">&#128207; Linijka</option>
+                        <option value="wheel">&#9899; Kolo</option>
+                        <option value="brake">&#128376; Hamulec</option>
+                        <option value="suspension">&#8597; Zawieszenie</option>
+                        <option value="electric">&#9889; Elektryczny</option>
+                        <option value="fuel">&#9981; Paliwo</option>
+                        <option value="document">&#128196; Dokument</option>
+                        <option value="car">&#128663; Samochod</option>
+                        <option value="gear">&#9881; Zebatka</option>
+                        <option value="info">&#8505; Info</option>
+                    </select>
+                </div>
+
+                {{-- Color --}}
+                <div>
+                    <label class="form-label">Kolor</label>
+                    <select wire:model="featureGroupColor" class="form-input">
+                        <option value="">-- Domyslny --</option>
+                        <option value="orange">Pomaranczowy</option>
+                        <option value="blue">Niebieski</option>
+                        <option value="green">Zielony</option>
+                        <option value="yellow">Zolty</option>
+                        <option value="red">Czerwony</option>
+                        <option value="purple">Fioletowy</option>
+                        <option value="cyan">Turkusowy</option>
+                        <option value="gray">Szary</option>
+                    </select>
+                </div>
+
+                {{-- Sort Order --}}
+                <div>
+                    <label class="form-label">Kolejnosc *</label>
+                    <input type="number"
+                           wire:model="featureGroupSortOrder"
+                           class="form-input"
+                           min="0"
+                           placeholder="0">
+                    @error('featureGroupSortOrder')
+                        <span class="error-message">{{ $message }}</span>
+                    @enderror
+                </div>
+
+                {{-- Vehicle Type Filter --}}
+                <div>
+                    <label class="form-label">Filtr typu pojazdu</label>
+                    <select wire:model="featureGroupVehicleFilter" class="form-input">
+                        <option value="">-- Dla wszystkich --</option>
+                        <option value="elektryczne">Tylko elektryczne</option>
+                        <option value="spalinowe">Tylko spalinowe</option>
+                    </select>
+                </div>
+            </div>
+
+            {{-- Modal Actions --}}
+            <div class="modal-actions mt-6">
+                <button wire:click="saveFeatureGroup"
+                        wire:loading.attr="disabled"
+                        class="btn-enterprise-primary">
+                    <span wire:loading.remove wire:target="saveFeatureGroup">&#128190; Zapisz</span>
+                    <span wire:loading wire:target="saveFeatureGroup">Zapisywanie...</span>
+                </button>
+                <button wire:click="closeFeatureGroupEditor" class="btn-enterprise-secondary">
+                    &#10005; Anuluj
+                </button>
+            </div>
+        </div>
+    </div>
+
+    {{-- JOB PROGRESS BAR --}}
+    @if($activeJobProgressId)
+        <div wire:poll.2s="refreshJobProgress" class="fixed bottom-4 right-4 z-50 w-96">
+            <div class="enterprise-card bg-gray-800 shadow-xl border border-gray-700">
+                <div class="flex justify-between items-center mb-2">
+                    <span class="text-sm font-medium text-gray-200">
+                        Przypisywanie cech...
+                    </span>
+                    <button wire:click="dismissProgress"
+                            class="text-gray-400 hover:text-gray-200 transition-colors">
+                        &#10005;
+                    </button>
+                </div>
+
+                {{-- Progress Message --}}
+                <p class="text-xs text-gray-400 mb-2">
+                    {{ $activeJobProgress['message'] ?? 'Inicjalizacja...' }}
+                </p>
+
+                {{-- Progress Bar --}}
+                <div class="w-full bg-gray-700 rounded-full h-2.5 mb-2">
+                    <div class="h-2.5 rounded-full transition-all duration-300 {{ ($activeJobProgress['status'] ?? 'pending') === 'completed' ? 'bg-green-500' : (($activeJobProgress['status'] ?? 'pending') === 'failed' ? 'bg-red-500' : 'bg-orange-500') }}"
+                         style="width: {{ $activeJobProgress['percentage'] ?? 0 }}%"></div>
+                </div>
+
+                {{-- Stats --}}
+                <div class="flex justify-between text-xs text-gray-400">
+                    <span>{{ $activeJobProgress['current'] ?? 0 }}/{{ $activeJobProgress['total'] ?? 0 }}</span>
+                    <span>{{ $activeJobProgress['percentage'] ?? 0 }}%</span>
+                </div>
+
+                {{-- Error Count --}}
+                @if(($activeJobProgress['errors'] ?? 0) > 0)
+                    <p class="text-xs text-red-400 mt-1">
+                        &#9888; {{ $activeJobProgress['errors'] }} bledow
+                    </p>
+                @endif
+
+                {{-- Status Badge --}}
+                @if(($activeJobProgress['status'] ?? '') === 'completed')
+                    <div class="mt-2 text-center">
+                        <span class="text-xs px-2 py-1 bg-green-500/20 text-green-400 rounded">
+                            &#10003; Ukonczone
+                        </span>
+                    </div>
+                @elseif(($activeJobProgress['status'] ?? '') === 'failed')
+                    <div class="mt-2 text-center">
+                        <span class="text-xs px-2 py-1 bg-red-500/20 text-red-400 rounded">
+                            &#10005; Blad
+                        </span>
+                    </div>
+                @endif
+            </div>
+        </div>
+    @endif
 
     {{-- Flash Messages --}}
     @if(session()->has('message'))

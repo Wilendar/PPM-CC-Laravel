@@ -3,6 +3,7 @@
 namespace App\Http\Livewire\Products\Management;
 
 use Livewire\Component;
+use Livewire\Attributes\Renderless;
 use App\Models\Product;
 use App\Models\ProductType;
 use App\Models\Category;
@@ -19,6 +20,11 @@ use App\Http\Livewire\Products\Management\Traits\ProductFormValidation;
 use App\Http\Livewire\Products\Management\Traits\ProductFormUpdates;
 use App\Http\Livewire\Products\Management\Traits\ProductFormComputed;
 use App\Http\Livewire\Products\Management\Traits\ProductFormShopTabs;
+use App\Http\Livewire\Products\Management\Traits\ProductFormFeatures;
+use App\Http\Livewire\Products\Management\Traits\ProductFormVariants;
+use App\Http\Livewire\Products\Management\Traits\VariantShopContextTrait;
+use App\Http\Livewire\Products\Management\Traits\ProductFormCompatibility;
+use App\Http\Livewire\Products\Management\Traits\ProductFormVisualDescription;
 use App\Http\Livewire\Products\Management\Services\ProductMultiStoreManager;
 use App\Http\Livewire\Products\Management\Services\ProductCategoryManager;
 use App\Http\Livewire\Products\Management\Services\ProductFormSaver;
@@ -51,6 +57,11 @@ class ProductForm extends Component
     use ProductFormUpdates;
     use ProductFormComputed;
     use ProductFormShopTabs;
+    use ProductFormFeatures;
+    use ProductFormVariants;
+    use VariantShopContextTrait;
+    use ProductFormCompatibility;
+    use ProductFormVisualDescription;
 
     /*
     |--------------------------------------------------------------------------
@@ -66,6 +77,7 @@ class ProductForm extends Component
     protected $listeners = [
         'shop-categories-reloaded' => 'handleCategoriesReloaded',
         'delayed-reset-unsaved-changes' => 'forceResetUnsavedChanges',
+        // Note: openCreateCategoryModal is called directly via wire:click, not via dispatch
     ];
 
     /*
@@ -173,6 +185,10 @@ class ProductForm extends Component
     // FIX 2025-11-21 v5: Category expansion as public property (computed property didn't execute)
     public array $expandedCategoryIds = []; // Category IDs to expand (parent categories of selected items)
 
+    // FIX 2025-11-28: Cache for expandedCategoryIds to avoid repeated database queries
+    // MUST be public to persist across Livewire requests (private properties are not serialized)
+    public array $expandedCategoryIdsCache = []; // [cacheKey => expandedIds]
+
     public array $shopAttributes = []; // [shopId => [attributeCode => value]]
     public array $exportedShops = [];   // Shops where product is exported
     public ?int $activeShopId = null;   // null = default data, int = specific shop
@@ -195,6 +211,26 @@ class ProductForm extends Component
     public bool $showSlugField = false;
     public int $shortDescriptionCount = 0;
     public int $longDescriptionCount = 0;
+
+    // === CREATE CATEGORY MODAL (ETAP_07b FAZA 4.2.3) ===
+    public bool $showCreateCategoryModal = false;
+    public ?int $createCategoryShopId = null;
+    public string $newCategoryName = '';
+    public ?int $newCategoryParentId = null;
+
+    // === INLINE CATEGORY CREATION (ETAP_07b FAZA 4.2.3 PERFORMANCE FIX) ===
+    // Single source of truth - controls which category shows inline form
+    // Prevents 927 Alpine x-data instances with functions (performance killer)
+    public ?int $inlineCreateParentId = null;
+    public string $inlineCreateName = '';
+    public string $inlineCreateContext = 'default';
+
+    // === DEFERRED CATEGORY OPERATIONS (2025-11-26) ===
+    // Categories are NOT created/deleted immediately - only on Save!
+    // User can cancel and all pending operations are discarded.
+    public array $pendingNewCategories = [];    // [context => [{name, parentId, tempId}, ...]]
+    public array $pendingDeleteCategories = []; // [context => [categoryId, ...]]
+    private int $tempCategoryIdCounter = -1;    // Negative IDs for pending categories
 
     // === PENDING CHANGES SYSTEM ===
     public array $pendingChanges = [];     // [shopId => [field => value]] or ['default' => [field => value]]
@@ -246,6 +282,15 @@ class ProductForm extends Component
      * @var string|null
      */
     public ?string $jobCreatedAt = null;
+
+    /**
+     * Shop ID for single-shop sync job tracking
+     * FIX 2025-11-27: Track which shop sync job was dispatched for
+     * Used by checkBulkSyncJobStatus() to check only the relevant shop
+     *
+     * @var int|null
+     */
+    public ?int $syncJobShopId = null;
 
     /**
      * Final result of job after completion
@@ -353,6 +398,19 @@ class ProductForm extends Component
             // FIX 2025-11-21 v5: Calculate expanded category IDs after mount
             $this->expandedCategoryIds = $this->calculateExpandedCategoryIds();
 
+            // ETAP_07e FAZA 3: Load product features
+            $this->loadProductFeatures();
+
+            // ETAP_05b FAZA 5: Load default variants snapshot for per-shop isolation
+            if ($this->isEditMode) {
+                $this->loadDefaultVariantsSnapshot();
+            }
+
+            // ETAP_05d FAZA 4: Load vehicle compatibility data
+            if ($this->isEditMode) {
+                $this->loadCompatibilityData();
+            }
+
             Log::info('ProductForm mount() completed successfully', [
                 'isEditMode' => $this->isEditMode,
                 'sku' => $this->sku,
@@ -388,6 +446,21 @@ class ProductForm extends Component
             $this->hasUnsavedChanges = false;
             $this->originalFormData = [];
         }
+    }
+
+    /**
+     * Livewire hydrate hook - restore state from session before each request
+     *
+     * FIX 2025-12-04: Pending variants were lost between Livewire requests because
+     * Livewire resets public properties. We use session storage to persist them.
+     *
+     * NOTE: hydrateVariantCrudTrait() doesn't work for nested traits, so we call
+     * restorePendingVariantsFromSession() directly here in the main component.
+     */
+    public function hydrate(): void
+    {
+        // Restore pending variant changes from session
+        $this->restorePendingVariantsFromSession();
     }
 
     /*
@@ -1290,7 +1363,14 @@ class ProductForm extends Component
         try {
             // Return ONLY root categories (parent_id = null)
             // Children will be rendered recursively via 'children' relationship in view
-            return \App\Models\Category::with('children')
+            // FIX 2025-11-26: Load children recursively (5 levels) for findCategoryInTree/getAllDescendantCategoryIds
+            return \App\Models\Category::with([
+                    'children',
+                    'children.children',
+                    'children.children.children',
+                    'children.children.children.children',
+                    'children.children.children.children.children'
+                ])
                 ->whereNull('parent_id')
                 ->orderBy('sort_order')
                 ->orderBy('name')
@@ -1323,6 +1403,20 @@ class ProductForm extends Component
 
         if (empty($selectedCategories)) {
             return []; // No selected categories = no expansion needed
+        }
+
+        // FIX 2025-11-28: Cache key based on context and selected categories
+        $contextKey = $this->activeShopId === null ? 'default' : "shop_{$this->activeShopId}";
+        sort($selectedCategories); // Ensure consistent order for cache key
+        $cacheKey = $contextKey . '_' . implode(',', $selectedCategories);
+
+        // Return cached result if available (avoid expensive database queries)
+        if (isset($this->expandedCategoryIdsCache[$cacheKey])) {
+            Log::debug('[calculateExpandedCategoryIds] CACHE HIT', [
+                'cache_key' => $cacheKey,
+                'cached_count' => count($this->expandedCategoryIdsCache[$cacheKey]),
+            ]);
+            return $this->expandedCategoryIdsCache[$cacheKey];
         }
 
         // FIX 2025-11-21 v5: Info logging (production LOG_LEVEL=info, debug disabled)
@@ -1407,6 +1501,9 @@ class ProductForm extends Component
                 'conversion_count' => count($prestashopExpandedIds),
             ]);
 
+            // FIX 2025-11-28: Store result in cache
+            $this->expandedCategoryIdsCache[$cacheKey] = $prestashopExpandedIds;
+
             return $prestashopExpandedIds;
         }
 
@@ -1416,7 +1513,53 @@ class ProductForm extends Component
             'ppm_count' => count($expandedIds),
         ]);
 
+        // FIX 2025-11-28: Store result in cache
+        $this->expandedCategoryIdsCache[$cacheKey] = $expandedIds;
+
         return $expandedIds;
+    }
+
+    /**
+     * FIX 2025-11-28: Calculate parents for a SINGLE category (optimized for toggle)
+     * This is much faster than calculateExpandedCategoryIds() which processes ALL categories
+     *
+     * @param int $ppmCategoryId PPM Category ID
+     * @return array Parent IDs (PrestaShop IDs in shop context, PPM IDs in default context)
+     */
+    protected function calculateParentsForCategory(int $ppmCategoryId): array
+    {
+        $category = \App\Models\Category::find($ppmCategoryId);
+
+        if (!$category) {
+            return [];
+        }
+
+        $parentPpmIds = [];
+
+        // Traverse up the parent chain
+        $parent = $category->parent;
+        while ($parent) {
+            $parentPpmIds[] = $parent->id;
+            $parent = $parent->parent;
+        }
+
+        // For shop context: convert PPM IDs → PrestaShop IDs
+        if ($this->activeShopId !== null) {
+            $mappings = $this->shopCategories[$this->activeShopId]['mappings'] ?? [];
+
+            $prestashopIds = [];
+            foreach ($parentPpmIds as $ppmId) {
+                $mappingKey = (string) $ppmId;
+                if (isset($mappings[$mappingKey])) {
+                    $prestashopIds[] = (int) $mappings[$mappingKey];
+                }
+            }
+
+            return $prestashopIds;
+        }
+
+        // Default context - return PPM IDs
+        return $parentPpmIds;
     }
 
     /*
@@ -1916,7 +2059,10 @@ class ProductForm extends Component
         $selectedCategories = $currentCategories['selected'] ?? [];
         $primaryCategory = $currentCategories['primary'] ?? null;
 
-        if (in_array($ppmCategoryId, $selectedCategories)) {
+        // FIX 2025-11-28: Track if we're adding a new category (for targeted expansion)
+        $isAdding = !in_array($ppmCategoryId, $selectedCategories);
+
+        if (!$isAdding) {
             // Remove category
             $selectedCategories = array_values(array_diff($selectedCategories, [$ppmCategoryId]));
             // Remove as primary if it was primary
@@ -1940,8 +2086,18 @@ class ProductForm extends Component
         // FIX #1 2025-11-21: Badge now uses real-time comparison, no cache invalidation needed
         // REMOVED: $this->invalidateCategoryValidationCache();
 
-        // FIX 2025-11-24: Recalculate expanded categories after toggle
-        $this->expandedCategoryIds = $this->calculateExpandedCategoryIds();
+        // FIX 2025-11-28: Optimized expansion calculation
+        // - When ADDING: Calculate only parents for the NEW category (not all categories)
+        // - When REMOVING: Keep tree expanded (no need to collapse)
+        if ($isAdding) {
+            // Only calculate parents for the newly added category
+            $newParentIds = $this->calculateParentsForCategory($ppmCategoryId);
+            // Merge with existing expanded IDs (avoid duplicates)
+            $this->expandedCategoryIds = array_values(array_unique(
+                array_merge($this->expandedCategoryIds, $newParentIds)
+            ));
+        }
+        // When removing, we keep the tree expanded - no recalculation needed
 
         // FIX 2025-11-21 v2: Reduced logging for better responsiveness (removed verbose log)
     }
@@ -2007,9 +2163,13 @@ class ProductForm extends Component
         $currentCategories = $this->getCurrentContextCategories();
         $selectedCategories = $currentCategories['selected'] ?? [];
 
+        // FIX 2025-11-28: Track if we're adding a new category (affects cache)
+        $categoryWasAdded = false;
+
         // Ensure the category is selected first
         if (!in_array($ppmCategoryId, $selectedCategories)) {
             $selectedCategories[] = $ppmCategoryId;
+            $categoryWasAdded = true;
         }
 
         // Set as primary
@@ -2036,7 +2196,13 @@ class ProductForm extends Component
             $mappings = $this->shopCategories[$this->activeShopId]['mappings'] ?? [];
             $eventCategoryId = $mappings[(string)$ppmCategoryId] ?? $categoryId;
         }
-        $this->dispatch('primary-category-changed', categoryId: $eventCategoryId);
+        // PERFORMANCE FIX 2025-11-27: Use consolidated event (86% listener reduction)
+        // FIX 2025-11-28: Add context to ensure only ONE primary badge per context
+        // FIX 2025-11-28 v2: Context format must match Blade's $context (shop ID or 'default', NOT 'shop_X')
+        // FIX 2025-11-28 v3: REMOVED server-side dispatch - Alpine optimistic UI handles visual update
+        // Server still saves correct state, but no dispatch needed (causes race condition with fast clicks)
+        // $eventContext = $this->activeShopId === null ? 'default' : (string)$this->activeShopId;
+        // $this->dispatch('category-event', type: 'primary-changed', categoryId: $eventCategoryId, context: $eventContext);
 
         Log::info('Primary category set with context isolation', [
             'received_category_id' => $categoryId,
@@ -2045,10 +2211,68 @@ class ProductForm extends Component
             'context' => $this->activeShopId === null ? 'default' : "shop_{$this->activeShopId}",
             'selected_categories' => $selectedCategories,
             'primary_category_id' => $ppmCategoryId,
+            'category_was_added' => $categoryWasAdded,
         ]);
 
-        // FIX 2025-11-24: Recalculate expanded categories after setting primary
+        // FIX 2025-11-28: Only expand tree to new category if it was added
+        // When just setting primary (no new category), no expansion changes needed
+        if ($categoryWasAdded) {
+            // Optimized: only calculate parents for the NEW category (not all categories)
+            $newParentIds = $this->calculateParentsForCategory($ppmCategoryId);
+            $this->expandedCategoryIds = array_values(array_unique(
+                array_merge($this->expandedCategoryIds, $newParentIds)
+            ));
+        }
+    }
+
+    /**
+     * ETAP_07b FAZA 4.2: Clear all category selections for a context
+     *
+     * For shop context: clears shop-specific categories (can inherit from default)
+     * For default context: clears all default categories
+     *
+     * @param string $context 'default' or shop_id
+     */
+    public function clearCategorySelection(string $context): void
+    {
+        Log::info('[clearCategorySelection] Clearing categories', [
+            'context' => $context,
+            'current_shop_id' => $this->activeShopId,
+        ]);
+
+        if ($context === 'default') {
+            // Clear default categories - FIX: use defaultCategories (not selectedCategories!)
+            // getPrestaShopCategoryIdsForContext(null) returns defaultCategories['selected']
+            $this->defaultCategories['selected'] = [];
+            $this->defaultCategories['primary'] = null;
+
+            Log::info('[clearCategorySelection] Cleared default categories');
+        } else {
+            // Clear shop-specific categories
+            $shopId = (int) $context;
+
+            if (isset($this->shopCategories[$shopId])) {
+                $this->shopCategories[$shopId]['selected'] = [];
+                $this->shopCategories[$shopId]['primary'] = null;
+
+                Log::info('[clearCategorySelection] Cleared shop categories', [
+                    'shop_id' => $shopId,
+                ]);
+            }
+        }
+
+        // Mark form as changed
+        $this->markFormAsChanged();
+
+        // Invalidate category validation cache
+        $this->invalidateCategoryValidationCache();
+
+        // Recalculate expanded categories
         $this->expandedCategoryIds = $this->calculateExpandedCategoryIds();
+
+        // PERFORMANCE FIX 2025-11-27: Use consolidated event (86% listener reduction)
+        // FAZA 4.2 FIX: Dispatch browser event to sync Alpine.js local state
+        $this->dispatch('category-event', type: 'clear-all', context: $context);
     }
 
     /*
@@ -2316,6 +2540,1116 @@ class ProductForm extends Component
         $this->selectedShopsToAdd = [];
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | CREATE CATEGORY MODAL (ETAP_07b FAZA 4.2.3)
+    |--------------------------------------------------------------------------
+    */
+
+    /**
+     * Open create category modal for a specific shop
+     *
+     * @param array $params Event params containing 'shopId'
+     */
+    public function openCreateCategoryModal(array $params): void
+    {
+        $shopId = $params['shopId'] ?? null;
+
+        if ($shopId === null || $shopId === 'default') {
+            $this->dispatch('error', message: 'Tworzenie kategorii dostępne tylko dla sklepów PrestaShop');
+            return;
+        }
+
+        $this->createCategoryShopId = (int) $shopId;
+        $this->newCategoryName = '';
+        $this->newCategoryParentId = null;
+        $this->showCreateCategoryModal = true;
+    }
+
+    /**
+     * Close create category modal
+     */
+    public function closeCreateCategoryModal(): void
+    {
+        $this->showCreateCategoryModal = false;
+        $this->createCategoryShopId = null;
+        $this->newCategoryName = '';
+        $this->newCategoryParentId = null;
+    }
+
+    /**
+     * Create new category in PrestaShop
+     *
+     * Uses CategorySyncService to create category via API
+     */
+    public function createNewCategory(): void
+    {
+        // Validate input
+        $this->validate([
+            'newCategoryName' => 'required|string|min:2|max:128',
+            'newCategoryParentId' => 'nullable|integer',
+        ], [
+            'newCategoryName.required' => 'Nazwa kategorii jest wymagana',
+            'newCategoryName.min' => 'Nazwa musi mieć minimum 2 znaki',
+            'newCategoryName.max' => 'Nazwa może mieć maksymalnie 128 znaków',
+        ]);
+
+        try {
+            $shop = \App\Models\PrestaShopShop::find($this->createCategoryShopId);
+
+            if (!$shop) {
+                throw new \Exception('Nie znaleziono sklepu');
+            }
+
+            // Get PrestaShop client
+            $client = $shop->getClient();
+
+            // Determine parent category ID in PrestaShop
+            $parentPrestashopId = 2; // Default: Home category
+
+            if ($this->newCategoryParentId) {
+                // Map PPM parent to PrestaShop ID
+                $categoryMapper = app(\App\Services\PrestaShop\CategoryMapper::class);
+                $mappedParentId = $categoryMapper->mapToPrestaShop($this->newCategoryParentId, $shop);
+
+                if ($mappedParentId) {
+                    $parentPrestashopId = $mappedParentId;
+                }
+            }
+
+            // Build category data for PrestaShop API
+            $categoryData = [
+                'category' => [
+                    'name' => [
+                        ['id' => 1, 'value' => $this->newCategoryName]
+                    ],
+                    'link_rewrite' => [
+                        ['id' => 1, 'value' => \Illuminate\Support\Str::slug($this->newCategoryName)]
+                    ],
+                    'description' => [
+                        ['id' => 1, 'value' => '']
+                    ],
+                    'active' => 1,
+                    'id_parent' => $parentPrestashopId,
+                ]
+            ];
+
+            // Convert to XML and send to PrestaShop
+            $xmlBody = $client->arrayToXml($categoryData);
+
+            $response = $client->makeRequest('POST', '/categories', [], [
+                'body' => $xmlBody,
+                'headers' => [
+                    'Content-Type' => 'application/xml',
+                ],
+            ]);
+
+            if (!isset($response['category']['id'])) {
+                throw new \Exception('PrestaShop API nie zwróciło ID kategorii');
+            }
+
+            $newPrestashopCategoryId = (int) $response['category']['id'];
+
+            // Create PPM category and mapping
+            $ppmCategory = \App\Models\Category::create([
+                'name' => $this->newCategoryName,
+                'slug' => \Illuminate\Support\Str::slug($this->newCategoryName),
+                'parent_id' => $this->newCategoryParentId,
+                'is_active' => true,
+            ]);
+
+            // Create mapping
+            $categoryMapper = app(\App\Services\PrestaShop\CategoryMapper::class);
+            $categoryMapper->createMapping(
+                $ppmCategory->id,
+                $shop,
+                $newPrestashopCategoryId,
+                $this->newCategoryName
+            );
+
+            \Illuminate\Support\Facades\Log::info('[CREATE CATEGORY] Created new category in PrestaShop', [
+                'shop_id' => $shop->id,
+                'prestashop_id' => $newPrestashopCategoryId,
+                'ppm_id' => $ppmCategory->id,
+                'name' => $this->newCategoryName,
+                'parent_prestashop_id' => $parentPrestashopId,
+            ]);
+
+            // Close modal
+            $this->closeCreateCategoryModal();
+
+            // Refresh categories for this shop
+            $this->refreshPrestaShopCategories($this->createCategoryShopId ?? $this->activeShopId);
+
+            $this->dispatch('success', message: "Utworzono kategorię: {$this->newCategoryName}");
+
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('[CREATE CATEGORY] Failed', [
+                'shop_id' => $this->createCategoryShopId,
+                'name' => $this->newCategoryName,
+                'error' => $e->getMessage(),
+            ]);
+
+            $this->dispatch('error', message: 'Błąd tworzenia kategorii: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Show inline category creation form for specific parent
+     *
+     * FAZA 4.2.3 PERFORMANCE FIX: Single Livewire property instead of 927 Alpine states
+     *
+     * @param int $parentId Parent category ID
+     * @param string $context 'default' or shop_id
+     */
+    public function showInlineCreate(int $parentId, string $context): void
+    {
+        $this->inlineCreateParentId = $parentId;
+        $this->inlineCreateName = '';
+        $this->inlineCreateContext = $context;
+    }
+
+    /**
+     * Cancel/hide inline category creation form
+     */
+    public function cancelInlineCreate(): void
+    {
+        $this->inlineCreateParentId = null;
+        $this->inlineCreateName = '';
+        $this->inlineCreateContext = 'default';
+    }
+
+    /**
+     * Submit inline category creation (called from Livewire form)
+     *
+     * FAZA 4.2.3 PERFORMANCE FIX: Uses Livewire properties instead of Alpine
+     * PERFORMANCE FIX 2025-11-27: Accept params directly to avoid showInlineCreate() Livewire call
+     */
+    public function submitInlineCreate(?int $parentId = null, ?string $context = null, ?string $name = null): void
+    {
+        // PERFORMANCE FIX 2025-11-27: Accept $name as param to avoid wire:model.live lag
+        // Use passed params or fall back to properties (backwards compat)
+        $parentId = $parentId ?? $this->inlineCreateParentId;
+        $context = $context ?? $this->inlineCreateContext;
+        $name = $name ?? $this->inlineCreateName;
+
+        if ($parentId === null) {
+            return;
+        }
+
+        // Validate name
+        if (empty(trim($name ?? ''))) {
+            return;
+        }
+
+        $this->createInlineCategory(
+            $parentId,
+            $name,  // Use passed $name (from Alpine) instead of $this->inlineCreateName
+            $context ?? 'default'
+        );
+
+        // Reset form after creation (just clear the name, Alpine handles visibility)
+        $this->inlineCreateName = '';
+        $this->inlineCreateParentId = null;
+        $this->inlineCreateContext = 'default';  // Reset to default, not null (property is typed as string)
+    }
+
+    /**
+     * Create inline subcategory directly in tree view
+     *
+     * FAZA 4.2.3: Called from category-tree-item.blade.php when user clicks "+" and submits name
+     *
+     * @param int $parentCategoryId Parent category ID (PPM)
+     * @param string $subcategoryName Name for new subcategory
+     * @param string $context 'default' or shop_id
+     */
+    public function createInlineCategory(int $parentCategoryId, string $subcategoryName, string $context): void
+    {
+        // Validate input
+        $subcategoryName = trim($subcategoryName);
+
+        if (strlen($subcategoryName) < 2) {
+            $this->dispatch('error', message: 'Nazwa kategorii musi miec minimum 2 znaki');
+            return;
+        }
+
+        if (strlen($subcategoryName) > 128) {
+            $this->dispatch('error', message: 'Nazwa kategorii moze miec maksymalnie 128 znakow');
+            return;
+        }
+
+        try {
+            // 2025-11-26 DEFERRED CREATION: Category is NOT created immediately!
+            // It's added to pending queue and created only when user clicks "Zapisz zmiany"
+            // This allows user to cancel without leaving orphan categories in PrestaShop.
+
+            // Generate temporary negative ID for pending category
+            $tempId = $this->tempCategoryIdCounter--;
+
+            // Create pending category entry
+            $pendingCategory = [
+                'tempId' => $tempId,
+                'name' => $subcategoryName,
+                'parentId' => $parentCategoryId,
+                'slug' => \Illuminate\Support\Str::slug($subcategoryName),
+                'context' => $context,
+                'createdAt' => now()->toIso8601String(),
+            ];
+
+            // Add to pending queue
+            if (!isset($this->pendingNewCategories[$context])) {
+                $this->pendingNewCategories[$context] = [];
+            }
+            $this->pendingNewCategories[$context][] = $pendingCategory;
+
+            // Mark as having unsaved changes
+            $this->hasUnsavedChanges = true;
+
+            if ($context === 'default') {
+                // DEFAULT TAB: Add pending category to local PPM tree
+                $this->addPendingCategoryToTree($tempId, $subcategoryName, $parentCategoryId, 'default');
+
+                \Illuminate\Support\Facades\Log::info('[INLINE CREATE CATEGORY] Added to pending queue (PPM)', [
+                    'context' => 'default',
+                    'temp_id' => $tempId,
+                    'name' => $subcategoryName,
+                    'parent_id' => $parentCategoryId,
+                ]);
+
+                $this->dispatch('success', message: "Kategoria '{$subcategoryName}' oczekuje na zapis");
+
+            } else {
+                // SHOP TAB: Add pending category to PrestaShop tree (local only)
+                $shopId = (int) $context;
+                $this->addPendingCategoryToTree($tempId, $subcategoryName, $parentCategoryId, $context);
+
+                \Illuminate\Support\Facades\Log::info('[INLINE CREATE CATEGORY] Added to pending queue (PrestaShop)', [
+                    'context' => 'shop',
+                    'shop_id' => $shopId,
+                    'temp_id' => $tempId,
+                    'name' => $subcategoryName,
+                    'parent_prestashop_id' => $parentCategoryId,
+                ]);
+
+                $this->dispatch('success', message: "Kategoria '{$subcategoryName}' oczekuje na zapis");
+            }
+
+            // Auto-select the pending category (using temp ID)
+            // Note: toggleCategory needs to handle negative IDs for pending categories
+            $this->selectPendingCategory($tempId, $context);
+
+            // PERFORMANCE FIX 2025-11-27: Use consolidated event (86% listener reduction)
+            $this->js("
+                setTimeout(() => {
+                    window.dispatchEvent(new CustomEvent('category-event', {
+                        detail: { type: 'created-scroll', categoryId: {$tempId}, context: '{$context}' }
+                    }));
+                }, 100);
+            ");
+
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('[INLINE CREATE CATEGORY] Failed to add to pending', [
+                'context' => $context,
+                'parent_id' => $parentCategoryId,
+                'name' => $subcategoryName,
+                'error' => $e->getMessage(),
+            ]);
+
+            $this->dispatch('error', message: 'Blad tworzenia kategorii: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Add pending category to the local category tree for display
+     * Uses negative tempId to distinguish from real categories
+     */
+    private function addPendingCategoryToTree(int $tempId, string $name, int $parentId, string $context): void
+    {
+        // Create a fake category object for display
+        $pendingCategoryObj = (object) [
+            'id' => $tempId,
+            'name' => $name . ' (oczekuje)',
+            'parent_id' => $parentId,
+            'children' => collect([]),
+            'is_pending' => true, // Flag for visual indicator
+            'sort_order' => 9999, // Show at end
+        ];
+
+        if ($context === 'default') {
+            // Add to PPM categories tree
+            $this->addCategoryToTreeRecursive($this->categories, $parentId, $pendingCategoryObj);
+        } else {
+            // Add to PrestaShop categories tree
+            $shopId = (int) $context;
+            if (isset($this->prestashopCategories[$shopId])) {
+                $this->addCategoryToArrayTreeRecursive($this->prestashopCategories[$shopId], $parentId, $pendingCategoryObj);
+            }
+        }
+    }
+
+    /**
+     * Recursively find parent and add child category (for Collection-based trees)
+     */
+    private function addCategoryToTreeRecursive(&$categories, int $parentId, object $newCategory): bool
+    {
+        foreach ($categories as $category) {
+            if ($category->id === $parentId) {
+                if (!$category->children) {
+                    $category->children = collect([]);
+                }
+                $category->children->push($newCategory);
+                return true;
+            }
+            if ($category->children && $category->children->count() > 0) {
+                $childrenArray = $category->children->all();
+                if ($this->addCategoryToTreeRecursive($childrenArray, $parentId, $newCategory)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Recursively find parent and add child category (for array-based trees)
+     * 2025-11-26 FIX: Direct Collection push instead of array copy
+     */
+    private function addCategoryToArrayTreeRecursive(array &$categories, int $parentId, object $newCategory): bool
+    {
+        foreach ($categories as &$category) {
+            $catId = is_object($category) ? $category->id : ($category['id'] ?? null);
+
+            if ($catId === $parentId) {
+                if (is_object($category)) {
+                    if (!isset($category->children) || $category->children === null) {
+                        $category->children = collect([]);
+                    }
+                    // Direct push to Collection (modifies in place)
+                    $category->children->push($newCategory);
+                    \Illuminate\Support\Facades\Log::debug('[ADD PENDING TO TREE] Added to parent', [
+                        'parent_id' => $parentId,
+                        'new_category_id' => $newCategory->id,
+                        'children_count' => $category->children->count(),
+                    ]);
+                } else {
+                    if (!isset($category['children'])) {
+                        $category['children'] = [];
+                    }
+                    $category['children'][] = $newCategory;
+                }
+                return true;
+            }
+
+            // Recurse into children - use Collection directly if available
+            if (is_object($category) && isset($category->children) && $category->children instanceof \Illuminate\Support\Collection) {
+                // Convert to array, recurse, then update Collection if found
+                $childrenArray = $category->children->all();
+                if ($this->addCategoryToArrayTreeRecursive($childrenArray, $parentId, $newCategory)) {
+                    // Update the Collection with modified array
+                    $category->children = collect($childrenArray);
+                    return true;
+                }
+            } elseif (is_object($category) && isset($category->children) && is_array($category->children)) {
+                if ($this->addCategoryToArrayTreeRecursive($category->children, $parentId, $newCategory)) {
+                    return true;
+                }
+            } elseif (is_array($category) && isset($category['children']) && !empty($category['children'])) {
+                if ($this->addCategoryToArrayTreeRecursive($category['children'], $parentId, $newCategory)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Select a pending category (add to selected list)
+     */
+    private function selectPendingCategory(int $tempId, string $context): void
+    {
+        if ($context === 'default') {
+            // Add to default categories selection
+            if (!isset($this->defaultCategories['selected'])) {
+                $this->defaultCategories['selected'] = [];
+            }
+            if (!in_array($tempId, $this->defaultCategories['selected'])) {
+                $this->defaultCategories['selected'][] = $tempId;
+            }
+        } else {
+            // Add to shop categories selection
+            $shopId = (int) $context;
+            if (!isset($this->shopCategories[$shopId])) {
+                $this->shopCategories[$shopId] = ['selected' => [], 'primary' => null, 'mappings' => []];
+            }
+            if (!in_array($tempId, $this->shopCategories[$shopId]['selected'])) {
+                $this->shopCategories[$shopId]['selected'][] = $tempId;
+            }
+        }
+    }
+
+    /**
+     * Remove a pending category (before save)
+     * Called when user clicks delete on a pending category
+     */
+    public function removePendingCategory(int $tempId, string $context): void
+    {
+        // Only works for pending (negative ID) categories
+        if ($tempId >= 0) {
+            $this->dispatch('error', message: 'Mozna usunac tylko oczekujace kategorie');
+            return;
+        }
+
+        // Remove from pending queue
+        if (isset($this->pendingNewCategories[$context])) {
+            $this->pendingNewCategories[$context] = array_filter(
+                $this->pendingNewCategories[$context],
+                fn($cat) => $cat['tempId'] !== $tempId
+            );
+            $this->pendingNewCategories[$context] = array_values($this->pendingNewCategories[$context]);
+        }
+
+        // Remove from selection
+        if ($context === 'default') {
+            $this->defaultCategories['selected'] = array_values(
+                array_diff($this->defaultCategories['selected'] ?? [], [$tempId])
+            );
+        } else {
+            $shopId = (int) $context;
+            if (isset($this->shopCategories[$shopId]['selected'])) {
+                $this->shopCategories[$shopId]['selected'] = array_values(
+                    array_diff($this->shopCategories[$shopId]['selected'], [$tempId])
+                );
+            }
+        }
+
+        // Remove from tree (will be re-rendered)
+        if ($context === 'default') {
+            $this->removeCategoryFromTree($this->categories, $tempId);
+        } else {
+            $shopId = (int) $context;
+            if (isset($this->prestashopCategories[$shopId])) {
+                $this->removeCategoryFromArrayTree($this->prestashopCategories[$shopId], $tempId);
+            }
+        }
+
+        $this->dispatch('success', message: 'Usunieto oczekujaca kategorie');
+    }
+
+    /**
+     * Mark a REAL category for deletion (deferred until Save)
+     * Category stays visible with red highlight, removed on Save
+     * Also marks all descendant categories for deletion
+     *
+     * FIX 2025-11-28: #[Renderless] prevents Livewire re-render (eliminates LAG!)
+     * UI update via Alpine events dispatched at end of method
+     *
+     * @param int $categoryId Real category ID (positive)
+     * @param string $context 'default' or shop_id
+     */
+    #[Renderless]
+    public function markCategoryForDeletion(int $categoryId, string $context): void
+    {
+        // Only for real (positive ID) categories
+        if ($categoryId < 0) {
+            // For pending categories, use removePendingCategory instead
+            $this->removePendingCategory($categoryId, $context);
+            return;
+        }
+
+        // Initialize context array if needed
+        if (!isset($this->pendingDeleteCategories[$context])) {
+            $this->pendingDeleteCategories[$context] = [];
+        }
+
+        // Check if already marked for deletion
+        if (in_array($categoryId, $this->pendingDeleteCategories[$context])) {
+            // Toggle off - unmark for deletion (and all descendants)
+            $this->unmarkCategoryForDeletion($categoryId, $context);
+            return;
+        }
+
+        // Add to pending delete queue
+        $this->pendingDeleteCategories[$context][] = $categoryId;
+
+        // Find the category in tree and get all descendant IDs
+        // FIX 2025-11-27: Pass context to use correct category tree (PPM vs PrestaShop)
+        $category = $this->findCategoryInTree($categoryId, $context);
+        $descendantIds = $category ? $this->getAllDescendantCategoryIds($category) : [];
+
+        // Mark all descendants for deletion too
+        foreach ($descendantIds as $descendantId) {
+            if (!in_array($descendantId, $this->pendingDeleteCategories[$context])) {
+                $this->pendingDeleteCategories[$context][] = $descendantId;
+            }
+        }
+
+        // Mark form as changed
+        $this->hasUnsavedChanges = true;
+
+        $totalMarked = 1 + count($descendantIds);
+        Log::info('[MARK FOR DELETION] Category and descendants marked for deletion', [
+            'category_id' => $categoryId,
+            'descendants' => $descendantIds,
+            'context' => $context,
+            'total_marked' => $totalMarked,
+        ]);
+
+        $message = $totalMarked > 1
+            ? "Oznaczono $totalMarked kategorii do usuniecia (zapisz aby potwierdzic)"
+            : 'Kategoria oznaczona do usuniecia (zapisz aby potwierdzic)';
+        $this->dispatch('success', message: $message);
+
+        // FIX 2025-11-28: Dispatch Alpine events for IMMEDIATE UI update (no re-render lag!)
+        // Send event for main category
+        $this->js("window.dispatchEvent(new CustomEvent('category-event', { detail: { type: 'marked-for-deletion', categoryId: {$categoryId}, context: '{$context}' } }));");
+
+        // Send events for all descendants (they become children of marked parent)
+        foreach ($descendantIds as $descId) {
+            $this->js("window.dispatchEvent(new CustomEvent('category-event', { detail: { type: 'child-marked-for-deletion', categoryId: {$descId}, context: '{$context}' } }));");
+        }
+    }
+
+    /**
+     * Unmark a category from deletion (undo)
+     * Also unmarks all descendant categories
+     * BLOCKED if parent category is still marked for deletion
+     *
+     * FIX 2025-11-28: #[Renderless] prevents Livewire re-render (eliminates LAG!)
+     *
+     * @param int $categoryId Real category ID
+     * @param string $context 'default' or shop_id
+     */
+    #[Renderless]
+    public function unmarkCategoryForDeletion(int $categoryId, string $context): void
+    {
+        if (!isset($this->pendingDeleteCategories[$context])) {
+            return;
+        }
+
+        // FIX 2025-11-26: Block unmarking if parent is still marked for deletion
+        // FIX 2025-11-27: Pass context to use correct category tree (PPM vs PrestaShop)
+        $parentId = $this->findParentCategoryId($categoryId, $context);
+        if ($parentId && in_array($parentId, $this->pendingDeleteCategories[$context])) {
+            $this->dispatch('warning', message: 'Nie mozna odznczyc - kategoria nadrzedna jest oznaczona do usuniecia');
+            Log::debug('[UNMARK BLOCKED] Cannot unmark - parent is still marked for deletion', [
+                'category_id' => $categoryId,
+                'parent_id' => $parentId,
+                'context' => $context,
+            ]);
+            return;
+        }
+
+        // Find category and get all descendant IDs
+        // FIX 2025-11-27: Pass context to use correct category tree (PPM vs PrestaShop)
+        $category = $this->findCategoryInTree($categoryId, $context);
+        $descendantIds = $category ? $this->getAllDescendantCategoryIds($category) : [];
+
+        // Remove parent from pending delete
+        $this->pendingDeleteCategories[$context] = array_values(
+            array_diff($this->pendingDeleteCategories[$context], [$categoryId])
+        );
+
+        // Remove all descendants from pending delete
+        foreach ($descendantIds as $descendantId) {
+            $this->pendingDeleteCategories[$context] = array_values(
+                array_diff($this->pendingDeleteCategories[$context], [$descendantId])
+            );
+        }
+
+        $totalUnmarked = 1 + count($descendantIds);
+        Log::info('[UNMARK DELETION] Category and descendants unmarked from deletion', [
+            'category_id' => $categoryId,
+            'descendants' => $descendantIds,
+            'context' => $context,
+            'total_unmarked' => $totalUnmarked,
+        ]);
+
+        $message = $totalUnmarked > 1
+            ? "Anulowano usuniecie $totalUnmarked kategorii"
+            : 'Anulowano usuniecie kategorii';
+        $this->dispatch('success', message: $message);
+
+        // FIX 2025-11-28: Dispatch Alpine events for IMMEDIATE UI update (no re-render lag!)
+        // Send event for main category
+        $this->js("window.dispatchEvent(new CustomEvent('category-event', { detail: { type: 'unmarked-for-deletion', categoryId: {$categoryId}, context: '{$context}' } }));");
+
+        // Send events for all descendants (they are no longer children of marked parent)
+        foreach ($descendantIds as $descId) {
+            $this->js("window.dispatchEvent(new CustomEvent('category-event', { detail: { type: 'child-unmarked-for-deletion', categoryId: {$descId}, context: '{$context}' } }));");
+        }
+    }
+
+    /**
+     * Check if category is marked for deletion
+     */
+    public function isCategoryMarkedForDeletion(int $categoryId, string $context): bool
+    {
+        return isset($this->pendingDeleteCategories[$context])
+            && in_array($categoryId, $this->pendingDeleteCategories[$context]);
+    }
+
+    /**
+     * Get all categories marked for deletion for a context
+     */
+    public function getCategoriesMarkedForDeletion(string $context): array
+    {
+        return $this->pendingDeleteCategories[$context] ?? [];
+    }
+
+    /**
+     * Build contextCategories for save, excluding pendingDeleteCategories
+     * FIX 2025-11-27: Categories marked for deletion should be removed from selected
+     *
+     * @param string $currentKey Context key ('default' or shop_id as string)
+     * @return array ['selected' => [...], 'primary' => int|null]
+     */
+    private function buildContextCategoriesForSave(string $currentKey): array
+    {
+        // Get current categories for this context
+        if ($currentKey === 'default') {
+            $contextCategories = $this->defaultCategories;
+            $mappings = []; // Default context uses PPM IDs directly
+        } else {
+            $contextCategories = $this->shopCategories[$currentKey] ?? ['selected' => [], 'primary' => null];
+            $mappings = $contextCategories['mappings'] ?? [];
+        }
+
+        $selected = $contextCategories['selected'] ?? []; // PPM IDs
+        $primary = $contextCategories['primary'] ?? null; // PPM ID
+
+        // Get categories marked for deletion in this context
+        // FIX 2025-11-27 v3: These are PrestaShop IDs (from category tree which uses PrestaShop data)
+        $toDeletePrestaShopIds = $this->pendingDeleteCategories[$currentKey] ?? [];
+
+        if (empty($toDeletePrestaShopIds)) {
+            // No deletions - return as is
+            return $contextCategories;
+        }
+
+        // FIX 2025-11-27 v3: Convert PrestaShop IDs to PPM IDs for comparison
+        // Mappings format: PPM_ID => PrestaShop_ID, so flip to get PrestaShop_ID => PPM_ID
+        $flippedMappings = array_flip($mappings);
+        $toDeletePpmIds = [];
+        foreach ($toDeletePrestaShopIds as $psId) {
+            if (isset($flippedMappings[$psId])) {
+                $toDeletePpmIds[] = $flippedMappings[$psId];
+            } else {
+                // If no mapping found, try to use as-is (might be PPM ID already)
+                $toDeletePpmIds[] = $psId;
+            }
+        }
+
+        // Remove deleted categories from selected (now both are PPM IDs)
+        $filteredSelected = array_values(array_diff($selected, $toDeletePpmIds));
+
+        // If primary was deleted, reset it
+        if ($primary !== null && in_array($primary, $toDeletePpmIds)) {
+            $primary = !empty($filteredSelected) ? $filteredSelected[0] : null;
+        }
+
+        Log::info('[FIX 2025-11-27 v3] buildContextCategoriesForSave: Filtered deleted categories', [
+            'context' => $currentKey,
+            'original_selected' => $selected,
+            'to_delete_prestashop_ids' => $toDeletePrestaShopIds,
+            'mappings' => $mappings,
+            'to_delete_ppm_ids' => $toDeletePpmIds,
+            'filtered_selected' => $filteredSelected,
+            'primary' => $primary,
+        ]);
+
+        return [
+            'selected' => $filteredSelected,
+            'primary' => $primary,
+        ];
+    }
+
+    /**
+     * Get all descendant category IDs from a category tree
+     * Used for marking children when parent is marked for deletion
+     */
+    private function getAllDescendantCategoryIds($category): array
+    {
+        $ids = [];
+
+        if (!$category || !isset($category->children) || !$category->children) {
+            return $ids;
+        }
+
+        foreach ($category->children as $child) {
+            if (isset($child->id) && $child->id > 0) {
+                $ids[] = $child->id;
+                // Recursively get grandchildren
+                $ids = array_merge($ids, $this->getAllDescendantCategoryIds($child));
+            }
+        }
+
+        return $ids;
+    }
+
+    /**
+     * Find a category by ID in the appropriate category tree
+     * FIX 2025-11-27: Added context parameter to use correct tree (PPM vs PrestaShop)
+     *
+     * @param int $categoryId Category ID to find
+     * @param string|null $context 'default' or shop_id - determines which category tree to use
+     * @param mixed $categories Internal recursion parameter
+     */
+    private function findCategoryInTree(int $categoryId, ?string $context = null, $categories = null)
+    {
+        if ($categories === null) {
+            // FIX 2025-11-27: Use appropriate category tree based on context
+            if ($context !== null && $context !== 'default') {
+                $categories = collect($this->getShopCategories());
+            } else {
+                $categories = $this->getAvailableCategories();
+            }
+        }
+
+        if (!$categories) {
+            return null;
+        }
+
+        foreach ($categories as $category) {
+            if ($category->id === $categoryId) {
+                return $category;
+            }
+            if (isset($category->children) && $category->children && $category->children->count() > 0) {
+                // FIX 2025-11-27: Pass context through recursive calls
+                $found = $this->findCategoryInTree($categoryId, $context, $category->children);
+                if ($found) {
+                    return $found;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Find parent category ID for a given category
+     * FIX 2025-11-26: Used to block unmarking children when parent is marked for deletion
+     * FIX 2025-11-27: Made public and added context parameter to use correct category tree
+     * (shop context uses PrestaShop IDs, default uses PPM IDs)
+     * Returns parent ID or null if category is root or not found
+     *
+     * @param int $categoryId Category ID to find parent of
+     * @param string|null $context 'default' or shop_id - determines which category tree to use
+     * @param mixed $categories Internal recursion parameter
+     * @param int|null $currentParentId Internal recursion parameter
+     */
+    public function findParentCategoryId(int $categoryId, ?string $context = null, $categories = null, ?int $currentParentId = null): ?int
+    {
+        if ($categories === null) {
+            // FIX 2025-11-27: Use appropriate category tree based on context
+            // Shop context uses PrestaShop categories, default uses PPM categories
+            if ($context !== null && $context !== 'default') {
+                $categories = collect($this->getShopCategories());
+            } else {
+                $categories = $this->getAvailableCategories();
+            }
+        }
+
+        if (!$categories || $categories->isEmpty()) {
+            return null;
+        }
+
+        foreach ($categories as $category) {
+            // Found the category - return its parent
+            if ($category->id === $categoryId) {
+                return $currentParentId;
+            }
+
+            // Search in children
+            $children = $category->children ?? collect();
+            if ($children instanceof \Illuminate\Support\Collection && $children->count() > 0) {
+                $result = $this->findParentCategoryId($categoryId, $context, $children, $category->id);
+                if ($result !== null) {
+                    return $result;
+                }
+            } elseif (is_array($children) && count($children) > 0) {
+                $result = $this->findParentCategoryId($categoryId, $context, collect($children), $category->id);
+                if ($result !== null) {
+                    return $result;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Remove category from Collection-based tree
+     */
+    private function removeCategoryFromTree(&$categories, int $categoryId): bool
+    {
+        foreach ($categories as $key => $category) {
+            if ($category->id === $categoryId) {
+                unset($categories[$key]);
+                return true;
+            }
+            if ($category->children && $category->children->count() > 0) {
+                $children = $category->children->all();
+                if ($this->removeCategoryFromTree($children, $categoryId)) {
+                    $category->children = collect($children);
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Remove category from array-based tree
+     */
+    private function removeCategoryFromArrayTree(array &$categories, int $categoryId): bool
+    {
+        foreach ($categories as $key => &$category) {
+            $catId = is_object($category) ? $category->id : ($category['id'] ?? null);
+
+            if ($catId === $categoryId) {
+                unset($categories[$key]);
+                $categories = array_values($categories);
+                return true;
+            }
+
+            $children = is_object($category)
+                ? ($category->children ?? [])
+                : ($category['children'] ?? []);
+
+            if (!empty($children)) {
+                $childrenArray = is_object($category) && $category->children instanceof \Illuminate\Support\Collection
+                    ? $category->children->all()
+                    : (array) $children;
+
+                if ($this->removeCategoryFromArrayTree($childrenArray, $categoryId)) {
+                    if (is_object($category)) {
+                        $category->children = collect($childrenArray);
+                    } else {
+                        $category['children'] = $childrenArray;
+                    }
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Process all pending categories - called on Save
+     * Creates categories in PrestaShop API and updates local state
+     */
+    public function processPendingCategories(): array
+    {
+        $results = ['created' => [], 'failed' => []];
+
+        foreach ($this->pendingNewCategories as $context => $pendingList) {
+            foreach ($pendingList as $pending) {
+                try {
+                    if ($context === 'default') {
+                        // Create PPM category
+                        $ppmCategory = \App\Models\Category::create([
+                            'name' => $pending['name'],
+                            'slug' => $pending['slug'],
+                            'parent_id' => $pending['parentId'],
+                            'is_active' => true,
+                        ]);
+
+                        $results['created'][] = [
+                            'tempId' => $pending['tempId'],
+                            'realId' => $ppmCategory->id,
+                            'name' => $pending['name'],
+                            'context' => $context,
+                        ];
+
+                        // Update selection: replace tempId with realId
+                        $this->replaceTempIdInSelection($pending['tempId'], $ppmCategory->id, $context);
+
+                    } else {
+                        // Create PrestaShop category
+                        $shopId = (int) $context;
+                        $shop = \App\Models\PrestaShopShop::find($shopId);
+
+                        if (!$shop) {
+                            throw new \Exception("Shop not found: {$shopId}");
+                        }
+
+                        $client = PrestaShopClientFactory::create($shop);
+                        $categoryMapper = app(\App\Services\PrestaShop\CategoryMapper::class);
+
+                        $categoryData = [
+                            'category' => [
+                                'name' => [['id' => 1, 'value' => $pending['name']]],
+                                'link_rewrite' => [['id' => 1, 'value' => $pending['slug']]],
+                                'description' => [['id' => 1, 'value' => '']],
+                                'active' => 1,
+                                'id_parent' => $pending['parentId'],
+                            ]
+                        ];
+
+                        $response = $client->makeRequest('POST', '/categories', [], [
+                            'body' => $client->arrayToXml($categoryData),
+                            'headers' => ['Content-Type' => 'application/xml'],
+                        ]);
+
+                        if (!isset($response['category']['id'])) {
+                            throw new \Exception('PrestaShop API error');
+                        }
+
+                        $prestashopId = (int) $response['category']['id'];
+
+                        // Create PPM category + mapping
+                        $ppmParentId = $categoryMapper->mapFromPrestaShop($pending['parentId'], $shop);
+                        $ppmCategory = \App\Models\Category::create([
+                            'name' => $pending['name'],
+                            'slug' => $pending['slug'],
+                            'parent_id' => $ppmParentId,
+                            'is_active' => true,
+                        ]);
+
+                        $categoryMapper->createMapping($ppmCategory->id, $shop, $prestashopId, $pending['name']);
+
+                        $results['created'][] = [
+                            'tempId' => $pending['tempId'],
+                            'realId' => $prestashopId,
+                            'ppmId' => $ppmCategory->id,
+                            'name' => $pending['name'],
+                            'context' => $context,
+                        ];
+
+                        // Update selection
+                        $this->replaceTempIdInSelection($pending['tempId'], $prestashopId, $context);
+                    }
+
+                } catch (\Exception $e) {
+                    $results['failed'][] = [
+                        'tempId' => $pending['tempId'],
+                        'name' => $pending['name'],
+                        'context' => $context,
+                        'error' => $e->getMessage(),
+                    ];
+
+                    \Illuminate\Support\Facades\Log::error('[PROCESS PENDING CATEGORY] Failed', [
+                        'pending' => $pending,
+                        'error' => $e->getMessage(),
+                    ]);
+                }
+            }
+        }
+
+        // Clear pending queue
+        $this->pendingNewCategories = [];
+
+        return $results;
+    }
+
+    /**
+     * Replace tempId with realId in selection arrays
+     */
+    private function replaceTempIdInSelection(int $tempId, int $realId, string $context): void
+    {
+        if ($context === 'default') {
+            $key = array_search($tempId, $this->defaultCategories['selected'] ?? []);
+            if ($key !== false) {
+                $this->defaultCategories['selected'][$key] = $realId;
+            }
+        } else {
+            $shopId = (int) $context;
+            if (isset($this->shopCategories[$shopId]['selected'])) {
+                $key = array_search($tempId, $this->shopCategories[$shopId]['selected']);
+                if ($key !== false) {
+                    $this->shopCategories[$shopId]['selected'][$key] = $realId;
+                }
+            }
+        }
+    }
+
+    /**
+     * Discard all pending categories - called on Cancel
+     */
+    public function discardPendingCategories(): void
+    {
+        // Remove pending categories from selections
+        foreach ($this->pendingNewCategories as $context => $pendingList) {
+            foreach ($pendingList as $pending) {
+                $tempId = $pending['tempId'];
+
+                if ($context === 'default') {
+                    $this->defaultCategories['selected'] = array_values(
+                        array_diff($this->defaultCategories['selected'] ?? [], [$tempId])
+                    );
+                } else {
+                    $shopId = (int) $context;
+                    if (isset($this->shopCategories[$shopId]['selected'])) {
+                        $this->shopCategories[$shopId]['selected'] = array_values(
+                            array_diff($this->shopCategories[$shopId]['selected'], [$tempId])
+                        );
+                    }
+                }
+            }
+        }
+
+        // Clear pending queue
+        $this->pendingNewCategories = [];
+        $this->pendingDeleteCategories = [];
+
+        \Illuminate\Support\Facades\Log::info('[DISCARD PENDING CATEGORIES] All pending operations discarded');
+    }
+
+    /**
+     * Check if a category ID is pending (negative = pending)
+     */
+    public function isPendingCategory(int $categoryId): bool
+    {
+        return $categoryId < 0;
+    }
+
+    /**
+     * Get count of pending categories for display
+     */
+    public function getPendingCategoriesCountProperty(): int
+    {
+        $count = 0;
+        foreach ($this->pendingNewCategories as $contextList) {
+            $count += count($contextList);
+        }
+        return $count;
+    }
+
+    /**
+     * Get available parent categories for create category modal
+     *
+     * @return array Parent category options [id => name]
+     */
+    public function getParentCategoryOptionsProperty(): array
+    {
+        if (!$this->createCategoryShopId) {
+            return [];
+        }
+
+        $categories = $this->prestashopCategories[$this->createCategoryShopId] ?? [];
+
+        return $this->flattenCategoriesForSelect($categories);
+    }
+
+    /**
+     * Flatten category tree for select dropdown
+     */
+    private function flattenCategoriesForSelect(array $categories, int $level = 0): array
+    {
+        $options = [];
+
+        foreach ($categories as $category) {
+            $prefix = str_repeat('─ ', $level);
+            $options[$category['id']] = $prefix . $category['name'];
+
+            if (!empty($category['children'])) {
+                $options += $this->flattenCategoriesForSelect($category['children'], $level + 1);
+            }
+        }
+
+        return $options;
+    }
+
     /**
      * Switch between shops or default data - Enhanced with pending changes system
      * CRITICAL: Now preserves user changes between tab switches until save/reset
@@ -2341,6 +3675,12 @@ class ProductForm extends Component
                 if ($shopId === null) {
                     // Switch to default data
                     $this->loadDefaultDataToForm();
+
+                    // ETAP_05b FAZA 5: Restore variant context to default
+                    $this->restoreVariantContextToDefault();
+
+                    // ETAP_05c: Clear PrestaShop variants when switching to default tab
+                    $this->prestaShopVariants = [];
                 } else {
                     // FAZA 5.2 FIX: Load tax rules BEFORE loading form data
                     // Ensures $availableTaxRuleGroups[$shopId] is populated for dropdown options
@@ -2348,6 +3688,9 @@ class ProductForm extends Component
 
                     // Switch to shop-specific data with inheritance
                     $this->loadShopDataToForm($shopId);
+
+                    // ETAP_05b FAZA 5: Switch variant context to shop
+                    $this->switchVariantContextToShop($shopId);
                 }
             }
 
@@ -2362,6 +3705,44 @@ class ProductForm extends Component
                     'product_id' => $this->product?->id,
                 ]);
                 $this->loadProductDataFromPrestaShop($shopId);
+
+                // ETAP_07e FAZA 5: Load features from PrestaShop for comparison
+                $this->loadShopFeaturesFromPrestaShop($shopId);
+
+                // ETAP_05c: Pull variants from PrestaShop API for shop context
+                $this->pullVariantsFromPrestaShop($shopId);
+            } elseif ($shopId !== null && isset($this->loadedShopData[$shopId])) {
+                // FIX 2025-11-28 v2: Cache hit - data already loaded from PrestaShop API
+                // ETAP_07e FAZA 5: Load features from PrestaShop if not cached
+                if (!isset($this->shopProductFeatures[$shopId])) {
+                    $this->loadShopFeaturesFromPrestaShop($shopId);
+                }
+
+                // ETAP_05c: Pull variants from PrestaShop API (always fresh, not cached)
+                $this->pullVariantsFromPrestaShop($shopId);
+
+                // Skip database query if shopCategories are already cached
+                if (!isset($this->shopCategories[$shopId]) || empty($this->shopCategories[$shopId]['selected'])) {
+                    // Categories not cached yet - load from database (first time only)
+                    $this->loadShopCategories($shopId);
+                    Log::info('Cache hit - categories loaded from database (first time)', [
+                        'shop_id' => $shopId,
+                        'product_id' => $this->product?->id,
+                    ]);
+                } else {
+                    // Categories already cached - skip database query entirely
+                    Log::info('Cache hit - categories already in memory (instant)', [
+                        'shop_id' => $shopId,
+                        'product_id' => $this->product?->id,
+                        'cached_categories_count' => count($this->shopCategories[$shopId]['selected']),
+                    ]);
+                }
+
+                // Dispatch category tree refresh for Alpine.js
+                $this->dispatch('category-tree-refresh', shopId: $shopId);
+
+                // Hide Alpine.js loading overlay (instant - no API call)
+                $this->dispatch('prestashop-loading-end');
             }
 
             Log::info('Switched to shop tab with pending changes support', [
@@ -2426,10 +3807,39 @@ class ProductForm extends Component
 
             // REMOVED 2025-11-25: updateCategoryColorCoding() - method was deleted, call caused error
             // Livewire automatically re-renders on property changes, no manual update needed
+
+            // === FEATURES (CONTEXT-ISOLATED SYSTEM) ===
+            // FIX 2025-12-03: Restore default features when switching to default context
+            // This ensures shop-specific changes don't leak into default tab
+            $this->restoreDefaultFeatures();
         } elseif ($this->product) {
             // Fallback: load from product if defaultData is not available
             $this->loadProductData();
         }
+    }
+
+    /**
+     * Restore default features from snapshot
+     * FIX 2025-12-03: Called when switching to "Dane domyslne" to restore original values
+     */
+    private function restoreDefaultFeatures(): void
+    {
+        if (empty($this->defaultProductFeatures)) {
+            return;
+        }
+
+        // Rebuild productFeatures from defaultProductFeatures snapshot
+        $this->productFeatures = [];
+        foreach ($this->defaultProductFeatures as $featureTypeId => $value) {
+            $this->productFeatures[] = [
+                'feature_type_id' => $featureTypeId,
+                'value' => $value,
+            ];
+        }
+
+        Log::debug('[FEATURE ISOLATION] Restored default features', [
+            'restored_count' => count($this->productFeatures),
+        ]);
     }
 
     /**
@@ -2596,7 +4006,9 @@ class ProductForm extends Component
 
         // === STATUS & SETTINGS ===
         $this->is_active = $this->getShopValue($shopId, 'is_active') ?? $this->is_active;
-        $this->is_variant_master = $this->getShopValue($shopId, 'is_variant_master') ?? $this->is_variant_master;
+        // NOTE: is_variant_master is a GLOBAL product property, NOT per-shop
+        // It defines whether product has variants at all - should NOT change when switching shops
+        // REMOVED: $this->is_variant_master = $this->getShopValue($shopId, 'is_variant_master') ?? $this->is_variant_master;
         $this->is_featured = $this->getShopValue($shopId, 'is_featured') ?? $this->is_featured;
         $this->sort_order = $this->getShopValue($shopId, 'sort_order') ?: $this->sort_order;
 
@@ -2637,6 +4049,78 @@ class ProductForm extends Component
 
         // REMOVED 2025-11-25: updateCategoryColorCoding() - method was deleted, call caused error
         // Livewire automatically re-renders on property changes, no manual update needed
+
+        // === FEATURES (CONTEXT-ISOLATED SYSTEM) ===
+        // FIX 2025-12-03: Load shop-specific features when switching to shop tab
+        // If shop has custom features loaded from PrestaShop, use them
+        // Otherwise inherit from default features
+        $this->loadShopFeaturesToForm($shopId);
+    }
+
+    /**
+     * Load shop-specific features to form
+     * FIX 2025-12-03: Called when switching to shop tab to load shop-specific feature values
+     *
+     * @param int $shopId
+     */
+    private function loadShopFeaturesToForm(int $shopId): void
+    {
+        // FIX 2025-12-03: OPCJA B - Per-shop features priority:
+        // 1. First check attribute_mappings storage (user-saved per-shop features)
+        // 2. Fall back to shopProductFeatures cache (from PrestaShop API pull)
+        // 3. Finally inherit from default features
+
+        // STEP 1: Try to load from attribute_mappings (per-shop storage)
+        $storedFeatures = $this->loadShopFeaturesFromStorage($shopId);
+
+        if (!empty($storedFeatures)) {
+            // Shop has saved per-shop features in attribute_mappings - use them
+            $this->productFeatures = [];
+            foreach ($storedFeatures as $featureTypeId => $value) {
+                $this->productFeatures[] = [
+                    'feature_type_id' => (int) $featureTypeId,
+                    'value' => $value,
+                ];
+            }
+
+            // Update cache for UI consistency
+            $this->shopProductFeatures[$shopId] = $storedFeatures;
+
+            Log::debug('[FEATURE ISOLATION] Loaded shop features from attribute_mappings storage', [
+                'shop_id' => $shopId,
+                'features_count' => count($this->productFeatures),
+                'source' => 'attribute_mappings',
+            ]);
+            return;
+        }
+
+        // STEP 2: Check if shop has features from PrestaShop API pull
+        if (isset($this->shopProductFeatures[$shopId]) && !empty($this->shopProductFeatures[$shopId])) {
+            // Shop has PrestaShop features - build productFeatures from them
+            $this->productFeatures = [];
+            foreach ($this->shopProductFeatures[$shopId] as $featureTypeId => $value) {
+                $this->productFeatures[] = [
+                    'feature_type_id' => (int) $featureTypeId,
+                    'value' => $value,
+                ];
+            }
+
+            Log::debug('[FEATURE ISOLATION] Loaded shop features from PrestaShop API cache', [
+                'shop_id' => $shopId,
+                'features_count' => count($this->productFeatures),
+                'source' => 'prestashop_api',
+            ]);
+            return;
+        }
+
+        // STEP 3: No shop-specific features anywhere - inherit from default
+        $this->restoreDefaultFeatures();
+
+        Log::debug('[FEATURE ISOLATION] Shop has no custom features - inheriting from default', [
+            'shop_id' => $shopId,
+            'inherited_count' => count($this->productFeatures),
+            'source' => 'default_inherited',
+        ]);
     }
 
     /**
@@ -2950,13 +4434,17 @@ class ProductForm extends Component
 
             // === CATEGORIES (CONTEXT-ISOLATED SYSTEM) ===
             // Save only current context categories to prevent cross-contamination
-            'contextCategories' => $this->activeShopId === null
-                ? $this->defaultCategories  // Save default categories only for default context
-                : ($this->shopCategories[$this->activeShopId] ?? ['selected' => [], 'primary' => null]), // Save only current shop categories
+            // FIX 2025-11-27: Remove pendingDeleteCategories from selected before save
+            'contextCategories' => $this->buildContextCategoriesForSave($currentKey),
 
             // Keep full state for save compatibility (but don't use for loading)
             '_fullDefaultCategories' => $this->defaultCategories,
             '_fullShopCategories' => $this->shopCategories,
+
+            // === FEATURES (CONTEXT-ISOLATED SYSTEM) ===
+            // FIX 2025-12-03: Save features per context to prevent cross-contamination
+            // Each shop tab should have its own feature values
+            'productFeatures' => $this->productFeatures,
         ];
 
         // DIAGNOSIS 2025-11-21: Debug category data flow
@@ -3033,6 +4521,12 @@ class ProductForm extends Component
                 // Loading into specific shop context
                 $this->shopCategories[$this->activeShopId] = $changes['contextCategories'];
             }
+        }
+
+        // === FEATURES (CONTEXT-ISOLATED SYSTEM) ===
+        // FIX 2025-12-03: Load features per context to prevent cross-contamination
+        if (isset($changes['productFeatures'])) {
+            $this->productFeatures = $changes['productFeatures'];
         }
 
         Log::info('Pending changes loaded', [
@@ -3546,7 +5040,8 @@ class ProductForm extends Component
      */
     public function getFieldClasses(string $field): string
     {
-        $baseClasses = 'block w-full rounded-md shadow-sm focus:ring-orange-500 sm:text-sm transition-all duration-200';
+        // Taller inputs (py-2.5) with proper text padding (px-4) from edges
+        $baseClasses = 'block w-full rounded-md shadow-sm focus:ring-orange-500 sm:text-sm transition-all duration-200 px-4 py-2.5';
 
         // PRIORITY 1: Check if field has pending sync (highest priority visual indicator)
         if ($this->activeShopId !== null && $this->isPendingSyncForShop($this->activeShopId, $field)) {
@@ -4472,10 +5967,80 @@ class ProductForm extends Component
         }
 
         try {
-            // Refresh shop data to get latest sync statuses
-            $this->product->load('shopData.shop');
+            // FIX 2025-11-27: Use fresh DB query instead of load() which may use cached data
+            // Previous bug: load() didn't actually refresh already-loaded relationships
 
-            // Get all connected shops
+            // FIX 2025-11-27: For single-shop sync, only check that specific shop
+            // (Previous logic checked ALL shops which failed when other shops weren't synced)
+            if ($this->syncJobShopId) {
+                // Single shop sync - query database directly for fresh data
+                $targetShopData = ProductShopData::where('product_id', $this->product->id)
+                    ->where('shop_id', $this->syncJobShopId)
+                    ->first();
+
+                Log::debug('[SINGLE SHOP SYNC] Checking sync status', [
+                    'product_id' => $this->product->id,
+                    'shop_id' => $this->syncJobShopId,
+                    'sync_status' => $targetShopData?->sync_status,
+                    'expected' => ProductShopData::STATUS_SYNCED,
+                ]);
+
+                if (!$targetShopData) {
+                    Log::warning('[SINGLE SHOP SYNC] Shop data not found', [
+                        'product_id' => $this->product->id,
+                        'shop_id' => $this->syncJobShopId,
+                    ]);
+                    return;
+                }
+
+                if ($targetShopData->sync_status === ProductShopData::STATUS_SYNCED) {
+                    // Single shop synced - mark as completed
+                    $this->activeJobStatus = 'completed';
+                    $this->jobResult = 'success';
+
+                    // FIX 2025-11-27: Dispatch job-completed event for Alpine.js to stop polling
+                    $this->dispatch('job-completed');
+
+                    // Clear cache for this shop
+                    unset($this->loadedShopData[$this->syncJobShopId]);
+
+                    // Auto-refresh data from PrestaShop
+                    $this->pullShopDataInstant($this->syncJobShopId);
+
+                    // Also refresh category tree (deleted categories need to disappear)
+                    $this->refreshCategoriesFromShop();
+
+                    // FIX 2025-11-27: Reload shopCategories from database to reflect inline category changes
+                    // Without this, UI shows stale data after job completion (tempId not replaced with real ID)
+                    $this->loadShopCategories($this->syncJobShopId);
+
+                    // Reset state
+                    $this->hasUnsavedChanges = false;
+                    $this->pendingChanges = [];
+                    $this->dispatch('delayed-reset-unsaved-changes');
+
+                    Log::info('[SINGLE SHOP SYNC] Shop synchronized with auto-refresh', [
+                        'product_id' => $this->product->id,
+                        'shop_id' => $this->syncJobShopId,
+                        'elapsed_seconds' => $this->jobCreatedAt ? now()->diffInSeconds($this->jobCreatedAt) : null,
+                    ]);
+
+                    // Clear the single shop tracking
+                    $this->syncJobShopId = null;
+                } else {
+                    // Still syncing
+                    Log::debug('[SINGLE SHOP SYNC] Still syncing', [
+                        'product_id' => $this->product->id,
+                        'shop_id' => $this->syncJobShopId,
+                        'sync_status' => $targetShopData->sync_status,
+                    ]);
+                }
+                return;
+            }
+
+            // BULK SYNC: Refresh product relationship and get all connected shops
+            // FIX 2025-11-27: Force reload from database to get fresh sync_status
+            $this->product->load('shopData.shop');
             $connectedShops = $this->product->shopData->filter(function ($shopData) {
                 return $shopData->shop && $shopData->shop->is_active && $shopData->shop->connection_status === 'connected';
             });
@@ -4484,6 +6049,7 @@ class ProductForm extends Component
                 // No shops to sync - mark as completed
                 $this->activeJobStatus = 'completed';
                 $this->jobResult = 'success';
+                $this->dispatch('job-completed');
 
                 Log::info('[ETAP_13 BULK SYNC] No connected shops found', [
                     'product_id' => $this->product->id,
@@ -4502,6 +6068,9 @@ class ProductForm extends Component
                 $this->activeJobStatus = 'completed';
                 $this->jobResult = 'success';
 
+                // FIX 2025-11-27: Dispatch job-completed event for Alpine.js to stop polling
+                $this->dispatch('job-completed');
+
                 // FIX 2025-11-18 (#9.1): Clear loadedShopData cache after sync
                 // (getPendingChangesForShop() compares DB vs loadedShopData - stale cache = false "Oczekujące zmiany")
                 foreach ($connectedShops as $shopData) {
@@ -4515,6 +6084,10 @@ class ProductForm extends Component
                 if ($this->activeShopId) {
                     // Pull fresh data from PrestaShop INSTANTLY (no new job)
                     $this->pullShopDataInstant($this->activeShopId);
+
+                    // FIX 2025-11-27: Reload shopCategories from database to reflect inline category changes
+                    $this->refreshCategoriesFromShop();
+                    $this->loadShopCategories($this->activeShopId);
                 }
 
                 // FIX 2025-11-25: Reset hasUnsavedChanges after successful bulk sync completion
@@ -4709,6 +6282,254 @@ class ProductForm extends Component
             return;
         }
 
+        // FIX 2025-11-27: Physical category deletion from PrestaShop (before product sync)
+        // pendingDeleteCategories contains PrestaShop category IDs to DELETE ENTIRELY from PrestaShop
+        $contextKey = (string) $shopId;
+        $categoriesToDelete = $this->pendingDeleteCategories[$contextKey] ?? [];
+
+        if (!empty($categoriesToDelete)) {
+            Log::info('[CATEGORY DELETE] Starting physical deletion of categories from PrestaShop', [
+                'shop_id' => $shopId,
+                'shop_name' => $shop->name,
+                'categories_to_delete' => $categoriesToDelete,
+            ]);
+
+            try {
+                // Get PrestaShop client for this shop
+                $clientFactory = app(\App\Services\PrestaShop\PrestaShopClientFactory::class);
+                $client = $clientFactory->create($shop);
+
+                $deletedCount = 0;
+                $failedCategories = [];
+
+                foreach ($categoriesToDelete as $categoryId) {
+                    try {
+                        $client->deleteCategory((int) $categoryId);
+                        $deletedCount++;
+
+                        Log::info('[CATEGORY DELETE] Category deleted successfully', [
+                            'category_id' => $categoryId,
+                            'shop_id' => $shopId,
+                        ]);
+                    } catch (\App\Exceptions\PrestaShopAPIException $e) {
+                        // Log but continue with other deletions
+                        $failedCategories[] = [
+                            'id' => $categoryId,
+                            'error' => $e->getMessage(),
+                        ];
+
+                        Log::error('[CATEGORY DELETE] Failed to delete category', [
+                            'category_id' => $categoryId,
+                            'shop_id' => $shopId,
+                            'error' => $e->getMessage(),
+                        ]);
+                    }
+                }
+
+                // Clear pending delete categories for this shop (even if some failed)
+                unset($this->pendingDeleteCategories[$contextKey]);
+
+                if ($deletedCount > 0) {
+                    $this->dispatch('success', message: "Usunieto $deletedCount kategorii z PrestaShop");
+                }
+
+                if (!empty($failedCategories)) {
+                    $failedIds = implode(', ', array_column($failedCategories, 'id'));
+                    $this->dispatch('warning', message: "Nie udalo sie usunac kategorii: $failedIds");
+                }
+
+                Log::info('[CATEGORY DELETE] Category deletion completed', [
+                    'shop_id' => $shopId,
+                    'deleted_count' => $deletedCount,
+                    'failed_count' => count($failedCategories),
+                    'failed_categories' => $failedCategories,
+                ]);
+
+            } catch (\Exception $e) {
+                Log::error('[CATEGORY DELETE] Fatal error during category deletion', [
+                    'shop_id' => $shopId,
+                    'error' => $e->getMessage(),
+                    'trace' => $e->getFile() . ':' . $e->getLine(),
+                ]);
+
+                $this->dispatch('error', message: 'Blad podczas usuwania kategorii: ' . $e->getMessage());
+                // Don't return - continue with sync even if deletion failed
+            }
+        }
+
+        // FIX 2025-11-27: Process pending NEW categories BEFORE product sync
+        // Creates inline categories in PrestaShop API and updates selections with real IDs
+        $pendingNewForShop = $this->pendingNewCategories[$contextKey] ?? [];
+
+        if (!empty($pendingNewForShop)) {
+            Log::info('[CATEGORY CREATE] Starting creation of pending categories in PrestaShop', [
+                'shop_id' => $shopId,
+                'shop_name' => $shop->name,
+                'pending_categories' => array_column($pendingNewForShop, 'name'),
+            ]);
+
+            try {
+                $clientFactory = app(\App\Services\PrestaShop\PrestaShopClientFactory::class);
+                $client = $clientFactory->create($shop);
+
+                $createdCount = 0;
+                $failedCategories = [];
+                $createdCategoryMappings = []; // FIX 2025-11-27: Track PPM ID → PrestaShop ID for mappings update
+
+                foreach ($pendingNewForShop as $pending) {
+                    try {
+                        // Build category XML for PrestaShop API
+                        $categoryData = [
+                            'category' => [
+                                'name' => [['id' => 1, 'value' => $pending['name']]],
+                                'link_rewrite' => [['id' => 1, 'value' => $pending['slug']]],
+                                'description' => [['id' => 1, 'value' => '']],
+                                'active' => 1,
+                                'id_parent' => $pending['parentId'],
+                            ]
+                        ];
+
+                        $response = $client->makeRequest('POST', '/categories', [], [
+                            'body' => $client->arrayToXml($categoryData),
+                            'headers' => ['Content-Type' => 'application/xml'],
+                        ]);
+
+                        if (!isset($response['category']['id'])) {
+                            throw new \Exception('PrestaShop API nie zwrocilo ID kategorii');
+                        }
+
+                        $prestashopId = (int) $response['category']['id'];
+                        $createdCount++;
+
+                        Log::info('[CATEGORY CREATE] Category created successfully in PrestaShop', [
+                            'temp_id' => $pending['tempId'],
+                            'prestashop_id' => $prestashopId,
+                            'name' => $pending['name'],
+                            'parent_id' => $pending['parentId'],
+                            'shop_id' => $shopId,
+                        ]);
+
+                        // FIX 2025-11-27: Create PPM Category + CategoryMapper mapping
+                        // Without this, calculateExpandedCategoryIds() cannot find the category
+                        $categoryMapper = app(\App\Services\PrestaShop\CategoryMapper::class);
+                        $ppmParentId = $categoryMapper->mapFromPrestaShop($pending['parentId'], $shop);
+
+                        $ppmCategory = \App\Models\Category::create([
+                            'name' => $pending['name'],
+                            'slug' => $pending['slug'],
+                            'parent_id' => $ppmParentId,
+                            'is_active' => true,
+                        ]);
+
+                        $categoryMapper->createMapping($ppmCategory->id, $shop, $prestashopId, $pending['name']);
+
+                        // FIX 2025-11-27: Store mapping for later update to category_mappings
+                        $createdCategoryMappings[$ppmCategory->id] = $prestashopId;
+
+                        Log::info('[CATEGORY CREATE] PPM Category and mapping created', [
+                            'ppm_category_id' => $ppmCategory->id,
+                            'prestashop_id' => $prestashopId,
+                            'ppm_parent_id' => $ppmParentId,
+                        ]);
+
+                        // Replace tempId with PPM Category ID in shopCategories selection
+                        // IMPORTANT: shopCategories['selected'] stores PPM IDs, NOT PrestaShop IDs!
+                        if (isset($this->shopCategories[$shopId]['selected'])) {
+                            $key = array_search($pending['tempId'], $this->shopCategories[$shopId]['selected']);
+                            if ($key !== false) {
+                                $this->shopCategories[$shopId]['selected'][$key] = $ppmCategory->id;
+                                Log::debug('[CATEGORY CREATE] Replaced tempId in selection with PPM Category ID', [
+                                    'temp_id' => $pending['tempId'],
+                                    'ppm_category_id' => $ppmCategory->id,
+                                    'prestashop_id' => $prestashopId,
+                                    'selection_key' => $key,
+                                ]);
+                            }
+                        }
+
+                    } catch (\Exception $e) {
+                        $failedCategories[] = [
+                            'name' => $pending['name'],
+                            'error' => $e->getMessage(),
+                        ];
+
+                        Log::error('[CATEGORY CREATE] Failed to create category', [
+                            'temp_id' => $pending['tempId'],
+                            'name' => $pending['name'],
+                            'parent_id' => $pending['parentId'],
+                            'shop_id' => $shopId,
+                            'error' => $e->getMessage(),
+                        ]);
+                    }
+                }
+
+                // Clear pending new categories for this shop
+                unset($this->pendingNewCategories[$contextKey]);
+
+                if ($createdCount > 0) {
+                    $this->dispatch('success', message: "Utworzono $createdCount nowych kategorii w PrestaShop");
+                }
+
+                if (!empty($failedCategories)) {
+                    $failedNames = implode(', ', array_column($failedCategories, 'name'));
+                    $this->dispatch('warning', message: "Nie udalo sie utworzyc kategorii: $failedNames");
+                }
+
+                Log::info('[CATEGORY CREATE] Category creation completed', [
+                    'shop_id' => $shopId,
+                    'created_count' => $createdCount,
+                    'failed_count' => count($failedCategories),
+                ]);
+
+                // FIX 2025-11-27: Save updated category selection to database BEFORE sync job
+                // Without this, loadShopCategories() after instaPull would load old selection
+                // because in-memory shopCategories[shopId]['selected'] is not persisted
+                if ($createdCount > 0 && $this->product) {
+                    $productShopData = \App\Models\ProductShopData::where('product_id', $this->product->id)
+                        ->where('shop_id', $shopId)
+                        ->first();
+
+                    if ($productShopData) {
+                        $categoryMappings = $productShopData->category_mappings ?? ['ui' => ['selected' => [], 'primary' => null], 'mappings' => []];
+                        $categoryMappings['ui']['selected'] = $this->shopCategories[$shopId]['selected'] ?? [];
+
+                        // FIX 2025-11-27: Add new category mappings to mappings array
+                        // Without this, validator fails: "Mappings keys must match selected categories"
+                        if (!isset($categoryMappings['mappings'])) {
+                            $categoryMappings['mappings'] = [];
+                        }
+                        foreach ($createdCategoryMappings as $ppmId => $prestashopId) {
+                            $categoryMappings['mappings'][$ppmId] = $prestashopId;
+                        }
+
+                        $categoryMappings['metadata']['last_updated'] = now()->toIso8601String();
+                        $categoryMappings['metadata']['source'] = 'manual'; // inline category creation is a manual action
+
+                        $productShopData->category_mappings = $categoryMappings;
+                        $productShopData->save();
+
+                        Log::info('[CATEGORY CREATE] Saved updated category selection to database', [
+                            'product_id' => $this->product->id,
+                            'shop_id' => $shopId,
+                            'selected' => $this->shopCategories[$shopId]['selected'],
+                            'new_mappings' => $createdCategoryMappings,
+                            'all_mappings_keys' => array_keys($categoryMappings['mappings']),
+                        ]);
+                    }
+                }
+
+            } catch (\Exception $e) {
+                Log::error('[CATEGORY CREATE] Fatal error during category creation', [
+                    'shop_id' => $shopId,
+                    'error' => $e->getMessage(),
+                    'trace' => $e->getFile() . ':' . $e->getLine(),
+                ]);
+
+                $this->dispatch('error', message: 'Blad podczas tworzenia kategorii: ' . $e->getMessage());
+                // Don't return - continue with sync even if creation failed
+            }
+        }
+
         try {
             // Dispatch sync job for single shop
             SyncProductToPrestaShop::dispatch($this->product, $shop, auth()->id());
@@ -4717,6 +6538,10 @@ class ProductForm extends Component
             $this->activeJobType = 'sync';
             $this->jobCreatedAt = now()->toIso8601String();
             $this->activeJobStatus = 'pending';
+            $this->syncJobShopId = $shopId; // FIX 2025-11-27: Track which shop we're syncing
+
+            // PERFORMANCE FIX 2025-11-27: Notify Alpine to start polling
+            $this->dispatch('job-started');
 
             // FIX 2025-11-25: Use 'info' not 'success' - actual success shown by Alpine panel after job completes
             $this->dispatch('info', message: "Rozpoczęto aktualizację produktu na sklepie {$shop->name}");
@@ -5499,6 +7324,10 @@ class ProductForm extends Component
      */
     public function saveAndClose()
     {
+        // ETAP_07d: Apply pending media shop changes BEFORE product save
+        // This ensures all media sync happens before the page redirects
+        $this->dispatch('before-product-save');
+
         $currentContext = $this->activeShopId ?? 'default';
 
         Log::info('[FIX #5 2025-11-21] saveAndClose: Saving ONLY current context', [
@@ -5506,7 +7335,253 @@ class ProductForm extends Component
             'defaultCategories' => $this->defaultCategories,
             'hasUnsavedChanges' => $this->hasUnsavedChanges,
             'all_pending_contexts' => array_keys($this->pendingChanges),
+            'pending_categories_count' => $this->pendingCategoriesCount,
+            'pending_delete_categories' => $this->pendingDeleteCategories,
         ]);
+
+        // FIX 2025-11-28: Process pending DELETE categories BEFORE creating new ones
+        // This was missing - categories marked for deletion were only cleared but NOT actually deleted!
+
+        // CASE 1: Default tab - delete from PPM database (local categories)
+        if ($this->activeShopId === null) {
+            $contextKey = 'default';
+            $categoriesToDelete = $this->pendingDeleteCategories[$contextKey] ?? [];
+
+            if (!empty($categoriesToDelete)) {
+                Log::info('[SAVE] Starting physical deletion of categories from PPM database', [
+                    'context' => 'default',
+                    'categories_to_delete' => $categoriesToDelete,
+                ]);
+
+                try {
+                    $deletedCount = 0;
+                    $failedCategories = [];
+
+                    foreach ($categoriesToDelete as $categoryId) {
+                        try {
+                            $category = \App\Models\Category::find($categoryId);
+                            if ($category) {
+                                // Delete with children (cascade)
+                                $category->delete();
+                                $deletedCount++;
+
+                                Log::info('[SAVE] Category deleted successfully from PPM database', [
+                                    'category_id' => $categoryId,
+                                    'category_name' => $category->name,
+                                ]);
+                            } else {
+                                Log::warning('[SAVE] Category not found in PPM database', [
+                                    'category_id' => $categoryId,
+                                ]);
+                            }
+                        } catch (\Exception $e) {
+                            $failedCategories[] = [
+                                'id' => $categoryId,
+                                'error' => $e->getMessage(),
+                            ];
+
+                            Log::error('[SAVE] Failed to delete category from PPM database', [
+                                'category_id' => $categoryId,
+                                'error' => $e->getMessage(),
+                            ]);
+                        }
+                    }
+
+                    // Clear pending delete categories AFTER successful deletion
+                    unset($this->pendingDeleteCategories[$contextKey]);
+
+                    if ($deletedCount > 0) {
+                        $this->dispatch('success', message: "Usunieto $deletedCount kategorii z PPM");
+                    }
+
+                    if (!empty($failedCategories)) {
+                        $failedIds = implode(', ', array_column($failedCategories, 'id'));
+                        $this->dispatch('warning', message: "Nie udalo sie usunac kategorii: $failedIds");
+                    }
+
+                    Log::info('[SAVE] PPM category deletion completed', [
+                        'deleted_count' => $deletedCount,
+                        'failed_count' => count($failedCategories),
+                    ]);
+
+                } catch (\Exception $e) {
+                    Log::error('[SAVE] Fatal error during PPM category deletion', [
+                        'error' => $e->getMessage(),
+                    ]);
+
+                    $this->dispatch('error', message: 'Blad podczas usuwania kategorii: ' . $e->getMessage());
+                    // Continue with save even if deletion failed
+                }
+            }
+        }
+
+        // CASE 2: Shop tab - delete from PrestaShop API
+        if ($this->activeShopId !== null) {
+            $contextKey = (string) $this->activeShopId;
+            $categoriesToDelete = $this->pendingDeleteCategories[$contextKey] ?? [];
+
+            if (!empty($categoriesToDelete)) {
+                $shop = \App\Models\PrestaShopShop::find($this->activeShopId);
+
+                if ($shop && $shop->is_active && $shop->connection_status === 'connected') {
+                    Log::info('[SAVE] Starting physical deletion of categories from PrestaShop', [
+                        'shop_id' => $this->activeShopId,
+                        'shop_name' => $shop->name,
+                        'categories_to_delete' => $categoriesToDelete,
+                    ]);
+
+                    try {
+                        $clientFactory = app(\App\Services\PrestaShop\PrestaShopClientFactory::class);
+                        $client = $clientFactory->create($shop);
+
+                        $deletedCount = 0;
+                        $failedCategories = [];
+
+                        foreach ($categoriesToDelete as $categoryId) {
+                            try {
+                                $client->deleteCategory((int) $categoryId);
+                                $deletedCount++;
+
+                                Log::info('[SAVE] Category deleted successfully from PrestaShop', [
+                                    'category_id' => $categoryId,
+                                    'shop_id' => $this->activeShopId,
+                                ]);
+                            } catch (\App\Exceptions\PrestaShopAPIException $e) {
+                                $failedCategories[] = [
+                                    'id' => $categoryId,
+                                    'error' => $e->getMessage(),
+                                ];
+
+                                Log::error('[SAVE] Failed to delete category from PrestaShop', [
+                                    'category_id' => $categoryId,
+                                    'shop_id' => $this->activeShopId,
+                                    'error' => $e->getMessage(),
+                                ]);
+                            }
+                        }
+
+                        // Clear pending delete categories AFTER successful deletion
+                        unset($this->pendingDeleteCategories[$contextKey]);
+
+                        if ($deletedCount > 0) {
+                            $this->dispatch('success', message: "Usunieto $deletedCount kategorii z PrestaShop");
+                        }
+
+                        if (!empty($failedCategories)) {
+                            $failedIds = implode(', ', array_column($failedCategories, 'id'));
+                            $this->dispatch('warning', message: "Nie udalo sie usunac kategorii: $failedIds");
+                        }
+
+                        Log::info('[SAVE] Category deletion completed', [
+                            'shop_id' => $this->activeShopId,
+                            'deleted_count' => $deletedCount,
+                            'failed_count' => count($failedCategories),
+                        ]);
+
+                        // FIX 2025-11-28: Clear category cache after deletion so fresh data loads
+                        if ($deletedCount > 0) {
+                            $categoryService = app(\App\Services\PrestaShop\PrestaShopCategoryService::class);
+                            $categoryService->clearCache($shop);
+                            Log::info('[SAVE] Category cache cleared after deletion', ['shop_id' => $this->activeShopId]);
+                        }
+
+                    } catch (\Exception $e) {
+                        Log::error('[SAVE] Fatal error during category deletion', [
+                            'shop_id' => $this->activeShopId,
+                            'error' => $e->getMessage(),
+                        ]);
+
+                        $this->dispatch('error', message: 'Blad podczas usuwania kategorii: ' . $e->getMessage());
+                        // Continue with save even if deletion failed
+                    }
+                } else {
+                    Log::warning('[SAVE] Shop not active or not connected - skipping category deletion', [
+                        'shop_id' => $this->activeShopId,
+                        'shop_active' => $shop?->is_active,
+                        'connection_status' => $shop?->connection_status,
+                    ]);
+                }
+            }
+        }
+
+        // 2025-11-26: Process pending NEW categories BEFORE saving product data
+        // Creates categories in PrestaShop API and updates selections with real IDs
+        if (!empty($this->pendingNewCategories)) {
+            $categoryResults = $this->processPendingCategories();
+
+            if (!empty($categoryResults['failed'])) {
+                foreach ($categoryResults['failed'] as $failed) {
+                    $this->addError('categories', "Blad tworzenia kategorii '{$failed['name']}': {$failed['error']}");
+                }
+            }
+
+            Log::info('[SAVE] Processed pending categories', [
+                'created' => count($categoryResults['created']),
+                'failed' => count($categoryResults['failed']),
+            ]);
+        }
+
+        // FIX 2025-12-08: Check for shop-only changes BEFORE commitPendingVariants() clears the array!
+        // ETAP_05c: Process SHOP-SPECIFIC variant operations when in shop context
+        $hasShopVariantChanges = false;
+        if ($this->activeShopId !== null) {
+            $hasShopVariantChanges = !empty($this->shopVariantOverrides[$this->activeShopId] ?? []);
+
+            // Check for shop-only pending creates BEFORE they get cleared
+            foreach ($this->pendingVariantCreates as $data) {
+                if (($data['is_shop_only'] ?? false) && ($data['shop_id'] ?? null) === $this->activeShopId) {
+                    $hasShopVariantChanges = true;
+                    break;
+                }
+            }
+
+            Log::info('[SAVE] Shop variant changes check (BEFORE commit)', [
+                'shop_id' => $this->activeShopId,
+                'hasShopVariantChanges' => $hasShopVariantChanges,
+                'shopVariantOverrides' => count($this->shopVariantOverrides[$this->activeShopId] ?? []),
+                'pendingVariantCreates' => count($this->pendingVariantCreates),
+            ]);
+        }
+
+        // 2025-12-04: Process pending VARIANT operations BEFORE saving product data
+        // Commits all variant creates/updates/deletes that were queued
+        // NOTE: This clears pendingVariantCreates, so shop-only check MUST be done above!
+        if ($this->hasPendingVariantChanges()) {
+            $variantResults = $this->commitPendingVariants();
+
+            if (!empty($variantResults['errors'])) {
+                foreach ($variantResults['errors'] as $error) {
+                    $this->addError('variants', $error);
+                }
+            }
+
+            Log::info('[SAVE] Processed pending variants', [
+                'created' => $variantResults['created'],
+                'updated' => $variantResults['updated'],
+                'deleted' => $variantResults['deleted'],
+                'errors' => count($variantResults['errors']),
+            ]);
+        }
+
+        // ETAP_05c FIX: Process SHOP-SPECIFIC variant operations
+        // Uses hasShopVariantChanges computed BEFORE pendingVariantCreates was cleared
+        if ($hasShopVariantChanges) {
+            $shopVariantResults = $this->commitShopVariants();
+
+            if (!empty($shopVariantResults['errors'])) {
+                foreach ($shopVariantResults['errors'] as $error) {
+                    $this->addError('variants', $error);
+                }
+            }
+
+            Log::info('[SAVE] Processed shop variant changes', [
+                'shop_id' => $this->activeShopId,
+                'created' => $shopVariantResults['created'],
+                'updated' => $shopVariantResults['updated'],
+                'deleted' => $shopVariantResults['deleted'],
+                'errors' => count($shopVariantResults['errors']),
+            ]);
+        }
 
         // FIX #5 2025-11-21: Save only current context (not all contexts)
         // FIX 2025-11-25: Skip job tracking - we're redirecting immediately, job runs in background
@@ -5594,6 +7669,21 @@ class ProductForm extends Component
 
             // Clear ONLY current context from pending changes
             unset($this->pendingChanges[$currentKey]);
+
+            // FIX 2025-11-27: Clear pending delete categories for this context after successful save
+            if (isset($this->pendingDeleteCategories[$currentKey])) {
+                Log::info('[FIX 2025-11-27] Clearing pendingDeleteCategories after save', [
+                    'context' => $currentKey,
+                    'deleted_count' => count($this->pendingDeleteCategories[$currentKey]),
+                ]);
+                unset($this->pendingDeleteCategories[$currentKey]);
+            }
+
+            // FIX 2025-11-27: Clear pending new categories for this context after successful save
+            if (isset($this->pendingNewCategories[$currentKey])) {
+                unset($this->pendingNewCategories[$currentKey]);
+            }
+
             $this->hasUnsavedChanges = !empty($this->pendingChanges);
 
             // Update stored data structures
@@ -5806,6 +7896,18 @@ class ProductForm extends Component
                 ]);
             }
 
+            // === FEATURES (CONTEXT-ISOLATED SYSTEM) ===
+            // FIX 2025-12-03: Restore and save productFeatures from pending changes
+            // This ensures features edited in "Dane domyslne" are saved to database
+            if (isset($changes['productFeatures'])) {
+                $this->productFeatures = $changes['productFeatures'];
+                $this->saveProductFeatures();
+                Log::info('[FEATURE SAVE] Product features saved from pending changes (default context)', [
+                    'product_id' => $this->product->id,
+                    'features_count' => count($this->productFeatures),
+                ]);
+            }
+
             Log::info('Product updated from pending changes', [
                 'product_id' => $this->product->id,
                 'changes_applied' => count($changes),
@@ -5857,6 +7959,17 @@ class ProductForm extends Component
                     'product_id' => $this->product->id,
                     'default_categories' => $changes['defaultCategories'],
                     'shop_categories' => $changes['shopCategories'] ?? [],
+                ]);
+            }
+
+            // === FEATURES (CONTEXT-ISOLATED SYSTEM) ===
+            // FIX 2025-12-03: Save productFeatures for new products
+            if (isset($changes['productFeatures'])) {
+                $this->productFeatures = $changes['productFeatures'];
+                $this->saveProductFeatures();
+                Log::info('[FEATURE SAVE] Product features saved for new product', [
+                    'product_id' => $this->product->id,
+                    'features_count' => count($this->productFeatures),
                 ]);
             }
 
@@ -5943,6 +8056,28 @@ class ProductForm extends Component
                     'error' => $e->getMessage(),
                 ]);
                 // Don't throw - allow product save to complete even if prices/stock fail
+            }
+
+            // ETAP_07e FAZA 3: Save product features
+            try {
+                $this->saveProductFeatures();
+            } catch (\Exception $e) {
+                Log::error('Failed to save product features in savePendingChangesToProduct', [
+                    'product_id' => $this->product->id,
+                    'error' => $e->getMessage(),
+                ]);
+                // Don't throw - allow product save to complete even if features fail
+            }
+
+            // ETAP_05d FAZA 4: Save vehicle compatibility data
+            try {
+                $this->saveCompatibilityData();
+            } catch (\Exception $e) {
+                Log::error('Failed to save compatibility data in savePendingChangesToProduct', [
+                    'product_id' => $this->product->id,
+                    'error' => $e->getMessage(),
+                ]);
+                // Don't throw - allow product save to complete even if compatibility fail
             }
         }
 
@@ -6202,6 +8337,33 @@ class ProductForm extends Component
         // Categories are now saved to category_mappings JSON column (Option A canonical format)
         // See lines 5092-5126 above for conversion logic
 
+        // === FEATURES (CONTEXT-ISOLATED SYSTEM - OPCJA B: PER-SHOP FEATURES) ===
+        // FIX 2025-12-03: Save productFeatures to shop-specific storage (attribute_mappings)
+        // Each shop has its own feature values - NOT saved to global product_features table!
+        // This allows different features per shop, same as other shop-specific data
+        // Storage: ProductShopData.attribute_mappings.features JSON
+        if (isset($changes['productFeatures'])) {
+            $this->productFeatures = $changes['productFeatures'];
+            $this->saveShopFeatures($shopId);
+            Log::info('[FEATURE SAVE] Shop features saved to attribute_mappings (per-shop storage)', [
+                'product_id' => $this->product->id,
+                'shop_id' => $shopId,
+                'features_count' => count($this->productFeatures),
+            ]);
+        }
+
+        // === VARIANTS (CONTEXT-ISOLATED SYSTEM - ETAP_05b FAZA 5: PER-SHOP VARIANTS) ===
+        // Save shop variant overrides to attribute_mappings.variants JSON
+        // Each shop can have different variant SKUs, names, prices, etc.
+        if ($this->shopHasVariantOverrides($shopId)) {
+            $this->saveShopVariantOverridesToDb($shopId);
+            Log::info('[VARIANT SAVE] Shop variant overrides saved to attribute_mappings', [
+                'product_id' => $this->product->id,
+                'shop_id' => $shopId,
+                'override_count' => $this->getShopVariantOverrideCount($shopId),
+            ]);
+        }
+
         Log::info('Shop-specific data updated from pending changes', [
             'product_id' => $this->product->id,
             'shop_id' => $shopId,
@@ -6391,39 +8553,41 @@ class ProductForm extends Component
                 'product_id' => $this->product?->id,
             ]);
 
-            // Call refresh endpoint (clears cache)
-            $response = \Illuminate\Support\Facades\Http::post(url("/api/v1/prestashop/categories/{$shopId}/refresh"));
-
-            if ($response->successful()) {
-                $data = $response->json();
-
-                // Update component state
-                $this->prestashopCategories[$shopId] = $data['categories'];
-
-                $this->dispatch('notification', [
-                    'type' => 'success',
-                    'message' => "Kategorie odświeżone z PrestaShop (" . count($data['categories']) . " głównych kategorii)"
-                ]);
-
-                Log::info("PrestaShop categories refreshed successfully", [
-                    'shop_id' => $shopId,
-                    'shop_name' => $data['shop_name'] ?? 'Unknown',
-                    'root_categories' => count($data['categories']),
-                ]);
-            } else {
-                throw new \Exception("API error: HTTP " . $response->status());
+            // FIX 2025-11-26 #4: Use service directly instead of API call (API returns null)
+            $shop = \App\Models\PrestaShopShop::find($shopId);
+            if (!$shop) {
+                throw new \Exception("Shop not found: {$shopId}");
             }
 
-        } catch (\Exception $e) {
-            $this->dispatch('notification', [
-                'type' => 'error',
-                'message' => "Błąd podczas odświeżania: {$e->getMessage()}"
+            $categoryService = app(\App\Services\PrestaShop\PrestaShopCategoryService::class);
+
+            // Clear cache for this shop
+            $categoryService->clearCache($shop);
+
+            // Reload fresh categories from PrestaShop API
+            $tree = $categoryService->getCachedCategoryTree($shop);
+
+            // Convert to objects for Blade compatibility
+            $categories = array_map([$this, 'convertCategoryArrayToObject'], $tree);
+
+            // Update component state
+            $this->prestashopCategories[$shopId] = $categories;
+
+            Log::info("PrestaShop categories refreshed successfully", [
+                'shop_id' => $shopId,
+                'root_categories' => count($categories),
             ]);
 
+            $this->dispatch('success', message: "Kategorie odświeżone (" . count($categories) . " głównych)");
+
+        } catch (\Exception $e) {
             Log::error("Failed to refresh PrestaShop categories", [
                 'shop_id' => $shopId,
                 'error' => $e->getMessage(),
             ]);
+
+            // Don't show error notification - just log it
+            // The tree might still work with cached data
         }
     }
 
@@ -6510,7 +8674,30 @@ class ProductForm extends Component
 
             // ETAP_07b FAZA 1 FIX: Convert arrays to objects for Blade compatibility
             // Blade partial expects objects with ->children property, not arrays
-            return array_map([$this, 'convertCategoryArrayToObject'], $tree);
+            $categories = array_map([$this, 'convertCategoryArrayToObject'], $tree);
+
+            // 2025-11-26 FIX: Inject pending categories into tree for display
+            // Pending categories are stored locally until Save, need to show them in tree
+            $shopIdStr = (string) $this->activeShopId;
+            if (!empty($this->pendingNewCategories[$shopIdStr])) {
+                foreach ($this->pendingNewCategories[$shopIdStr] as $pending) {
+                    $pendingObj = (object) [
+                        'id' => $pending['tempId'],
+                        'name' => $pending['name'] . ' (oczekuje)',
+                        'parent_id' => $pending['parentId'],
+                        'children' => collect([]),
+                        'is_pending' => true,
+                        'sort_order' => 9999,
+                    ];
+                    $this->addCategoryToArrayTreeRecursive($categories, $pending['parentId'], $pendingObj);
+                }
+                Log::debug('[getShopCategories] Injected pending categories', [
+                    'shop_id' => $this->activeShopId,
+                    'pending_count' => count($this->pendingNewCategories[$shopIdStr]),
+                ]);
+            }
+
+            return $categories;
 
         } catch (\Exception $e) {
             Log::error('Failed to get shop categories', [
@@ -6545,7 +8732,27 @@ class ProductForm extends Component
         })->toArray();
 
         // ETAP_07b FAZA 1 FIX: Convert arrays to objects for Blade compatibility
-        return array_map([$this, 'convertCategoryArrayToObject'], $categoryArray);
+        $result = array_map([$this, 'convertCategoryArrayToObject'], $categoryArray);
+
+        // 2025-11-26 FIX: Inject pending categories into tree for display
+        if (!empty($this->pendingNewCategories['default'])) {
+            foreach ($this->pendingNewCategories['default'] as $pending) {
+                $pendingObj = (object) [
+                    'id' => $pending['tempId'],
+                    'name' => $pending['name'] . ' (oczekuje)',
+                    'parent_id' => $pending['parentId'],
+                    'children' => collect([]),
+                    'is_pending' => true,
+                    'sort_order' => 9999,
+                ];
+                $this->addCategoryToArrayTreeRecursive($result, $pending['parentId'], $pendingObj);
+            }
+            Log::debug('[getDefaultCategories] Injected pending categories', [
+                'pending_count' => count($this->pendingNewCategories['default']),
+            ]);
+        }
+
+        return $result;
     }
 
     /**
@@ -6795,6 +9002,8 @@ class ProductForm extends Component
         // If already loaded and not forcing reload, skip
         if (isset($this->loadedShopData[$shopId]) && !$forceReload) {
             Log::info('Shop data already loaded (cached)', ['shop_id' => $shopId]);
+            // FIX 2025-11-28: Dispatch end event for Alpine.js overlay (cache hit = instant hide)
+            $this->dispatch('prestashop-loading-end');
             return;
         }
 
@@ -6866,11 +9075,16 @@ class ProductForm extends Component
                 $this->loadShopDataToForm($shopId);
 
                 $this->isLoadingShopData = false;
+                // FIX 2025-11-28: Dispatch end event for Alpine.js overlay (pending sync = instant hide)
+                $this->dispatch('prestashop-loading-end');
                 session()->flash('message', 'Oczekiwanie na synchronizacje - pokazano zapisane dane');
                 return; // SKIP PrestaShop API call entirely
             }
 
             // 3. Fetch from PrestaShop API (only when NOT pending)
+            // FIX 2025-11-28: Alpine.js shows overlay IMMEDIATELY on button click (x-on:click)
+            // PHP only dispatches 'prestashop-loading-end' when done (in finally block)
+
             $client = PrestaShopClientFactory::create($shop);
             $prestashopData = $client->getProduct($shopData->prestashop_product_id);
 
@@ -7034,6 +9248,8 @@ class ProductForm extends Component
             session()->flash('error', 'Blad wczytywania danych: ' . $e->getMessage());
         } finally {
             $this->isLoadingShopData = false;
+            // FIX 2025-11-28: Dispatch event to hide Alpine.js loading overlay
+            $this->dispatch('prestashop-loading-end');
         }
     }
 
@@ -7122,6 +9338,9 @@ class ProductForm extends Component
      */
     public function cancel()
     {
+        // 2025-11-26: Discard pending categories (not created in PrestaShop)
+        $this->discardPendingCategories();
+
         // FIX 2025-11-20 (ETAP_07b Fix #7): Use event-based JavaScript redirect
         $this->dispatch('redirectToProductList');
     }
@@ -7353,14 +9572,33 @@ class ProductForm extends Component
                 ->where('is_active', true)
                 ->get();
 
+            // ETAP_07d (2025-12-02): Get pending media changes from session
+            // Session is available in HTTP context but NOT in queue job context
+            // So we capture it here and pass it to the job
+            $sessionKey = "pending_media_sync_{$this->product->id}";
+            $pendingMediaChanges = session($sessionKey, []);
+
+            Log::info('[MEDIA SYNC] Capturing pending media changes for jobs', [
+                'product_id' => $this->product->id,
+                'pending_changes_count' => count($pendingMediaChanges),
+                'pending_changes' => $pendingMediaChanges,
+            ]);
+
             $dispatchedCount = 0;
             foreach ($shops as $shop) {
                 \App\Jobs\PrestaShop\SyncProductToPrestaShop::dispatch(
                     $this->product,
                     $shop,
-                    auth()->id()
+                    auth()->id(),
+                    $pendingMediaChanges  // ETAP_07d: Pass pending media changes to job
                 );
                 $dispatchedCount++;
+            }
+
+            // Clear session after dispatching jobs (changes are now in job payload)
+            if (!empty($pendingMediaChanges)) {
+                session()->forget($sessionKey);
+                Log::debug('[MEDIA SYNC] Cleared pending media changes from session after job dispatch');
             }
 
             if ($dispatchedCount > 0) {
@@ -7369,6 +9607,7 @@ class ProductForm extends Component
                     'product_sku' => $this->product->sku,
                     'shops_count' => $dispatchedCount,
                     'user_id' => auth()->id(),
+                    'pending_media_changes_count' => count($pendingMediaChanges),
                 ]);
             }
 

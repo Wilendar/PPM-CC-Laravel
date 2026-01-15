@@ -1,13 +1,6 @@
 ---
-name: product-form-category-test
-description: Automatyczne testowanie workflow kategorii w ProductForm (sklep B2B Test DEV). Testuje: zmianę kategorii, zapis, redirect, i weryfikację persistencji zmian.
-version: 1.0.0
-author: Skill-Creator
-created: 2025-01-20
-updated: 2025-01-20
-tags: [testing, livewire, productform, categories, e2e, ppm]
-category: testing
-status: active
+name: "product-form-category-test"
+description: "Automatyczne testowanie workflow kategorii w ProductForm (sklep B2B Test DEV)"
 ---
 
 # Product Form Category Test Skill

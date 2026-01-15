@@ -1,0 +1,236 @@
+/**
+ * Visual Editor - Base Block Styles
+ *
+ * Generic block styles that work with CSS variables.
+ * {{namespace}} is replaced with the actual namespace (pd, blok, etc.)
+ */
+
+/* === WRAPPER === */
+.{{namespace}}-wrapper {
+  font-family: var(--{{namespace}}-font-family);
+  font-size: var(--{{namespace}}-font-size-base);
+  line-height: var(--{{namespace}}-line-height);
+  color: var(--{{namespace}}-text-color);
+}
+
+.{{namespace}}-wrapper *,
+.{{namespace}}-wrapper *::before,
+.{{namespace}}-wrapper *::after {
+  box-sizing: border-box;
+}
+
+/* === BASE BLOCK === */
+.{{namespace}}-block {
+  margin-bottom: var(--{{namespace}}-spacing-lg);
+}
+
+.{{namespace}}-block-contained {
+  max-width: 1200px;
+  margin-left: auto;
+  margin-right: auto;
+  padding-left: var(--{{namespace}}-spacing-md);
+  padding-right: var(--{{namespace}}-spacing-md);
+}
+
+.{{namespace}}-block-full {
+  width: 100%;
+}
+
+/* === TYPOGRAPHY === */
+.{{namespace}}-heading {
+  font-family: var(--{{namespace}}-heading-font);
+  color: var(--{{namespace}}-text-color);
+  line-height: 1.2;
+  margin-bottom: var(--{{namespace}}-spacing-md);
+}
+
+.{{namespace}}-heading--h1 { font-size: 2.5rem; font-weight: 700; }
+.{{namespace}}-heading--h2 { font-size: 2rem; font-weight: 700; }
+.{{namespace}}-heading--h3 { font-size: 1.5rem; font-weight: 600; }
+.{{namespace}}-heading--h4 { font-size: 1.25rem; font-weight: 600; }
+.{{namespace}}-heading--h5 { font-size: 1.125rem; font-weight: 600; }
+.{{namespace}}-heading--h6 { font-size: 1rem; font-weight: 600; }
+
+.{{namespace}}-text {
+  font-family: var(--{{namespace}}-font-family);
+  color: var(--{{namespace}}-text-color);
+  line-height: var(--{{namespace}}-line-height);
+}
+
+.{{namespace}}-text--muted {
+  color: var(--{{namespace}}-text-muted);
+}
+
+.{{namespace}}-text--light {
+  color: var(--{{namespace}}-text-light);
+}
+
+/* === IMAGES === */
+.{{namespace}}-image {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  border-radius: var(--{{namespace}}-border-radius);
+}
+
+.{{namespace}}-image--rounded {
+  border-radius: var(--{{namespace}}-border-radius-lg);
+}
+
+.{{namespace}}-image--circle {
+  border-radius: 50%;
+}
+
+.{{namespace}}-image--shadow {
+  box-shadow: var(--{{namespace}}-shadow);
+}
+
+/* === BUTTONS === */
+.{{namespace}}-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--{{namespace}}-spacing-sm);
+  padding: var(--{{namespace}}-spacing-sm) var(--{{namespace}}-spacing-md);
+  background: var(--{{namespace}}-primary-color);
+  color: var(--{{namespace}}-text-light);
+  border: none;
+  border-radius: var(--{{namespace}}-border-radius);
+  font-family: var(--{{namespace}}-font-family);
+  font-size: var(--{{namespace}}-font-size-base);
+  font-weight: 500;
+  text-decoration: none;
+  cursor: pointer;
+  transition: opacity 0.2s, transform 0.2s;
+}
+
+.{{namespace}}-button:hover {
+  opacity: 0.9;
+}
+
+.{{namespace}}-button--secondary {
+  background: var(--{{namespace}}-secondary-color);
+}
+
+.{{namespace}}-button--outline {
+  background: transparent;
+  border: 2px solid var(--{{namespace}}-primary-color);
+  color: var(--{{namespace}}-primary-color);
+}
+
+.{{namespace}}-button--large {
+  padding: var(--{{namespace}}-spacing-md) var(--{{namespace}}-spacing-lg);
+  font-size: var(--{{namespace}}-font-size-lg);
+}
+
+.{{namespace}}-button--small {
+  padding: var(--{{namespace}}-spacing-xs) var(--{{namespace}}-spacing-sm);
+  font-size: var(--{{namespace}}-font-size-sm);
+}
+
+/* === LAYOUT === */
+.{{namespace}}-grid {
+  display: grid;
+  gap: var(--{{namespace}}-spacing-md);
+}
+
+.{{namespace}}-grid--2 {
+  grid-template-columns: repeat(2, 1fr);
+}
+
+.{{namespace}}-grid--3 {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.{{namespace}}-grid--4 {
+  grid-template-columns: repeat(4, 1fr);
+}
+
+.{{namespace}}-flex {
+  display: flex;
+  gap: var(--{{namespace}}-spacing-md);
+}
+
+.{{namespace}}-flex--column {
+  flex-direction: column;
+}
+
+.{{namespace}}-flex--center {
+  align-items: center;
+  justify-content: center;
+}
+
+.{{namespace}}-flex--between {
+  justify-content: space-between;
+}
+
+/* === CARDS === */
+.{{namespace}}-card {
+  background: var(--{{namespace}}-background-color);
+  border: 1px solid var(--{{namespace}}-border-color);
+  border-radius: var(--{{namespace}}-border-radius);
+  padding: var(--{{namespace}}-spacing-lg);
+}
+
+.{{namespace}}-card--shadow {
+  box-shadow: var(--{{namespace}}-shadow);
+  border: none;
+}
+
+.{{namespace}}-card--dark {
+  background: var(--{{namespace}}-background-dark);
+  color: var(--{{namespace}}-text-light);
+}
+
+/* === SECTIONS === */
+.{{namespace}}-section {
+  padding: var(--{{namespace}}-spacing-xl) 0;
+}
+
+.{{namespace}}-section--dark {
+  background: var(--{{namespace}}-background-dark);
+  color: var(--{{namespace}}-text-light);
+}
+
+.{{namespace}}-section--alt {
+  background: var(--{{namespace}}-background-alt);
+}
+
+/* === TABLES === */
+.{{namespace}}-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.{{namespace}}-table th,
+.{{namespace}}-table td {
+  padding: var(--{{namespace}}-spacing-sm) var(--{{namespace}}-spacing-md);
+  text-align: left;
+  border-bottom: 1px solid var(--{{namespace}}-border-color);
+}
+
+.{{namespace}}-table th {
+  background: var(--{{namespace}}-background-alt);
+  font-weight: 600;
+}
+
+.{{namespace}}-table tr:last-child td {
+  border-bottom: none;
+}
+
+/* === RESPONSIVE === */
+@media (max-width: 768px) {
+  .{{namespace}}-grid--2,
+  .{{namespace}}-grid--3,
+  .{{namespace}}-grid--4 {
+    grid-template-columns: 1fr;
+  }
+
+  .{{namespace}}-flex {
+    flex-wrap: wrap;
+  }
+
+  .{{namespace}}-heading--h1 { font-size: 2rem; }
+  .{{namespace}}-heading--h2 { font-size: 1.5rem; }
+  .{{namespace}}-heading--h3 { font-size: 1.25rem; }
+}

@@ -155,7 +155,8 @@ class PrestaShopCategoryService
 
         try {
             // GET /categories?display=full (returns all category details)
-            $response = $client->makeRequest('GET', 'categories?display=full');
+            // FIX: Added leading slash for consistent URL building
+            $response = $client->makeRequest('GET', '/categories?display=full');
 
             // Normalize response (PrestaShop returns different structures)
             $categories = $this->normalizeCategoriesResponse($response);
@@ -223,7 +224,7 @@ class PrestaShopCategoryService
 
         try {
             // GET /categories/{id}?display=full (returns single category details)
-            $response = $client->makeRequest('GET', "categories/{$categoryId}?display=full");
+            $response = $client->makeRequest('GET', "/categories/{$categoryId}?display=full");
 
             // Normalize response (single category)
             $category = $this->normalizeSingleCategoryResponse($response);

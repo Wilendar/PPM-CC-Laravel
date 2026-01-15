@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -13,12 +14,19 @@ use Illuminate\Support\Facades\Storage;
  * Zdjęcie wariantu produktu
  * Wspiera cover image i pozycjonowanie
  *
+ * UPDATED 2025-12-04: Synced $fillable with migration schema
+ * Migration has: image_path, image_thumb_path (NOT filename, path)
+ *
  * @property int $id
  * @property int $variant_id
- * @property string $filename Nazwa pliku
- * @property string $path Ścieżka do pliku
- * @property bool $is_cover Czy główne zdjęcie
- * @property int|null $position Kolejność wyświetlania
+ * @property string $image_path Sciezka do pliku (main image)
+ * @property string|null $image_thumb_path Sciezka do miniaturki
+ * @property string|null $image_url PrestaShop URL (for API imports)
+ * @property bool $is_cached Czy obraz jest w cache lokalnym
+ * @property string|null $cache_path Sciezka do cache
+ * @property bool $is_cover Czy glowne zdjecie
+ * @property int|null $position Kolejnosc wyswietlania
+ * @property \Illuminate\Support\Carbon|null $cached_at
  * @property \Illuminate\Support\Carbon|null $created_at
  * @property \Illuminate\Support\Carbon|null $updated_at
  */
@@ -33,11 +41,20 @@ class VariantImage extends Model
 
     /**
      * Fillable attributes
+     *
+     * UPDATED 2025-12-04: Synced with migration schema
+     * - image_path (was: path) - main image path
+     * - image_thumb_path (was: filename) - thumbnail path
+     * - Added: image_url, is_cached, cache_path, cached_at (from extend migration)
      */
     protected $fillable = [
         'variant_id',
-        'filename',
-        'path',
+        'image_path',
+        'image_thumb_path',
+        'image_url',
+        'is_cached',
+        'cache_path',
+        'cached_at',
         'is_cover',
         'position',
     ];
@@ -48,7 +65,9 @@ class VariantImage extends Model
     protected $casts = [
         'variant_id' => 'integer',
         'is_cover' => 'boolean',
+        'is_cached' => 'boolean',
         'position' => 'integer',
+        'cached_at' => 'datetime',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
     ];
@@ -101,6 +120,72 @@ class VariantImage extends Model
 
     /*
     |--------------------------------------------------------------------------
+    | ACCESSORS (Laravel Attribute Pattern)
+    |--------------------------------------------------------------------------
+    | FIX 2025-12-04: Added accessors for property-style access in Blade
+    | Blade templates use $image->url not $image->getUrl()
+    */
+
+    /**
+     * Get public URL (accessor for $image->url)
+     *
+     * FIX 2025-12-10: Priority changed - local files first, then external URLs
+     * Previously: image_url (PS API) was checked first, causing broken images
+     * Now: Local cached images have priority over external URLs
+     */
+    public function url(): Attribute
+    {
+        return Attribute::make(
+            get: function (): string {
+                // PRIORITY 1: Local cached image (is_cached=true + image_path exists)
+                if ($this->is_cached && !empty($this->image_path) && Storage::disk(self::STORAGE_DISK)->exists($this->image_path)) {
+                    return Storage::disk(self::STORAGE_DISK)->url($this->image_path);
+                }
+
+                // PRIORITY 2: Local image without cache flag (for manually uploaded)
+                if (!empty($this->image_path) && Storage::disk(self::STORAGE_DISK)->exists($this->image_path)) {
+                    return Storage::disk(self::STORAGE_DISK)->url($this->image_path);
+                }
+
+                // PRIORITY 3: External URL (PrestaShop API) - only if it's a full URL
+                if (!empty($this->image_url) && filter_var($this->image_url, FILTER_VALIDATE_URL)) {
+                    return $this->image_url;
+                }
+
+                // Fallback to placeholder
+                return asset('/images/placeholders/default-placeholder.jpg');
+            }
+        );
+    }
+
+    /**
+     * Get thumbnail URL (accessor for $image->thumbnail_url)
+     *
+     * FIX 2025-12-15: Uses on-demand thumbnail generation
+     * instead of falling back to full-size image
+     */
+    public function thumbnailUrl(): Attribute
+    {
+        return Attribute::make(
+            get: function (): string {
+                // First try explicit thumb path (pre-generated)
+                if (!empty($this->image_thumb_path) && Storage::disk(self::STORAGE_DISK)->exists($this->image_thumb_path)) {
+                    return Storage::disk(self::STORAGE_DISK)->url($this->image_thumb_path);
+                }
+
+                // Use on-demand thumbnail generation (48x48 for ProductList)
+                if (!empty($this->id) && !empty($this->image_path)) {
+                    return route('thumbnail.variant', ['variantImageId' => $this->id, 'w' => 48, 'h' => 48]);
+                }
+
+                // Fallback to placeholder
+                return asset('/images/placeholders/default-placeholder.jpg');
+            }
+        );
+    }
+
+    /*
+    |--------------------------------------------------------------------------
     | METHODS
     |--------------------------------------------------------------------------
     */
@@ -110,15 +195,15 @@ class VariantImage extends Model
      */
     public function getFullPath(): string
     {
-        return Storage::disk(self::STORAGE_DISK)->path($this->path);
+        return Storage::disk(self::STORAGE_DISK)->path($this->image_path);
     }
 
     /**
-     * Get public URL
+     * Get public URL (method version for backward compatibility)
      */
     public function getUrl(): string
     {
-        return Storage::disk(self::STORAGE_DISK)->url($this->path);
+        return $this->url;
     }
 
     /**
@@ -126,11 +211,16 @@ class VariantImage extends Model
      */
     public function getThumbPath(): ?string
     {
-        $thumbPath = str_replace(
-            $this->filename,
-            'thumb_' . $this->filename,
-            $this->path
-        );
+        // First check if image_thumb_path is set
+        if ($this->image_thumb_path) {
+            if (Storage::disk(self::STORAGE_DISK)->exists($this->image_thumb_path)) {
+                return $this->image_thumb_path;
+            }
+        }
+
+        // Fallback: try to construct thumb path from image_path
+        $filename = basename($this->image_path);
+        $thumbPath = str_replace($filename, 'thumb_' . $filename, $this->image_path);
 
         if (Storage::disk(self::STORAGE_DISK)->exists($thumbPath)) {
             return $thumbPath;
@@ -140,17 +230,11 @@ class VariantImage extends Model
     }
 
     /**
-     * Get thumbnail URL (if exists)
+     * Get thumbnail URL (method version for backward compatibility)
      */
     public function getThumbUrl(): ?string
     {
-        $thumbPath = $this->getThumbPath();
-
-        if ($thumbPath) {
-            return Storage::disk(self::STORAGE_DISK)->url($thumbPath);
-        }
-
-        return null;
+        return $this->thumbnail_url;
     }
 
     /**
@@ -158,12 +242,11 @@ class VariantImage extends Model
      */
     public function deleteFile(): bool
     {
-        $deleted = Storage::disk(self::STORAGE_DISK)->delete($this->path);
+        $deleted = Storage::disk(self::STORAGE_DISK)->delete($this->image_path);
 
         // Delete thumbnail if exists
-        $thumbPath = $this->getThumbPath();
-        if ($thumbPath) {
-            Storage::disk(self::STORAGE_DISK)->delete($thumbPath);
+        if ($this->image_thumb_path) {
+            Storage::disk(self::STORAGE_DISK)->delete($this->image_thumb_path);
         }
 
         return $deleted;

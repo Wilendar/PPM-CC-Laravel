@@ -1,0 +1,74 @@
+{
+  "hostido": {
+    "host": "host379076.hostido.net.pl",
+    "user": "host379076",
+    "port": 64321,
+    "sshKey": "D:\\OneDrive - MPP TRADE\\SSH\\Hostido\\HostidoSSHNoPass.ppk",
+    "remotePath": "domains/ppm.mpptrade.pl/public_html"
+  },
+  "project": {
+    "localRoot": "D:\\OneDrive - MPP TRADE\\Skrypty\\PPM-CC-Laravel",
+    "buildOutput": "public/build",
+    "logPath": "_TOOLS/_logs"
+  },
+  "deployment": {
+    "autoBackup": true,
+    "backupRetention": 10,
+    "verifyAfterDeploy": true,
+    "clearCacheAfterDeploy": true,
+    "chromeDevToolsVerification": true
+  },
+  "excludePatterns": [
+    "node_modules/*",
+    ".git/*",
+    "tests/*",
+    "storage/logs/*",
+    "storage/framework/cache/*",
+    "bootstrap/cache/*",
+    ".env*",
+    "*.log",
+    "_TOOLS/*",
+    "_AGENT_REPORTS/*",
+    "_DOCS/*",
+    "_OTHER/*",
+    "References/*"
+  ],
+  "vite": {
+    "buildCommand": "npm run build",
+    "outputPath": "public/build",
+    "manifestPath": "public/build/.vite/manifest.json",
+    "manifestTargetPath": "public/build/manifest.json"
+  },
+  "verification": {
+    "healthCheckUrl": "https://ppm.mpptrade.pl",
+    "expectedHttpCodes": [200, 302],
+    "timeout": 10,
+    "chromeDevTools": {
+      "enabled": true,
+      "checkConsoleErrors": true,
+      "checkNetworkRequests": true,
+      "takeScreenshot": true
+    }
+  },
+  "notifications": {
+    "slack": {
+      "enabled": false,
+      "webhook": "",
+      "channel": "#deployments"
+    },
+    "email": {
+      "enabled": false,
+      "recipients": [],
+      "smtp": {
+        "host": "",
+        "port": 587,
+        "username": "",
+        "password": ""
+      }
+    }
+  },
+  "rollback": {
+    "autoRollbackOnFailure": false,
+    "requireManualConfirmation": true
+  }
+}

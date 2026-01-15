@@ -661,6 +661,8 @@ Po ukończeniu tej fazy system będzie:
         - ❌ 5.2.1.2.5 Reorder point recommendations
 
 - ❌ **6. MEDIA SYSTEM - ZARZĄDZANIE ZDJĘCIAMI**
+  **📖 SZCZEGÓŁOWA SPECYFIKACJA:** [ETAP_07d_Media_Sync_System.md](ETAP_07d_Media_Sync_System.md) - Kompletny system mediów z synchronizacją PrestaShop
+  **⚠️ UWAGA:** Punkt 6 został rozbudowany do osobnego dokumentu ETAP_07d ze względu na złożoność integracji z PrestaShop API (punkt 7.4.3) oraz wymagania enterprise (drag&drop, folder upload, live labels, multi-store sync).
   - ❌ **6.1 Media Upload & Management**
     - ❌ **6.1.1 Image Upload System**
       - ❌ **6.1.1.1 Upload Interface**

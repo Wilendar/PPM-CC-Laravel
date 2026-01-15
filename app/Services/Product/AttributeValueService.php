@@ -93,6 +93,10 @@ class AttributeValueService
                     'code' => $data['code'],
                     'label' => $data['label'],
                     'color_hex' => $data['color_hex'] ?? null,
+                    'auto_prefix' => $data['auto_prefix'] ?? null,
+                    'auto_prefix_enabled' => $data['auto_prefix_enabled'] ?? false,
+                    'auto_suffix' => $data['auto_suffix'] ?? null,
+                    'auto_suffix_enabled' => $data['auto_suffix_enabled'] ?? false,
                     'position' => $data['position'],
                     'is_active' => $data['is_active'] ?? true,
                 ]);
@@ -148,6 +152,10 @@ class AttributeValueService
                     'code' => $data['code'] ?? $value->code,
                     'label' => $data['label'] ?? $value->label,
                     'color_hex' => $data['color_hex'] ?? $value->color_hex,
+                    'auto_prefix' => array_key_exists('auto_prefix', $data) ? $data['auto_prefix'] : $value->auto_prefix,
+                    'auto_prefix_enabled' => array_key_exists('auto_prefix_enabled', $data) ? $data['auto_prefix_enabled'] : $value->auto_prefix_enabled,
+                    'auto_suffix' => array_key_exists('auto_suffix', $data) ? $data['auto_suffix'] : $value->auto_suffix,
+                    'auto_suffix_enabled' => array_key_exists('auto_suffix_enabled', $data) ? $data['auto_suffix_enabled'] : $value->auto_suffix_enabled,
                     'position' => $data['position'] ?? $value->position,
                     'is_active' => $data['is_active'] ?? $value->is_active,
                 ]);

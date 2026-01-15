@@ -58,6 +58,12 @@ class BulkSyncProducts implements ShouldQueue
     public ?int $userId = null;
 
     /**
+     * Sync mode - ETAP_07c FAZA 4
+     * full_sync, prices_only, stock_only, descriptions_only, categories_only
+     */
+    public string $syncMode = 'full_sync';
+
+    /**
      * Number of times job may be attempted
      */
     public int $tries = 1; // No retry - individual jobs handle retries
@@ -69,18 +75,26 @@ class BulkSyncProducts implements ShouldQueue
 
     /**
      * Create new job instance
+     * ETAP_07c FAZA 4: Added syncMode parameter
      *
      * @param Collection $products Products to sync
      * @param PrestaShopShop $shop Target shop
      * @param string|null $batchName Batch name for tracking
      * @param int|null $userId User who triggered sync (NULL = SYSTEM)
+     * @param string $syncMode Sync mode: full_sync, prices_only, stock_only, etc.
      */
-    public function __construct(Collection $products, PrestaShopShop $shop, ?string $batchName = null, ?int $userId = null)
-    {
+    public function __construct(
+        Collection $products,
+        PrestaShopShop $shop,
+        ?string $batchName = null,
+        ?int $userId = null,
+        string $syncMode = 'full_sync'
+    ) {
         $this->products = $products;
         $this->shop = $shop;
         $this->batchName = $batchName ?? "Bulk Sync to {$shop->name}";
         $this->userId = $userId;
+        $this->syncMode = $syncMode;
         // Use default queue for CRON compatibility
         // $this->onQueue('prestashop_sync');
     }
@@ -97,6 +111,7 @@ class BulkSyncProducts implements ShouldQueue
             'shop_name' => $this->shop->name,
             'total_products' => $this->products->count(),
             'batch_name' => $this->batchName,
+            'sync_mode' => $this->syncMode,
         ]);
 
         try {
@@ -109,13 +124,30 @@ class BulkSyncProducts implements ShouldQueue
                 return;
             }
 
+            // ETAP_07c FAZA 4: Determine job_type based on sync mode
+            $jobType = $this->determineJobType();
+
             // 📊 CREATE PROGRESS TRACKING RECORD
             $progressId = $progressService->createJobProgress(
                 $this->job->getJobId(),
                 $this->shop,
-                'sync',
+                $jobType,
                 $this->products->count()
             );
+
+            // ETAP_07c FAZA 2+4: Collect sample SKUs and sync mode for progress bar display
+            $sampleSkus = $this->products->take(5)->pluck('sku')->filter()->values()->toArray();
+            $syncModeLabel = config("job_types.sync_modes.{$this->syncMode}", $this->syncMode);
+
+            if ($progressId) {
+                $progressService->updateMetadata($progressId, [
+                    'sample_skus' => $sampleSkus,
+                    'sync_mode' => $this->syncMode,
+                    'sync_mode_label' => $syncModeLabel,
+                    'batch_name' => $this->batchName,
+                    'total_products' => $this->products->count(),
+                ]);
+            }
 
             // Group products by priority
             $productsByPriority = $this->groupProductsByPriority();
@@ -291,6 +323,24 @@ class BulkSyncProducts implements ShouldQueue
             ->first();
 
         return $shopData?->priority ?? ProductShopData::PRIORITY_NORMAL;
+    }
+
+    /**
+     * Determine job type based on sync mode
+     * ETAP_07c FAZA 4: Maps sync mode to job_type for progress tracking
+     *
+     * @return string Job type identifier
+     */
+    private function determineJobType(): string
+    {
+        return match ($this->syncMode) {
+            'prices_only' => 'price_sync',
+            'stock_only' => 'stock_sync',
+            'categories_only' => 'category_sync',
+            'descriptions_only' => 'sync',
+            'images_only' => 'sync',
+            default => 'sync',
+        };
     }
 
     /**

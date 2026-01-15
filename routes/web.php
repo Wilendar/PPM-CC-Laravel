@@ -5,6 +5,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use App\Http\Controllers\Admin\VehicleFeatureController;
+use App\Http\Controllers\ThumbnailController;
 
 /*
 |--------------------------------------------------------------------------
@@ -19,6 +20,16 @@ use App\Http\Controllers\Admin\VehicleFeatureController;
 // ==========================================
 // PUBLIC ROUTES (no auth required)
 // ==========================================
+
+// Thumbnail generation route (on-demand, cached)
+Route::get('/thumbnail/{mediaId}', [ThumbnailController::class, 'show'])
+    ->name('thumbnail')
+    ->where('mediaId', '[0-9]+');
+
+// Variant Image thumbnail (on-demand, cached)
+Route::get('/thumbnail/variant/{variantImageId}', [ThumbnailController::class, 'showVariant'])
+    ->name('thumbnail.variant')
+    ->where('variantImageId', '[0-9]+');
 
 // Test CSS loading
 Route::get('/test-css', function () {
@@ -209,13 +220,20 @@ Route::prefix('admin')->name('admin.')->group(function () {
     // Maintenance Management - działający komponent
     Route::get('/maintenance', \App\Http\Livewire\Admin\Maintenance\DatabaseMaintenance::class)
          ->name('maintenance.index');
-    
+
+    // Media Management - ETAP_07d Phase 8: Admin Media Panel
+    Route::get('/media', \App\Http\Livewire\Admin\Media\MediaManager::class)
+         ->name('media.index');
+
     // Shop Management - działający komponent
     Route::get('/shops', \App\Http\Livewire\Admin\Shops\ShopManager::class)->name('shops');
     
     // Add New Shop - wizard component
     Route::get('/shops/add', \App\Http\Livewire\Admin\Shops\AddShop::class)->name('shops.add');
     
+    // Shop CSS Editor - ETAP_07h FAZA 8: Direct CSS editing
+    Route::get('/shops/{shopId}/css-editor', \App\Http\Livewire\Admin\Shops\ShopCssEditor::class)->name('shops.css-editor');
+
     // Shop Synchronization Control - sync management panel
     Route::get('/shops/sync', \App\Http\Livewire\Admin\Shops\SyncController::class)->name('shops.sync');
 
@@ -276,6 +294,14 @@ Route::prefix('admin')->name('admin.')->group(function () {
         ->name('csv.import')
         ->where('type', 'variants|features|compatibility');
 
+    // ==========================================
+    // EXPORTS DOWNLOAD - ETAP_07f Faza 6.2
+    // ==========================================
+    Route::get('/exports/download/{file}', [\App\Http\Controllers\Admin\ExportDownloadController::class, 'download'])
+        ->name('exports.download');
+    Route::delete('/exports/{file}', [\App\Http\Controllers\Admin\ExportDownloadController::class, 'delete'])
+        ->name('exports.delete');
+
     // ERP Integration Management - działający komponent
     Route::get('/integrations', \App\Http\Livewire\Admin\ERP\ERPManager::class)->name('integrations');
 
@@ -304,6 +330,13 @@ Route::prefix('admin')->name('admin.')->group(function () {
         Route::get('/create-diagnostic', function () {
             return view('pages.create-diagnostic');
         })->name('create-diagnostic');
+
+        // ==========================================
+        // ETAP_06: Product Import Panel
+        // ==========================================
+        Route::get('/import', function () {
+            return view('pages.product-import');
+        })->name('import');
 
         // Product editing - Blade wrapper with admin layout
         Route::get('/{product}/edit', function ($product) {
@@ -352,6 +385,36 @@ Route::prefix('admin')->name('admin.')->group(function () {
         // });
     });
 
+    // ==========================================
+    // ETAP_07f: VISUAL DESCRIPTION EDITOR
+    // ==========================================
+
+    // Visual Editor Routes - FAZA 9 Admin Panel
+    // Using blade wrapper pattern for Livewire 3.x compatibility
+    Route::prefix('visual-editor')->name('visual-editor.')->group(function () {
+        // Block Manager - admin panel for managing blocks (FAZA 9.1)
+        Route::get('/blocks', fn() => view('admin.visual-editor.blocks'))
+            ->name('blocks');
+
+        // Template Manager - admin panel for managing templates (FAZA 5)
+        Route::get('/templates', fn() => view('admin.visual-editor.templates'))
+            ->name('templates');
+
+        // Styleset Editor - admin panel for CSS stylesets (FAZA 5 + 9.2)
+        Route::get('/styleset', fn() => view('admin.visual-editor.styleset'))
+            ->name('styleset');
+        Route::get('/styleset/{shop}', fn($shop) => view('admin.visual-editor.styleset-shop', compact('shop')))
+            ->name('styleset.shop');
+
+        // Visual Description Editor - product description editor (ETAP_07f Faza 6)
+        Route::get('/product/{product}/shop/{shop}', fn($product, $shop) => view('admin.visual-editor.product-editor', compact('product', 'shop')))
+            ->name('product');
+
+        // Unified Visual Editor (UVE) - ETAP_07f_P5
+        Route::get('/uve/{product}/shop/{shop}', fn($product, $shop) => view('admin.visual-editor.unified-editor', compact('product', 'shop')))
+            ->name('uve');
+    });
+
     // Users Management - ETAP_04 FAZA A (User Management - completed, awaiting deployment)
     Route::get('/users', function () {
         return view('placeholder-page', [
@@ -385,10 +448,24 @@ Route::prefix('admin')->name('admin.')->group(function () {
     // PLACEHOLDER PAGES - Menu v2.0 unimplemented sections
     // ==========================================
 
-    // ETAP_05b - System Zarządzania Wariantami (CORRECT ARCHITECTURE)
-    // Main Variant System Panel - AttributeSystemManager (Phase 4 - Enhanced with PrestaShop sync)
-    Route::get('/variants', \App\Http\Livewire\Admin\Variants\AttributeSystemManager::class)
-        ->name('admin.variants.index');
+    // Panel Zarządzania Parametrami Produktu (Atrybuty, Marki, Magazyny, Typy)
+    // Unified panel with tabs - replaces old /variants route
+    Route::get('/product-parameters', fn() => view('admin.product-parameters'))
+        ->name('product-parameters');
+
+    // ETAP_07g: Manufacturer Management Panel
+    // Dedicated panel for manufacturer/brand management with PrestaShop sync
+    Route::get('/manufacturers', fn() => view('admin.manufacturers'))
+        ->name('manufacturers.index');
+
+    // Legacy redirect (keep old route working)
+    Route::get('/variants', fn() => redirect('/admin/product-parameters?tab=attributes'))
+        ->name('variants.index');
+
+    // Variant Panel Redesign - 3-Panel Layout with Product Search
+    // NEW: Search products by variant attribute values (OR/AND filtering)
+    // Using blade wrapper pattern for Livewire 3.x compatibility
+    Route::get('/variants-panel', fn() => view('admin.variants.panel'))->name('variants.panel');
 
     // Vehicle Features Management (Phase 2 - ETAP_05a)
     // DEVELOPMENT: Auth disabled (consistent with other ETAP_05a routes)
@@ -404,14 +481,9 @@ Route::prefix('admin')->name('admin.')->group(function () {
         return view('admin.compatibility-management');
     })->name('compatibility.index');
 
-    // ETAP_06 (95% complete) - Produkty/Import
-    Route::get('/products/import', function () {
-        return view('placeholder-page', [
-            'title' => 'Import z pliku',
-            'message' => 'System importu CSV/XLSX jest prawie gotowy. Unified interface dla import z pliku będzie dostępny wkrótce.',
-            'etap' => 'ETAP_06 (95% ukończone)'
-        ]);
-    })->name('products.import');
+    // ETAP_06 FAZA 2 - Panel Importu Produktow (UKOŃCZONE)
+    Route::get('/products/import', fn() => view('pages.product-import'))
+        ->name('products.import');
 
     Route::get('/products/import-history', function () {
         return view('placeholder-page', [

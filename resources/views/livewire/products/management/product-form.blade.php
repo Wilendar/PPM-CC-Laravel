@@ -1,15 +1,56 @@
 {{-- ProductForm Component - Advanced Product Create/Edit Form --}}
 {{-- CSS loaded via admin layout --}}
 
-{{-- ETAP_13.6: Wire:poll Integration for JOB Monitoring --}}
-{{-- FIX 2025-11-18: Poll based on activeJobStatus (not activeJobId) to support bulk jobs --}}
-{{-- FIX 2025-11-20 (ETAP_07b Fix #7): Event listener for JavaScript redirect after save --}}
-{{-- FIX 2025-11-21 (ETAP_07b Fix #9): Disable beforeunload before redirect to prevent dialog --}}
-{{-- FIX 2025-11-25: ALWAYS have wire:poll wrapper (not conditional!) --}}
-{{-- Root Cause (ETAP_07b Fix #15 REVERTED): wire:poll inside @if doesn't activate on dynamic changes --}}
-{{-- Livewire troubleshooting skill ISSUE #3: wire:poll must be OUTSIDE @if conditional --}}
-{{-- checkJobStatus() already returns early when no job active - no performance impact --}}
-<div wire:poll.5s="checkJobStatus">
+{{-- ETAP_13.6: Job Monitoring with CONDITIONAL Polling (PERFORMANCE FIX 2025-11-27) --}}
+{{-- FIX 2025-11-27: Use $wire.activeJobStatus for reactive checking instead of static Blade value --}}
+{{-- Previous bug: isJobActive() used static '{{ $activeJobStatus }}' which didn't update after Livewire changes --}}
+<div
+    x-data="{
+        pollingInterval: null,
+        pollCount: 0,
+        maxPolls: 120,
+        async isJobActive() {
+            const status = await $wire.get('activeJobStatus');
+            console.log('[POLL DEBUG] Checking job status:', status, 'pollCount:', this.pollCount);
+            return status && status !== 'completed' && status !== 'failed' && status !== '';
+        },
+        async startPolling() {
+            if (this.pollingInterval) {
+                console.log('[POLL DEBUG] Polling already active');
+                return;
+            }
+            console.log('[POLL DEBUG] Starting polling...');
+            this.pollCount = 0;
+            this.pollingInterval = setInterval(async () => {
+                this.pollCount++;
+                if (this.pollCount > this.maxPolls) {
+                    console.log('[POLL DEBUG] Max polls reached, stopping');
+                    this.stopPolling();
+                    return;
+                }
+                const active = await this.isJobActive();
+                if (active) {
+                    console.log('[POLL DEBUG] Job still active, calling checkJobStatus');
+                    $wire.checkJobStatus();
+                } else {
+                    console.log('[POLL DEBUG] Job no longer active, stopping polling');
+                    this.stopPolling();
+                }
+            }, 5000);
+        },
+        stopPolling() {
+            if (this.pollingInterval) {
+                console.log('[POLL DEBUG] Stopping polling');
+                clearInterval(this.pollingInterval);
+                this.pollingInterval = null;
+            }
+        }
+    }"
+    x-init="$nextTick(async () => { if (await isJobActive()) startPolling(); })"
+    @job-started.window="startPolling()"
+    @job-completed.window="stopPolling()"
+    @job-failed.window="stopPolling()"
+>
 <div
     class="category-form-container"
     @redirect-to-product-list.window="window.skipBeforeUnload = true; window.location.href = '/admin/products'">
@@ -20,46 +61,83 @@
     {{-- Messages --}}
     @include('livewire.products.management.partials.form-messages')
 
-    {{-- Main Form --}}
-    <form wire:submit.prevent="save">
-        <div class="category-form-main-container">
-            {{-- Left Column - Form Content --}}
-            <div class="category-form-left-column">
-                <div class="enterprise-card p-8">
+    {{-- Main Layout Container --}}
+    {{-- FIX 2025-12-08: Layout repair via global Livewire hooks in @push('scripts') --}}
+    <div class="category-form-main-container">
+        {{-- Left Column - Form Content (inside form) --}}
+        <form wire:submit.prevent="save" class="category-form-left-column" wire:key="left-column-{{ $product?->id ?? 'new' }}">
+            <div class="enterprise-card p-8 relative" wire:key="enterprise-card-{{ $product?->id ?? 'new' }}">
+                    {{-- Loading Overlay - Shop Data Fetch (FIX 2025-11-28 v2) --}}
+                    {{-- Using Alpine.js + Livewire events for precise control --}}
+                    {{-- Only shows when ACTUALLY calling PrestaShop API (not on cache hits) --}}
+                    <div x-data="{ isLoadingPrestaShop: false }"
+                         @prestashop-loading-start.window="isLoadingPrestaShop = true"
+                         @prestashop-loading-end.window="isLoadingPrestaShop = false">
+                        <div x-show="isLoadingPrestaShop"
+                             x-transition:enter="transition ease-out duration-300"
+                             x-transition:enter-start="opacity-0"
+                             x-transition:enter-end="opacity-100"
+                             x-transition:leave="transition ease-in duration-200"
+                             x-transition:leave-start="opacity-100"
+                             x-transition:leave-end="opacity-0"
+                             class="shop-data-loading-overlay">
+                            <div class="shop-data-loading-content">
+                                <svg class="shop-data-loading-spinner" viewBox="0 0 24 24" fill="none">
+                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                                <span class="shop-data-loading-text">Pobieranie danych z PrestaShop...</span>
+                            </div>
+                        </div>
+                    </div>
+
                     {{-- Tab Navigation --}}
                     @include('livewire.products.management.partials.tab-navigation')
 
-                    {{-- Multi-Store Management --}}
-                    @include('livewire.products.management.partials.shop-management')
-
-                    {{-- TAB CONTENT AREA - CONDITIONAL RENDERING (Only 1 tab in DOM at a time) --}}
-                    @if($activeTab === 'basic')
-                        @include('livewire.products.management.tabs.basic-tab')
-                    @elseif($activeTab === 'description')
-                        @include('livewire.products.management.tabs.description-tab')
-                    @elseif($activeTab === 'physical')
-                        @include('livewire.products.management.tabs.physical-tab')
-                    @elseif($activeTab === 'attributes')
-                        @include('livewire.products.management.tabs.attributes-tab')
-                    @elseif($activeTab === 'prices')
-                        @include('livewire.products.management.tabs.prices-tab')
-                    @elseif($activeTab === 'stock')
-                        @include('livewire.products.management.tabs.stock-tab')
+                    {{-- Multi-Store Management (hidden for Gallery, Stock, Prices - combined data tabs) --}}
+                    {{-- FIX 2025-12-01: These tabs show combined data from ALL shops, so shop tabs are not applicable --}}
+                    @if(!in_array($activeTab, ['gallery', 'stock', 'prices']))
+                        @include('livewire.products.management.partials.shop-management')
                     @endif
 
-                </div> {{-- Close enterprise-card --}}
-            </div> {{-- Close category-form-left-column --}}
+                    {{-- TAB CONTENT AREA - CONDITIONAL RENDERING (Only 1 tab in DOM at a time) --}}
+                    {{-- FIX 2025-12-08: Wrap in div with activeTab in wire:key to force full replacement instead of morphing --}}
+                    <div wire:key="tab-content-{{ $activeTab }}-{{ $product?->id ?? 'new' }}">
+                        @if($activeTab === 'basic')
+                            @include('livewire.products.management.tabs.basic-tab')
+                        @elseif($activeTab === 'description')
+                            @include('livewire.products.management.tabs.description-tab')
+                        @elseif($activeTab === 'physical')
+                            @include('livewire.products.management.tabs.physical-tab')
+                        @elseif($activeTab === 'attributes')
+                            @include('livewire.products.management.tabs.attributes-tab')
+                        @elseif($activeTab === 'compatibility')
+                            @include('livewire.products.management.tabs.compatibility-tab')
+                        @elseif($activeTab === 'prices')
+                            @include('livewire.products.management.tabs.prices-tab')
+                        @elseif($activeTab === 'stock')
+                            @include('livewire.products.management.tabs.stock-tab')
+                        @elseif($activeTab === 'variants')
+                            @include('livewire.products.management.tabs.variants-tab')
+                        @elseif($activeTab === 'gallery')
+                            <livewire:products.management.tabs.gallery-tab :productId="$product?->id" />
+                        @elseif($activeTab === 'visual-description')
+                            @include('livewire.products.management.tabs.visual-description-tab')
+                        @endif
+                    </div>
 
-            {{-- Right Column - Quick Actions & Info --}}
-            <div class="category-form-right-column">
-                {{-- Quick Actions Panel --}}
-                @include('livewire.products.management.partials.quick-actions')
+            </div> {{-- Close enterprise-card --}}
+        </form> {{-- Close form (which is also left-column) --}}
 
-                {{-- Product Info (Edit Mode) --}}
-                @include('livewire.products.management.partials.product-info')
-            </div>
-        </div> {{-- Close category-form-main-container --}}
-    </form> {{-- Close form --}}
+        {{-- Right Column - Quick Actions & Info (OUTSIDE form to prevent morphing issues) --}}
+        <div class="category-form-right-column" wire:key="right-column-{{ $product?->id ?? 'new' }}">
+            {{-- Quick Actions Panel --}}
+            @include('livewire.products.management.partials.quick-actions')
+
+            {{-- Product Info (Edit Mode) --}}
+            @include('livewire.products.management.partials.product-info')
+        </div>
+    </div> {{-- Close category-form-main-container --}}
 
 
     {{-- SHOP SELECTOR MODAL --}}
@@ -175,17 +253,43 @@
             </div>
         </div>
     @endif
+
+    {{-- FAZA 4.2.3: Modal removed - inline category creation via + buttons in tree --}}
+
 </div> {{-- Close w-full py-4 ROOT ELEMENT --}}
 </div> {{-- Close category-form-container --}}
-</div> {{-- Close wire:poll wrapper (FIX 2025-11-25: always present, not conditional) --}}
+</div> {{-- Close Alpine.js job polling wrapper (PERFORMANCE FIX 2025-11-27) --}}
 
 {{-- JavaScript section - moved outside root element like CategoryForm --}}
 @push('scripts')
 <script>
 document.addEventListener('livewire:init', () => {
+    // FIX 2025-12-08: Repair DOM structure after Livewire morphing
+    // Livewire's morph algorithm sometimes moves right-column outside main-container
+    function repairLayoutStructure() {
+        const mainContainer = document.querySelector('.category-form-main-container');
+        const rightCol = document.querySelector('.category-form-right-column');
+        if (mainContainer && rightCol && rightCol.parentElement !== mainContainer) {
+            console.log('[LAYOUT FIX] Moving right-column back to main-container');
+            mainContainer.appendChild(rightCol);
+        }
+    }
+
+    // Run repair after every Livewire update
+    Livewire.hook('morph.updated', ({ el, component }) => {
+        setTimeout(repairLayoutStructure, 50);
+    });
+
+    // Also run on message.processed as backup
+    Livewire.hook('message.processed', (message, component) => {
+        setTimeout(repairLayoutStructure, 100);
+    });
+
     // Handle tab switching animations
     Livewire.on('tab-switched', (event) => {
         console.log('Tab switched to:', event.tab);
+        // Run repair after tab switch specifically
+        setTimeout(repairLayoutStructure, 150);
     });
 
     // Handle product saved event

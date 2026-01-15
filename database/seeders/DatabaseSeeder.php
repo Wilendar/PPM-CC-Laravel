@@ -112,6 +112,28 @@ class DatabaseSeeder extends Seeder
         $this->command->newLine();
 
         // =================================================================
+        // ETAP_07f: VISUAL DESCRIPTION EDITOR SEEDERS
+        // =================================================================
+
+        $this->command->info('📝 PHASE 5: Visual Description Editor');
+        $this->command->info('⏱️  Estimated time: ~10 seconds');
+        $this->command->newLine();
+
+        // Description Blocks - Available block types for editor
+        $this->call(DescriptionBlockSeeder::class);
+        $this->command->newLine();
+
+        // Shop Stylesets - Per-shop CSS configurations (requires shops to exist)
+        // Note: Run only if shops are seeded, otherwise skip
+        if (\App\Models\PrestaShopShop::exists()) {
+            $this->call(ShopStylesetSeeder::class);
+            $this->command->newLine();
+        } else {
+            $this->command->warn('⚠️  Skipping ShopStylesetSeeder - no shops found');
+            $this->command->newLine();
+        }
+
+        // =================================================================
         // SEEDING SUMMARY & VALIDATION
         // =================================================================
 
@@ -154,11 +176,20 @@ class DatabaseSeeder extends Seeder
         $activeUsers = \App\Models\User::where('is_active', true)->count();
         $this->command->info("👤 Users: {$users} (Active: {$activeUsers})");
         
+        // Description Blocks Summary (ETAP_07f)
+        $descriptionBlocks = \App\Models\DescriptionBlock::count();
+        $activeBlocks = \App\Models\DescriptionBlock::where('is_active', true)->count();
+        $this->command->info("📝 Description Blocks: {$descriptionBlocks} (Active: {$activeBlocks})");
+
+        // Shop Stylesets Summary
+        $stylesets = \App\Models\ShopStyleset::count();
+        $this->command->info("🎨 Shop Stylesets: {$stylesets}");
+
         // Integration Readiness
         $integrationReady = $priceGroups > 0 && $warehouses > 0 && $roles > 0 && $users > 0;
         $status = $integrationReady ? '✅ READY' : '❌ NOT READY';
         $this->command->info("🔗 Integration Status: {$status}");
-        
+
         $this->command->newLine();
     }
 

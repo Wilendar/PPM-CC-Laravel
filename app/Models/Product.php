@@ -107,6 +107,7 @@ class Product extends Model
         'short_description',
         'long_description',
         'product_type_id',
+        'manufacturer_id',
         'manufacturer',
         'supplier_code',
         'weight',
@@ -219,6 +220,16 @@ class Product extends Model
     public function productType(): BelongsTo
     {
         return $this->belongsTo(ProductType::class);
+    }
+
+    /**
+     * Manufacturer relationship (Marka produktu)
+     *
+     * FIX 2025-12-15: Added for automatic manufacturer import from PrestaShop
+     */
+    public function manufacturerRelation(): BelongsTo
+    {
+        return $this->belongsTo(Manufacturer::class, 'manufacturer_id');
     }
 
     /*

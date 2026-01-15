@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Collection;
+use App\Models\ShopVariant;
 
 /**
  * Product Variant Model
@@ -114,6 +115,37 @@ class ProductVariant extends Model
     public function images(): HasMany
     {
         return $this->hasMany(VariantImage::class, 'variant_id')->orderBy('position');
+    }
+
+    /**
+     * Shop-specific overrides for this variant (ETAP_05c)
+     *
+     * @return \Illuminate\Database\Eloquent\Relations\HasMany
+     */
+    public function shopOverrides(): HasMany
+    {
+        return $this->hasMany(ShopVariant::class, 'variant_id');
+    }
+
+    /**
+     * Get variant data for specific shop (with overrides applied)
+     *
+     * @param int $shopId
+     * @return array
+     */
+    public function getForShop(int $shopId): array
+    {
+        $shopOverride = $this->shopOverrides()->where('shop_id', $shopId)->first();
+
+        if (!$shopOverride) {
+            return $this->toArray(); // No override - return base
+        }
+
+        if ($shopOverride->isDeleteOperation()) {
+            return []; // Hidden in this shop
+        }
+
+        return $shopOverride->getEffectiveVariantData(); // OVERRIDE - merge
     }
 
     /*
@@ -228,8 +260,11 @@ class ProductVariant extends Model
 
     /**
      * Get attributes grouped by type
+     *
+     * NOTE: Renamed from getAttributes() to avoid collision with Eloquent's
+     * internal attribute accessor (causes infinite recursion)
      */
-    public function getAttributes(): Collection
+    public function getGroupedAttributes(): Collection
     {
         return $this->attributes()
             ->with('attributeType')

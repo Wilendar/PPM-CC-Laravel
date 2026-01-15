@@ -3,7 +3,9 @@
 namespace App\Services\PrestaShop;
 
 use App\Models\Category;
+use App\Models\Manufacturer;
 use App\Models\Product;
+use App\Models\ProductDescription;
 use App\Models\PrestaShopShop;
 use App\Services\PrestaShop\BasePrestaShopClient;
 use App\Services\PrestaShop\CategoryMapper;
@@ -98,12 +100,18 @@ class ProductTransformer
                     $this->getEffectiveValue($shopData, $product, 'name'),
                     $defaultLangId
                 ),
+                // ETAP_07f Faza 8.2: Visual Description integration
+                // Priority: 1. Visual Editor HTML, 2. Shop-specific text, 3. Product default
                 'description_short' => $this->buildMultilangField(
-                    $this->getEffectiveValue($shopData, $product, 'short_description') ?? '',
+                    $this->getVisualDescription($product, $shop, 'description_short')
+                        ?? $this->getEffectiveValue($shopData, $product, 'short_description')
+                        ?? '',
                     $defaultLangId
                 ),
                 'description' => $this->buildMultilangField(
-                    $this->getEffectiveValue($shopData, $product, 'long_description') ?? '',
+                    $this->getVisualDescription($product, $shop, 'description')
+                        ?? $this->getEffectiveValue($shopData, $product, 'long_description')
+                        ?? '',
                     $defaultLangId
                 ),
 
@@ -144,9 +152,9 @@ class ProductTransformer
                 // Tax (PrestaShop tax_rules_group_id) - FAZA 5.2 Integration (2025-11-14)
                 'id_tax_rules_group' => $this->mapTaxRate($effectiveTaxRate, $shop),
 
-                // Manufacturer (FIXED 2025-11-14: removed readonly manufacturer_name field)
+                // Manufacturer (FIX 2025-12-15: Map manufacturer_id to PrestaShop id_manufacturer)
                 // 'manufacturer_name' => $product->manufacturer ?? '', // ❌ READONLY - causes API error
-                'id_manufacturer' => null, // TODO: Implement ManufacturerMapper service
+                'id_manufacturer' => $this->getManufacturerPsId($product, $shop),
 
                 // SEO fields
                 'meta_title' => $this->buildMultilangField(
@@ -196,6 +204,71 @@ class ProductTransformer
 
         // Fallback to product default value
         return $product->$field;
+    }
+
+    /**
+     * Get Visual Description HTML for PrestaShop sync
+     *
+     * ETAP_07f Faza 8.2: Visual Description Editor integration
+     *
+     * Checks if product has a visual description for the shop:
+     * 1. Looks for ProductDescription record (product_id + shop_id)
+     * 2. Checks if sync_to_prestashop is enabled
+     * 3. Renders and caches HTML if needed
+     * 4. Returns appropriate field based on target_field setting
+     *
+     * @param Product $product Product instance
+     * @param PrestaShopShop $shop Shop instance
+     * @param string $targetField Which field to get ('description' or 'description_short')
+     * @return string|null Visual description HTML or null if not available
+     */
+    private function getVisualDescription(Product $product, PrestaShopShop $shop, string $targetField): ?string
+    {
+        try {
+            // Find visual description for this product-shop pair
+            $visualDescription = ProductDescription::where('product_id', $product->id)
+                ->where('shop_id', $shop->id)
+                ->where('sync_to_prestashop', true)
+                ->first();
+
+            // No visual description or sync disabled
+            if (!$visualDescription) {
+                return null;
+            }
+
+            // Check if this description targets the requested field
+            $allowedTargets = match ($targetField) {
+                'description' => ['description', 'both'],
+                'description_short' => ['description_short', 'both'],
+                default => [],
+            };
+
+            if (!in_array($visualDescription->target_field, $allowedTargets)) {
+                return null;
+            }
+
+            // Get HTML for PrestaShop (renders if needed)
+            $htmlData = $visualDescription->getHtmlForPrestaShop();
+
+            Log::debug('[VISUAL DESC TRANSFORM] Retrieved visual description', [
+                'product_id' => $product->id,
+                'shop_id' => $shop->id,
+                'target_field' => $targetField,
+                'visual_target' => $visualDescription->target_field,
+                'has_html' => !empty($htmlData[$targetField]),
+            ]);
+
+            return $htmlData[$targetField] ?? null;
+
+        } catch (\Exception $e) {
+            Log::warning('[VISUAL DESC TRANSFORM] Failed to get visual description', [
+                'product_id' => $product->id,
+                'shop_id' => $shop->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return null;
+        }
     }
 
     /**
@@ -856,8 +929,9 @@ class ProductTransformer
                 // Tax rate (reverse map from PrestaShop tax_rules_group_id)
                 'tax_rate' => $this->reverseMapTaxRate((int) ($prestashopProduct['id_tax_rules_group'] ?? 1)),
 
-                // Manufacturer
+                // Manufacturer (FIX 2025-12-15: Import manufacturer_id from PrestaShop)
                 'manufacturer' => $prestashopProduct['manufacturer_name'] ?? null,
+                'manufacturer_id' => $this->importManufacturer($prestashopProduct, $shop),
 
                 // Timestamps (preserve PrestaShop dates)
                 'created_at' => $prestashopProduct['date_add'] ?? now(),
@@ -1252,5 +1326,116 @@ class ProductTransformer
         ]);
 
         return $result;
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | MANUFACTURER MAPPING (FIX 2025-12-15)
+    |--------------------------------------------------------------------------
+    */
+
+    /**
+     * Import manufacturer from PrestaShop product data
+     *
+     * FIX 2025-12-15: Auto-import manufacturers during product import
+     *
+     * Workflow:
+     * 1. Extract manufacturer_name and id_manufacturer from PS product
+     * 2. If manufacturer_name is empty, return null
+     * 3. Look up existing manufacturer by code (slugified name)
+     * 4. If not found, create new manufacturer
+     * 5. Assign manufacturer to shop with PS manufacturer ID
+     * 6. Return manufacturer_id for Product
+     *
+     * @param array $prestashopProduct PrestaShop product data
+     * @param PrestaShopShop $shop Shop instance
+     * @return int|null Manufacturer ID or null
+     */
+    private function importManufacturer(array $prestashopProduct, PrestaShopShop $shop): ?int
+    {
+        $manufacturerName = $prestashopProduct['manufacturer_name'] ?? null;
+        $psManufacturerId = isset($prestashopProduct['id_manufacturer'])
+            ? (int) $prestashopProduct['id_manufacturer']
+            : null;
+
+        // Skip if no manufacturer name
+        if (empty($manufacturerName) || $psManufacturerId === 0) {
+            return null;
+        }
+
+        // Generate code from name
+        $code = \Illuminate\Support\Str::slug($manufacturerName, '_');
+
+        // Look up existing manufacturer by code
+        $manufacturer = Manufacturer::where('code', $code)->first();
+
+        if (!$manufacturer) {
+            // Create new manufacturer
+            $manufacturer = Manufacturer::create([
+                'name' => $manufacturerName,
+                'code' => $code,
+                'is_active' => true,
+                'sort_order' => 0,
+            ]);
+
+            Log::info('ProductTransformer: Created new manufacturer during import', [
+                'manufacturer_id' => $manufacturer->id,
+                'name' => $manufacturerName,
+                'code' => $code,
+                'ps_manufacturer_id' => $psManufacturerId,
+                'shop_id' => $shop->id,
+            ]);
+        }
+
+        // Ensure manufacturer is assigned to shop with PS ID
+        $existingPivot = $manufacturer->shops()
+            ->where('prestashop_shop_id', $shop->id)
+            ->first();
+
+        if (!$existingPivot) {
+            // Assign to shop with PrestaShop ID
+            $manufacturer->shops()->attach($shop->id, [
+                'ps_manufacturer_id' => $psManufacturerId,
+                'sync_status' => 'synced',
+                'last_synced_at' => now(),
+            ]);
+        } elseif ($existingPivot->pivot->ps_manufacturer_id !== $psManufacturerId) {
+            // Update PS ID if different
+            $manufacturer->shops()->updateExistingPivot($shop->id, [
+                'ps_manufacturer_id' => $psManufacturerId,
+                'sync_status' => 'synced',
+                'last_synced_at' => now(),
+            ]);
+        }
+
+        return $manufacturer->id;
+    }
+
+    /**
+     * Get PrestaShop manufacturer ID for product sync
+     *
+     * FIX 2025-12-15: Map manufacturer_id to PrestaShop id_manufacturer
+     *
+     * @param Product $product PPM Product instance
+     * @param PrestaShopShop $shop Shop instance
+     * @return int|null PrestaShop manufacturer ID or null
+     */
+    private function getManufacturerPsId(Product $product, PrestaShopShop $shop): ?int
+    {
+        if (!$product->manufacturer_id) {
+            return null;
+        }
+
+        $manufacturer = Manufacturer::find($product->manufacturer_id);
+        if (!$manufacturer) {
+            return null;
+        }
+
+        // Get PS manufacturer ID from pivot table
+        $pivot = $manufacturer->shops()
+            ->where('prestashop_shop_id', $shop->id)
+            ->first();
+
+        return $pivot?->pivot?->ps_manufacturer_id;
     }
 }

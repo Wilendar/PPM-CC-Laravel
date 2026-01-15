@@ -6,6 +6,7 @@
 - ✅ FAZA 2: Dynamiczny category picker + reverse transformers
 - ✅ FAZA 3: Import PrestaShop → PPM + real-time progress + queue worker
 - 🛠️ FAZA 9: Changed fields tracking + SYNC NOW optymalizacja + integracja stanów (w trakcie)
+- ❌ **ETAP_07d:** System Synchronizacji Mediów (Zdjęć) PPM ↔ PrestaShop → **[ETAP_07d_Media_Sync_System.md](ETAP_07d_Media_Sync_System.md)**
 
 ---
 
@@ -177,7 +178,7 @@
    - ❌ Manual retry button w UI
 
 **❌ FAZA 4+ (FUTURE):**
-- ❌ Synchronizacja zdjęć produktów
+- ❌ Synchronizacja zdjęć produktów **→ [ETAP_07d_Media_Sync_System.md](ETAP_07d_Media_Sync_System.md)**
 - ❌ Webhook system (real-time updates)
 - ❌ Advanced conflict resolution UI
 - ❌ Real-time monitoring dashboard
@@ -969,7 +970,9 @@ class CategorySyncStrategy
 }
 ```
 
-### ❌ 7.4.3 ImageSyncStrategy  
+### ❌ 7.4.3 ImageSyncStrategy
+**📖 SZCZEGÓŁOWA SPECYFIKACJA:** [ETAP_07d_Media_Sync_System.md](ETAP_07d_Media_Sync_System.md) - Kompletny plan systemu mediów
+**⚠️ UWAGA:** Sekcja 7.4.3 została rozbudowana do osobnego dokumentu ETAP_07d ze względu na złożoność systemu (9 faz, 17+ plików, 22-28 dni implementacji)
 #### ❌ 7.4.3.1 Synchronizacja zdjęć produktów
         **🔗 🔗 POWIAZANIE Z ETAP_05 (punkt 6.2.1.1):** Strategia obrazu powinna wykorzystywac procesy media sync w module produktowym.
 ```php
@@ -2622,18 +2625,22 @@ Funkcjonalność może być wykorzystana w przyszłości dla:
 
 **Status:** ⏳ ZAPLANOWANE (renumbered from 9.3)
 **Priority:** 🟡 HIGH - następny feature po warehouse fix
+**📖 SZCZEGÓŁOWA SPECYFIKACJA:** [ETAP_07d_Media_Sync_System.md](ETAP_07d_Media_Sync_System.md)
 **Reference:** Punkt 7.4.3 w tym planie
 
 #### 🎯 Scope ImageSyncStrategy:
-Patrz: **❌ 7.4.3 ImageSyncStrategy** (line 834-863 w tym pliku)
+**⚠️ WAŻNE:** Pełna specyfikacja w **ETAP_07d_Media_Sync_System.md** - 9 faz, 22-28 dni implementacji
 
-**Zadania:**
-1. ❌ Implementacja ImageSyncStrategy class
-2. ❌ Upload images do PrestaShop API
-3. ❌ Handle image resizing, optimization
-4. ❌ Update image references w PrestaShop
-5. ❌ Integration z ProductSyncStrategy
-6. ❌ Testing z real product images
+**Quick Reference - 9 Faz w ETAP_07d:**
+1. ❌ **PHASE 1:** Core Infrastructure (Services + DTOs + Jobs) - 3-4 dni
+2. ❌ **PHASE 2:** Livewire Components Basic (GalleryTab, Upload Widget) - 3-4 dni
+3. ❌ **PHASE 3:** Advanced Upload (Drag&Drop, Folder Upload, Bulk) - 2-3 dni
+4. ❌ **PHASE 4:** PrestaShop Sync (MediaSyncService, Pull/Push Jobs) - 4-5 dni
+5. ❌ **PHASE 5:** ProductList Thumbnails - 1 dzień
+6. ❌ **PHASE 6:** Admin Media Manager (/admin/media) - 3-4 dni
+7. ❌ **PHASE 7:** Variant Media Integration - 2-3 dni
+8. ❌ **PHASE 8:** Performance & Optimization - 2-3 dni
+9. ❌ **PHASE 9:** Testing & Documentation - 2 dni
 
 🔗 **Powiązanie**: ETAP_05 punkt 6.2.1.1 (media sync w module produktowym)
 

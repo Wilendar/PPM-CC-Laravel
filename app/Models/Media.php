@@ -76,6 +76,42 @@ class Media extends Model
 {
     use HasFactory, SoftDeletes;
 
+    /*
+    |--------------------------------------------------------------------------
+    | CONTEXT CONSTANTS - Media Source/Purpose Identification
+    |--------------------------------------------------------------------------
+    */
+
+    /**
+     * Context: Product gallery images (main product photos)
+     */
+    public const CONTEXT_PRODUCT_GALLERY = 'product_gallery';
+
+    /**
+     * Context: Visual description/UVE images (backgrounds, decorations)
+     */
+    public const CONTEXT_VISUAL_DESCRIPTION = 'visual_description';
+
+    /**
+     * Context: Variant-specific images
+     */
+    public const CONTEXT_VARIANT = 'variant';
+
+    /**
+     * Context: Other/uncategorized media
+     */
+    public const CONTEXT_OTHER = 'other';
+
+    /**
+     * All valid context values
+     */
+    public const CONTEXTS = [
+        self::CONTEXT_PRODUCT_GALLERY,
+        self::CONTEXT_VISUAL_DESCRIPTION,
+        self::CONTEXT_VARIANT,
+        self::CONTEXT_OTHER,
+    ];
+
     /**
      * The attributes that are mass assignable.
      *
@@ -89,6 +125,7 @@ class Media extends Model
         'file_path',
         'file_size',
         'mime_type',
+        'context',
         'width',
         'height',
         'alt_text',
@@ -96,6 +133,7 @@ class Media extends Model
         'is_primary',
         'prestashop_mapping',
         'sync_status',
+        'orphan_history',
         'is_active',
     ];
 
@@ -125,6 +163,7 @@ class Media extends Model
             'is_primary' => 'boolean',
             'is_active' => 'boolean',
             'prestashop_mapping' => 'array',
+            'orphan_history' => 'array',
             'created_at' => 'datetime',
             'updated_at' => 'datetime',
             'deleted_at' => 'datetime',
@@ -190,10 +229,11 @@ class Media extends Model
     {
         return Attribute::make(
             get: function (): string {
-                if (Storage::exists($this->file_path)) {
-                    return Storage::url($this->file_path);
+                // Explicitly use 'public' disk for web-accessible files
+                if (Storage::disk('public')->exists($this->file_path)) {
+                    return Storage::disk('public')->url($this->file_path);
                 }
-                
+
                 // Fallback to placeholder based on mediable type
                 return $this->getPlaceholderUrl();
             }
@@ -201,7 +241,10 @@ class Media extends Model
     }
 
     /**
-     * Get the thumbnail URL (150x150 square crop)
+     * Get the thumbnail URL (200x200 square crop, on-demand generation)
+     *
+     * Uses ThumbnailController for on-demand thumbnail generation.
+     * Thumbnails are cached on disk after first generation.
      *
      * @return \Illuminate\Database\Eloquent\Casts\Attribute
      */
@@ -209,15 +252,13 @@ class Media extends Model
     {
         return Attribute::make(
             get: function (): string {
-                // Generate thumbnail path
-                $thumbnailPath = $this->getThumbnailPath();
-                
-                if (Storage::exists($thumbnailPath)) {
-                    return Storage::url($thumbnailPath);
+                // Use on-demand thumbnail route
+                // ThumbnailController will generate and cache thumbnails
+                if ($this->id) {
+                    return route('thumbnail', ['mediaId' => $this->id, 'w' => 200, 'h' => 200]);
                 }
-                
-                // Try to generate thumbnail (placeholder implementation)
-                // TODO: Implement actual thumbnail generation in FAZA C
+
+                // Fallback to original URL if no ID
                 return $this->url;
             }
         );
@@ -377,6 +418,51 @@ class Media extends Model
     public function scopeNeedsSync(Builder $query): Builder
     {
         return $query->whereIn('sync_status', ['pending', 'error']);
+    }
+
+    /**
+     * Scope: Product gallery images only (excludes UVE/visual description media)
+     *
+     * @param \Illuminate\Database\Eloquent\Builder $query
+     * @return \Illuminate\Database\Eloquent\Builder
+     */
+    public function scopeForGallery(Builder $query): Builder
+    {
+        return $query->where('context', self::CONTEXT_PRODUCT_GALLERY);
+    }
+
+    /**
+     * Scope: Visual description/UVE images only
+     *
+     * @param \Illuminate\Database\Eloquent\Builder $query
+     * @return \Illuminate\Database\Eloquent\Builder
+     */
+    public function scopeForVisualDescription(Builder $query): Builder
+    {
+        return $query->where('context', self::CONTEXT_VISUAL_DESCRIPTION);
+    }
+
+    /**
+     * Scope: Variant images only
+     *
+     * @param \Illuminate\Database\Eloquent\Builder $query
+     * @return \Illuminate\Database\Eloquent\Builder
+     */
+    public function scopeForVariant(Builder $query): Builder
+    {
+        return $query->where('context', self::CONTEXT_VARIANT);
+    }
+
+    /**
+     * Scope: Filter by specific context
+     *
+     * @param \Illuminate\Database\Eloquent\Builder $query
+     * @param string $context Context value
+     * @return \Illuminate\Database\Eloquent\Builder
+     */
+    public function scopeByContext(Builder $query, string $context): Builder
+    {
+        return $query->where('context', $context);
     }
 
     /**
@@ -551,8 +637,23 @@ class Media extends Model
         // TODO: Add checks for:
         // - Active sync processes
         // - External system dependencies
-        
+
         return true;
+    }
+
+    /**
+     * Check if the physical file exists in storage
+     *
+     * @return bool
+     */
+    public function fileExists(): bool
+    {
+        if (empty($this->file_path)) {
+            return false;
+        }
+
+        // Explicitly use 'public' disk for web-accessible files
+        return Storage::disk('public')->exists($this->file_path);
     }
 
     /**
@@ -584,6 +685,105 @@ class Media extends Model
         
         $this->prestashop_mapping = $mappings;
         
+        return $this->save();
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | ORPHAN HISTORY TRACKING - Enterprise Feature
+    |--------------------------------------------------------------------------
+    */
+
+    /**
+     * Record orphan history before detaching from mediable
+     * Call this method BEFORE setting mediable_type/id to null
+     *
+     * @param string $reason 'product_deleted'|'manual_detach'|'bulk_operation'
+     * @return bool
+     */
+    public function recordOrphanHistory(string $reason = 'manual_detach'): bool
+    {
+        // Only record if currently attached to something
+        if (empty($this->mediable_type) || empty($this->mediable_id)) {
+            return false;
+        }
+
+        $history = [
+            'previous_type' => $this->mediable_type,
+            'previous_id' => $this->mediable_id,
+            'orphaned_at' => now()->toISOString(),
+            'orphan_reason' => $reason,
+        ];
+
+        // Try to get additional info from the mediable
+        $mediable = $this->mediable;
+        if ($mediable) {
+            if ($mediable instanceof Product) {
+                $history['previous_name'] = $mediable->name ?? $mediable->display_name ?? null;
+                $history['previous_sku'] = $mediable->sku ?? null;
+            } elseif (method_exists($mediable, 'getName')) {
+                $history['previous_name'] = $mediable->getName();
+            } elseif (isset($mediable->name)) {
+                $history['previous_name'] = $mediable->name;
+            }
+        }
+
+        $this->orphan_history = $history;
+        return $this->save();
+    }
+
+    /**
+     * Get human-readable orphan history description
+     *
+     * @return \Illuminate\Database\Eloquent\Casts\Attribute
+     */
+    public function orphanHistoryDisplay(): Attribute
+    {
+        return Attribute::make(
+            get: function (): ?array {
+                $history = $this->orphan_history;
+                if (empty($history)) {
+                    return null;
+                }
+
+                $reasonLabels = [
+                    'product_deleted' => 'Produkt usuniety',
+                    'manual_detach' => 'Reczne odpiecie',
+                    'bulk_operation' => 'Operacja zbiorcza',
+                ];
+
+                return [
+                    'product_name' => $history['previous_name'] ?? null,
+                    'product_sku' => $history['previous_sku'] ?? null,
+                    'product_id' => $history['previous_id'] ?? null,
+                    'orphaned_at' => isset($history['orphaned_at'])
+                        ? \Carbon\Carbon::parse($history['orphaned_at'])->format('d.m.Y H:i')
+                        : null,
+                    'reason' => $reasonLabels[$history['orphan_reason'] ?? ''] ?? 'Nieznany',
+                    'reason_code' => $history['orphan_reason'] ?? null,
+                ];
+            }
+        );
+    }
+
+    /**
+     * Check if media has orphan history
+     *
+     * @return bool
+     */
+    public function hasOrphanHistory(): bool
+    {
+        return !empty($this->orphan_history);
+    }
+
+    /**
+     * Clear orphan history (when re-assigning to a product)
+     *
+     * @return bool
+     */
+    public function clearOrphanHistory(): bool
+    {
+        $this->orphan_history = null;
         return $this->save();
     }
 

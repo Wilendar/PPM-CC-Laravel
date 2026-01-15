@@ -16,9 +16,9 @@ if ($LASTEXITCODE -eq 0) {
 }
 
 Write-Host ""
-Write-Host "[2/2] Clearing Laravel cache..." -ForegroundColor Yellow
+Write-Host "[2/3] Clearing Laravel cache and failed jobs..." -ForegroundColor Yellow
 plink -ssh host379076@host379076.hostido.net.pl -P 64321 -i $HostidoKey -batch `
-  "cd domains/ppm.mpptrade.pl/public_html && php artisan cache:clear"
+  "cd domains/ppm.mpptrade.pl/public_html && php artisan cache:clear && php artisan queue:flush"
 
 if ($LASTEXITCODE -eq 0) {
     Write-Host "[OK] Cache cleared" -ForegroundColor Green
@@ -27,5 +27,10 @@ if ($LASTEXITCODE -eq 0) {
 }
 
 Write-Host ""
+Write-Host "[3/3] Verifying getProductImages method..." -ForegroundColor Yellow
+plink -ssh host379076@host379076.hostido.net.pl -P 64321 -i $HostidoKey -batch `
+  "grep -n 'function getProductImages' domains/ppm.mpptrade.pl/public_html/app/Services/PrestaShop/PrestaShop8Client.php"
+
+Write-Host ""
 Write-Host "=== DEPLOYMENT COMPLETE ===" -ForegroundColor Green
-Write-Host "getProductsByCategory() method is now available in PrestaShop8Client!" -ForegroundColor Cyan
+Write-Host "getProductImages() method is now available in PrestaShop8Client!" -ForegroundColor Cyan

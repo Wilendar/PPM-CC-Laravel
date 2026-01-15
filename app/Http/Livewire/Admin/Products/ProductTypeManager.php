@@ -31,10 +31,10 @@ class ProductTypeManager extends Component
     |--------------------------------------------------------------------------
     */
 
-    // Modal states
-    public bool $showCreateModal = false;
-    public bool $showEditModal = false;
-    public bool $showDeleteModal = false;
+    // Modal states (nazwy property inne niż metody - unikamy konfliktu Livewire 3.x)
+    public bool $isCreateModalOpen = false;
+    public bool $isEditModalOpen = false;
+    public bool $isDeleteModalOpen = false;
 
     // Form data
     public ?ProductType $selectedType = null;
@@ -51,6 +51,9 @@ class ProductTypeManager extends Component
     public bool $selectAll = false;
     public string $successMessage = '';
     public string $errorMessage = '';
+
+    // Embedded mode (no header/layout when used in tabs)
+    public bool $embedded = false;
 
     /*
     |--------------------------------------------------------------------------
@@ -134,31 +137,39 @@ class ProductTypeManager extends Component
     */
 
     /**
-     * Show create modal
+     * Open create modal
      */
-    public function showCreateModal(): void
+    public function openCreateModal(): void
     {
         $this->resetForm();
-        $this->showCreateModal = true;
+        $this->isCreateModalOpen = true;
     }
 
     /**
-     * Show edit modal
+     * Open edit modal
+     * FIX 2025-12-15: Accept ID instead of model for embedded mode compatibility
+     * FIX 2025-12-15: Renamed from showEditModal to avoid Livewire 3.x property/method name conflict
      */
-    public function showEditModal(ProductType $productType): void
+    public function openEditModal(int $id): void
     {
-        $this->selectedType = $productType;
-        $this->loadTypeData();
-        $this->showEditModal = true;
+        $this->selectedType = ProductType::withCount('products')->find($id);
+        if ($this->selectedType) {
+            $this->loadTypeData();
+            $this->isEditModalOpen = true;
+        }
     }
 
     /**
-     * Show delete confirmation modal
+     * Open delete confirmation modal
+     * FIX 2025-12-15: Accept ID instead of model for embedded mode compatibility
+     * FIX 2025-12-15: Renamed from showDeleteModal to avoid Livewire 3.x property/method name conflict
      */
-    public function showDeleteModal(ProductType $productType): void
+    public function openDeleteModal(int $id): void
     {
-        $this->selectedType = $productType;
-        $this->showDeleteModal = true;
+        $this->selectedType = ProductType::withCount('products')->find($id);
+        if ($this->selectedType) {
+            $this->isDeleteModalOpen = true;
+        }
     }
 
     /**
@@ -183,7 +194,7 @@ class ProductTypeManager extends Component
             DB::commit();
 
             $this->successMessage = "Typ produktu '{$this->name}' został utworzony pomyślnie.";
-            $this->showCreateModal = false;
+            $this->isCreateModalOpen = false;
             $this->resetForm();
 
             Log::info('ProductType created', [
@@ -211,6 +222,10 @@ class ProductTypeManager extends Component
     {
         $this->validate();
 
+        // FIX 2025-12-15: Save ID before resetForm() nullifies selectedType
+        $typeId = $this->selectedType?->id;
+        $typeName = $this->name;
+
         try {
             DB::beginTransaction();
 
@@ -225,13 +240,13 @@ class ProductTypeManager extends Component
 
             DB::commit();
 
-            $this->successMessage = "Typ produktu '{$this->name}' został zaktualizowany pomyślnie.";
-            $this->showEditModal = false;
+            $this->successMessage = "Typ produktu '{$typeName}' został zaktualizowany pomyślnie.";
+            $this->isEditModalOpen = false;
             $this->resetForm();
 
             Log::info('ProductType updated', [
-                'id' => $this->selectedType->id,
-                'name' => $this->name,
+                'id' => $typeId,
+                'name' => $typeName,
                 'user_id' => Auth::id(),
             ]);
 
@@ -241,7 +256,7 @@ class ProductTypeManager extends Component
 
             Log::error('ProductType update failed', [
                 'error' => $e->getMessage(),
-                'id' => $this->selectedType->id,
+                'id' => $typeId,
                 'user_id' => Auth::id(),
             ]);
         }
@@ -252,25 +267,29 @@ class ProductTypeManager extends Component
      */
     public function delete(): void
     {
-        if (!$this->selectedType->canBeDeleted()) {
+        if (!$this->selectedType || !$this->selectedType->canBeDeleted()) {
             $this->errorMessage = 'Nie można usunąć typu produktu, który ma przypisane produkty.';
-            $this->showDeleteModal = false;
+            $this->isDeleteModalOpen = false;
             return;
         }
+
+        // FIX 2025-12-15: Save values before deletion
+        $typeId = $this->selectedType->id;
+        $typeName = $this->selectedType->name;
 
         try {
             DB::beginTransaction();
 
-            $typeName = $this->selectedType->name;
             $this->selectedType->delete();
 
             DB::commit();
 
             $this->successMessage = "Typ produktu '{$typeName}' został usunięty pomyślnie.";
-            $this->showDeleteModal = false;
+            $this->isDeleteModalOpen = false;
             $this->selectedType = null;
 
             Log::info('ProductType deleted', [
+                'id' => $typeId,
                 'name' => $typeName,
                 'user_id' => Auth::id(),
             ]);
@@ -281,7 +300,7 @@ class ProductTypeManager extends Component
 
             Log::error('ProductType deletion failed', [
                 'error' => $e->getMessage(),
-                'id' => $this->selectedType->id,
+                'id' => $typeId,
                 'user_id' => Auth::id(),
             ]);
         }
@@ -295,10 +314,17 @@ class ProductTypeManager extends Component
 
     /**
      * Toggle product type status (active/inactive)
+     * FIX 2025-12-15: Accept ID instead of model for embedded mode compatibility
      */
-    public function toggleStatus(ProductType $productType): void
+    public function toggleStatus(int $id): void
     {
         try {
+            $productType = ProductType::find($id);
+            if (!$productType) {
+                $this->errorMessage = 'Typ produktu nie został znaleziony.';
+                return;
+            }
+
             $productType->update(['is_active' => !$productType->is_active]);
 
             $status = $productType->is_active ? 'aktywowany' : 'dezaktywowany';
@@ -308,7 +334,7 @@ class ProductTypeManager extends Component
             $this->errorMessage = 'Wystąpił błąd podczas zmiany statusu.';
             Log::error('ProductType status toggle failed', [
                 'error' => $e->getMessage(),
-                'id' => $productType->id,
+                'id' => $id,
             ]);
         }
     }
@@ -430,9 +456,9 @@ class ProductTypeManager extends Component
      */
     public function closeModal(): void
     {
-        $this->showCreateModal = false;
-        $this->showEditModal = false;
-        $this->showDeleteModal = false;
+        $this->isCreateModalOpen = false;
+        $this->isEditModalOpen = false;
+        $this->isDeleteModalOpen = false;
         $this->resetForm();
     }
 
@@ -456,15 +482,23 @@ class ProductTypeManager extends Component
      */
     public function render()
     {
-        return view('livewire.admin.products.product-type-manager', [
+        $view = view('livewire.admin.products.product-type-manager', [
             'productTypes' => $this->productTypes,
-        ])->layout('layouts.admin', [
-            'title' => 'Zarządzanie typami produktów',
-            'breadcrumbs' => [
-                ['name' => 'Admin', 'url' => route('admin.dashboard')],
-                ['name' => 'Produkty', 'url' => route('admin.products.index')],
-                ['name' => 'Typy produktów', 'url' => null],
-            ],
+            'embedded' => $this->embedded,
         ]);
+
+        // Only apply layout when NOT embedded
+        if (!$this->embedded) {
+            $view->layout('layouts.admin', [
+                'title' => 'Zarządzanie typami produktów',
+                'breadcrumbs' => [
+                    ['name' => 'Admin', 'url' => route('admin.dashboard')],
+                    ['name' => 'Produkty', 'url' => route('admin.products.index')],
+                    ['name' => 'Typy produktów', 'url' => null],
+                ],
+            ]);
+        }
+
+        return $view;
     }
 }

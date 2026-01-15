@@ -1,5 +1,6 @@
-{{-- Flash Messages Component --}}
-<div class="fixed top-4 right-4 z-50 space-y-2" x-data="flashMessages()" x-init="init()">
+{{-- Flash Messages Container - DOM managed by JavaScript --}}
+<div id="flash-messages-container" class="fixed top-4 right-4 z-50 space-y-2">
+
     {{-- Success Messages (support both 'success' and 'message' keys) --}}
     @if(session('success') || session('message'))
         <div x-data="{ show: true }" 
@@ -11,7 +12,7 @@
              x-transition:leave-start="opacity-100 scale-100 translate-x-0"
              x-transition:leave-end="opacity-0 scale-95 translate-x-full"
              x-init="setTimeout(() => show = false, 5000)"
-             class="max-w-sm w-full bg-gray-800 shadow-lg rounded-lg pointer-events-auto ring-1 ring-black ring-opacity-5 overflow-hidden">
+             class="max-w-md w-full bg-gray-800 shadow-lg rounded-lg pointer-events-auto ring-1 ring-black ring-opacity-5 overflow-hidden">
             <div class="p-4">
                 <div class="flex items-start">
                     <div class="flex-shrink-0">
@@ -60,7 +61,7 @@
              x-transition:leave-start="opacity-100 scale-100 translate-x-0"
              x-transition:leave-end="opacity-0 scale-95 translate-x-full"
              x-init="setTimeout(() => show = false, 8000)"
-             class="max-w-sm w-full bg-gray-800 shadow-lg rounded-lg pointer-events-auto ring-1 ring-black ring-opacity-5 overflow-hidden">
+             class="max-w-md w-full bg-gray-800 shadow-lg rounded-lg pointer-events-auto ring-1 ring-black ring-opacity-5 overflow-hidden">
             <div class="p-4">
                 <div class="flex items-start">
                     <div class="flex-shrink-0">
@@ -109,7 +110,7 @@
              x-transition:leave-start="opacity-100 scale-100 translate-x-0"
              x-transition:leave-end="opacity-0 scale-95 translate-x-full"
              x-init="setTimeout(() => show = false, 6000)"
-             class="max-w-sm w-full bg-gray-800 shadow-lg rounded-lg pointer-events-auto ring-1 ring-black ring-opacity-5 overflow-hidden">
+             class="max-w-md w-full bg-gray-800 shadow-lg rounded-lg pointer-events-auto ring-1 ring-black ring-opacity-5 overflow-hidden">
             <div class="p-4">
                 <div class="flex items-start">
                     <div class="flex-shrink-0">
@@ -158,7 +159,7 @@
              x-transition:leave-start="opacity-100 scale-100 translate-x-0"
              x-transition:leave-end="opacity-0 scale-95 translate-x-full"
              x-init="setTimeout(() => show = false, 5000)"
-             class="max-w-sm w-full bg-gray-800 shadow-lg rounded-lg pointer-events-auto ring-1 ring-black ring-opacity-5 overflow-hidden">
+             class="max-w-md w-full bg-gray-800 shadow-lg rounded-lg pointer-events-auto ring-1 ring-black ring-opacity-5 overflow-hidden">
             <div class="p-4">
                 <div class="flex items-start">
                     <div class="flex-shrink-0">
@@ -197,117 +198,110 @@
     @endif
 </div>
 
-{{-- JavaScript for dynamic flash messages --}}
+{{-- JavaScript for Livewire flash-message event handling - Direct DOM manipulation --}}
 <script>
-function flashMessages() {
-    return {
-        messages: [],
-        
-        init() {
-            // Listen for Livewire flash messages
-            window.addEventListener('livewire:init', () => {
-                Livewire.on('flash-message', (data) => {
-                    this.showMessage(data.type, data.message);
-                });
-            });
-        },
+(function() {
+    const ICONS = {
+        success: '<svg class="h-6 w-6 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>',
+        error: '<svg class="h-6 w-6 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.732-.833-2.464 0L4.35 16.5c-.77.833.192 2.5 1.732 2.5z"></path></svg>',
+        warning: '<svg class="h-6 w-6 text-yellow-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.732-.833-2.464 0L4.35 16.5c-.77.833.192 2.5 1.732 2.5z"></path></svg>',
+        info: '<svg class="h-6 w-6 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>'
+    };
 
-        showMessage(type, message, duration = 5000) {
-            const id = Date.now();
-            const messageObj = {
-                id: id,
-                type: type,
-                message: message,
-                show: true
-            };
-            
-            this.messages.push(messageObj);
-            
-            // Auto-remove message after duration
-            setTimeout(() => {
-                this.removeMessage(id);
-            }, duration);
-        },
+    const TITLES = {
+        success: 'Sukces!',
+        error: 'Blad',
+        warning: 'Ostrzezenie',
+        info: 'Informacja'
+    };
 
-        removeMessage(id) {
-            const index = this.messages.findIndex(msg => msg.id === id);
-            if (index > -1) {
-                this.messages[index].show = false;
-                // Remove from array after animation
-                setTimeout(() => {
-                    this.messages.splice(index, 1);
-                }, 300);
-            }
-        },
+    const DURATIONS = {
+        success: 5000,
+        error: 8000,
+        warning: 6000,
+        info: 5000
+    };
 
-        // Public methods for manual flash messages
-        success(message) {
-            this.showMessage('success', message);
-        },
+    function showFlashMessage(type, message) {
+        console.log('[FLASH] showFlashMessage:', type, message);
+        const container = document.getElementById('flash-messages-container');
+        if (!container) {
+            console.error('[FLASH] Container not found!');
+            return;
+        }
 
-        error(message) {
-            this.showMessage('error', message, 8000);
-        },
+        const id = 'flash-' + Date.now();
+        const duration = DURATIONS[type] || 5000;
 
-        warning(message) {
-            this.showMessage('warning', message, 6000);
-        },
+        const notification = document.createElement('div');
+        notification.id = id;
+        notification.className = 'max-w-xl w-full bg-gray-800 shadow-lg rounded-lg pointer-events-auto ring-1 ring-black ring-opacity-5 overflow-hidden transform translate-x-full opacity-0 transition-all duration-300';
+        notification.innerHTML = `
+            <div class="p-4">
+                <div class="flex items-start">
+                    <div class="flex-shrink-0">${ICONS[type] || ICONS.info}</div>
+                    <div class="ml-3 flex-1 min-w-0 pt-0.5">
+                        <p class="text-sm font-medium text-white">${TITLES[type] || TITLES.info}</p>
+                        <p class="mt-1 text-sm text-gray-400 break-words whitespace-pre-wrap">${message}</p>
+                    </div>
+                    <div class="ml-4 flex-shrink-0 flex">
+                        <button class="bg-gray-800 rounded-md inline-flex text-gray-400 hover:text-gray-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500" onclick="window.flash.close('${id}')">
+                            <span class="sr-only">Close</span>
+                            <svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"></path>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
 
-        info(message) {
-            this.showMessage('info', message);
+        container.insertBefore(notification, container.firstChild);
+
+        // Animate in
+        requestAnimationFrame(() => {
+            notification.classList.remove('translate-x-full', 'opacity-0');
+            notification.classList.add('translate-x-0', 'opacity-100');
+        });
+
+        // Auto-remove after duration
+        setTimeout(() => window.flash.close(id), duration);
+    }
+
+    function closeFlashMessage(id) {
+        const notification = document.getElementById(id);
+        if (notification) {
+            notification.classList.remove('translate-x-0', 'opacity-100');
+            notification.classList.add('translate-x-full', 'opacity-0');
+            setTimeout(() => notification.remove(), 300);
         }
     }
-}
 
-// Global flash message functions
-window.flash = {
-    success: (message) => Alpine.store('flash').success(message),
-    error: (message) => Alpine.store('flash').error(message),
-    warning: (message) => Alpine.store('flash').warning(message),
-    info: (message) => Alpine.store('flash').info(message)
-};
+    // Global flash helper
+    window.flash = {
+        show: showFlashMessage,
+        close: closeFlashMessage,
+        success: (msg) => showFlashMessage('success', msg),
+        error: (msg) => showFlashMessage('error', msg),
+        warning: (msg) => showFlashMessage('warning', msg),
+        info: (msg) => showFlashMessage('info', msg)
+    };
 
-// Make flash messages available globally via Alpine store
-document.addEventListener('alpine:init', () => {
-    Alpine.store('flash', {
-        messages: [],
-        
-        success(message) {
-            this.add('success', message);
-        },
-        
-        error(message) {
-            this.add('error', message, 8000);
-        },
-        
-        warning(message) {
-            this.add('warning', message, 6000);
-        },
-        
-        info(message) {
-            this.add('info', message);
-        },
-        
-        add(type, message, duration = 5000) {
-            const id = Date.now() + Math.random();
-            this.messages.push({
-                id: id,
-                type: type,
-                message: message,
-                show: true
-            });
-            
-            setTimeout(() => {
-                this.remove(id);
-            }, duration);
-        },
-        
-        remove(id) {
-            const index = this.messages.findIndex(msg => msg.id === id);
-            if (index > -1) {
-                this.messages.splice(index, 1);
-            }
-        }
+    // Register Livewire listener
+    document.addEventListener('livewire:init', () => {
+        console.log('[FLASH] Livewire:init - registering flash-message listener');
+
+        Livewire.on('flash-message', (params) => {
+            console.log('[FLASH] Received flash-message event:', params);
+
+            // Livewire 3.x passes params as array with single object
+            const data = Array.isArray(params) ? params[0] : params;
+            const type = data?.type || 'info';
+            const message = data?.message || '';
+
+            console.log('[FLASH] Calling showFlashMessage:', type, message);
+            showFlashMessage(type, message);
+        });
     });
-});
+})();
 </script>

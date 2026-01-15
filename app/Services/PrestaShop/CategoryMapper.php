@@ -80,7 +80,25 @@ class CategoryMapper
         }
 
         // PPM value is stored as string, cast to int
-        return (int) $mapping->ppm_value;
+        $ppmCategoryId = (int) $mapping->ppm_value;
+
+        // 🔧 FIX 2025-12-15: Validate category exists before returning
+        // Prevents FK constraint violation if category was deleted but mapping remains
+        if (!Category::where('id', $ppmCategoryId)->exists()) {
+            Log::warning('CategoryMapper: Orphan mapping detected - category does not exist', [
+                'mapping_id' => $mapping->id,
+                'ppm_value' => $ppmCategoryId,
+                'prestashop_id' => $prestashopId,
+                'shop_id' => $shop->id,
+            ]);
+
+            // Deactivate orphan mapping
+            $mapping->update(['is_active' => false]);
+
+            return null;
+        }
+
+        return $ppmCategoryId;
     }
 
     /**
@@ -151,9 +169,36 @@ class CategoryMapper
         ]);
 
         // HIERARCHY SUPPORT: Recursively create/map parent if exists
-        // PrestaShop roots: 1 = Home, 2 = Root catalog (should NOT be created in PPM)
+        // FIX 2025-12-22: DO NOT hardcode id=2! Find "Wszystko" dynamically
+        // PrestaShop roots:
+        // - id_parent = 1: Root of all categories → PPM: "Wszystko" (level=1) as fallback
+        // - id_parent = 2: Home category (Wszystko) → PPM: "Wszystko" (level=1)
+        // - id_parent > 2: Specific category → Recursively map
         $ppmParentId = null;
-        if ($prestashopParentId && !in_array($prestashopParentId, [1, 2], true)) {
+
+        // Helper: Find "Wszystko" category dynamically (level=1 = child of root "Baza")
+        $getWszystkoId = function () {
+            $wszystko = Category::where('name', 'Wszystko')
+                ->where('level', 1)
+                ->first();
+            return $wszystko?->id;
+        };
+
+        if ($prestashopParentId === 1) {
+            // PrestaShop Root (id=1) → PPM "Wszystko" (level=1)
+            $ppmParentId = $getWszystkoId();
+            Log::debug('[AUTO-CREATE CATEGORY] PrestaShop id_parent=1 mapped to PPM "Wszystko"', [
+                'prestashop_id' => $prestashopId,
+                'wszystko_id' => $ppmParentId,
+            ]);
+        } elseif ($prestashopParentId === 2) {
+            // PrestaShop Home (id=2) → PPM "Wszystko" (level=1)
+            $ppmParentId = $getWszystkoId();
+            Log::debug('[AUTO-CREATE CATEGORY] PrestaShop id_parent=2 mapped to PPM "Wszystko"', [
+                'prestashop_id' => $prestashopId,
+                'wszystko_id' => $ppmParentId,
+            ]);
+        } elseif ($prestashopParentId && $prestashopParentId > 2) {
             try {
                 // Recursively create parent category first
                 $ppmParentId = $this->mapOrCreateFromPrestaShop($prestashopParentId, $shop);
@@ -163,12 +208,12 @@ class CategoryMapper
                     'ppm_parent_id' => $ppmParentId,
                 ]);
             } catch (\Exception $e) {
-                // Parent creation failed - log warning but continue (create as root)
-                Log::warning('[AUTO-CREATE CATEGORY] Failed to create parent category', [
+                // Parent creation failed - use "Wszystko" as fallback
+                Log::warning('[AUTO-CREATE CATEGORY] Failed to create parent category - using Wszystko fallback', [
                     'prestashop_parent_id' => $prestashopParentId,
                     'error' => $e->getMessage(),
                 ]);
-                $ppmParentId = null;
+                $ppmParentId = $getWszystkoId();
             }
         }
 
@@ -176,9 +221,9 @@ class CategoryMapper
         $ppmCategory = Category::whereRaw('LOWER(name) = ?', [strtolower($categoryName)])->first();
 
         if (!$ppmCategory) {
-            // FIX 2025-11-25: Default parent to "Wszystko" (id=2) if no parent found
+            // FIX 2025-12-22: Default parent to "Wszystko" dynamically if no parent found
             // This ensures all imported categories have proper PPM hierarchy
-            $effectiveParentId = $ppmParentId ?? 2; // Wszystko (id=2) as fallback
+            $effectiveParentId = $ppmParentId ?? $getWszystkoId(); // "Wszystko" as fallback
 
             // Create new PPM category WITH HIERARCHY
             $ppmCategory = Category::create([

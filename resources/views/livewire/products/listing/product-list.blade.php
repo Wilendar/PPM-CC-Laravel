@@ -409,6 +409,13 @@
                                            class="rounded border-primary text-orange-500 shadow-sm focus:ring-orange-500 focus:ring-opacity-50 bg-input">
                                 </th>
 
+                                {{-- ETAP_07d FAZA 7: Thumbnail Column --}}
+                                <th class="product-list-thumbnail-cell text-center text-xs font-medium text-muted uppercase tracking-wider">
+                                    <svg class="w-4 h-4 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                                    </svg>
+                                </th>
+
                                 {{-- Sortable Headers --}}
                                 <th class="px-6 py-3 text-left text-xs font-medium text-muted uppercase tracking-wider cursor-pointer hover:bg-card-hover transition-all duration-300"
                                     wire:click="sortBy('sku')">
@@ -473,40 +480,98 @@
                                 </th>
                             </tr>
                         </thead>
-                        <tbody class="bg-card divide-y divide-border-primary">
+                        {{-- Multiple tbody elements are valid HTML5 - used for row grouping with Alpine state --}}
                             @forelse($products as $product)
-                                <tr class="hover:bg-card-hover transition-all duration-300">
+                                <tbody x-data="{
+                                        pressing: false,
+                                        expanded: false,
+                                        hasVariants: {{ $product->variants && $product->variants->count() > 0 ? 'true' : 'false' }}
+                                    }"
+                                    class="bg-card divide-y divide-border-primary product-tbody-group">
+                                {{-- Clickable Row with hover/click animations + Expandable state --}}
+                                <tr @click="window.location.href = '{{ route('products.edit', $product) }}'"
+                                    @mousedown="pressing = true"
+                                    @mouseup="pressing = false"
+                                    @mouseleave="pressing = false"
+                                    :class="{
+                                        'scale-[0.995] bg-orange-500/10': pressing,
+                                        'product-row-expanded': expanded && hasVariants,
+                                        'product-row-expandable': hasVariants
+                                    }"
+                                    class="product-list-row cursor-pointer hover:bg-orange-500/5 hover:shadow-lg hover:shadow-orange-500/5 transition-all duration-200 ease-out">
                                     {{-- Bulk Select --}}
-                                    <td class="px-6 py-4">
+                                    <td class="px-6 py-4" @click.stop>
                                         <input type="checkbox"
                                                wire:key="select-{{ $product->id }}"
                                                value="{{ $product->id }}"
                                                wire:model.live="selectedProducts"
-                                               class="rounded border-primary text-orange-500 shadow-sm focus:ring-orange-500 focus:ring-opacity-50 bg-input">
+                                               class="rounded border-primary text-orange-500 shadow-sm focus:ring-orange-500 focus:ring-opacity-50 bg-input cursor-pointer">
                                     </td>
 
-                                    {{-- SKU --}}
-                                    <td class="px-6 py-4 whitespace-nowrap">
-                                        <div class="text-sm font-medium text-primary">
-                                            {{ $product->sku }}
-                                        </div>
-                                        @if($product->supplier_code)
-                                            <div class="text-xs text-muted">
-                                                {{ $product->supplier_code }}
+                                    {{-- ETAP_07d FAZA 7: Thumbnail --}}
+                                    <td class="product-list-thumbnail-cell">
+                                        @if($product->media->first())
+                                            <img src="{{ $product->media->first()->thumbnailUrl ?? $product->media->first()->url }}"
+                                                 alt="{{ $product->name }}"
+                                                 class="product-list-thumbnail"
+                                                 loading="lazy" />
+                                        @else
+                                            <div class="product-list-thumbnail-placeholder">
+                                                <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                                                </svg>
                                             </div>
                                         @endif
                                     </td>
 
-                                    {{-- Name --}}
-                                    <td class="px-6 py-4">
-                                        <div class="text-sm text-primary">
-                                            <a href="{{ route('products.edit', $product) }}"
-                                               class="hover:text-orange-500 transition-colors duration-300">
-                                                {{ Str::limit($product->name, 50) }}
-                                            </a>
+                                    {{-- SKU + Expand Toggle --}}
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <div class="flex items-center gap-2">
+                                            {{-- Expand Toggle (tylko dla produktów z wariantami) --}}
+                                            <template x-if="hasVariants">
+                                                <button @click.stop="expanded = !expanded"
+                                                        class="expand-toggle"
+                                                        :class="{ 'expanded': expanded }">
+                                                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                                                    </svg>
+                                                </button>
+                                            </template>
+
+                                            <div>
+                                                <div class="text-sm font-medium text-primary">
+                                                    {{ $product->sku }}
+                                                </div>
+                                                @if($product->supplier_code)
+                                                    <div class="text-xs text-muted">
+                                                        {{ $product->supplier_code }}
+                                                    </div>
+                                                @endif
+                                            </div>
                                         </div>
+                                    </td>
+
+                                    {{-- Name + Variants Badge --}}
+                                    <td class="px-6 py-4">
+                                        <div class="flex items-center">
+                                            <div class="text-sm text-primary">
+                                                <a href="{{ route('products.edit', $product) }}"
+                                                   class="hover:text-orange-500 transition-colors duration-300">
+                                                    {{ Str::limit($product->name, 50) }}
+                                                </a>
+                                            </div>
+
+                                            {{-- Variants Count Badge --}}
+                                            @if($product->variants && $product->variants->count() > 0)
+                                                <button @click.stop="expanded = !expanded"
+                                                        class="variants-badge">
+                                                    Warianty: {{ $product->variants->count() }}
+                                                </button>
+                                            @endif
+                                        </div>
+
                                         @if($product->is_variant_master)
-                                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-800 text-purple-200">
+                                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-800 text-purple-200 mt-1">
                                                 Master
                                             </span>
                                         @endif
@@ -537,7 +602,7 @@
                                     </td>
 
                                     {{-- Status --}}
-                                    <td class="px-6 py-4 whitespace-nowrap">
+                                    <td class="px-6 py-4 whitespace-nowrap" @click.stop>
                                         <button wire:click="toggleStatus({{ $product->id }})"
                                                 class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium transition-colors
                                                     {{ $product->is_active
@@ -621,7 +686,7 @@
                                     </td>
 
                                     {{-- Actions --}}
-                                    <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                    <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium" @click.stop>
                                         <div class="flex items-center justify-end space-x-1">
                                             {{-- Quick Preview Modal Button --}}
                                             <button wire:click="showProductPreview({{ $product->id }})"
@@ -681,9 +746,138 @@
                                         </div>
                                     </td>
                                 </tr>
+
+                                {{-- FAZA 4: Expandable Variant Rows - directly in main table for column alignment --}}
+                                @if($product->variants && $product->variants->count() > 0)
+                                    @foreach($product->variants as $variant)
+                                        <tr x-show="expanded"
+                                            x-transition:enter="transition ease-out duration-150"
+                                            x-transition:enter-start="opacity-0"
+                                            x-transition:enter-end="opacity-100"
+                                            x-transition:leave="transition ease-in duration-100"
+                                            x-transition:leave-start="opacity-100"
+                                            x-transition:leave-end="opacity-0"
+                                            class="variant-subrow">
+                                            {{-- 1. Checkbox --}}
+                                            <td class="px-6 py-3" @click.stop>
+                                                <input type="checkbox"
+                                                       wire:model="selectedVariants"
+                                                       value="{{ $variant->id }}"
+                                                       class="rounded border-gray-600 text-orange-500 focus:ring-orange-500 bg-gray-700">
+                                            </td>
+
+                                            {{-- 2. Thumbnail --}}
+                                            <td class="product-list-thumbnail-cell">
+                                                @if($variant->images && $variant->images->isNotEmpty())
+                                                    @php $coverImage = $variant->images->where('is_cover', true)->first() ?? $variant->images->first(); @endphp
+                                                    <img src="{{ $coverImage->thumbnail_url ?? $coverImage->url ?? asset('images/placeholder.png') }}"
+                                                         alt="{{ $variant->name }}"
+                                                         class="w-12 h-12 object-cover rounded"
+                                                         loading="lazy" />
+                                                @else
+                                                    <div class="w-12 h-12 bg-gray-700 rounded flex items-center justify-center">
+                                                        <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                                                        </svg>
+                                                    </div>
+                                                @endif
+                                            </td>
+
+                                            {{-- 3. SKU --}}
+                                            <td class="px-6 py-3 whitespace-nowrap">
+                                                <div class="flex items-center gap-2">
+                                                    <svg class="w-3 h-3 text-orange-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                                                    </svg>
+                                                    <span class="text-sm font-medium text-orange-300">{{ $variant->sku }}</span>
+                                                </div>
+                                            </td>
+
+                                            {{-- 4. Name --}}
+                                            <td class="px-6 py-3">
+                                                <div class="text-sm text-gray-300">{{ Str::limit($variant->name, 40) }}</div>
+                                                @if($variant->attributes && $variant->attributes->isNotEmpty())
+                                                    {{-- FIX 2025-12-15: Show attribute group names (e.g. "Średnica / Kolor") --}}
+                                                    <div class="text-xs text-gray-500 mt-0.5">
+                                                        {{ $variant->attributes->map(fn($a) => $a->attributeType?->name)->filter()->implode(' / ') }}
+                                                    </div>
+                                                @endif
+                                            </td>
+
+                                            {{-- 5. Type --}}
+                                            <td class="px-6 py-3 whitespace-nowrap">
+                                                @if($variant->product?->productType)
+                                                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium
+                                                        @switch($variant->product->productType->slug)
+                                                            @case('pojazd') bg-green-800/70 text-green-300 @break
+                                                            @case('czesc-zamienna') bg-blue-800/70 text-blue-300 @break
+                                                            @default bg-gray-700 text-gray-300
+                                                        @endswitch">
+                                                        {{ $variant->product->productType->name }}
+                                                    </span>
+                                                @else
+                                                    <span class="text-xs text-gray-500">-</span>
+                                                @endif
+                                            </td>
+
+                                            {{-- 6. Manufacturer --}}
+                                            <td class="px-6 py-3 whitespace-nowrap text-sm text-gray-400">
+                                                {{ $variant->product?->manufacturer ?? '-' }}
+                                            </td>
+
+                                            {{-- 7. Status --}}
+                                            <td class="px-6 py-3 whitespace-nowrap" @click.stop>
+                                                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium
+                                                    {{ $variant->is_active ? 'bg-green-800/70 text-green-300' : 'bg-red-800/70 text-red-300' }}">
+                                                    {{ $variant->is_active ? 'Aktywny' : 'Nieaktywny' }}
+                                                </span>
+                                            </td>
+
+                                            {{-- 8. PrestaShop Sync --}}
+                                            <td class="px-6 py-3 text-center">
+                                                <span class="text-xs text-gray-500">-</span>
+                                            </td>
+
+                                            {{-- 9. Updated At --}}
+                                            <td class="px-6 py-3 whitespace-nowrap text-sm text-muted">
+                                                {{ $variant->updated_at?->format('d.m.Y H:i') ?? '-' }}
+                                            </td>
+
+                                            {{-- 10. Actions --}}
+                                            <td class="px-6 py-3 whitespace-nowrap text-right" @click.stop>
+                                                <div class="flex items-center justify-end gap-1">
+                                                    <a href="{{ route('products.edit', $variant->product_id) }}?tab=warianty"
+                                                       class="p-1 text-gray-400 hover:text-blue-400 transition-colors"
+                                                       title="Edytuj wariant">
+                                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                                                        </svg>
+                                                    </a>
+                                                    <button wire:click="toggleVariantStatus({{ $variant->id }})"
+                                                            class="p-1 text-gray-400 hover:text-yellow-400 transition-colors"
+                                                            title="{{ $variant->is_active ? 'Dezaktywuj' : 'Aktywuj' }}">
+                                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/>
+                                                        </svg>
+                                                    </button>
+                                                    <button wire:click="deleteVariant({{ $variant->id }})"
+                                                            wire:confirm="Czy na pewno chcesz usunac ten wariant?"
+                                                            class="p-1 text-gray-400 hover:text-red-500 transition-colors"
+                                                            title="Usun wariant">
+                                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                                                        </svg>
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    @endforeach
+                                @endif
+                                </tbody>
                             @empty
+                            <tbody class="bg-card">
                                 <tr>
-                                    <td colspan="9" class="px-6 py-12 text-center">
+                                    <td colspan="10" class="px-6 py-12 text-center">
                                         <div class="flex flex-col items-center">
                                             <svg class="w-12 h-12 text-muted mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10"/>
@@ -704,8 +898,8 @@
                                         </div>
                                     </td>
                                 </tr>
+                            </tbody>
                             @endforelse
-                        </tbody>
                         </table>
                     </div>
                 </div>
@@ -733,7 +927,14 @@
             {{-- Grid View --}}
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                 @forelse($products as $product)
-                    <div class="card glass-effect rounded-xl shadow-soft border border-primary overflow-hidden card-hover transition-all duration-300">
+                    {{-- Clickable Card with hover/click animations --}}
+                    <div x-data="{ pressing: false }"
+                         @click="window.location.href = '{{ route('products.edit', $product) }}'"
+                         @mousedown="pressing = true"
+                         @mouseup="pressing = false"
+                         @mouseleave="pressing = false"
+                         :class="{ 'scale-[0.98] ring-2 ring-orange-500/50': pressing }"
+                         class="product-grid-card cursor-pointer card glass-effect rounded-xl shadow-soft border border-primary overflow-hidden transition-all duration-200 ease-out hover:shadow-xl hover:shadow-orange-500/10 hover:border-orange-500/30 hover:-translate-y-1">
                         {{-- Product Image Placeholder --}}
                         <div class="h-48 bg-card flex items-center justify-center">
                             <svg class="w-12 h-12 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -745,20 +946,20 @@
                         <div class="p-4">
                             <div class="flex items-start justify-between mb-2">
                                 <h3 class="text-sm font-medium text-primary line-clamp-2">
-                                    <a href="{{ route('products.edit', $product) }}" class="hover:text-orange-500 transition-colors duration-300">
-                                        {{ $product->name }}
-                                    </a>
+                                    {{ $product->name }}
                                 </h3>
-                                <input type="checkbox"
-                                       wire:key="grid-select-{{ $product->id }}"
-                                       value="{{ $product->id }}"
-                                       wire:model.live="selectedProducts"
-                                       class="rounded border-primary text-orange-500 shadow-sm focus:ring-orange-500 focus:ring-opacity-50 bg-input">
+                                <div @click.stop>
+                                    <input type="checkbox"
+                                           wire:key="grid-select-{{ $product->id }}"
+                                           value="{{ $product->id }}"
+                                           wire:model.live="selectedProducts"
+                                           class="rounded border-primary text-orange-500 shadow-sm focus:ring-orange-500 focus:ring-opacity-50 bg-input cursor-pointer">
+                                </div>
                             </div>
 
                             <p class="text-xs text-muted mb-2">SKU: {{ $product->sku }}</p>
 
-                            <div class="flex items-center justify-between mb-3">
+                            <div class="flex items-center justify-between mb-3" @click.stop>
                                 @if($product->productType)
                                 <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium
                                     @switch($product->productType->slug)
@@ -786,34 +987,37 @@
                             </div>
 
                             {{-- Actions --}}
-                            <div class="flex items-center justify-between">
+                            <div class="flex items-center justify-between" @click.stop>
                                 <span class="text-xs text-muted">
                                     {{ $product->updated_at->format('d.m.Y') }}
                                 </span>
 
                                 <div class="flex items-center space-x-1">
-                                    <a href="{{ route('products.edit', $product) }}"
-                                       class="p-1 text-muted hover:text-orange-500 transition-colors duration-300"
-                                       title="Edytuj szczegóły">
+                                    {{-- Quick Preview --}}
+                                    <button wire:click="showProductPreview({{ $product->id }})"
+                                            class="p-1 text-muted hover:text-blue-500 transition-colors duration-300"
+                                            title="Szybki podglad">
                                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
                                         </svg>
-                                    </a>
+                                    </button>
 
-                                    <a href="{{ route('products.edit', $product) }}"
-                                       class="p-1 text-muted hover:text-orange-500 transition-colors duration-300"
-                                       title="Edytuj">
-                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
-                                        </svg>
-                                    </a>
-
+                                    {{-- Duplicate --}}
                                     <button wire:click="duplicateProduct({{ $product->id }})"
                                             class="p-1 text-muted hover:text-green-500 transition-colors duration-300"
                                             title="Duplikuj">
                                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+                                        </svg>
+                                    </button>
+
+                                    {{-- Delete --}}
+                                    <button wire:click="confirmDelete({{ $product->id }})"
+                                            class="p-1 text-muted hover:text-red-500 transition-colors duration-300"
+                                            title="Usun">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
                                         </svg>
                                     </button>
                                 </div>
@@ -1761,6 +1965,20 @@ class="fixed top-4 right-4 z-50">
                                 Zaimportujesz WSZYSTKIE produkty ze sklepu PrestaShop.
                                 Operacja może zająć kilka minut w zależności od liczby produktów.
                             </p>
+
+                            {{-- Variant Import Checkbox --}}
+                            <div class="mb-4">
+                                <label class="flex items-center text-sm text-gray-300 cursor-pointer hover:text-white transition-colors">
+                                    <input type="checkbox"
+                                           wire:model.live="importWithVariants"
+                                           class="form-checkbox mr-2 text-orange-500 rounded border-gray-500 focus:ring-orange-500">
+                                    <span>Automatycznie importuj brakujace warianty z PrestaShop</span>
+                                </label>
+                                <p class="text-xs text-gray-500 mt-1 ml-6">
+                                    Dla produktow z wariantami (combinations) zostana utworzone odpowiednie warianty w PPM
+                                </p>
+                            </div>
+
                             <button wire:click="importAllProducts"
                                     class="btn-primary inline-flex items-center px-4 py-2 text-white text-sm font-medium rounded-lg">
                                 🚀 Rozpocznij import wszystkich produktów
@@ -1961,8 +2179,21 @@ class="fixed top-4 right-4 z-50">
                                 </div>
 
                                 @if($importCategoryId)
+                                    {{-- Variant Import Checkbox --}}
+                                    <div class="mt-4 mb-4">
+                                        <label class="flex items-center text-sm text-gray-300 cursor-pointer hover:text-white transition-colors">
+                                            <input type="checkbox"
+                                                   wire:model.live="importWithVariants"
+                                                   class="form-checkbox mr-2 text-orange-500 rounded border-gray-500 focus:ring-orange-500">
+                                            <span>Automatycznie importuj brakujace warianty z PrestaShop</span>
+                                        </label>
+                                        <p class="text-xs text-gray-500 mt-1 ml-6">
+                                            Dla produktow z wariantami (combinations) zostana utworzone odpowiednie warianty w PPM
+                                        </p>
+                                    </div>
+
                                     <button wire:click="importFromCategory"
-                                            class="btn-primary inline-flex items-center px-4 py-2 text-white text-sm font-medium rounded-lg mt-4">
+                                            class="btn-primary inline-flex items-center px-4 py-2 text-white text-sm font-medium rounded-lg">
                                         🚀 Importuj z wybranej kategorii
                                     </button>
                                 @endif
@@ -2073,8 +2304,21 @@ class="fixed top-4 right-4 z-50">
                                 </div>
 
                                 @if(count($selectedProductsToImport) > 0)
+                                    {{-- Variant Import Checkbox --}}
+                                    <div class="mt-4 mb-4">
+                                        <label class="flex items-center text-sm text-gray-300 cursor-pointer hover:text-white transition-colors">
+                                            <input type="checkbox"
+                                                   wire:model.live="importWithVariants"
+                                                   class="form-checkbox mr-2 text-orange-500 rounded border-gray-500 focus:ring-orange-500">
+                                            <span>Automatycznie importuj brakujace warianty z PrestaShop</span>
+                                        </label>
+                                        <p class="text-xs text-gray-500 mt-1 ml-6">
+                                            Dla produktow z wariantami (combinations) zostana utworzone odpowiednie warianty w PPM
+                                        </p>
+                                    </div>
+
                                     <button wire:click="importSelectedProducts"
-                                            class="btn-primary inline-flex items-center px-4 py-2 text-white text-sm font-medium rounded-lg mt-4">
+                                            class="btn-primary inline-flex items-center px-4 py-2 text-white text-sm font-medium rounded-lg">
                                         🚀 Importuj wybrane ({{ count($selectedProductsToImport) }})
                                     </button>
                                 @endif

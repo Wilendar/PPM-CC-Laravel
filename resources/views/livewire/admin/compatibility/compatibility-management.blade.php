@@ -1,422 +1,477 @@
+{{--
+    CompatibilityManagement - Tile-Based Vehicle Compatibility UI
+    ETAP_05d FAZA 3 - Per-shop compatibility editing
+
+    Features:
+    - Tile-based vehicle selection (click = toggle)
+    - Per-shop filtering
+    - Smart suggestions panel
+    - Collapsible brand sections
+--}}
 <div class="compatibility-management-panel">
+    @vite(['resources/css/products/compatibility-tiles.css'])
+
     {{-- Header --}}
-    <div class="panel-header mb-8">
-        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-            <div>
-                <h1 class="text-3xl font-bold text-white mb-2">
-                    <i class="fas fa-link text-blue-600 mr-3"></i>
-                    Dopasowania Części Zamiennych
-                </h1>
-                <p class="text-gray-600 dark:text-gray-400">
-                    Zarządzanie globalnymi dopasowaniami części do pojazdów - centralna baza dla wszystkich sklepów
-                </p>
+    <div class="compat-panel-header">
+        <div class="compat-header-content">
+            <div class="compat-header-title">
+                <i class="fas fa-link"></i>
+                <div>
+                    <h1>Dopasowania Czesci Zamiennych</h1>
+                    <p>Zarzadzanie globalnymi dopasowaniami czesci do pojazdow - centralna baza dla wszystkich sklepow</p>
+                </div>
             </div>
 
-            {{-- Bulk Edit button (FAZA 2.2) --}}
-            @if(count($selectedPartIds) > 0)
-                <div class="flex items-center gap-3">
-                    <span class="text-sm text-gray-600 dark:text-gray-400">
-                        Zaznaczono: <strong>{{ count($selectedPartIds) }}</strong>
-                    </span>
-                    <button
-                        class="btn-bulk-edit px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition flex items-center"
-                        wire:click="openBulkEdit"
-                    >
-                        <i class="fas fa-edit mr-2"></i>
-                        Edycja masowa ({{ count($selectedPartIds) }})
-                    </button>
+            {{-- Statistics --}}
+            <div class="compat-stats">
+                <div class="compat-stat">
+                    <span class="compat-stat-value">{{ $statistics['total_compatibilities'] ?? 0 }}</span>
+                    <span class="compat-stat-label">Dopasowan</span>
                 </div>
+                <div class="compat-stat">
+                    <span class="compat-stat-value">{{ $statistics['unique_products'] ?? 0 }}</span>
+                    <span class="compat-stat-label">Czesci</span>
+                </div>
+                <div class="compat-stat">
+                    <span class="compat-stat-value">{{ $statistics['unique_vehicles'] ?? 0 }}</span>
+                    <span class="compat-stat-label">Pojazdow</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {{-- Filters Bar --}}
+    <div class="compat-filters-bar">
+        <div class="compat-filters-row">
+            {{-- Search Parts --}}
+            <div class="compat-filter-item compat-filter-search">
+                <label>
+                    <i class="fas fa-search"></i>
+                    Szukaj Czesci
+                </label>
+                <input
+                    type="text"
+                    wire:model.live.debounce.300ms="searchPart"
+                    placeholder="SKU lub nazwa czesci..."
+                    class="compat-filter-input"
+                />
+            </div>
+
+            {{-- Shop Context --}}
+            <div class="compat-filter-item">
+                <label>
+                    <i class="fas fa-store"></i>
+                    Kontekst Sklepu
+                </label>
+                <select wire:model.live="shopContext" class="compat-filter-select">
+                    <option value="">Dane domyslne</option>
+                    @foreach($shops as $shop)
+                        <option value="{{ $shop->id }}">{{ $shop->name }}</option>
+                    @endforeach
+                </select>
+            </div>
+
+            {{-- Brand Filter --}}
+            <div class="compat-filter-item">
+                <label>
+                    <i class="fas fa-car"></i>
+                    Marka Pojazdu
+                </label>
+                <select wire:model.live="filterBrand" class="compat-filter-select">
+                    <option value="">Wszystkie marki</option>
+                    @foreach($brands as $brand)
+                        <option value="{{ $brand }}">{{ $brand }}</option>
+                    @endforeach
+                </select>
+            </div>
+
+            {{-- Vehicle Search --}}
+            <div class="compat-filter-item">
+                <label>
+                    <i class="fas fa-motorcycle"></i>
+                    Szukaj Pojazdu
+                </label>
+                <input
+                    type="text"
+                    wire:model.live.debounce.300ms="vehicleSearch"
+                    placeholder="Marka lub model..."
+                    class="compat-filter-input"
+                />
+            </div>
+
+            {{-- No Matches Filter --}}
+            <div class="compat-filter-item compat-filter-checkbox">
+                <label class="compat-checkbox-label">
+                    <input
+                        type="checkbox"
+                        wire:model.live="filterNoMatches"
+                        class="compat-checkbox"
+                    />
+                    <span>
+                        <i class="fas fa-exclamation-circle"></i>
+                        Tylko bez dopasowan
+                    </span>
+                </label>
+            </div>
+
+            {{-- Reset Button --}}
+            @if($searchPart || $shopContext || $filterBrand || $vehicleSearch || $filterNoMatches)
+                <button wire:click="resetFilters" class="compat-btn-reset">
+                    <i class="fas fa-undo"></i>
+                    Resetuj
+                </button>
             @endif
         </div>
     </div>
 
-    {{-- Filters Section --}}
-    <div class="filters-section grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-        {{-- 1. Search input (searchPart) --}}
-        <div class="filter-item">
-            <label for="searchPart" class="block text-sm font-medium text-gray-300 mb-2">
-                <i class="fas fa-search mr-1"></i>
-                Szukaj Części
-            </label>
-            <input
-                type="text"
-                id="searchPart"
-                wire:model.live.debounce.300ms="searchPart"
-                placeholder="SKU lub nazwa części..."
-                class="filter-input w-full px-4 py-2 border border-gray-600 rounded-lg bg-gray-800 text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
-        </div>
+    {{-- Main Content: Two-Column Layout --}}
+    <div class="compat-main-content">
+        {{-- Left: Parts List --}}
+        <div class="compat-parts-column">
+            <div class="compat-parts-header">
+                <h3>
+                    <i class="fas fa-puzzle-piece"></i>
+                    Lista Czesci
+                </h3>
+                @if(count($selectedPartIds) > 0)
+                    <button wire:click="openBulkEdit" class="compat-btn-bulk">
+                        <i class="fas fa-edit"></i>
+                        Edycja masowa ({{ count($selectedPartIds) }})
+                    </button>
+                @endif
+            </div>
 
-        {{-- 2. Shop dropdown (filterShopId) --}}
-        <div class="filter-item">
-            <label for="filterShopId" class="block text-sm font-medium text-gray-300 mb-2">
-                <i class="fas fa-store mr-1"></i>
-                Sklep
-            </label>
-            <select
-                id="filterShopId"
-                wire:model.live="filterShopId"
-                class="filter-select w-full px-4 py-2 border border-gray-600 rounded-lg bg-gray-800 text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            >
-                <option value="">Wszystkie sklepy</option>
-                @foreach($this->shops as $shop)
-                    <option value="{{ $shop->id }}">{{ $shop->name }}</option>
-                @endforeach
-            </select>
-        </div>
-
-        {{-- 3. Brand dropdown (filterBrand) --}}
-        <div class="filter-item">
-            <label for="filterBrand" class="block text-sm font-medium text-gray-300 mb-2">
-                <i class="fas fa-car mr-1"></i>
-                Marka Pojazdu
-            </label>
-            <select
-                id="filterBrand"
-                wire:model.live="filterBrand"
-                class="filter-select w-full px-4 py-2 border border-gray-600 rounded-lg bg-gray-800 text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            >
-                <option value="">Wszystkie marki</option>
-                @foreach($this->brands as $brand)
-                    <option value="{{ $brand }}">{{ $brand }}</option>
-                @endforeach
-            </select>
-        </div>
-
-        {{-- 4. Status dropdown (filterStatus) --}}
-        <div class="filter-item">
-            <label for="filterStatus" class="block text-sm font-medium text-gray-300 mb-2">
-                <i class="fas fa-filter mr-1"></i>
-                Status Dopasowań
-            </label>
-            <select
-                id="filterStatus"
-                wire:model.live="filterStatus"
-                class="filter-select w-full px-4 py-2 border border-gray-600 rounded-lg bg-gray-800 text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            >
-                <option value="all">Wszystkie statusy</option>
-                <option value="full">✅ Pełny (Oryginał + Zamiennik)</option>
-                <option value="partial">🟡 Częściowy (tylko jeden typ)</option>
-                <option value="none">❌ Brak (bez dopasowań)</option>
-            </select>
-        </div>
-    </div>
-
-    {{-- Reset Filters Button (conditional: show if any filter active) --}}
-    @if($searchPart || $filterShopId || $filterBrand || $filterStatus !== 'all')
-        <div class="mb-6 flex justify-end">
-            <button wire:click="resetFilters" class="btn-reset px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg transition-all">
-                <i class="fas fa-undo mr-2"></i>
-                Resetuj Filtry
-            </button>
-        </div>
-    @endif
-
-    {{-- Parts Table --}}
-    <div class="enterprise-table bg-gray-800 rounded-lg shadow-lg overflow-hidden">
-        <div class="overflow-x-auto">
-            <table class="w-full">
-                <thead class="bg-gray-100 dark:bg-gray-900">
-                    <tr>
-                        {{-- Checkbox (bulk select) --}}
-                        <th class="px-4 py-3 text-left w-12">
+            <div class="compat-parts-list">
+                @forelse($parts as $part)
+                    <div
+                        wire:key="part-{{ $part->id }}"
+                        class="compat-part-item {{ $editingProductId === $part->id ? 'compat-part-item--active' : '' }} {{ $this->productHasUnsavedChanges($part->id) ? 'compat-part-item--unsaved' : '' }}"
+                        wire:click="editPart({{ $part->id }})"
+                    >
+                        <div class="compat-part-checkbox" wire:click.stop="togglePartSelection({{ $part->id }})">
                             <input
                                 type="checkbox"
-                                class="rounded border-gray-600 text-blue-600 focus:ring-blue-500"
-                                wire:model.live="selectAll"
+                                {{ in_array($part->id, $selectedPartIds) ? 'checked' : '' }}
                             />
-                        </th>
+                        </div>
 
-                        {{-- SKU (sortable) --}}
-                        <th
-                            wire:click="sortBy('sku')"
-                            class="px-4 py-3 text-left cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-800 transition-colors"
-                        >
-                            <div class="flex items-center gap-2">
-                                <span class="font-semibold text-gray-300">SKU</span>
-                                @if($sortField === 'sku')
-                                    <i class="fas fa-sort-{{ $sortDirection === 'asc' ? 'up' : 'down' }} text-blue-600"></i>
-                                @else
-                                    <i class="fas fa-sort text-gray-400"></i>
+                        <div class="compat-part-info">
+                            <span class="compat-part-sku">
+                                {{ $part->sku }}
+                                @if($this->productHasUnsavedChanges($part->id))
+                                    <span class="compat-unsaved-badge" title="Niezapisane zmiany">
+                                        <i class="fas fa-exclamation-circle"></i>
+                                    </span>
                                 @endif
-                            </div>
-                        </th>
+                            </span>
+                            <span class="compat-part-name">{{ Str::limit($part->name, 40) }}</span>
+                        </div>
 
-                        {{-- Nazwa --}}
-                        <th class="px-4 py-3 text-left">
-                            <span class="font-semibold text-gray-300">Nazwa Części</span>
-                        </th>
+                        <div class="compat-part-counts">
+                            <span class="inline-flex items-center justify-center min-w-[1.5rem] px-1.5 py-0.5 text-xs font-medium rounded bg-blue-600 text-white" title="Oryginal">
+                                {{ $part->original_count }}
+                            </span>
+                            <span class="inline-flex items-center justify-center min-w-[1.5rem] px-1.5 py-0.5 text-xs font-medium rounded bg-orange-600 text-white" title="Zamiennik">
+                                {{ $part->replacement_count }}
+                            </span>
+                        </div>
 
-                        {{-- Oryginał count (sortable) --}}
-                        <th
-                            wire:click="sortBy('original_count')"
-                            class="px-4 py-3 text-center cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-800 transition-colors"
-                        >
-                            <div class="flex items-center justify-center gap-2">
-                                <span class="font-semibold text-gray-300">Oryginał</span>
-                                @if($sortField === 'original_count')
-                                    <i class="fas fa-sort-{{ $sortDirection === 'asc' ? 'up' : 'down' }} text-blue-600"></i>
-                                @else
-                                    <i class="fas fa-sort text-gray-400"></i>
-                                @endif
-                            </div>
-                        </th>
-
-                        {{-- Zamiennik count (sortable) --}}
-                        <th
-                            wire:click="sortBy('replacement_count')"
-                            class="px-4 py-3 text-center cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-800 transition-colors"
-                        >
-                            <div class="flex items-center justify-center gap-2">
-                                <span class="font-semibold text-gray-300">Zamiennik</span>
-                                @if($sortField === 'replacement_count')
-                                    <i class="fas fa-sort-{{ $sortDirection === 'asc' ? 'up' : 'down' }} text-blue-600"></i>
-                                @else
-                                    <i class="fas fa-sort text-gray-400"></i>
-                                @endif
-                            </div>
-                        </th>
-
-                        {{-- Model count (sortable) --}}
-                        <th
-                            wire:click="sortBy('model_count')"
-                            class="px-4 py-3 text-center cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-800 transition-colors"
-                        >
-                            <div class="flex items-center justify-center gap-2">
-                                <span class="font-semibold text-gray-300">Model (auto)</span>
-                                @if($sortField === 'model_count')
-                                    <i class="fas fa-sort-{{ $sortDirection === 'asc' ? 'up' : 'down' }} text-blue-600"></i>
-                                @else
-                                    <i class="fas fa-sort text-gray-400"></i>
-                                @endif
-                            </div>
-                        </th>
-
-                        {{-- Status --}}
-                        <th class="px-4 py-3 text-center">
-                            <span class="font-semibold text-gray-300">Status</span>
-                        </th>
-
-                        {{-- Akcje --}}
-                        <th class="px-4 py-3 text-center w-24">
-                            <span class="font-semibold text-gray-300">Akcje</span>
-                        </th>
-                    </tr>
-                </thead>
-
-                <tbody class="divide-y divide-gray-700">
-                    @forelse($this->parts as $part)
-                        {{-- Main row --}}
-                        <tr
-                            wire:key="part-{{ $part->id }}"
-                            class="hover:bg-gray-700 transition-colors"
-                        >
-                            {{-- Checkbox --}}
-                            <td class="px-4 py-3">
-                                <input
-                                    type="checkbox"
-                                    wire:model.live="selectedPartIds"
-                                    value="{{ $part->id }}"
-                                    class="rounded border-gray-600 text-blue-600 focus:ring-blue-500"
-                                />
-                            </td>
-
-                            {{-- SKU --}}
-                            <td class="px-4 py-3">
-                                <span class="font-mono font-semibold text-white">
-                                    {{ $part->sku }}
+                        <div class="compat-part-status">
+                            @if($part->sync_status === 'synced')
+                                <span class="compat-status-badge compat-status-synced" title="{{ $part->sync_shop_names ?? '' }}">
+                                    <i class="fas fa-check-circle"></i>
+                                    {{ $part->sync_shops_count }} {{ $part->sync_shops_count === 1 ? 'sklep' : 'sklepy' }}
                                 </span>
-                            </td>
-
-                            {{-- Nazwa --}}
-                            <td class="px-4 py-3">
-                                <span class="text-gray-300">
-                                    {{ $part->name }}
+                            @else
+                                <span class="compat-status-badge compat-status-not-published">
+                                    <i class="fas fa-times-circle"></i>
+                                    Brak
                                 </span>
-                            </td>
+                            @endif
+                        </div>
+                    </div>
+                @empty
+                    <div class="compat-parts-empty">
+                        <i class="fas fa-search"></i>
+                        <p>Brak czesci spelniajacych kryteria</p>
+                    </div>
+                @endforelse
+            </div>
 
-                            {{-- Oryginał count --}}
-                            <td class="px-4 py-3 text-center">
-                                <span class="count-badge count-original">
-                                    {{ $part->original_count }}
-                                </span>
-                            </td>
+            {{-- Pagination --}}
+            <div class="compat-parts-pagination">
+                {{ $parts->links() }}
+            </div>
+        </div>
 
-                            {{-- Zamiennik count --}}
-                            <td class="px-4 py-3 text-center">
-                                <span class="count-badge count-replacement">
-                                    {{ $part->replacement_count }}
-                                </span>
-                            </td>
+        {{-- Right: Vehicle Tiles --}}
+        <div class="compat-vehicles-column">
+            @if($editingProductId)
+                @php
+                    $editingPart = $parts->firstWhere('id', $editingProductId);
+                @endphp
 
-                            {{-- Model count (sum) --}}
-                            <td class="px-4 py-3 text-center">
-                                <span class="count-badge count-model">
-                                    {{ $part->original_count + $part->replacement_count }}
-                                </span>
-                            </td>
+                {{-- Editing Header --}}
+                <div class="compat-vehicles-header">
+                    <div class="compat-editing-info">
+                        <h3>
+                            <i class="fas fa-cog"></i>
+                            Edycja dopasowań:
+                        </h3>
+                        <span class="compat-editing-sku">{{ $editingPart?->sku ?? 'Produkt' }}</span>
+                    </div>
 
-                            {{-- Status badge --}}
-                            <td class="px-4 py-3 text-center">
-                                <span class="{{ $this->getStatusBadgeClass($part->original_count, $part->replacement_count) }}">
-                                    {{ $this->getStatusBadgeLabel($part->original_count, $part->replacement_count) }}
-                                </span>
-                            </td>
+                    <div class="compat-selection-counts">
+                        <span class="compat-count-label">
+                            <i class="fas fa-circle" style="color: var(--compat-original);"></i>
+                            Oryginal: {{ $this->getOriginalCount() }}
+                        </span>
+                        <span class="compat-count-label">
+                            <i class="fas fa-circle" style="color: var(--compat-zamiennik);"></i>
+                            Zamiennik: {{ $this->getZamiennikCount() }}
+                        </span>
+                    </div>
+                </div>
 
-                            {{-- Expand button --}}
-                            <td class="px-4 py-3 text-center">
-                                <button
-                                    wire:click="toggleExpand({{ $part->id }})"
-                                    class="btn-expand text-2xl text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-all"
-                                >
-                                    {{ in_array($part->id, $expandedPartIds) ? '▲' : '▼' }}
-                                </button>
-                            </td>
-                        </tr>
+                {{-- Suggestions Panel --}}
+                @if($showSuggestions && $suggestions->count() > 0)
+                    <div class="suggestions-panel">
+                        <div class="suggestions-panel__header">
+                            <h4>
+                                <i class="fas fa-lightbulb"></i>
+                                Sugestie AI ({{ $suggestions->count() }})
+                            </h4>
+                            <button wire:click="$toggle('showSuggestions')" class="suggestions-toggle">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
 
-                        {{-- Expandable row (vehicles list) --}}
-                        @if(in_array($part->id, $expandedPartIds))
-                            <tr wire:key="expand-{{ $part->id }}" class="expandable-row bg-gray-50 dark:bg-gray-900">
-                                <td colspan="8" class="px-4 py-6">
-                                    <div class="compatibility-details grid grid-cols-1 lg:grid-cols-3 gap-6">
-                                        {{-- Oryginał section --}}
-                                        <div class="compatibility-section original-section">
-                                            <h4 class="text-lg font-bold text-white mb-4 flex items-center gap-2">
-                                                <div class="w-4 h-4 rounded-full bg-green-500"></div>
-                                                Oryginał
-                                                <span class="text-sm text-gray-600 dark:text-gray-400">({{ $part->original_count }})</span>
-                                            </h4>
-
-                                            <div class="vehicle-badges flex flex-wrap gap-2 mb-4">
-                                                @foreach($part->compatibilities->where('compatibilityAttribute.code', 'original') as $compat)
-                                                    <span
-                                                        wire:key="compat-original-{{ $compat->id }}"
-                                                        class="vehicle-badge badge-original"
-                                                    >
-                                                        {{ $compat->vehicleModel->brand }} {{ $compat->vehicleModel->model }}
-                                                        <button
-                                                            wire:click="removeCompatibility({{ $compat->id }})"
-                                                            class="btn-remove ml-2"
-                                                        >
-                                                            ×
-                                                        </button>
-                                                    </span>
-                                                @endforeach
-
-                                                @if($part->original_count === 0)
-                                                    <p class="text-sm text-gray-500 dark:text-gray-400 italic">
-                                                        Brak dopasowanych pojazdów
-                                                    </p>
-                                                @endif
-                                            </div>
-
-                                            <button class="btn-add-vehicle" wire:click="addVehicle({{ $part->id }}, 'original')">
-                                                <i class="fas fa-plus mr-2"></i>
-                                                Dodaj Pojazd
-                                            </button>
-                                        </div>
-
-                                        {{-- Zamiennik section --}}
-                                        <div class="compatibility-section replacement-section">
-                                            <h4 class="text-lg font-bold text-white mb-4 flex items-center gap-2">
-                                                <div class="w-4 h-4 rounded-full bg-orange-500"></div>
-                                                Zamiennik
-                                                <span class="text-sm text-gray-600 dark:text-gray-400">({{ $part->replacement_count }})</span>
-                                            </h4>
-
-                                            <div class="vehicle-badges flex flex-wrap gap-2 mb-4">
-                                                @foreach($part->compatibilities->where('compatibilityAttribute.code', 'replacement') as $compat)
-                                                    <span
-                                                        wire:key="compat-replacement-{{ $compat->id }}"
-                                                        class="vehicle-badge badge-replacement"
-                                                    >
-                                                        {{ $compat->vehicleModel->brand }} {{ $compat->vehicleModel->model }}
-                                                        <button
-                                                            wire:click="removeCompatibility({{ $compat->id }})"
-                                                            class="btn-remove ml-2"
-                                                        >
-                                                            ×
-                                                        </button>
-                                                    </span>
-                                                @endforeach
-
-                                                @if($part->replacement_count === 0)
-                                                    <p class="text-sm text-gray-500 dark:text-gray-400 italic">
-                                                        Brak dopasowanych pojazdów
-                                                    </p>
-                                                @endif
-                                            </div>
-
-                                            <button class="btn-add-vehicle" wire:click="addVehicle({{ $part->id }}, 'replacement')">
-                                                <i class="fas fa-plus mr-2"></i>
-                                                Dodaj Pojazd
-                                            </button>
-                                        </div>
-
-                                        {{-- Model section (auto-generated, read-only) --}}
-                                        <div class="compatibility-section model-section">
-                                            <h4 class="text-lg font-bold text-white mb-4 flex items-center gap-2">
-                                                <div class="w-4 h-4 rounded-full bg-blue-500"></div>
-                                                Model (auto)
-                                                <span class="text-sm text-gray-600 dark:text-gray-400">({{ $part->original_count + $part->replacement_count }})</span>
-                                            </h4>
-
-                                            <div class="info-box bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
-                                                <p class="info-text text-sm text-blue-800 dark:text-blue-300 mb-2">
-                                                    <i class="fas fa-info-circle mr-2"></i>
-                                                    <strong>Auto-generated:</strong> Union(Oryginał, Zamiennik) without duplicates.
-                                                </p>
-                                                <p class="info-text text-sm text-blue-800 dark:text-blue-300">
-                                                    Total: <strong>{{ $part->original_count + $part->replacement_count }}</strong> unikalnych pojazdów.
-                                                </p>
-                                            </div>
-
-                                            <div class="mt-4 text-sm text-gray-600 dark:text-gray-400">
-                                                <p class="mb-2">
-                                                    <i class="fas fa-check-circle text-green-500 mr-2"></i>
-                                                    Automatycznie synchronizowane
-                                                </p>
-                                                <p>
-                                                    <i class="fas fa-shield-alt text-blue-500 mr-2"></i>
-                                                    Tylko do odczytu
-                                                </p>
-                                            </div>
-                                        </div>
+                        <div class="suggestions-panel__list">
+                            @foreach($suggestions as $suggestion)
+                                <div class="suggestion-item" wire:key="sugg-{{ $suggestion->id }}">
+                                    <div class="suggestion-info">
+                                        <span class="suggestion-vehicle">
+                                            {{ $suggestion->vehicleModel?->brand }} {{ $suggestion->vehicleModel?->model }}
+                                        </span>
+                                        <span class="suggestion-score">
+                                            {{ number_format($suggestion->confidence_score * 100, 0) }}%
+                                        </span>
                                     </div>
-                                </td>
-                            </tr>
-                        @endif
-                    @empty
-                        <tr>
-                            <td colspan="8" class="px-4 py-12 text-center">
-                                <div class="flex flex-col items-center gap-4">
-                                    <i class="fas fa-search text-6xl text-gray-400"></i>
-                                    <p class="text-gray-600 dark:text-gray-400 text-lg">
-                                        Brak części spełniających kryteria wyszukiwania
-                                    </p>
-                                    @if($searchPart || $filterShopId || $filterBrand || $filterStatus !== 'all')
+                                    <div class="suggestion-actions">
                                         <button
-                                            wire:click="resetFilters"
-                                            class="btn-reset px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-all"
+                                            wire:click="applySuggestion({{ $suggestion->id }}, 'original')"
+                                            class="suggestion-btn suggestion-btn--original"
+                                            title="Dodaj jako Oryginal"
                                         >
-                                            <i class="fas fa-undo mr-2"></i>
-                                            Resetuj Filtry
+                                            <i class="fas fa-plus"></i> O
                                         </button>
-                                    @endif
+                                        <button
+                                            wire:click="applySuggestion({{ $suggestion->id }}, 'replacement')"
+                                            class="suggestion-btn suggestion-btn--replacement"
+                                            title="Dodaj jako Zamiennik"
+                                        >
+                                            <i class="fas fa-plus"></i> Z
+                                        </button>
+                                        <button
+                                            wire:click="dismissSuggestion({{ $suggestion->id }})"
+                                            class="suggestion-btn suggestion-btn--dismiss"
+                                            title="Odrzuc"
+                                        >
+                                            <i class="fas fa-times"></i>
+                                        </button>
+                                    </div>
                                 </div>
-                            </td>
-                        </tr>
+                            @endforeach
+                        </div>
+                    </div>
+                @endif
+
+                {{-- Vehicle Tiles Grid by Brand --}}
+                <div class="compat-tiles-container">
+                    @forelse($vehiclesGrouped as $brand => $brandVehicles)
+                        <div class="brand-section" wire:key="brand-{{ $brand }}">
+                            <div
+                                class="brand-section__header"
+                                wire:click="toggleBrandCollapse('{{ $brand }}')"
+                            >
+                                <div class="brand-section__title">
+                                    <i class="fas fa-chevron-{{ $this->isBrandCollapsed($brand) ? 'right' : 'down' }}"></i>
+                                    <span>{{ $brand }}</span>
+                                    <span class="brand-section__count">({{ $brandVehicles->count() }})</span>
+                                </div>
+                                <div class="brand-section__actions">
+                                    <button
+                                        wire:click.stop="selectAllInBrand('{{ $brand }}')"
+                                        class="brand-btn brand-btn--select"
+                                        title="Zaznacz wszystkie w marce"
+                                    >
+                                        <i class="fas fa-check-double"></i>
+                                    </button>
+                                    <button
+                                        wire:click.stop="deselectAllInBrand('{{ $brand }}')"
+                                        class="brand-btn brand-btn--deselect"
+                                        title="Odznacz wszystkie w marce"
+                                    >
+                                        <i class="fas fa-times"></i>
+                                    </button>
+                                </div>
+                            </div>
+
+                            @unless($this->isBrandCollapsed($brand))
+                                <div class="vehicle-tiles-grid">
+                                    @foreach($brandVehicles as $vehicle)
+                                        <div
+                                            wire:key="tile-{{ $vehicle->id }}"
+                                            class="vehicle-tile {{ $this->getVehicleStateClass($vehicle->id) }}"
+                                            wire:click="toggleVehicle({{ $vehicle->id }})"
+                                        >
+                                            <div class="vehicle-tile__content">
+                                                {{-- 2025-12-08: Changed from brand/model to manufacturer/name (Product instead of VehicleModel) --}}
+                                                <span class="vehicle-tile__brand">{{ $vehicle->manufacturer }}</span>
+                                                <span class="vehicle-tile__model">{{ $vehicle->name }}</span>
+                                                {{-- year_from/year_to not available in Product model --}}
+                                            </div>
+
+                                            {{-- Selection Indicator --}}
+                                            @if($this->isBoth($vehicle->id))
+                                                <div class="vehicle-tile__indicator vehicle-tile__indicator--both">
+                                                    <span>O+Z</span>
+                                                </div>
+                                            @elseif($this->isOriginal($vehicle->id))
+                                                <div class="vehicle-tile__indicator vehicle-tile__indicator--original">
+                                                    <span>O</span>
+                                                </div>
+                                            @elseif($this->isZamiennik($vehicle->id))
+                                                <div class="vehicle-tile__indicator vehicle-tile__indicator--zamiennik">
+                                                    <span>Z</span>
+                                                </div>
+                                            @endif
+                                        </div>
+                                    @endforeach
+                                </div>
+                            @endunless
+                        </div>
+                    @empty
+                        <div class="compat-vehicles-empty">
+                            <i class="fas fa-motorcycle"></i>
+                            <p>Brak pojazdow dla wybranych filtrow</p>
+                            @if($filterBrand || $shopContext)
+                                <button wire:click="resetFilters" class="compat-btn-reset">
+                                    <i class="fas fa-undo"></i>
+                                    Resetuj filtry
+                                </button>
+                            @endif
+                        </div>
                     @endforelse
-                </tbody>
-            </table>
+                </div>
+
+                {{-- Floating Action Bar - ZAWSZE widoczny przy edycji dla latwego przelaczania trybu --}}
+                <div class="floating-action-bar floating-action-bar--visible"
+                    @if($this->hasSyncJobsActive())
+                        wire:poll.2s="refreshSyncStatus"
+                    @endif
+                >
+                    <div class="floating-action-bar__left">
+                        {{-- Selection Mode Toggle --}}
+                        <div class="selection-mode-toggle">
+                            <button
+                                class="mode-btn {{ $selectionMode === 'original' ? 'mode-btn--active-original' : '' }}"
+                                wire:click="setSelectionMode('original')"
+                            >
+                                <i class="{{ $selectionMode === 'original' ? 'fas' : 'far' }} fa-circle"></i>
+                                Oryginal
+                            </button>
+                            <button
+                                class="mode-btn {{ $selectionMode === 'zamiennik' ? 'mode-btn--active-zamiennik' : '' }}"
+                                wire:click="setSelectionMode('zamiennik')"
+                            >
+                                <i class="{{ $selectionMode === 'zamiennik' ? 'fas' : 'far' }} fa-circle"></i>
+                                Zamiennik
+                            </button>
+                        </div>
+
+                        {{-- Pending Changes Counter --}}
+                        @if($this->hasPendingChanges())
+                            <span class="pending-changes-badge">
+                                {{ $this->getPendingChangesCount() }} zmian
+                            </span>
+                        @endif
+
+                        {{-- Sync Job Status Badge --}}
+                        @if($this->hasSyncJobsActive())
+                            @php $syncStatus = $this->getOverallSyncStatus(); @endphp
+                            <span class="sync-status-badge sync-status-{{ $syncStatus }}">
+                                @if($syncStatus === 'pending')
+                                    <i class="fas fa-clock fa-spin"></i>
+                                    Oczekuje...
+                                @elseif($syncStatus === 'running')
+                                    <i class="fas fa-sync fa-spin"></i>
+                                    Synchronizacja...
+                                @elseif($syncStatus === 'completed')
+                                    <i class="fas fa-check"></i>
+                                    Ukonczone
+                                @elseif($syncStatus === 'failed')
+                                    <i class="fas fa-exclamation-triangle"></i>
+                                    Blad
+                                @endif
+                            </span>
+                        @endif
+                    </div>
+
+                    <div class="floating-action-bar__right">
+                        <button
+                            wire:click="cancelEdit"
+                            class="floating-btn floating-btn--cancel"
+                        >
+                            <i class="fas fa-times"></i>
+                            Anuluj
+                        </button>
+                        <button
+                            wire:click="saveCompatibility"
+                            class="floating-btn floating-btn--save"
+                            @if($this->isSyncInProgress()) disabled @endif
+                        >
+                            <i class="fas fa-save"></i>
+                            Zapisz
+                        </button>
+                        <button
+                            wire:click="saveAndSync"
+                            class="floating-btn floating-btn--sync"
+                            @if($this->isSyncInProgress()) disabled @endif
+                        >
+                            @if($this->isSyncInProgress())
+                                <i class="fas fa-spinner fa-spin"></i>
+                                Synchronizacja...
+                            @else
+                                <i class="fas fa-cloud-upload-alt"></i>
+                                Zapisz i wyslij
+                            @endif
+                        </button>
+                    </div>
+                </div>
+            @else
+                {{-- No Part Selected --}}
+                <div class="compat-vehicles-placeholder">
+                    <i class="fas fa-hand-pointer"></i>
+                    <h3>Wybierz czesc z listy</h3>
+                    <p>Kliknij na czesc po lewej stronie, aby edytowac jej dopasowania do pojazdow.</p>
+
+                    <div class="compat-placeholder-legend">
+                        <div class="legend-item">
+                            <span class="legend-color legend-color--original"></span>
+                            <span>Oryginal - czesc pasuje do pojazdu oryginalnie</span>
+                        </div>
+                        <div class="legend-item">
+                            <span class="legend-color legend-color--zamiennik"></span>
+                            <span>Zamiennik - czesc moze zastapic oryginalna</span>
+                        </div>
+                        <div class="legend-item">
+                            <span class="legend-color legend-color--both"></span>
+                            <span>Oba - czesc jest zarowno oryginalem jak i zamiennikiem</span>
+                        </div>
+                    </div>
+                </div>
+            @endif
         </div>
     </div>
-
-    {{-- Pagination --}}
-    <div class="pagination mt-6">
-        {{ $this->parts->links() }}
-    </div>
-
-    {{-- Bulk Edit Modal (FAZA 2.2) --}}
-    @livewire('admin.compatibility.bulk-edit-compatibility-modal')
 </div>

@@ -9,6 +9,7 @@ use App\Services\PrestaShop\PrestaShopClientFactory;
 use App\Services\PrestaShop\PrestaShopPriceImporter;
 use App\Services\PrestaShop\PrestaShopStockImporter;
 use App\Services\PrestaShop\ConflictResolver;
+use Illuminate\Bus\Batchable;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -32,7 +33,7 @@ use Illuminate\Support\Facades\Log;
  */
 class PullSingleProductFromPrestaShop implements ShouldQueue
 {
-    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+    use Batchable, Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     /**
      * Product to pull data for
@@ -215,6 +216,33 @@ class PullSingleProductFromPrestaShop implements ShouldQueue
                     'error_code' => $stockError->getHttpStatusCode(),
                     'error' => $stockError->getMessage(),
                 ]);
+            }
+
+            // Import compatibility from PrestaShop features (Oryginal, Model, Zamiennik)
+            // Only for spare parts (czesc-zamienna)
+            if ($this->product->productType?->slug === 'czesc-zamienna') {
+                try {
+                    $compatSyncService = app(\App\Services\PrestaShop\VehicleCompatibilitySyncService::class);
+                    $importedCompat = $compatSyncService->importFromPrestaShopFeatures(
+                        $psData,
+                        $this->product,
+                        $this->shop->id
+                    );
+
+                    if ($importedCompat->isNotEmpty()) {
+                        Log::info('Compatibility imported for product', [
+                            'product_id' => $this->product->id,
+                            'sku' => $this->product->sku,
+                            'compatibility_count' => $importedCompat->count(),
+                        ]);
+                    }
+                } catch (\Exception $compatError) {
+                    // Non-blocking: log but continue
+                    Log::warning('Failed to import compatibility', [
+                        'product_id' => $this->product->id,
+                        'error' => $compatError->getMessage(),
+                    ]);
+                }
             }
 
             Log::info('Single product pull completed successfully', [

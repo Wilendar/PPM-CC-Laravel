@@ -61,7 +61,7 @@ trait VariantValidation
                 'required',
                 'string',
                 'max:255',
-                'regex:/^[\pL\s\-_0-9]+$/u',
+                'regex:/^[\pL\s\-_0-9\.]+$/u', // FIX: Added dot (.) for version numbers like "2.5"
             ],
             'is_active' => 'boolean',
             'is_default' => 'boolean',
@@ -101,7 +101,7 @@ trait VariantValidation
                 'required',
                 'string',
                 'max:255',
-                'regex:/^[\pL\s\-_0-9]+$/u',
+                'regex:/^[\pL\s\-_0-9\.]+$/u', // FIX: Added dot (.) for version numbers like "2.5"
             ],
             'is_active' => 'boolean',
             'is_default' => 'boolean',

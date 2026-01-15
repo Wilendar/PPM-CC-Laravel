@@ -406,6 +406,13 @@ class JobProgressService
             'errors' => $progress->error_details ?? [], // Already cast to array in model
             'shop_name' => $progress->shop?->name ?? 'Unknown Shop',
             'job_id' => $progress->job_id, // For ErrorDetailsModal
+            'job_type' => $progress->job_type, // ETAP_07c: For UI differentiation
+            'job_type_label' => $progress->getJobTypeLabel(), // ETAP_07c: Human-readable label
+            'user_name' => $progress->user?->name ?? null, // ETAP_07c: Who initiated
+            'metadata' => $progress->metadata ?? [], // ETAP_07c: Rich context
+            'action_button' => $progress->action_button, // ETAP_07c: UI action button
+            'has_action_button' => $progress->hasActionButton(), // ETAP_07c: Quick check
+            'started_at' => $progress->started_at?->toIso8601String(), // ETAP_07c FAZA 2: For accordion duration
             'pending_conflicts' => [], // Default: no conflicts
         ];
 
@@ -450,19 +457,213 @@ class JobProgressService
         $shopName = $progress->shop?->name ?? 'Unknown Shop';
         $current = $progress->current_count;
         $total = $progress->total_count;
+        $jobType = $progress->job_type;
+
+        // Job type specific messages (ETAP_07c)
+        $jobTypeLabels = [
+            'import' => 'Importowanie',
+            'sync' => 'Synchronizacja',
+            'export' => 'Eksportowanie',
+            'category_delete' => 'Usuwanie kategorii',
+            'category_analysis' => 'Analiza kategorii',
+            'bulk_export' => 'Eksport masowy',
+            'bulk_update' => 'Aktualizacja masowa',
+            'stock_sync' => 'Synchronizacja stanow',
+            'price_sync' => 'Synchronizacja cen',
+        ];
+
+        $typeLabel = $jobTypeLabels[$jobType] ?? 'Operacja';
 
         switch ($progress->status) {
             case 'running':
-                return "Importowanie... {$current}/{$total} Produktów z {$shopName}";
+                if ($jobType === 'category_analysis') {
+                    return "Analizuje kategorie... {$current}/{$total} produktow z {$shopName}";
+                }
+                return "{$typeLabel}... {$current}/{$total} z {$shopName}";
+
             case 'completed':
-                return "Ukończono! {$current}/{$total} Produktów z {$shopName}";
+                return "Ukonczone! {$current}/{$total} z {$shopName}";
+
             case 'failed':
-                return "Błąd importu z {$shopName}";
+                return "Blad: {$typeLabel} z {$shopName}";
+
             case 'pending':
+                if ($jobType === 'category_analysis') {
+                    return "Przygotowanie analizy kategorii... {$shopName}";
+                }
                 return "Oczekiwanie... {$shopName}";
+
+            case 'awaiting_user':
+                $awaitingMessage = $progress->getMetadataValue('awaiting_message', '');
+                if ($awaitingMessage) {
+                    return $awaitingMessage;
+                }
+                if ($jobType === 'category_analysis') {
+                    return "Analiza zakonczona - kliknij aby zobaczyc wyniki ({$shopName})";
+                }
+                return "Wymaga akcji uzytkownika ({$shopName})";
+
             default:
                 return "Status nieznany";
         }
+    }
+
+    /**
+     * Mark job as awaiting user action (ETAP_07c)
+     *
+     * Sets status to 'awaiting_user' and adds action button for user to click
+     *
+     * @param int $progressId JobProgress record ID
+     * @param string $buttonType Action type (e.g., 'preview', 'confirm', 'retry')
+     * @param string $buttonLabel Button label for UI
+     * @param string $actionRoute Route/action identifier
+     * @param array $actionParams Route parameters
+     * @param string $message Optional message to display
+     * @return bool Success status
+     */
+    public function markAwaitingUser(
+        int $progressId,
+        string $buttonType,
+        string $buttonLabel,
+        string $actionRoute,
+        array $actionParams = [],
+        string $message = ''
+    ): bool {
+        $progress = JobProgress::find($progressId);
+
+        if (!$progress) {
+            Log::error('JobProgress record not found for markAwaitingUser', [
+                'progress_id' => $progressId,
+            ]);
+            return false;
+        }
+
+        // Set awaiting_user status
+        $progress->markAwaitingUser($message);
+
+        // Set action button
+        $progress->setActionButton($buttonType, $buttonLabel, $actionRoute, $actionParams);
+
+        Log::info('Job progress marked as awaiting_user with action button', [
+            'progress_id' => $progressId,
+            'job_id' => $progress->job_id,
+            'job_type' => $progress->job_type,
+            'button_type' => $buttonType,
+            'button_label' => $buttonLabel,
+            'action_route' => $actionRoute,
+        ]);
+
+        return true;
+    }
+
+    /**
+     * Create category analysis job progress (ETAP_07c)
+     *
+     * @param string $jobId Pre-generated UUID for job
+     * @param PrestaShopShop $shop Target shop
+     * @param int $productCount Number of products to analyze
+     * @param int|null $userId User who initiated the job
+     * @param array $metadata Additional context (mode, options, etc.)
+     * @return int Created JobProgress ID
+     */
+    public function createCategoryAnalysisProgress(
+        string $jobId,
+        PrestaShopShop $shop,
+        int $productCount,
+        ?int $userId = null,
+        array $metadata = []
+    ): int {
+        $progress = JobProgress::create([
+            'job_id' => $jobId,
+            'job_type' => 'category_analysis',
+            'shop_id' => $shop->id,
+            'user_id' => $userId,
+            'status' => 'pending',
+            'current_count' => 0,
+            'total_count' => $productCount,
+            'error_count' => 0,
+            'error_details' => [],
+            'metadata' => array_merge($metadata, [
+                'shop_name' => $shop->name,
+                'initiated_at' => now()->toDateTimeString(),
+            ]),
+            'started_at' => now(),
+        ]);
+
+        Log::info('Category analysis job progress created', [
+            'progress_id' => $progress->id,
+            'job_id' => $jobId,
+            'shop_id' => $shop->id,
+            'shop_name' => $shop->name,
+            'product_count' => $productCount,
+            'user_id' => $userId,
+        ]);
+
+        return $progress->id;
+    }
+
+    /**
+     * Update job metadata (ETAP_07c)
+     *
+     * @param int $progressId JobProgress record ID
+     * @param array $newMetadata Metadata to merge
+     * @return bool Success status
+     */
+    public function updateMetadata(int $progressId, array $newMetadata): bool
+    {
+        $progress = JobProgress::find($progressId);
+
+        if (!$progress) {
+            Log::error('JobProgress record not found for updateMetadata', [
+                'progress_id' => $progressId,
+            ]);
+            return false;
+        }
+
+        return $progress->updateMetadata($newMetadata);
+    }
+
+    /**
+     * Get jobs awaiting user action (ETAP_07c)
+     *
+     * @param int|null $userId Optional filter by user
+     * @param int|null $shopId Optional filter by shop
+     * @return Collection
+     */
+    public function getAwaitingUserJobs(?int $userId = null, ?int $shopId = null): Collection
+    {
+        $query = JobProgress::with(['shop:id,name', 'user:id,name'])
+            ->awaitingUser()
+            ->orderBy('updated_at', 'desc');
+
+        if ($userId) {
+            $query->forUser($userId);
+        }
+
+        if ($shopId) {
+            $query->forShop($shopId);
+        }
+
+        return $query->get();
+    }
+
+    /**
+     * Get jobs requiring attention (awaiting_user or with errors) (ETAP_07c)
+     *
+     * @param int|null $shopId Optional filter by shop
+     * @return Collection
+     */
+    public function getJobsRequiringAttention(?int $shopId = null): Collection
+    {
+        $query = JobProgress::with(['shop:id,name', 'user:id,name'])
+            ->requiringAttention()
+            ->orderBy('updated_at', 'desc');
+
+        if ($shopId) {
+            $query->forShop($shopId);
+        }
+
+        return $query->limit(10)->get();
     }
 
     /**

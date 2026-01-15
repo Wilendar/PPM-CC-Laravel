@@ -12,6 +12,11 @@
     --primary-gold-dark: #d1975a;
     --primary-gold-darker: #c08449;
 
+    /* PPM Primary (aliases for consistency with PPM Styling Playbook) */
+    --mpp-primary: #e0ac7e;
+    --mpp-primary-dark: #d1975a;
+    --mpp-primary-rgb: 224, 172, 126;
+
     /* Enterprise Grays */
     --gray-50: #f9fafb;
     --gray-100: #f3f4f6;

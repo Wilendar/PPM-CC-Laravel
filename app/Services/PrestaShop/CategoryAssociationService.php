@@ -61,32 +61,44 @@ class CategoryAssociationService
             // Check existing associations
             $existingCategories = $this->getProductCategories($pdo, $prestashopProductId);
 
-            Log::debug('Checking product categories', [
+            // FIX 2025-11-27: Calculate categories to add AND remove
+            $categoriesToAdd = array_diff($categoryIds, $existingCategories);
+            $categoriesToRemove = array_diff($existingCategories, $categoryIds);
+
+            Log::info('[CATEGORY SYNC] Calculating category changes', [
                 'product_id' => $product->id,
                 'prestashop_id' => $prestashopProductId,
                 'requested_categories' => $categoryIds,
                 'existing_categories' => $existingCategories,
+                'to_add' => array_values($categoriesToAdd),
+                'to_remove' => array_values($categoriesToRemove),
                 'shop_id' => $shop->id,
             ]);
 
             // Add missing categories
             $added = 0;
-            foreach ($categoryIds as $categoryId) {
-                if (!in_array($categoryId, $existingCategories)) {
-                    $this->addCategoryAssociation($pdo, $prestashopProductId, $categoryId);
-                    $added++;
-                }
+            foreach ($categoriesToAdd as $categoryId) {
+                $this->addCategoryAssociation($pdo, $prestashopProductId, $categoryId);
+                $added++;
+            }
+
+            // FIX 2025-11-27: Remove categories that should no longer be associated
+            $removed = 0;
+            foreach ($categoriesToRemove as $categoryId) {
+                $this->removeCategoryAssociation($pdo, $prestashopProductId, $categoryId);
+                $removed++;
             }
 
             // Update id_category_default if needed
             $this->updateDefaultCategory($pdo, $prestashopProductId, $categoryIds[0]);
 
-            if ($added > 0) {
-                Log::info('Added category associations via direct database', [
+            if ($added > 0 || $removed > 0) {
+                Log::info('[CATEGORY SYNC] Updated category associations via direct database', [
                     'product_id' => $product->id,
                     'prestashop_id' => $prestashopProductId,
                     'categories_added' => $added,
-                    'total_categories' => count($categoryIds),
+                    'categories_removed' => $removed,
+                    'final_categories' => $categoryIds,
                     'shop_id' => $shop->id,
                 ]);
             }
@@ -195,6 +207,29 @@ class CategoryAssociationService
             VALUES (?, ?, ?)
         ");
         $stmt->execute([$productId, $categoryId, $position]);
+    }
+
+    /**
+     * Remove category association from product
+     * FIX 2025-11-27: Added for proper category deletion support
+     *
+     * @param PDO $pdo Database connection
+     * @param int $productId PrestaShop product ID
+     * @param int $categoryId PrestaShop category ID
+     * @return void
+     */
+    private function removeCategoryAssociation(PDO $pdo, int $productId, int $categoryId): void
+    {
+        $stmt = $pdo->prepare("
+            DELETE FROM ps_category_product
+            WHERE id_product = ? AND id_category = ?
+        ");
+        $stmt->execute([$productId, $categoryId]);
+
+        Log::debug('[CATEGORY SYNC] Removed category association', [
+            'prestashop_product_id' => $productId,
+            'category_id' => $categoryId,
+        ]);
     }
 
     /**

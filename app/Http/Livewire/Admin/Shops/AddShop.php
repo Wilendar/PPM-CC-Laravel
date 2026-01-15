@@ -69,6 +69,26 @@ class AddShop extends Component
     public $syncOnlyActiveProducts = true;
     public $preserveLocalImages = true;
     public $syncMetaData = true;
+
+    // ETAP_07f: CSS/JS Sync Configuration (2025-12-16)
+    // FTP is REQUIRED for CSS/JS scanning and editing
+    public $enableFtpSync = false;
+    public $ftpProtocol = 'ftp';
+    public $ftpHost = '';
+    public $ftpPort = 21;
+    public $ftpUser = '';
+    public $ftpPassword = '';
+    public $ftpConnectionStatus = null;
+    public $ftpConnectionMessage = '';
+
+    // ETAP_07f_P3.5: Multi-file CSS/JS Auto-Scan (2025-12-17)
+    public array $scannedCssFiles = [];
+    public array $scannedJsFiles = [];
+    public array $selectedCssFiles = [];
+    public array $selectedJsFiles = [];
+    public ?string $scanStatus = null;
+    public string $scanMessage = '';
+    public bool $isScanning = false;
     
     // Validation messages
     protected $messages = [
@@ -159,6 +179,25 @@ class AddShop extends Component
         $this->syncOnlyActiveProducts = true;
         $this->preserveLocalImages = true;
         $this->syncMetaData = true;
+
+        // ETAP_07f: CSS/JS Sync Configuration (FTP required)
+        $this->enableFtpSync = false;
+        $this->ftpProtocol = 'ftp';
+        $this->ftpHost = '';
+        $this->ftpPort = 21;
+        $this->ftpUser = '';
+        $this->ftpPassword = '';
+        $this->ftpConnectionStatus = null;
+        $this->ftpConnectionMessage = '';
+
+        // ETAP_07f_P3.5: Multi-file CSS/JS Auto-Scan
+        $this->scannedCssFiles = [];
+        $this->scannedJsFiles = [];
+        $this->selectedCssFiles = [];
+        $this->selectedJsFiles = [];
+        $this->scanStatus = null;
+        $this->scanMessage = '';
+        $this->isScanning = false;
     }
 
     public function loadShopData()
@@ -262,6 +301,51 @@ class AddShop extends Component
                 'tax_0' => $this->taxRulesGroup0,
             ]
         ]);
+
+        // ETAP_07f: Load CSS/JS Sync Configuration (FTP required)
+        $ftpConfig = $shop->ftp_config ?? [];
+        if (!empty($ftpConfig)) {
+            $this->enableFtpSync = true;
+            $this->ftpProtocol = $ftpConfig['protocol'] ?? 'ftp';
+            $this->ftpHost = $ftpConfig['host'] ?? '';
+            $this->ftpPort = $ftpConfig['port'] ?? 21;
+            $this->ftpUser = $ftpConfig['user'] ?? '';
+            // Password is NOT loaded for security - user must re-enter
+        }
+
+        Log::info('CSS/JS config loaded in edit mode', [
+            'shop_id' => $shop->id,
+            'ftp_enabled' => $this->enableFtpSync,
+            'ftp_host' => $this->ftpHost,
+        ]);
+
+        // ETAP_07f_P3.5: Load multi-file CSS/JS configuration
+        $cssFiles = $shop->css_files ?? [];
+        $jsFiles = $shop->js_files ?? [];
+
+        if (!empty($cssFiles) || !empty($jsFiles)) {
+            $this->scannedCssFiles = $cssFiles;
+            $this->scannedJsFiles = $jsFiles;
+
+            // Extract selected (enabled) files
+            $this->selectedCssFiles = array_values(array_filter(
+                array_map(fn($f) => ($f['enabled'] ?? false) ? $f['url'] : null, $cssFiles)
+            ));
+            $this->selectedJsFiles = array_values(array_filter(
+                array_map(fn($f) => ($f['enabled'] ?? false) ? $f['url'] : null, $jsFiles)
+            ));
+
+            $this->scanStatus = 'loaded';
+            $this->scanMessage = 'Pliki zaladowane z konfiguracji sklepu';
+
+            Log::info('CSS/JS files loaded in edit mode', [
+                'shop_id' => $shop->id,
+                'css_count' => count($cssFiles),
+                'js_count' => count($jsFiles),
+                'selected_css' => count($this->selectedCssFiles),
+                'selected_js' => count($this->selectedJsFiles),
+            ]);
+        }
     }
 
     public function nextStep()
@@ -519,6 +603,314 @@ class AddShop extends Component
                 'is_editing' => $this->isEditing
             ]);
         }
+    }
+
+    /**
+     * Test FTP connection for CSS/JS sync (ETAP_07f - 2025-12-16)
+     *
+     * Tests the FTP/SFTP connection with provided credentials.
+     * Used in Step 6: Advanced Settings.
+     */
+    public function testFtpConnection()
+    {
+        $this->ftpConnectionStatus = 'testing';
+        $this->ftpConnectionMessage = 'Testowanie polaczenia FTP...';
+
+        try {
+            // Validate required fields
+            if (empty($this->ftpHost)) {
+                throw new \Exception('Host FTP jest wymagany');
+            }
+            if (empty($this->ftpUser)) {
+                throw new \Exception('Uzytkownik FTP jest wymagany');
+            }
+            if (empty($this->ftpPassword)) {
+                throw new \Exception('Haslo FTP jest wymagane');
+            }
+
+            // Use PrestaShopCssFetcher to test connection
+            $cssFetcher = new \App\Services\VisualEditor\PrestaShopCssFetcher();
+
+            $config = [
+                'protocol' => $this->ftpProtocol,
+                'host' => $this->ftpHost,
+                'port' => (int) $this->ftpPort,
+                'user' => $this->ftpUser,
+                'password' => \App\Services\VisualEditor\PrestaShopCssFetcher::encryptPassword($this->ftpPassword),
+            ];
+
+            $result = $cssFetcher->testFtpConnection($config);
+
+            if ($result['success']) {
+                $this->ftpConnectionStatus = 'success';
+                $this->ftpConnectionMessage = 'Polaczenie FTP pomyslne!';
+
+                if (isset($result['server_info'])) {
+                    $info = $result['server_info'];
+                    $details = [];
+                    if (!empty($info['system_type'])) {
+                        $details[] = "System: {$info['system_type']}";
+                    }
+                    if (!empty($info['current_dir'])) {
+                        $details[] = "Dir: {$info['current_dir']}";
+                    }
+                    if (isset($info['css_path_exists'])) {
+                        $details[] = $info['css_path_exists'] ? 'CSS path exists' : 'CSS path NOT found';
+                    }
+                    if (!empty($details)) {
+                        $this->ftpConnectionMessage .= ' (' . implode(', ', $details) . ')';
+                    }
+                }
+
+                Log::info('FTP connection test successful', [
+                    'host' => $this->ftpHost,
+                    'protocol' => $this->ftpProtocol,
+                    'server_info' => $result['server_info'] ?? null,
+                ]);
+            } else {
+                throw new \Exception($result['error'] ?? 'Nieznany blad polaczenia FTP');
+            }
+
+        } catch (\Exception $e) {
+            $this->ftpConnectionStatus = 'error';
+            $this->ftpConnectionMessage = 'Blad: ' . $e->getMessage();
+
+            Log::error('FTP connection test failed', [
+                'host' => $this->ftpHost,
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    /**
+     * Scan CSS/JS files from PrestaShop (ETAP_07f_P3.5 - 2025-12-17)
+     *
+     * Discovers all CSS and JS files from the PrestaShop shop page.
+     * Filters out minified files (.min.css, .min.js).
+     * User can then select which files to synchronize.
+     */
+    public function scanCssJsFiles(): void
+    {
+        $this->isScanning = true;
+        $this->scanStatus = 'scanning';
+        $this->scanMessage = 'Skanowanie plikow CSS/JS z PrestaShop...';
+        $this->scannedCssFiles = [];
+        $this->scannedJsFiles = [];
+
+        try {
+            // Validate required fields
+            if (empty($this->shopUrl)) {
+                throw new \Exception('URL sklepu jest wymagany');
+            }
+
+            // Create temporary shop instance for asset discovery
+            $tempShop = new PrestaShopShop([
+                'id' => $this->editingShopId ?? 0,
+                'name' => $this->shopName ?: 'Temp Shop',
+                'url' => $this->shopUrl,
+            ]);
+
+            // Use PrestaShopAssetDiscovery to scan files via HTTP
+            $discovery = app(\App\Services\VisualEditor\PrestaShopAssetDiscovery::class);
+            $manifest = $discovery->discoverAssets($tempShop, forceRefresh: true);
+
+            $cssFiles = $manifest['css'] ?? [];
+            $jsFiles = $manifest['js'] ?? [];
+            $scanSource = 'http';
+
+            // FTP FALLBACK: If HTTP scan returns 0 files AND FTP is configured, try FTP scan
+            if (empty($cssFiles) && empty($jsFiles) && $this->ftpEnabled && !empty($this->ftpHost) && !empty($this->ftpPassword)) {
+                Log::info('CSS/JS HTTP scan returned 0 files, trying FTP fallback', [
+                    'shop_url' => $this->shopUrl,
+                    'ftp_host' => $this->ftpHost,
+                ]);
+
+                $this->scanMessage = 'HTTP zablokowany, skanowanie przez FTP...';
+
+                $ftpConfig = [
+                    'protocol' => $this->ftpProtocol,
+                    'host' => $this->ftpHost,
+                    'port' => (int) $this->ftpPort,
+                    'user' => $this->ftpUser,
+                    'password' => \App\Services\VisualEditor\PrestaShopCssFetcher::encryptPassword($this->ftpPassword),
+                ];
+
+                $cssFetcher = new \App\Services\VisualEditor\PrestaShopCssFetcher();
+                $ftpManifest = $cssFetcher->scanFilesViaFtp($ftpConfig, $this->shopUrl);
+
+                if (!empty($ftpManifest['css']) || !empty($ftpManifest['js'])) {
+                    $cssFiles = $ftpManifest['css'] ?? [];
+                    $jsFiles = $ftpManifest['js'] ?? [];
+                    $scanSource = 'ftp';
+
+                    Log::info('CSS/JS FTP scan successful', [
+                        'shop_url' => $this->shopUrl,
+                        'css_count' => count($cssFiles),
+                        'js_count' => count($jsFiles),
+                    ]);
+                }
+            }
+
+            // Filter out minified files
+            $cssFiles = array_filter($cssFiles, fn($f) => !$this->isMinifiedFile($f['url'] ?? ''));
+            $jsFiles = array_filter($jsFiles, fn($f) => !$this->isMinifiedFile($f['url'] ?? ''));
+
+            // Convert to our format with enabled flag
+            $this->scannedCssFiles = array_values(array_map(function($file) {
+                $url = $file['url'] ?? '';
+                return [
+                    'url' => $url,
+                    'name' => $file['filename'] ?? basename($url),
+                    'type' => $file['category'] ?? 'other',
+                    'enabled' => $this->shouldAutoEnable($file),
+                    'cached_content' => null,
+                    'last_fetched_at' => null,
+                ];
+            }, $cssFiles));
+
+            $this->scannedJsFiles = array_values(array_map(function($file) {
+                $url = $file['url'] ?? '';
+                return [
+                    'url' => $url,
+                    'name' => $file['filename'] ?? basename($url),
+                    'type' => $file['category'] ?? 'other',
+                    'enabled' => $this->shouldAutoEnableJs($file),
+                    'cached_content' => null,
+                    'last_fetched_at' => null,
+                ];
+            }, $jsFiles));
+
+            // Update selected arrays based on enabled flag
+            $this->selectedCssFiles = array_values(array_filter(
+                array_map(fn($f) => ($f['enabled'] ?? false) ? $f['url'] : null, $this->scannedCssFiles)
+            ));
+            $this->selectedJsFiles = array_values(array_filter(
+                array_map(fn($f) => ($f['enabled'] ?? false) ? $f['url'] : null, $this->scannedJsFiles)
+            ));
+
+            $this->scanStatus = 'success';
+            $sourceLabel = $scanSource === 'ftp' ? ' (via FTP)' : '';
+            $this->scanMessage = sprintf(
+                'Znaleziono %d plikow CSS i %d plikow JS%s',
+                count($this->scannedCssFiles),
+                count($this->scannedJsFiles),
+                $sourceLabel
+            );
+
+            Log::info('CSS/JS files scanned successfully', [
+                'shop_url' => $this->shopUrl,
+                'scan_source' => $scanSource,
+                'css_count' => count($this->scannedCssFiles),
+                'js_count' => count($this->scannedJsFiles),
+                'auto_selected_css' => count($this->selectedCssFiles),
+                'auto_selected_js' => count($this->selectedJsFiles),
+            ]);
+
+        } catch (\Exception $e) {
+            $this->scanStatus = 'error';
+            $this->scanMessage = 'Blad skanowania: ' . $e->getMessage();
+
+            Log::error('CSS/JS scan failed', [
+                'shop_url' => $this->shopUrl,
+                'error' => $e->getMessage(),
+            ]);
+        } finally {
+            $this->isScanning = false;
+        }
+    }
+
+    /**
+     * Check if file is minified (should be excluded from scan).
+     */
+    private function isMinifiedFile(string $url): bool
+    {
+        $lowercaseUrl = strtolower($url);
+        return str_contains($lowercaseUrl, '.min.css')
+            || str_contains($lowercaseUrl, '.min.js')
+            || str_contains($lowercaseUrl, '-min.css')
+            || str_contains($lowercaseUrl, '-min.js');
+    }
+
+    /**
+     * Determine if CSS file should be auto-enabled.
+     *
+     * Auto-enables: theme.css, custom.css
+     */
+    private function shouldAutoEnable(array $file): bool
+    {
+        $name = strtolower($file['filename'] ?? '');
+        $type = $file['category'] ?? '';
+
+        // Always enable custom.css
+        if (str_contains($name, 'custom.css')) {
+            return true;
+        }
+
+        // Enable main theme CSS
+        if ($type === 'theme' && (str_contains($name, 'theme.css') || $name === 'theme.css')) {
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * Determine if JS file should be auto-enabled.
+     *
+     * Auto-enables: custom.js only
+     */
+    private function shouldAutoEnableJs(array $file): bool
+    {
+        $name = strtolower($file['filename'] ?? '');
+
+        // Only enable custom.js
+        return str_contains($name, 'custom.js');
+    }
+
+    /**
+     * Toggle CSS file selection.
+     */
+    public function toggleCssFile(string $url): void
+    {
+        if (in_array($url, $this->selectedCssFiles)) {
+            $this->selectedCssFiles = array_values(array_filter(
+                $this->selectedCssFiles,
+                fn($u) => $u !== $url
+            ));
+        } else {
+            $this->selectedCssFiles[] = $url;
+        }
+
+        // Update scannedCssFiles enabled flag
+        $this->scannedCssFiles = array_map(function($f) use ($url) {
+            if (($f['url'] ?? '') === $url) {
+                $f['enabled'] = in_array($url, $this->selectedCssFiles);
+            }
+            return $f;
+        }, $this->scannedCssFiles);
+    }
+
+    /**
+     * Toggle JS file selection.
+     */
+    public function toggleJsFile(string $url): void
+    {
+        if (in_array($url, $this->selectedJsFiles)) {
+            $this->selectedJsFiles = array_values(array_filter(
+                $this->selectedJsFiles,
+                fn($u) => $u !== $url
+            ));
+        } else {
+            $this->selectedJsFiles[] = $url;
+        }
+
+        // Update scannedJsFiles enabled flag
+        $this->scannedJsFiles = array_map(function($f) use ($url) {
+            if (($f['url'] ?? '') === $url) {
+                $f['enabled'] = in_array($url, $this->selectedJsFiles);
+            }
+            return $f;
+        }, $this->scannedJsFiles);
     }
 
     /**
@@ -863,6 +1255,20 @@ class AddShop extends Component
                     'retry_failed' => $this->retryFailedSyncs,
                     'max_retry_attempts' => $this->maxRetryAttempts,
                 ],
+                // ETAP_07f: CSS/JS Sync Configuration (FTP required)
+                'ftp_config' => $this->enableFtpSync ? [
+                    'protocol' => $this->ftpProtocol,
+                    'host' => $this->ftpHost,
+                    'port' => (int) $this->ftpPort,
+                    'user' => $this->ftpUser,
+                    'password' => $this->ftpPassword
+                        ? \App\Services\VisualEditor\PrestaShopCssFetcher::encryptPassword($this->ftpPassword)
+                        : null,
+                ] : null,
+                // ETAP_07f_P3.5: Multi-file CSS/JS configuration (2025-12-17)
+                'css_files' => !empty($this->scannedCssFiles) ? $this->scannedCssFiles : null,
+                'js_files' => !empty($this->scannedJsFiles) ? $this->scannedJsFiles : null,
+                'files_scanned_at' => !empty($this->scannedCssFiles) || !empty($this->scannedJsFiles) ? now() : null,
             ];
 
             if ($this->isEditing) {

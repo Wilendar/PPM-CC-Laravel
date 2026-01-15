@@ -1,14 +1,6 @@
 ---
-name: prestashop-database-structure
-description: Reference skill for PrestaShop database structure, table schemas, ObjectModel patterns, and query optimization. Use when working with PrestaShop database tables, migrations, or raw SQL queries.
-version: 1.0.0
-author: Kamil Wilinski (via skill-creator)
-created: 2025-11-05
-updated: 2025-11-05
-tags: [prestashop, database, schema, objectmodel, sql, migrations]
-scope: project-specific
-category: reference
-status: active
+name: "prestashop-database-structure"
+description: "Reference skill for PrestaShop database structure, table schemas, ObjectModel patterns, and query optimization. Use when working with PrestaShop database tables, migrations, or raw SQL queries."
 ---
 
 # PrestaShop Database Structure Skill

@@ -2,13 +2,18 @@
 
 namespace App\Http\Livewire\Admin\Features;
 
+use App\Jobs\Features\BulkAssignFeaturesJob;
+use App\Models\FeatureGroup;
 use App\Models\FeatureTemplate;
 use App\Models\FeatureType;
+use App\Models\JobProgress;
 use App\Models\Product;
+use App\Services\JobProgressService;
 use App\Services\Product\FeatureManager;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 use Livewire\Component;
 
 /**
@@ -47,13 +52,27 @@ use Livewire\Component;
 class VehicleFeatureManagement extends Component
 {
     // ========================================
-    // TEMPLATE MANAGEMENT
+    // TAB NAVIGATION (ETAP_07e Phase 2)
     // ========================================
 
     /**
-     * TEST COUNTER - verify Livewire reactivity
+     * Active tab: 'library' | 'templates' | 'browser'
      */
-    public int $testCounter = 0;
+    public string $activeTab = 'library';
+
+    /**
+     * Set active tab
+     */
+    public function setTab(string $tab): void
+    {
+        if (in_array($tab, ['library', 'templates', 'browser'])) {
+            $this->activeTab = $tab;
+        }
+    }
+
+    // ========================================
+    // TEMPLATE MANAGEMENT
+    // ========================================
 
     /**
      * Show/hide template editor modal
@@ -101,6 +120,56 @@ class VehicleFeatureManagement extends Component
     public array $featureLibrary = [];
 
     // ========================================
+    // FEATURE TYPE CRUD
+    // ========================================
+
+    /**
+     * Show/hide feature type editor modal
+     */
+    public bool $showFeatureTypeEditor = false;
+
+    /**
+     * Currently editing feature type ID (null = new)
+     */
+    public ?int $editingFeatureTypeId = null;
+
+    /**
+     * Feature type form fields
+     */
+    public string $featureTypeName = '';
+    public string $featureTypeCode = '';
+    public string $featureTypeValueType = 'text';
+    public ?string $featureTypeUnit = null;
+    public ?int $featureTypeGroupId = null;
+    public ?string $featureTypePlaceholder = null;
+    public ?string $featureTypeConditional = null;
+
+    // ========================================
+    // FEATURE GROUP CRUD
+    // ========================================
+
+    /**
+     * Show/hide feature group editor modal
+     */
+    public bool $showFeatureGroupEditor = false;
+
+    /**
+     * Currently editing feature group ID (null = new)
+     */
+    public ?int $editingFeatureGroupId = null;
+
+    /**
+     * Feature group form fields
+     */
+    public string $featureGroupName = '';
+    public string $featureGroupCode = '';
+    public ?string $featureGroupNamePl = null;
+    public ?string $featureGroupIcon = null;
+    public ?string $featureGroupColor = null;
+    public ?string $featureGroupVehicleFilter = null;
+    public int $featureGroupSortOrder = 0;
+
+    // ========================================
     // BULK ASSIGN WIZARD
     // ========================================
 
@@ -133,6 +202,16 @@ class VehicleFeatureManagement extends Component
      * Products count matching bulk assign scope
      */
     public int $bulkAssignProductsCount = 0;
+
+    /**
+     * Active job progress ID for bulk assign tracking
+     */
+    public ?int $activeJobProgressId = null;
+
+    /**
+     * Active job progress data for UI
+     */
+    public array $activeJobProgress = [];
 
     // ========================================
     // SERVICE LAYER (LAZY LOADING)
@@ -215,15 +294,6 @@ class VehicleFeatureManagement extends Component
         Log::debug('VehicleFeatureManagement::loadCustomTemplates', [
             'count' => $this->customTemplates->count(),
         ]);
-    }
-
-    /**
-     * TEST METHOD - increment counter to verify Livewire reactivity
-     */
-    public function incrementTest(): void
-    {
-        $this->testCounter++;
-        Log::info('TEST INCREMENT CALLED', ['new_value' => $this->testCounter]);
     }
 
     /**
@@ -441,25 +511,34 @@ class VehicleFeatureManagement extends Component
     // ========================================
 
     /**
-     * Load feature library from database (grouped by group)
+     * Load feature library from database (grouped by FeatureGroup)
+     *
+     * ETAP_07e FAZA 2 - Uses FeatureGroup model with icons and colors
      */
     public function loadFeatureLibrary(): void
     {
-        // Use new scope from FeatureType model (FAZA 2.1)
-        $grouped = FeatureType::active()
-            ->orderBy('position')
-            ->get()
-            ->groupBy('group');
+        // Get all active groups with their feature types
+        $groups = FeatureGroup::getGroupsWithFeatures();
 
-        // Transform to component format
-        $this->featureLibrary = $grouped->map(function($features, $groupName) {
+        // Transform to component format with icon and color support
+        $this->featureLibrary = $groups->map(function(FeatureGroup $group) {
             return [
-                'group' => $groupName,
-                'features' => $features->map(fn($f) => [
+                'id' => $group->id,
+                'code' => $group->code,
+                'group' => $group->getDisplayName(),
+                'icon' => $group->icon,
+                'color' => $group->color,
+                'colorClasses' => $group->getColorClasses(),
+                'isConditional' => $group->isConditional(),
+                'vehicleTypeFilter' => $group->vehicle_type_filter,
+                'features' => $group->activeFeatureTypes->map(fn($f) => [
+                    'id' => $f->id,
                     'name' => $f->name,
-                    'type' => $f->value_type,
                     'code' => $f->code,
+                    'type' => $f->value_type,
                     'unit' => $f->unit,
+                    'placeholder' => $f->input_placeholder,
+                    'conditionalGroup' => $f->conditional_group,
                     'default' => '',
                 ])->toArray(),
             ];
@@ -500,6 +579,295 @@ class VehicleFeatureManagement extends Component
     }
 
     // ========================================
+    // FEATURE TYPE CRUD METHODS
+    // ========================================
+
+    /**
+     * Open feature type editor (new)
+     */
+    public function openFeatureTypeEditor(?int $groupId = null): void
+    {
+        $this->resetFeatureTypeForm();
+        $this->featureTypeGroupId = $groupId;
+        $this->showFeatureTypeEditor = true;
+    }
+
+    /**
+     * Edit existing feature type
+     */
+    public function editFeatureType(int $featureTypeId): void
+    {
+        $featureType = FeatureType::find($featureTypeId);
+
+        if (!$featureType) {
+            $this->addError('general', 'Cecha nie zostala znaleziona.');
+            return;
+        }
+
+        $this->editingFeatureTypeId = $featureType->id;
+        $this->featureTypeName = $featureType->name;
+        $this->featureTypeCode = $featureType->code;
+        $this->featureTypeValueType = $featureType->value_type;
+        $this->featureTypeUnit = $featureType->unit;
+        $this->featureTypeGroupId = $featureType->feature_group_id;
+        $this->featureTypePlaceholder = $featureType->input_placeholder;
+        $this->featureTypeConditional = $featureType->conditional_group;
+
+        $this->showFeatureTypeEditor = true;
+    }
+
+    /**
+     * Save feature type (create or update)
+     */
+    public function saveFeatureType(): void
+    {
+        $this->validate([
+            'featureTypeName' => 'required|string|max:255',
+            'featureTypeCode' => 'required|string|max:100',
+            'featureTypeValueType' => 'required|in:text,number,bool,select',
+            'featureTypeGroupId' => 'nullable|exists:feature_groups,id',
+        ]);
+
+        try {
+            DB::transaction(function () {
+                if ($this->editingFeatureTypeId) {
+                    // UPDATE
+                    $featureType = FeatureType::findOrFail($this->editingFeatureTypeId);
+                    $featureType->update([
+                        'name' => $this->featureTypeName,
+                        'code' => $this->featureTypeCode,
+                        'value_type' => $this->featureTypeValueType,
+                        'unit' => $this->featureTypeUnit,
+                        'feature_group_id' => $this->featureTypeGroupId,
+                        'input_placeholder' => $this->featureTypePlaceholder,
+                        'conditional_group' => $this->featureTypeConditional,
+                    ]);
+                    Log::info('FeatureType updated', ['id' => $featureType->id]);
+                } else {
+                    // CREATE
+                    $maxPosition = FeatureType::where('feature_group_id', $this->featureTypeGroupId)->max('position') ?? 0;
+                    FeatureType::create([
+                        'name' => $this->featureTypeName,
+                        'code' => $this->featureTypeCode,
+                        'value_type' => $this->featureTypeValueType,
+                        'unit' => $this->featureTypeUnit,
+                        'feature_group_id' => $this->featureTypeGroupId,
+                        'input_placeholder' => $this->featureTypePlaceholder,
+                        'conditional_group' => $this->featureTypeConditional,
+                        'is_active' => true,
+                        'position' => $maxPosition + 1,
+                    ]);
+                    Log::info('FeatureType created', ['name' => $this->featureTypeName]);
+                }
+            });
+
+            $this->loadFeatureLibrary();
+            $this->closeFeatureTypeEditor();
+            session()->flash('message', 'Cecha zapisana pomyslnie.');
+
+        } catch (\Exception $e) {
+            Log::error('FeatureType save failed', ['error' => $e->getMessage()]);
+            $this->addError('general', 'Blad zapisu: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Delete feature type
+     */
+    public function deleteFeatureType(int $featureTypeId): void
+    {
+        try {
+            $featureType = FeatureType::findOrFail($featureTypeId);
+
+            // Check if feature is used by products
+            $usageCount = $featureType->productFeatures()->count();
+            if ($usageCount > 0) {
+                $this->addError('general', "Nie mozna usunac - cecha uzywana przez {$usageCount} produktow.");
+                return;
+            }
+
+            $featureType->delete();
+            $this->loadFeatureLibrary();
+            session()->flash('message', 'Cecha usunieta.');
+
+        } catch (\Exception $e) {
+            Log::error('FeatureType delete failed', ['error' => $e->getMessage()]);
+            $this->addError('general', 'Blad usuwania: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Close feature type editor
+     */
+    public function closeFeatureTypeEditor(): void
+    {
+        $this->showFeatureTypeEditor = false;
+        $this->resetFeatureTypeForm();
+    }
+
+    /**
+     * Reset feature type form
+     */
+    private function resetFeatureTypeForm(): void
+    {
+        $this->editingFeatureTypeId = null;
+        $this->featureTypeName = '';
+        $this->featureTypeCode = '';
+        $this->featureTypeValueType = 'text';
+        $this->featureTypeUnit = null;
+        $this->featureTypeGroupId = null;
+        $this->featureTypePlaceholder = null;
+        $this->featureTypeConditional = null;
+    }
+
+    // ========================================
+    // FEATURE GROUP CRUD METHODS
+    // ========================================
+
+    /**
+     * Open feature group editor (new)
+     */
+    public function openFeatureGroupEditor(): void
+    {
+        $this->resetFeatureGroupForm();
+        $this->showFeatureGroupEditor = true;
+    }
+
+    /**
+     * Edit existing feature group
+     */
+    public function editFeatureGroup(int $groupId): void
+    {
+        $group = FeatureGroup::find($groupId);
+
+        if (!$group) {
+            $this->addError('general', 'Grupa nie zostala znaleziona.');
+            return;
+        }
+
+        $this->editingFeatureGroupId = $group->id;
+        $this->featureGroupName = $group->name;
+        $this->featureGroupCode = $group->code;
+        $this->featureGroupNamePl = $group->name_pl;
+        $this->featureGroupIcon = $group->icon;
+        $this->featureGroupColor = $group->color;
+        $this->featureGroupVehicleFilter = $group->vehicle_type_filter;
+        $this->featureGroupSortOrder = $group->sort_order;
+
+        $this->showFeatureGroupEditor = true;
+    }
+
+    /**
+     * Save feature group (create or update)
+     */
+    public function saveFeatureGroup(): void
+    {
+        $this->validate([
+            'featureGroupName' => 'required|string|max:255',
+            'featureGroupCode' => 'required|string|max:100',
+            'featureGroupSortOrder' => 'required|integer|min:0',
+        ]);
+
+        try {
+            DB::transaction(function () {
+                if ($this->editingFeatureGroupId) {
+                    // UPDATE
+                    $group = FeatureGroup::findOrFail($this->editingFeatureGroupId);
+                    $group->update([
+                        'name' => $this->featureGroupName,
+                        'code' => $this->featureGroupCode,
+                        'name_pl' => $this->featureGroupNamePl,
+                        'icon' => $this->featureGroupIcon,
+                        'color' => $this->featureGroupColor,
+                        'vehicle_type_filter' => $this->featureGroupVehicleFilter,
+                        'sort_order' => $this->featureGroupSortOrder,
+                    ]);
+                    Log::info('FeatureGroup updated', ['id' => $group->id]);
+                } else {
+                    // CREATE
+                    FeatureGroup::create([
+                        'name' => $this->featureGroupName,
+                        'code' => $this->featureGroupCode,
+                        'name_pl' => $this->featureGroupNamePl,
+                        'icon' => $this->featureGroupIcon,
+                        'color' => $this->featureGroupColor,
+                        'vehicle_type_filter' => $this->featureGroupVehicleFilter,
+                        'sort_order' => $this->featureGroupSortOrder,
+                        'is_active' => true,
+                        'is_collapsible' => true,
+                    ]);
+                    Log::info('FeatureGroup created', ['name' => $this->featureGroupName]);
+                }
+            });
+
+            $this->loadFeatureLibrary();
+            $this->closeFeatureGroupEditor();
+            session()->flash('message', 'Grupa zapisana pomyslnie.');
+
+        } catch (\Exception $e) {
+            Log::error('FeatureGroup save failed', ['error' => $e->getMessage()]);
+            $this->addError('general', 'Blad zapisu: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Delete feature group
+     */
+    public function deleteFeatureGroup(int $groupId): void
+    {
+        try {
+            $group = FeatureGroup::findOrFail($groupId);
+
+            // Check if group has features
+            $featureCount = $group->featureTypes()->count();
+            if ($featureCount > 0) {
+                $this->addError('general', "Nie mozna usunac - grupa zawiera {$featureCount} cech.");
+                return;
+            }
+
+            $group->delete();
+            $this->loadFeatureLibrary();
+            session()->flash('message', 'Grupa usunieta.');
+
+        } catch (\Exception $e) {
+            Log::error('FeatureGroup delete failed', ['error' => $e->getMessage()]);
+            $this->addError('general', 'Blad usuwania: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Close feature group editor
+     */
+    public function closeFeatureGroupEditor(): void
+    {
+        $this->showFeatureGroupEditor = false;
+        $this->resetFeatureGroupForm();
+    }
+
+    /**
+     * Reset feature group form
+     */
+    private function resetFeatureGroupForm(): void
+    {
+        $this->editingFeatureGroupId = null;
+        $this->featureGroupName = '';
+        $this->featureGroupCode = '';
+        $this->featureGroupNamePl = null;
+        $this->featureGroupIcon = null;
+        $this->featureGroupColor = null;
+        $this->featureGroupVehicleFilter = null;
+        $this->featureGroupSortOrder = 0;
+    }
+
+    /**
+     * Get available feature groups for dropdown
+     */
+    public function getFeatureGroupsProperty(): Collection
+    {
+        return FeatureGroup::active()->ordered()->get();
+    }
+
+    // ========================================
     // BULK ASSIGN METHODS
     // ========================================
 
@@ -525,10 +893,13 @@ class VehicleFeatureManagement extends Component
 
     /**
      * Calculate products count for bulk assign scope
+     *
+     * NOTE: Removed is_vehicle filter as column doesn't exist.
+     * Features can be assigned to any product.
      */
     public function calculateBulkAssignProductsCount(): void
     {
-        $query = Product::query()->where('is_vehicle', true);
+        $query = Product::query();
 
         if ($this->bulkAssignScope === 'by_category' && $this->bulkAssignCategoryId) {
             $query->where('category_id', $this->bulkAssignCategoryId);
@@ -554,7 +925,9 @@ class VehicleFeatureManagement extends Component
     }
 
     /**
-     * Apply template to products (bulk assign)
+     * Apply template to products (bulk assign) via background job
+     *
+     * ETAP_07e FAZA 2: Dispatches BulkAssignFeaturesJob with JobProgress tracking
      */
     public function bulkAssign(): void
     {
@@ -569,41 +942,41 @@ class VehicleFeatureManagement extends Component
                 'template_id' => $this->selectedTemplateId,
                 'scope' => $this->bulkAssignScope,
                 'action' => $this->bulkAssignAction,
+                'products_count' => $this->bulkAssignProductsCount,
             ]);
 
-            DB::transaction(function () {
-                // Get products matching scope
-                $query = Product::query()->where('is_vehicle', true);
+            // Generate job ID for progress tracking
+            $jobId = Str::uuid()->toString();
 
-                if ($this->bulkAssignScope === 'by_category' && $this->bulkAssignCategoryId) {
-                    $query->where('category_id', $this->bulkAssignCategoryId);
-                }
+            // Create pending progress BEFORE dispatching job
+            $progressService = app(JobProgressService::class);
+            $progressId = $progressService->createJobProgress(
+                $jobId,
+                null, // No shop context for features
+                'bulk_assign_features',
+                $this->bulkAssignProductsCount
+            );
 
-                $products = $query->get();
+            // Store progress ID for UI tracking
+            $this->activeJobProgressId = $progressId;
 
-                // Get template features
-                $templateFeatures = $this->getTemplateFeatures($this->selectedTemplateId);
+            // Dispatch job to queue
+            BulkAssignFeaturesJob::dispatch(
+                $this->selectedTemplateId,
+                $this->bulkAssignScope,
+                $this->bulkAssignCategoryId,
+                $this->bulkAssignAction,
+                $jobId,
+                auth()->id()
+            );
 
-                // Apply to each product
-                $manager = $this->getFeatureManager();
-
-                foreach ($products as $product) {
-                    if ($this->bulkAssignAction === 'replace_features') {
-                        // Replace all features
-                        $manager->setFeatures($product, $templateFeatures);
-                    } else {
-                        // Add features (keep existing)
-                        foreach ($templateFeatures as $featureData) {
-                            $manager->addFeature($product, $featureData);
-                        }
-                    }
-                }
-            });
-
+            // Close modal and show progress
             $this->closeBulkAssignModal();
-            session()->flash('message', "Template applied to {$this->bulkAssignProductsCount} products successfully.");
+            session()->flash('message', "Rozpoczeto przypisywanie szablonu do {$this->bulkAssignProductsCount} produktow...");
 
-            Log::info('VehicleFeatureManagement::bulkAssign COMPLETED', [
+            Log::info('VehicleFeatureManagement::bulkAssign DISPATCHED', [
+                'job_id' => $jobId,
+                'progress_id' => $progressId,
                 'products_count' => $this->bulkAssignProductsCount,
             ]);
 
@@ -612,7 +985,74 @@ class VehicleFeatureManagement extends Component
                 'error' => $e->getMessage(),
             ]);
 
-            $this->addError('general', 'Error applying template: ' . $e->getMessage());
+            $this->addError('general', 'Error dispatching bulk assign: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Refresh job progress (called by wire:poll)
+     */
+    public function refreshJobProgress(): void
+    {
+        if (!$this->activeJobProgressId) {
+            return;
+        }
+
+        $progress = JobProgress::find($this->activeJobProgressId);
+
+        if (!$progress) {
+            $this->activeJobProgressId = null;
+            $this->activeJobProgress = [];
+            return;
+        }
+
+        $this->activeJobProgress = [
+            'status' => $progress->status,
+            'current' => $progress->current_count,
+            'total' => $progress->total_count,
+            'percentage' => $progress->progress_percentage,
+            'errors' => $progress->error_count,
+            'message' => $this->formatProgressMessage($progress),
+        ];
+
+        // Clear progress ID when completed or failed
+        if (in_array($progress->status, ['completed', 'failed'])) {
+            if ($progress->status === 'completed') {
+                session()->flash('message', "Ukonczone! Szablon zastosowany do {$progress->current_count} produktow.");
+            } elseif ($progress->status === 'failed') {
+                $this->addError('general', 'Blad podczas przypisywania szablonu.');
+            }
+
+            // Keep progress visible for 5 seconds after completion
+            // User can dismiss manually
+        }
+    }
+
+    /**
+     * Dismiss progress bar (manual close)
+     */
+    public function dismissProgress(): void
+    {
+        $this->activeJobProgressId = null;
+        $this->activeJobProgress = [];
+    }
+
+    /**
+     * Format progress message for UI
+     */
+    private function formatProgressMessage(JobProgress $progress): string
+    {
+        switch ($progress->status) {
+            case 'running':
+                return "Przetwarzanie... {$progress->current_count}/{$progress->total_count}";
+            case 'completed':
+                return "Ukonczone! {$progress->current_count}/{$progress->total_count}";
+            case 'failed':
+                return 'Wystapil blad podczas przypisywania szablonu';
+            case 'pending':
+                return 'Oczekiwanie na uruchomienie...';
+            default:
+                return 'Status nieznany';
         }
     }
 

@@ -19,9 +19,14 @@
         'resources/css/app.css',
         'resources/css/admin/layout.css',
         'resources/css/admin/components.css',
+        'resources/css/admin/category-tree.css',
         'resources/css/products/category-form.css',
         'resources/css/products/product-form.css',
-        'resources/css/components/category-picker.css'
+        'resources/css/products/media-gallery.css',
+        'resources/css/admin/media-admin.css',
+        'resources/css/admin/feature-browser.css',
+        'resources/css/components/category-picker.css',
+        'resources/css/products/compatibility-tiles.css'
     ])
 
     {{-- Alpine.js is included with Livewire 3.x - no need to load separately --}}
@@ -40,6 +45,9 @@
         🚧 DEVELOPMENT MODE - Authentication Disabled 🚧
     </div>
     
+    {{-- Flash Messages Component --}}
+    <x-flash-messages />
+
     <div class="relative min-h-screen" x-data="{ sidebarOpen: false, sidebarCollapsed: false }">
         <!-- Admin Header -->
         <div class="admin-header backdrop-blur-xl shadow-2xl fixed top-0 left-0 right-0 z-50" style="background: linear-gradient(135deg, rgba(31, 41, 55, 0.95), rgba(17, 24, 39, 0.95)); border-bottom: 1px solid rgba(224, 172, 126, 0.3); height: 64px;">
@@ -306,8 +314,8 @@
                                     </svg>
                                     <span x-show="!sidebarCollapsed" x-transition class="whitespace-nowrap">Import z pliku</span>
                                 </a>
-                                <a href="/admin/products/import-history" class="flex items-center px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-700 hover:text-white transition-colors duration-200 {{ request()->is('admin/products/import-history') ? 'bg-gray-700 text-white' : '' }}"
-                                   :title="sidebarCollapsed ? 'Historie importów' : ''"
+                                <a href="/admin/products/import-history" class="sidebar-link-disabled flex items-center px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-700 hover:text-white transition-colors duration-200"
+                                   title="W przygotowaniu"
                                    :class="{ 'justify-center': sidebarCollapsed }">
                                     <svg class="w-4 h-4 flex-shrink-0"
                                          :class="{ 'mr-0': sidebarCollapsed, 'mr-3': !sidebarCollapsed }"
@@ -316,8 +324,8 @@
                                     </svg>
                                     <span x-show="!sidebarCollapsed" x-transition class="whitespace-nowrap">Historie importów</span>
                                 </a>
-                                <a href="/admin/products/search" class="flex items-center px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-700 hover:text-white transition-colors duration-200 {{ request()->is('admin/products/search') ? 'bg-gray-700 text-white' : '' }}"
-                                   :title="sidebarCollapsed ? 'Szybka Wyszukiwarka' : ''"
+                                <a href="/admin/products/search" class="sidebar-link-disabled flex items-center px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-700 hover:text-white transition-colors duration-200"
+                                   title="W przygotowaniu"
                                    :class="{ 'justify-center': sidebarCollapsed }">
                                     <svg class="w-4 h-4 flex-shrink-0"
                                          :class="{ 'mr-0': sidebarCollapsed, 'mr-3': !sidebarCollapsed }"
@@ -347,8 +355,8 @@
                                     </svg>
                                     <span x-show="!sidebarCollapsed" x-transition class="whitespace-nowrap">Grupy cenowe</span>
                                 </a>
-                                <a href="/admin/price-management/product-prices" class="flex items-center px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-700 hover:text-white transition-colors duration-200 {{ request()->is('admin/price-management/product-prices') ? 'bg-gray-700 text-white' : '' }}"
-                                   :title="sidebarCollapsed ? 'Ceny produktów' : ''"
+                                <a href="/admin/price-management/product-prices" class="sidebar-link-disabled flex items-center px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-700 hover:text-white transition-colors duration-200"
+                                   title="W przygotowaniu"
                                    :class="{ 'justify-center': sidebarCollapsed }">
                                     <svg class="w-4 h-4 flex-shrink-0"
                                          :class="{ 'mr-0': sidebarCollapsed, 'mr-3': !sidebarCollapsed }"
@@ -357,8 +365,8 @@
                                     </svg>
                                     <span x-show="!sidebarCollapsed" x-transition class="whitespace-nowrap">Ceny produktów</span>
                                 </a>
-                                <a href="/admin/price-management/bulk-updates" class="flex items-center px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-700 hover:text-white transition-colors duration-200 {{ request()->is('admin/price-management/bulk-updates') ? 'bg-gray-700 text-white' : '' }}"
-                                   :title="sidebarCollapsed ? 'Aktualizacja masowa' : ''"
+                                <a href="/admin/price-management/bulk-updates" class="sidebar-link-disabled flex items-center px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-700 hover:text-white transition-colors duration-200"
+                                   title="W przygotowaniu"
                                    :class="{ 'justify-center': sidebarCollapsed }">
                                     <svg class="w-4 h-4 flex-shrink-0"
                                          :class="{ 'mr-0': sidebarCollapsed, 'mr-3': !sidebarCollapsed }"
@@ -369,24 +377,26 @@
                                 </a>
                             </div>
 
-                            <!-- WARIANTY & CECHY -->
+                            <!-- ZARZADZANIE PRODUKTAMI -->
                             <div class="space-y-1 pt-4">
                                 <div class="flex items-center px-3 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wide transition-opacity duration-300"
                                      :class="{ 'opacity-0 h-0 py-0 overflow-hidden': sidebarCollapsed }">
                                     <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"></path>
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
                                     </svg>
-                                    Warianty & Cechy
+                                    Zarzadzanie produktami
                                 </div>
-                                <a href="/admin/variants" class="flex items-center px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-700 hover:text-white transition-colors duration-200 {{ request()->is('admin/variants') ? 'bg-gray-700 text-white' : '' }}"
-                                   :title="sidebarCollapsed ? 'Zarządzanie wariantami' : ''"
+                                <a href="/admin/product-parameters" class="flex items-center px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-700 hover:text-white transition-colors duration-200 {{ request()->is('admin/product-parameters*') ? 'bg-gray-700 text-white' : '' }}"
+                                   :title="sidebarCollapsed ? 'Parametry produktow' : ''"
                                    :class="{ 'justify-center': sidebarCollapsed }">
                                     <svg class="w-4 h-4 flex-shrink-0"
                                          :class="{ 'mr-0': sidebarCollapsed, 'mr-3': !sidebarCollapsed }"
                                          fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"></path>
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
                                     </svg>
-                                    <span x-show="!sidebarCollapsed" x-transition class="whitespace-nowrap">Zarządzanie wariantami</span>
+                                    <span x-show="!sidebarCollapsed" x-transition class="whitespace-nowrap">Parametry produktow</span>
                                 </a>
                                 <a href="/admin/features/vehicles" class="flex items-center px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-700 hover:text-white transition-colors duration-200 {{ request()->is('admin/features/vehicles') ? 'bg-gray-700 text-white' : '' }}"
                                    :title="sidebarCollapsed ? 'Cechy pojazdów' : ''"
@@ -399,14 +409,14 @@
                                     <span x-show="!sidebarCollapsed" x-transition class="whitespace-nowrap">Cechy pojazdów</span>
                                 </a>
                                 <a href="/admin/compatibility" class="flex items-center px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-700 hover:text-white transition-colors duration-200 {{ request()->is('admin/compatibility') ? 'bg-gray-700 text-white' : '' }}"
-                                   :title="sidebarCollapsed ? 'Dopasowania części' : ''"
+                                   :title="sidebarCollapsed ? 'Dopasowania czesci' : ''"
                                    :class="{ 'justify-center': sidebarCollapsed }">
                                     <svg class="w-4 h-4 flex-shrink-0"
                                          :class="{ 'mr-0': sidebarCollapsed, 'mr-3': !sidebarCollapsed }"
                                          fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 4a2 2 0 114 0v1a1 1 0 001 1h3a1 1 0 011 1v3a1 1 0 01-1 1h-1a2 2 0 100 4h1a1 1 0 011 1v3a1 1 0 01-1 1h-3a1 1 0 01-1-1v-1a2 2 0 10-4 0v1a1 1 0 01-1 1H7a1 1 0 01-1-1v-3a1 1 0 00-1-1H4a2 2 0 110-4h1a1 1 0 001-1V7a1 1 0 011-1h3a1 1 0 001-1V4z"></path>
                                     </svg>
-                                    <span x-show="!sidebarCollapsed" x-transition class="whitespace-nowrap">Dopasowania części</span>
+                                    <span x-show="!sidebarCollapsed" x-transition class="whitespace-nowrap">Dopasowania czesci</span>
                                 </a>
                             </div>
 
@@ -419,8 +429,8 @@
                                     </svg>
                                     Dostawy & Kontenery
                                 </div>
-                                <a href="/admin/deliveries" class="flex items-center px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-700 hover:text-white transition-colors duration-200 {{ request()->is('admin/deliveries') && !request()->is('admin/deliveries/*') ? 'bg-gray-700 text-white' : '' }}"
-                                   :title="sidebarCollapsed ? 'Lista dostaw' : ''"
+                                <a href="/admin/deliveries" class="sidebar-link-disabled flex items-center px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-700 hover:text-white transition-colors duration-200"
+                                   title="W przygotowaniu"
                                    :class="{ 'justify-center': sidebarCollapsed }">
                                     <svg class="w-4 h-4 flex-shrink-0"
                                          :class="{ 'mr-0': sidebarCollapsed, 'mr-3': !sidebarCollapsed }"
@@ -429,8 +439,8 @@
                                     </svg>
                                     <span x-show="!sidebarCollapsed" x-transition class="whitespace-nowrap">Lista dostaw</span>
                                 </a>
-                                <a href="/admin/deliveries/containers" class="flex items-center px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-700 hover:text-white transition-colors duration-200 {{ request()->is('admin/deliveries/containers*') ? 'bg-gray-700 text-white' : '' }}"
-                                   :title="sidebarCollapsed ? 'Kontenery' : ''"
+                                <a href="/admin/deliveries/containers" class="sidebar-link-disabled flex items-center px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-700 hover:text-white transition-colors duration-200"
+                                   title="W przygotowaniu"
                                    :class="{ 'justify-center': sidebarCollapsed }">
                                     <svg class="w-4 h-4 flex-shrink-0"
                                          :class="{ 'mr-0': sidebarCollapsed, 'mr-3': !sidebarCollapsed }"
@@ -439,8 +449,8 @@
                                     </svg>
                                     <span x-show="!sidebarCollapsed" x-transition class="whitespace-nowrap">Kontenery</span>
                                 </a>
-                                <a href="/admin/deliveries/receiving" class="flex items-center px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-700 hover:text-white transition-colors duration-200 {{ request()->is('admin/deliveries/receiving') ? 'bg-gray-700 text-white' : '' }}"
-                                   :title="sidebarCollapsed ? 'Przyjęcia magazynowe' : ''"
+                                <a href="/admin/deliveries/receiving" class="sidebar-link-disabled flex items-center px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-700 hover:text-white transition-colors duration-200"
+                                   title="W przygotowaniu"
                                    :class="{ 'justify-center': sidebarCollapsed }">
                                     <svg class="w-4 h-4 flex-shrink-0"
                                          :class="{ 'mr-0': sidebarCollapsed, 'mr-3': !sidebarCollapsed }"
@@ -449,8 +459,8 @@
                                     </svg>
                                     <span x-show="!sidebarCollapsed" x-transition class="whitespace-nowrap">Przyjęcia magazynowe</span>
                                 </a>
-                                <a href="/admin/deliveries/documents" class="flex items-center px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-700 hover:text-white transition-colors duration-200 {{ request()->is('admin/deliveries/documents') ? 'bg-gray-700 text-white' : '' }}"
-                                   :title="sidebarCollapsed ? 'Dokumenty odpraw' : ''"
+                                <a href="/admin/deliveries/documents" class="sidebar-link-disabled flex items-center px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-700 hover:text-white transition-colors duration-200"
+                                   title="W przygotowaniu"
                                    :class="{ 'justify-center': sidebarCollapsed }">
                                     <svg class="w-4 h-4 flex-shrink-0"
                                          :class="{ 'mr-0': sidebarCollapsed, 'mr-3': !sidebarCollapsed }"
@@ -470,8 +480,8 @@
                                     </svg>
                                     Zamówienia
                                 </div>
-                                <a href="/admin/orders" class="flex items-center px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-700 hover:text-white transition-colors duration-200 {{ request()->is('admin/orders') && !request()->is('admin/orders/*') ? 'bg-gray-700 text-white' : '' }}"
-                                   :title="sidebarCollapsed ? 'Lista zamówień' : ''"
+                                <a href="/admin/orders" class="sidebar-link-disabled flex items-center px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-700 hover:text-white transition-colors duration-200"
+                                   title="W przygotowaniu"
                                    :class="{ 'justify-center': sidebarCollapsed }">
                                     <svg class="w-4 h-4 flex-shrink-0"
                                          :class="{ 'mr-0': sidebarCollapsed, 'mr-3': !sidebarCollapsed }"
@@ -480,8 +490,8 @@
                                     </svg>
                                     <span x-show="!sidebarCollapsed" x-transition class="whitespace-nowrap">Lista zamówień</span>
                                 </a>
-                                <a href="/admin/orders/reservations" class="flex items-center px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-700 hover:text-white transition-colors duration-200 {{ request()->is('admin/orders/reservations') ? 'bg-gray-700 text-white' : '' }}"
-                                   :title="sidebarCollapsed ? 'Rezerwacje z kontenera' : ''"
+                                <a href="/admin/orders/reservations" class="sidebar-link-disabled flex items-center px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-700 hover:text-white transition-colors duration-200"
+                                   title="W przygotowaniu"
                                    :class="{ 'justify-center': sidebarCollapsed }">
                                     <svg class="w-4 h-4 flex-shrink-0"
                                          :class="{ 'mr-0': sidebarCollapsed, 'mr-3': !sidebarCollapsed }"
@@ -490,8 +500,8 @@
                                     </svg>
                                     <span x-show="!sidebarCollapsed" x-transition class="whitespace-nowrap">Rezerwacje z kontenera</span>
                                 </a>
-                                <a href="/admin/orders/history" class="flex items-center px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-700 hover:text-white transition-colors duration-200 {{ request()->is('admin/orders/history') ? 'bg-gray-700 text-white' : '' }}"
-                                   :title="sidebarCollapsed ? 'Historia zamówień' : ''"
+                                <a href="/admin/orders/history" class="sidebar-link-disabled flex items-center px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-700 hover:text-white transition-colors duration-200"
+                                   title="W przygotowaniu"
                                    :class="{ 'justify-center': sidebarCollapsed }">
                                     <svg class="w-4 h-4 flex-shrink-0"
                                          :class="{ 'mr-0': sidebarCollapsed, 'mr-3': !sidebarCollapsed }"
@@ -511,8 +521,8 @@
                                     </svg>
                                     Reklamacje
                                 </div>
-                                <a href="/admin/claims" class="flex items-center px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-700 hover:text-white transition-colors duration-200 {{ request()->is('admin/claims') && !request()->is('admin/claims/*') ? 'bg-gray-700 text-white' : '' }}"
-                                   :title="sidebarCollapsed ? 'Lista reklamacji' : ''"
+                                <a href="/admin/claims" class="sidebar-link-disabled flex items-center px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-700 hover:text-white transition-colors duration-200"
+                                   title="W przygotowaniu"
                                    :class="{ 'justify-center': sidebarCollapsed }">
                                     <svg class="w-4 h-4 flex-shrink-0"
                                          :class="{ 'mr-0': sidebarCollapsed, 'mr-3': !sidebarCollapsed }"
@@ -521,8 +531,8 @@
                                     </svg>
                                     <span x-show="!sidebarCollapsed" x-transition class="whitespace-nowrap">Lista reklamacji</span>
                                 </a>
-                                <a href="/admin/claims/create" class="flex items-center px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-700 hover:text-white transition-colors duration-200 {{ request()->is('admin/claims/create') ? 'bg-gray-700 text-white' : '' }}"
-                                   :title="sidebarCollapsed ? 'Nowa reklamacja' : ''"
+                                <a href="/admin/claims/create" class="sidebar-link-disabled flex items-center px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-700 hover:text-white transition-colors duration-200"
+                                   title="W przygotowaniu"
                                    :class="{ 'justify-center': sidebarCollapsed }">
                                     <svg class="w-4 h-4 flex-shrink-0"
                                          :class="{ 'mr-0': sidebarCollapsed, 'mr-3': !sidebarCollapsed }"
@@ -531,8 +541,8 @@
                                     </svg>
                                     <span x-show="!sidebarCollapsed" x-transition class="whitespace-nowrap">Nowa reklamacja</span>
                                 </a>
-                                <a href="/admin/claims/archive" class="flex items-center px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-700 hover:text-white transition-colors duration-200 {{ request()->is('admin/claims/archive') ? 'bg-gray-700 text-white' : '' }}"
-                                   :title="sidebarCollapsed ? 'Archiwum' : ''"
+                                <a href="/admin/claims/archive" class="sidebar-link-disabled flex items-center px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-700 hover:text-white transition-colors duration-200"
+                                   title="W przygotowaniu"
                                    :class="{ 'justify-center': sidebarCollapsed }">
                                     <svg class="w-4 h-4 flex-shrink-0"
                                          :class="{ 'mr-0': sidebarCollapsed, 'mr-3': !sidebarCollapsed }"
@@ -552,8 +562,8 @@
                                     </svg>
                                     Raporty & Statystyki
                                 </div>
-                                <a href="/admin/reports/products" class="flex items-center px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-700 hover:text-white transition-colors duration-200 {{ request()->is('admin/reports/products') ? 'bg-gray-700 text-white' : '' }}"
-                                   :title="sidebarCollapsed ? 'Raporty produktowe' : ''"
+                                <a href="/admin/reports/products" class="sidebar-link-disabled flex items-center px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-700 hover:text-white transition-colors duration-200"
+                                   title="W przygotowaniu"
                                    :class="{ 'justify-center': sidebarCollapsed }">
                                     <svg class="w-4 h-4 flex-shrink-0"
                                          :class="{ 'mr-0': sidebarCollapsed, 'mr-3': !sidebarCollapsed }"
@@ -562,8 +572,8 @@
                                     </svg>
                                     <span x-show="!sidebarCollapsed" x-transition class="whitespace-nowrap">Raporty produktowe</span>
                                 </a>
-                                <a href="/admin/reports/financial" class="flex items-center px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-700 hover:text-white transition-colors duration-200 {{ request()->is('admin/reports/financial') ? 'bg-gray-700 text-white' : '' }}"
-                                   :title="sidebarCollapsed ? 'Raporty finansowe' : ''"
+                                <a href="/admin/reports/financial" class="sidebar-link-disabled flex items-center px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-700 hover:text-white transition-colors duration-200"
+                                   title="W przygotowaniu"
                                    :class="{ 'justify-center': sidebarCollapsed }">
                                     <svg class="w-4 h-4 flex-shrink-0"
                                          :class="{ 'mr-0': sidebarCollapsed, 'mr-3': !sidebarCollapsed }"
@@ -572,8 +582,8 @@
                                     </svg>
                                     <span x-show="!sidebarCollapsed" x-transition class="whitespace-nowrap">Raporty finansowe</span>
                                 </a>
-                                <a href="/admin/reports/warehouse" class="flex items-center px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-700 hover:text-white transition-colors duration-200 {{ request()->is('admin/reports/warehouse') ? 'bg-gray-700 text-white' : '' }}"
-                                   :title="sidebarCollapsed ? 'Raporty magazynowe' : ''"
+                                <a href="/admin/reports/warehouse" class="sidebar-link-disabled flex items-center px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-700 hover:text-white transition-colors duration-200"
+                                   title="W przygotowaniu"
                                    :class="{ 'justify-center': sidebarCollapsed }">
                                     <svg class="w-4 h-4 flex-shrink-0"
                                          :class="{ 'mr-0': sidebarCollapsed, 'mr-3': !sidebarCollapsed }"
@@ -582,8 +592,8 @@
                                     </svg>
                                     <span x-show="!sidebarCollapsed" x-transition class="whitespace-nowrap">Raporty magazynowe</span>
                                 </a>
-                                <a href="/admin/reports/export" class="flex items-center px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-700 hover:text-white transition-colors duration-200 {{ request()->is('admin/reports/export') ? 'bg-gray-700 text-white' : '' }}"
-                                   :title="sidebarCollapsed ? 'Eksport raportów' : ''"
+                                <a href="/admin/reports/export" class="sidebar-link-disabled flex items-center px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-700 hover:text-white transition-colors duration-200"
+                                   title="W przygotowaniu"
                                    :class="{ 'justify-center': sidebarCollapsed }">
                                     <svg class="w-4 h-4 flex-shrink-0"
                                          :class="{ 'mr-0': sidebarCollapsed, 'mr-3': !sidebarCollapsed }"
@@ -604,8 +614,8 @@
                                     </svg>
                                     System
                                 </div>
-                                <a href="/admin/system-settings" class="flex items-center px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-700 hover:text-white transition-colors duration-200 {{ request()->is('admin/system-settings') ? 'bg-gray-700 text-white' : '' }}"
-                                   :title="sidebarCollapsed ? 'Ustawienia' : ''"
+                                <a href="/admin/system-settings" class="sidebar-link-disabled flex items-center px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-700 hover:text-white transition-colors duration-200"
+                                   title="W przygotowaniu"
                                    :class="{ 'justify-center': sidebarCollapsed }">
                                     <svg class="w-4 h-4 flex-shrink-0"
                                          :class="{ 'mr-0': sidebarCollapsed, 'mr-3': !sidebarCollapsed }"
@@ -615,8 +625,8 @@
                                     </svg>
                                     <span x-show="!sidebarCollapsed" x-transition class="whitespace-nowrap">Ustawienia</span>
                                 </a>
-                                <a href="/admin/backup" class="flex items-center px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-700 hover:text-white transition-colors duration-200 {{ request()->is('admin/backup') ? 'bg-gray-700 text-white' : '' }}"
-                                   :title="sidebarCollapsed ? 'Backup' : ''"
+                                <a href="/admin/backup" class="sidebar-link-disabled flex items-center px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-700 hover:text-white transition-colors duration-200"
+                                   title="W przygotowaniu"
                                    :class="{ 'justify-center': sidebarCollapsed }">
                                     <svg class="w-4 h-4 flex-shrink-0"
                                          :class="{ 'mr-0': sidebarCollapsed, 'mr-3': !sidebarCollapsed }"
@@ -625,8 +635,8 @@
                                     </svg>
                                     <span x-show="!sidebarCollapsed" x-transition class="whitespace-nowrap">Backup</span>
                                 </a>
-                                <a href="/admin/maintenance" class="flex items-center px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-700 hover:text-white transition-colors duration-200 {{ request()->is('admin/maintenance') ? 'bg-gray-700 text-white' : '' }}"
-                                   :title="sidebarCollapsed ? 'Konserwacja' : ''"
+                                <a href="/admin/maintenance" class="sidebar-link-disabled flex items-center px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-700 hover:text-white transition-colors duration-200"
+                                   title="W przygotowaniu"
                                    :class="{ 'justify-center': sidebarCollapsed }">
                                     <svg class="w-4 h-4 flex-shrink-0"
                                          :class="{ 'mr-0': sidebarCollapsed, 'mr-3': !sidebarCollapsed }"
@@ -635,8 +645,18 @@
                                     </svg>
                                     <span x-show="!sidebarCollapsed" x-transition class="whitespace-nowrap">Konserwacja</span>
                                 </a>
-                                <a href="/admin/integrations" class="flex items-center px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-700 hover:text-white transition-colors duration-200 {{ request()->is('admin/integrations') ? 'bg-gray-700 text-white' : '' }}"
-                                   :title="sidebarCollapsed ? 'Integracje ERP' : ''"
+                                <a href="/admin/media" class="flex items-center px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-700 hover:text-white transition-colors duration-200 {{ request()->is('admin/media') ? 'bg-gray-700 text-white' : '' }}"
+                                   :title="sidebarCollapsed ? 'Media' : ''"
+                                   :class="{ 'justify-center': sidebarCollapsed }">
+                                    <svg class="w-4 h-4 flex-shrink-0"
+                                         :class="{ 'mr-0': sidebarCollapsed, 'mr-3': !sidebarCollapsed }"
+                                         fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                                    </svg>
+                                    <span x-show="!sidebarCollapsed" x-transition class="whitespace-nowrap">Media</span>
+                                </a>
+                                <a href="/admin/integrations" class="sidebar-link-disabled flex items-center px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-700 hover:text-white transition-colors duration-200"
+                                   title="W przygotowaniu"
                                    :class="{ 'justify-center': sidebarCollapsed }">
                                     <svg class="w-4 h-4 flex-shrink-0"
                                          :class="{ 'mr-0': sidebarCollapsed, 'mr-3': !sidebarCollapsed }"
@@ -645,8 +665,8 @@
                                     </svg>
                                     <span x-show="!sidebarCollapsed" x-transition class="whitespace-nowrap">Integracje ERP</span>
                                 </a>
-                                <a href="/admin/users" class="flex items-center px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-700 hover:text-white transition-colors duration-200 {{ request()->is('admin/users') ? 'bg-gray-700 text-white' : '' }}"
-                                   :title="sidebarCollapsed ? 'Użytkownicy' : ''"
+                                <a href="/admin/users" class="sidebar-link-disabled flex items-center px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-700 hover:text-white transition-colors duration-200"
+                                   title="W przygotowaniu"
                                    :class="{ 'justify-center': sidebarCollapsed }">
                                     <svg class="w-4 h-4 flex-shrink-0"
                                          :class="{ 'mr-0': sidebarCollapsed, 'mr-3': !sidebarCollapsed }"
@@ -655,8 +675,8 @@
                                     </svg>
                                     <span x-show="!sidebarCollapsed" x-transition class="whitespace-nowrap">Użytkownicy</span>
                                 </a>
-                                <a href="/admin/logs" class="flex items-center px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-700 hover:text-white transition-colors duration-200 {{ request()->is('admin/logs') ? 'bg-gray-700 text-white' : '' }}"
-                                   :title="sidebarCollapsed ? 'Logi systemowe' : ''"
+                                <a href="/admin/logs" class="sidebar-link-disabled flex items-center px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-700 hover:text-white transition-colors duration-200"
+                                   title="W przygotowaniu"
                                    :class="{ 'justify-center': sidebarCollapsed }">
                                     <svg class="w-4 h-4 flex-shrink-0"
                                          :class="{ 'mr-0': sidebarCollapsed, 'mr-3': !sidebarCollapsed }"
@@ -665,8 +685,8 @@
                                     </svg>
                                     <span x-show="!sidebarCollapsed" x-transition class="whitespace-nowrap">Logi systemowe</span>
                                 </a>
-                                <a href="/admin/monitoring" class="flex items-center px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-700 hover:text-white transition-colors duration-200 {{ request()->is('admin/monitoring') ? 'bg-gray-700 text-white' : '' }}"
-                                   :title="sidebarCollapsed ? 'Monitoring' : ''"
+                                <a href="/admin/monitoring" class="sidebar-link-disabled flex items-center px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-700 hover:text-white transition-colors duration-200"
+                                   title="W przygotowaniu"
                                    :class="{ 'justify-center': sidebarCollapsed }">
                                     <svg class="w-4 h-4 flex-shrink-0"
                                          :class="{ 'mr-0': sidebarCollapsed, 'mr-3': !sidebarCollapsed }"
@@ -675,8 +695,8 @@
                                     </svg>
                                     <span x-show="!sidebarCollapsed" x-transition class="whitespace-nowrap">Monitoring</span>
                                 </a>
-                                <a href="/admin/api" class="flex items-center px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-700 hover:text-white transition-colors duration-200 {{ request()->is('admin/api') ? 'bg-gray-700 text-white' : '' }}"
-                                   :title="sidebarCollapsed ? 'API Management' : ''"
+                                <a href="/admin/api" class="sidebar-link-disabled flex items-center px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-700 hover:text-white transition-colors duration-200"
+                                   title="W przygotowaniu"
                                    :class="{ 'justify-center': sidebarCollapsed }">
                                     <svg class="w-4 h-4 flex-shrink-0"
                                          :class="{ 'mr-0': sidebarCollapsed, 'mr-3': !sidebarCollapsed }"
@@ -807,7 +827,7 @@
          x-data="toastNotifications()"
          x-init="init()"
          class="fixed top-24 right-6 z-[9999] space-y-3 pointer-events-none"
-         style="max-width: min(calc(100vw - 3rem), 600px); min-width: 320px; width: fit-content;">
+         style="max-width: min(calc(100vw - 3rem), 420px); min-width: 360px; width: 360px;">
 
         <template x-for="notification in notifications" :key="notification.id">
             <div x-show="notification.show"

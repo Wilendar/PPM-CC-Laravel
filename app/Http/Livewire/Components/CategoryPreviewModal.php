@@ -9,7 +9,10 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use App\Models\CategoryPreview;
 use App\Models\Category;
+use App\Models\PrestaShopShop;
+use App\Models\ShopMapping;
 use App\Jobs\PrestaShop\BulkCreateCategories;
+use App\Services\CategoryComparisonService;
 
 /**
  * CategoryPreviewModal Component
@@ -238,6 +241,59 @@ class CategoryPreviewModal extends Component
 
     /*
     |--------------------------------------------------------------------------
+    | ETAP_07f: COMPARISON TREE & VARIANT IMPORT PROPERTIES
+    |--------------------------------------------------------------------------
+    */
+
+    /**
+     * Comparison tree with status for each category
+     * Shows all categories (synced, to-add, to-remove)
+     *
+     * @var array
+     */
+    public array $comparisonTree = [];
+
+    /**
+     * Summary statistics for comparison
+     *
+     * @var array
+     */
+    public array $comparisonSummary = [];
+
+    /**
+     * Enable automatic variant import from PrestaShop
+     *
+     * @var bool
+     */
+    public bool $importVariantsEnabled = false;
+
+    /**
+     * Variant import configuration
+     *
+     * @var array
+     */
+    public array $variantImportConfig = [
+        'create_missing_attributes' => true,
+        'update_existing' => false,
+        'match_by' => 'sku',
+    ];
+
+    /**
+     * Estimated variants to import (from PS combinations)
+     *
+     * @var int
+     */
+    public int $estimatedVariantsCount = 0;
+
+    /**
+     * Show enhanced comparison view (always shows full tree)
+     *
+     * @var bool
+     */
+    public bool $showComparisonView = true;
+
+    /*
+    |--------------------------------------------------------------------------
     | EVENT LISTENERS
     |--------------------------------------------------------------------------
     */
@@ -324,6 +380,9 @@ class CategoryPreviewModal extends Component
             // Detect category conflicts for re-imported products (2025-10-13)
             $this->detectedConflicts = $this->detectCategoryConflicts($preview);
 
+            // ETAP_07f: Load comparison tree for enhanced view
+            $this->loadComparisonTree();
+
             // Open modal
             $this->isOpen = true;
 
@@ -333,6 +392,7 @@ class CategoryPreviewModal extends Component
                 'total_categories' => $this->totalCount,
                 'selected_count' => count($this->selectedCategoryIds),
                 'conflicts_detected' => count($this->detectedConflicts),
+                'comparison_tree_size' => count($this->comparisonTree),
             ]);
 
         } catch (\Exception $e) {
@@ -549,6 +609,14 @@ class CategoryPreviewModal extends Component
                 count($this->selectedCategoryIds)
             ));
 
+            // ETAP_07c FIX: Notify JobProgressBar that user action was taken
+            // This hides the action button and shows "Przetwarzanie..." state
+            $this->dispatch('user-action-completed', jobId: $preview->job_id);
+
+            Log::info('CategoryPreviewModal: Dispatched user-action-completed event', [
+                'job_id' => $preview->job_id,
+            ]);
+
             $this->close();
 
         } catch (\Exception $e) {
@@ -622,6 +690,9 @@ class CategoryPreviewModal extends Component
             ]);
 
             $this->dispatch('warning', message: 'Import produktów rozpoczęty BEZ kategorii. Produkty zostaną zaimportowane bez przypisania kategorii.');
+
+            // ETAP_07c FIX: Notify JobProgressBar that user action was taken
+            $this->dispatch('user-action-completed', jobId: $preview->job_id);
 
             $this->close();
 
@@ -1234,17 +1305,43 @@ class CategoryPreviewModal extends Component
             return $categoryTree;
         }
 
-        // Get existing PrestaShop category IDs from mappings
-        $existingPrestashopIds = \App\Models\ShopMapping::where('shop_id', $this->shopId)
+        // FIX 2025-12-08: Must check BOTH:
+        // 1. ShopMapping exists for this prestashop_id
+        // 2. AND the actual Category in PPM (ppm_value) exists in categories table
+        // Without this, orphaned mappings show categories as "existing" when they're not
+
+        $mappings = \App\Models\ShopMapping::where('shop_id', $this->shopId)
             ->where('mapping_type', \App\Models\ShopMapping::TYPE_CATEGORY)
             ->where('is_active', true)
+            ->get(['prestashop_id', 'ppm_value']);
+
+        if ($mappings->isEmpty()) {
+            Log::info('CategoryPreviewModal: No mappings found - all categories are new', [
+                'shop_id' => $this->shopId,
+            ]);
+            return $this->markExistingInTree($categoryTree, []);
+        }
+
+        // Get PPM category IDs from mappings
+        $ppmCategoryIds = $mappings->pluck('ppm_value')->unique()->toArray();
+
+        // Check which PPM categories actually exist in the database
+        $existingPpmIds = \App\Models\Category::whereIn('id', $ppmCategoryIds)
+            ->pluck('id')
+            ->toArray();
+
+        // Return only prestashop_ids where the PPM category actually exists
+        $existingPrestashopIds = $mappings
+            ->filter(fn($mapping) => in_array($mapping->ppm_value, $existingPpmIds))
             ->pluck('prestashop_id')
             ->toArray();
 
-        Log::info('CategoryPreviewModal: Checking existing categories', [
+        Log::info('CategoryPreviewModal: Checking existing categories (with PPM verification)', [
             'shop_id' => $this->shopId,
-            'existing_count' => count($existingPrestashopIds),
-            'existing_ids' => $existingPrestashopIds,
+            'total_mappings' => $mappings->count(),
+            'ppm_categories_exist' => count($existingPpmIds),
+            'verified_existing_count' => count($existingPrestashopIds),
+            'existing_prestashop_ids' => $existingPrestashopIds,
         ]);
 
         // Recursively mark existing categories in tree
@@ -2097,6 +2194,338 @@ class CategoryPreviewModal extends Component
         }
 
         return $tree; // Parent not found in this branch
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | ETAP_07f: COMPARISON TREE & VARIANT IMPORT METHODS
+    |--------------------------------------------------------------------------
+    */
+
+    /**
+     * Load comparison tree for current shop
+     *
+     * ETAP_07f FIX: Build tree only from categories used by products to import
+     * NOT all categories from PrestaShop shop (was showing 1170 instead of ~20)
+     *
+     * Data sources:
+     * - Missing categories: from $this->categoryTree (prestashop_only status)
+     * - Existing categories: from CategoryPreview->import_context_json (synced status)
+     */
+    public function loadComparisonTree(): void
+    {
+        if (!$this->shopId || !$this->previewId) {
+            Log::warning('[CategoryPreviewModal] Cannot load comparison tree - no shopId or previewId');
+            return;
+        }
+
+        try {
+            $preview = CategoryPreview::find($this->previewId);
+            if (!$preview) {
+                Log::warning('[CategoryPreviewModal] Preview not found', ['preview_id' => $this->previewId]);
+                return;
+            }
+
+            // Build comparison tree from product categories only (not entire shop)
+            $this->comparisonTree = $this->buildProductCategoriesTree($preview);
+
+            // Calculate summary from built tree
+            $this->comparisonSummary = $this->calculateTreeSummary($this->comparisonTree);
+
+            Log::info('[CategoryPreviewModal] Comparison tree loaded (product categories only)', [
+                'shop_id' => $this->shopId,
+                'tree_size' => count($this->comparisonTree),
+                'summary' => $this->comparisonSummary,
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('[CategoryPreviewModal] Failed to load comparison tree', [
+                'shop_id' => $this->shopId,
+                'error' => $e->getMessage(),
+            ]);
+
+            $this->dispatch('error', message: 'Blad ladowania drzewka kategorii: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Build comparison tree from product categories only
+     *
+     * ETAP_07f FIX: Shows only categories used by products to import:
+     * - Missing categories from categoryTree (prestashop_only)
+     * - Existing mapped categories (both/synced)
+     *
+     * @param CategoryPreview $preview
+     * @return array Hierarchical comparison tree
+     */
+    protected function buildProductCategoriesTree(CategoryPreview $preview): array
+    {
+        $tree = [];
+
+        // 1. Add MISSING categories from categoryTree (prestashop_only status)
+        $missingCategories = $this->categoryTree;
+        foreach ($missingCategories as $category) {
+            $tree[] = $this->buildComparisonNode(
+                $category,
+                CategoryComparisonService::STATUS_PS_ONLY
+            );
+        }
+
+        // 2. Add EXISTING categories (synced) - from product category associations
+        $existingCategories = $this->getExistingProductCategories($preview);
+        foreach ($existingCategories as $category) {
+            // Skip if already in missing (shouldn't happen, but safety check)
+            $psId = $category['prestashop_id'] ?? null;
+            $alreadyInTree = collect($tree)->contains(fn($node) => $node['prestashop_id'] == $psId);
+
+            if (!$alreadyInTree) {
+                $tree[] = $this->buildComparisonNode(
+                    $category,
+                    CategoryComparisonService::STATUS_SYNCED
+                );
+            }
+        }
+
+        // Sort by name
+        usort($tree, fn($a, $b) => strcasecmp($a['name'], $b['name']));
+
+        return $tree;
+    }
+
+    /**
+     * Get existing (synced) categories used by products to import
+     *
+     * Fetches category IDs from products and returns mapped ones
+     *
+     * @param CategoryPreview $preview
+     * @return array Existing categories with PPM and PS IDs
+     */
+    protected function getExistingProductCategories(CategoryPreview $preview): array
+    {
+        $importContext = $preview->import_context_json ?? [];
+        $productIds = $importContext['options']['product_ids'] ?? $importContext['product_ids'] ?? [];
+
+        if (empty($productIds)) {
+            Log::debug('[CategoryPreviewModal] No product_ids in import_context_json');
+            return [];
+        }
+
+        // Fetch categories from PrestaShop API for these products
+        try {
+            $shop = PrestaShopShop::find($this->shopId);
+            if (!$shop) {
+                return [];
+            }
+
+            $client = app(\App\Services\PrestaShop\PrestaShopClientFactory::class)->create($shop);
+
+            // Get all category IDs used by products
+            $allCategoryIds = [];
+            foreach ($productIds as $productId) {
+                try {
+                    $product = $client->getProduct($productId);
+                    $productData = $product['product'] ?? $product;
+
+                    // Default category
+                    if (isset($productData['id_category_default'])) {
+                        $allCategoryIds[] = (int) $productData['id_category_default'];
+                    }
+
+                    // Associated categories
+                    if (isset($productData['associations']['categories'])) {
+                        foreach ($productData['associations']['categories'] as $cat) {
+                            if (isset($cat['id'])) {
+                                $allCategoryIds[] = (int) $cat['id'];
+                            }
+                        }
+                    }
+                } catch (\Exception $e) {
+                    Log::debug('[CategoryPreviewModal] Failed to fetch product categories', [
+                        'product_id' => $productId,
+                        'error' => $e->getMessage(),
+                    ]);
+                }
+            }
+
+            $allCategoryIds = array_unique($allCategoryIds);
+
+            // Filter only existing (mapped) categories
+            $mappings = ShopMapping::where('shop_id', $this->shopId)
+                ->where('mapping_type', ShopMapping::TYPE_CATEGORY)
+                ->whereIn('prestashop_id', $allCategoryIds)
+                ->get();
+
+            $existingCategories = [];
+            foreach ($mappings as $mapping) {
+                $ppmCategory = Category::find($mapping->ppm_value);
+                if ($ppmCategory) {
+                    $existingCategories[] = [
+                        'prestashop_id' => (int) $mapping->prestashop_id,
+                        'id' => $ppmCategory->id,
+                        'name' => $ppmCategory->name,
+                        'level_depth' => $this->calculateCategoryLevel($ppmCategory),
+                    ];
+                }
+            }
+
+            Log::debug('[CategoryPreviewModal] Existing categories found', [
+                'total_category_ids' => count($allCategoryIds),
+                'existing_count' => count($existingCategories),
+            ]);
+
+            return $existingCategories;
+
+        } catch (\Exception $e) {
+            Log::error('[CategoryPreviewModal] Failed to get existing product categories', [
+                'error' => $e->getMessage(),
+            ]);
+            return [];
+        }
+    }
+
+    /**
+     * Build comparison node from category data
+     *
+     * @param array $category Category data
+     * @param string $status Sync status (both, prestashop_only, ppm_only)
+     * @return array Comparison node
+     */
+    protected function buildComparisonNode(array $category, string $status): array
+    {
+        return [
+            'id' => $category['id'] ?? null,
+            'prestashop_id' => $category['prestashop_id'] ?? null,
+            'name' => $category['name'] ?? 'Unknown',
+            'full_path' => $category['name'] ?? '',
+            'level' => $category['level_depth'] ?? 1,
+            'status' => $status,
+            'is_mapped' => ($status === CategoryComparisonService::STATUS_SYNCED),
+            'product_count_ppm' => 0,
+            'children' => [],
+            'can_delete' => false,
+            'is_selected' => false,
+        ];
+    }
+
+    /**
+     * Calculate category level in PPM hierarchy
+     *
+     * @param Category $category
+     * @return int Level depth
+     */
+    protected function calculateCategoryLevel(Category $category): int
+    {
+        $level = 1;
+        $current = $category->parent;
+        while ($current && $level < 5) {
+            $level++;
+            $current = $current->parent;
+        }
+        return $level;
+    }
+
+    /**
+     * Calculate summary from comparison tree
+     *
+     * @param array $tree Comparison tree
+     * @return array Summary statistics
+     */
+    protected function calculateTreeSummary(array $tree): array
+    {
+        $summary = [
+            'categories_synced' => 0,
+            'categories_to_add' => 0,
+            'categories_to_remove' => 0,
+            'total_prestashop' => 0,
+            'total_ppm' => 0,
+        ];
+
+        foreach ($tree as $node) {
+            switch ($node['status']) {
+                case CategoryComparisonService::STATUS_SYNCED:
+                    $summary['categories_synced']++;
+                    $summary['total_prestashop']++;
+                    $summary['total_ppm']++;
+                    break;
+                case CategoryComparisonService::STATUS_PS_ONLY:
+                    $summary['categories_to_add']++;
+                    $summary['total_prestashop']++;
+                    break;
+                case CategoryComparisonService::STATUS_PPM_ONLY:
+                    $summary['categories_to_remove']++;
+                    $summary['total_ppm']++;
+                    break;
+            }
+
+            // Process children recursively
+            if (!empty($node['children'])) {
+                $childSummary = $this->calculateTreeSummary($node['children']);
+                $summary['categories_synced'] += $childSummary['categories_synced'];
+                $summary['categories_to_add'] += $childSummary['categories_to_add'];
+                $summary['categories_to_remove'] += $childSummary['categories_to_remove'];
+                $summary['total_prestashop'] += $childSummary['total_prestashop'];
+                $summary['total_ppm'] += $childSummary['total_ppm'];
+            }
+        }
+
+        return $summary;
+    }
+
+    /**
+     * Toggle variant import option
+     */
+    public function toggleVariantImport(): void
+    {
+        $this->importVariantsEnabled = !$this->importVariantsEnabled;
+
+        Log::info('[CategoryPreviewModal] Variant import toggled', [
+            'enabled' => $this->importVariantsEnabled,
+        ]);
+    }
+
+    /**
+     * Update variant import configuration
+     *
+     * @param string $key Configuration key
+     * @param mixed $value Configuration value
+     */
+    public function updateVariantConfig(string $key, mixed $value): void
+    {
+        if (array_key_exists($key, $this->variantImportConfig)) {
+            $this->variantImportConfig[$key] = $value;
+
+            Log::info('[CategoryPreviewModal] Variant config updated', [
+                'key' => $key,
+                'value' => $value,
+            ]);
+        }
+    }
+
+    /**
+     * Get variant import config for job dispatch
+     *
+     * @return array Variant import configuration
+     */
+    public function getVariantImportConfig(): array
+    {
+        if (!$this->importVariantsEnabled) {
+            return ['enabled' => false];
+        }
+
+        return array_merge(
+            ['enabled' => true],
+            $this->variantImportConfig
+        );
+    }
+
+    /**
+     * Check if comparison view should show full tree
+     *
+     * @return bool True if should show full comparison tree
+     */
+    public function shouldShowComparisonTree(): bool
+    {
+        return $this->showComparisonView && !empty($this->comparisonTree);
     }
 
     /*

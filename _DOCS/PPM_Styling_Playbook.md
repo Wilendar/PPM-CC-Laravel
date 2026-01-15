@@ -37,6 +37,21 @@ Używaj `@class` do dokładania stanów (`disabled`, `loading`). Dodatkowe efekt
 - Sync/queue badge korzystają z klas `.sync-status-*` – zrefaktoryzuj je na tokeny (zob. TODO).
 - Nowe badge tworzymy jako wariant `.badge-enterprise` z modyfikatorem (`.badge-enterprise--warning`).
 
+### Wiersze tabel i subrows
+- `.variant-subrow` – wiersz wariantu produktu (zagnieżdżony pod produktem głównym).
+  ```css
+  .variant-subrow {
+      background: #151a238c;
+      border-left: 3px solid var(--ppm-primary);
+  }
+  .variant-subrow:hover {
+      background: rgba(31, 41, 55, 0.7);
+  }
+  ```
+- Lokalizacja: `resources/css/admin/components.css` (linia ~6828)
+- **Zasada:** Stylowanie wierszy tabeli TYLKO przez klasy CSS, NIGDY przez inline Tailwind (`bg-gray-800/30` itp.)
+- Hover state definiujemy w CSS, nie w Blade (`hover:bg-*` zabronione dla subrows)
+
 ---
 
 ## 3. Formularze i kontrolki
@@ -121,7 +136,39 @@ Używaj `@class` do dokładania stanów (`disabled`, `loading`). Dodatkowe efekt
 
 ---
 
-## 9. Checklist przed merge/deploy
+## 9. Livewire Loading Overlays (KRYTYCZNE!)
+
+**Problem:** `wire:loading` bez `wire:target` pokazuje loading overlay przy KAŻDYM Livewire request - w tym przy `$wire.$set()`, zmianach zaznaczenia, itp. Powoduje to migotanie/flickering UI.
+
+**Rozwiązanie:** ZAWSZE używaj `wire:target` dla loading overlays:
+
+```html
+{{-- ZLE - loading przy KAZDYM uzyciu Livewire --}}
+<div wire:loading.flex class="loading-overlay">
+    <div class="spinner"></div>
+</div>
+
+{{-- DOBRZE - loading TYLKO dla dlugich operacji --}}
+<div wire:loading.flex wire:target="save, syncCss, executeImport" class="loading-overlay">
+    <div class="spinner"></div>
+</div>
+```
+
+**Zasady:**
+- `wire:target` MUSI zawierac liste metod ktore rzeczywiscie wymagaja loading (np. `save`, `import`, `sync`)
+- NIE dodawaj do `wire:target` metod ktore sa szybkie (selekcja elementow, zmiana tabow, itp.)
+- Dla szybkich interakcji uzywaj `$wire.$set()` zamiast metod - eliminuje to pełny re-render
+
+**Typowe metody wymagajace loading:**
+- `save`, `saveAll`, `saveDraft`
+- `syncCss`, `syncToPrestaShop`
+- `executeImport`, `importFromPrestaShop`
+- `compileAllBlocks`, `generateHtml`
+- `bulkOperation`, `deleteAll`
+
+---
+
+## 10. Checklist przed merge/deploy
 - [ ] Zero `style="..."` w nowych/zmienionych plikach Blade.
 - [ ] Wszystkie kolory odnoszą się do tokenów.
 - [ ] Przyciski używają `.btn-enterprise-*`.
@@ -131,5 +178,5 @@ Używaj `@class` do dokładania stanów (`disabled`, `loading`). Dodatkowe efekt
 
 ---
 
-**Ostatnia aktualizacja:** 2025-11-19  
+**Ostatnia aktualizacja:** 2025-12-23
 **Autor:** Codex (na bazie PPM_Color_Style_Guide.md)

@@ -1,0 +1,1360 @@
+/* ========================================
+   CATEGORY TREE STYLES
+   ========================================
+
+   PPM Enterprise - Category Panel Enhancement (ETAP_15)
+
+   Features:
+   - Smooth expand/collapse animations (Alpine.js x-transition)
+   - Drag & Drop visual indicators
+   - Inline insert line (+)
+   - Loading states without full-page overlay
+
+   Created: 2025-12-23
+*/
+
+/* ----------------------------------------
+   1. EXPAND/COLLAPSE ANIMATIONS
+   ---------------------------------------- */
+
+/* Smooth expand/collapse transition for children */
+.category-tree-children {
+    overflow: hidden;
+    max-height: 0;
+    opacity: 0;
+    transform: translateY(-8px);
+    transition:
+        max-height 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+        opacity 0.25s ease-out,
+        transform 0.25s ease-out;
+}
+
+.category-tree-children.is-expanded {
+    max-height: 5000px; /* Large enough for any content */
+    opacity: 1;
+    transform: translateY(0);
+}
+
+/* Chevron rotation animation */
+.category-node-toggle i {
+    transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    transform-origin: center;
+}
+
+.category-node-toggle.is-expanded i {
+    transform: rotate(90deg);
+}
+
+/* Alternative: Use fa-chevron icons with rotation */
+.category-toggle-chevron {
+    transition: transform 0.2s ease-out;
+}
+
+.category-toggle-chevron.is-expanded {
+    transform: rotate(180deg);
+}
+
+/* Staggered children animation */
+.category-tree-children.is-expanded > tr {
+    animation: categorySlideIn 0.3s ease-out forwards;
+}
+
+.category-tree-children.is-expanded > tr:nth-child(1) { animation-delay: 0.02s; }
+.category-tree-children.is-expanded > tr:nth-child(2) { animation-delay: 0.04s; }
+.category-tree-children.is-expanded > tr:nth-child(3) { animation-delay: 0.06s; }
+.category-tree-children.is-expanded > tr:nth-child(4) { animation-delay: 0.08s; }
+.category-tree-children.is-expanded > tr:nth-child(5) { animation-delay: 0.10s; }
+.category-tree-children.is-expanded > tr:nth-child(6) { animation-delay: 0.12s; }
+.category-tree-children.is-expanded > tr:nth-child(7) { animation-delay: 0.14s; }
+.category-tree-children.is-expanded > tr:nth-child(8) { animation-delay: 0.16s; }
+.category-tree-children.is-expanded > tr:nth-child(9) { animation-delay: 0.18s; }
+.category-tree-children.is-expanded > tr:nth-child(10) { animation-delay: 0.20s; }
+
+@keyframes categorySlideIn {
+    from {
+        opacity: 0;
+        transform: translateY(-12px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* ----------------------------------------
+   2. ROW ANIMATIONS (Alpine x-transition)
+   ---------------------------------------- */
+
+/* Enter transition */
+.category-row-enter {
+    transition: all 0.2s ease-out;
+}
+
+.category-row-enter-start {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.98);
+}
+
+.category-row-enter-end {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+}
+
+/* Leave transition */
+.category-row-leave {
+    transition: all 0.15s ease-in;
+}
+
+.category-row-leave-start {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+}
+
+.category-row-leave-end {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.98);
+}
+
+/* ----------------------------------------
+   3. DRAG & DROP SYSTEM
+   ---------------------------------------- */
+
+/* Drag states - moved from inline style */
+.category-ghost {
+    background: rgba(249, 115, 22, 0.1) !important;
+    border: 2px dashed rgba(249, 115, 22, 0.4) !important;
+}
+
+.category-drag {
+    transform: rotate(2deg);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+    z-index: 100;
+}
+
+.category-chosen {
+    background: rgba(249, 115, 22, 0.05) !important;
+}
+
+/* Being dragged */
+.category-row.is-dragging {
+    opacity: 0.5;
+    transform: scale(0.98);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+}
+
+/* Drop zone indicators */
+.category-drop-zone {
+    position: relative;
+}
+
+/* Drop zone - before (insert above) */
+.category-drop-zone::before {
+    content: '';
+    position: absolute;
+    top: -2px;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: transparent;
+    border-radius: 2px;
+    transition: all 0.15s ease;
+    pointer-events: none;
+}
+
+/* Drop zone - after (insert below) */
+.category-drop-zone::after {
+    content: '';
+    position: absolute;
+    bottom: -2px;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: transparent;
+    border-radius: 2px;
+    transition: all 0.15s ease;
+    pointer-events: none;
+}
+
+/* Active drop zone - top */
+.category-drop-zone.drop-target-top::before {
+    background: linear-gradient(90deg,
+        transparent,
+        #f97316 10%,
+        #f97316 90%,
+        transparent
+    );
+    box-shadow: 0 0 12px rgba(249, 115, 22, 0.4);
+}
+
+/* Active drop zone - bottom */
+.category-drop-zone.drop-target-bottom::after {
+    background: linear-gradient(90deg,
+        transparent,
+        #f97316 10%,
+        #f97316 90%,
+        transparent
+    );
+    box-shadow: 0 0 12px rgba(249, 115, 22, 0.4);
+}
+
+/* Active drop zone - nest as child */
+.category-drop-zone.drop-target-child {
+    background: rgba(249, 115, 22, 0.08);
+    border: 2px solid rgba(249, 115, 22, 0.3);
+    border-radius: 8px;
+}
+
+/* Drop indicator line with dots */
+.category-drop-indicator {
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: #f97316;
+    border-radius: 2px;
+    pointer-events: none;
+    z-index: 50;
+    display: none;
+}
+
+.category-drop-indicator::before,
+.category-drop-indicator::after {
+    content: '';
+    position: absolute;
+    width: 8px;
+    height: 8px;
+    background: #f97316;
+    border-radius: 50%;
+    top: 50%;
+    transform: translateY(-50%);
+}
+
+.category-drop-indicator::before {
+    left: -4px;
+}
+
+.category-drop-indicator::after {
+    right: -4px;
+}
+
+.category-drop-indicator.is-visible {
+    display: block;
+    animation: dropIndicatorPulse 0.8s ease-in-out infinite;
+}
+
+@keyframes dropIndicatorPulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.6; }
+}
+
+/* Invalid drop target */
+.category-drop-zone.drop-invalid {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+/* Drag handle enhancement */
+.drag-handle {
+    cursor: move;
+    opacity: 0.3;
+    transition: opacity 0.2s ease, background 0.2s ease;
+    padding: 4px;
+    border-radius: 4px;
+}
+
+.drag-handle:hover {
+    opacity: 0.8;
+    background: rgba(249, 115, 22, 0.1);
+}
+
+.category-row:hover .drag-handle {
+    opacity: 0.6;
+}
+
+.category-chosen .drag-handle {
+    opacity: 1;
+    background: rgba(249, 115, 22, 0.2);
+}
+
+/* Global drag state */
+body.category-dragging {
+    cursor: grabbing !important;
+}
+
+body.category-dragging * {
+    cursor: grabbing !important;
+}
+
+/* ----------------------------------------
+   4. INLINE INSERT LINE (+)
+   ---------------------------------------- */
+
+.category-insert-line {
+    position: relative;
+    height: 0;
+    overflow: visible;
+    opacity: 0; /* Hidden by default */
+    pointer-events: none;
+    transition: opacity 0.2s ease;
+}
+
+/* Show on hover of previous row */
+.category-row:hover + .category-insert-line {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+/* Keep visible when hovering the line itself */
+.category-insert-line:hover {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+/* Top insert line - also hidden by default */
+.category-insert-line-top {
+    opacity: 0;
+    pointer-events: none;
+}
+
+/* Show top line on table hover at the very beginning */
+.sortable-tbody:hover .category-insert-line-top:first-child {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.category-insert-line-top:hover {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+/* Expanded state - when adding inline form */
+.category-insert-line.is-adding {
+    opacity: 1;
+    pointer-events: auto;
+    height: auto;
+    padding: 8px 0;
+}
+
+/* Insert trigger button - positioned at 25% of Kategoria column */
+.category-insert-trigger {
+    position: absolute;
+    left: 25%; /* ~25% of Kategoria column width */
+    top: -14px;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: rgba(224, 172, 126, 0.15); /* Semi-transparent MPP orange background */
+    border: 2px solid var(--mpp-primary, #e0ac7e); /* Solid 2px border */
+    color: var(--mpp-primary, #e0ac7e);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    z-index: 5;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3); /* Subtle shadow */
+}
+
+.category-insert-trigger:hover {
+    background: var(--mpp-primary, #e0ac7e);
+    border-color: var(--mpp-primary, #e0ac7e);
+    color: white;
+    transform: scale(1.15);
+    box-shadow: 0 4px 12px rgba(224, 172, 126, 0.4);
+}
+
+.category-insert-trigger i {
+    font-size: 12px;
+    font-weight: bold;
+}
+
+/* Insert cell positioning */
+.category-insert-cell {
+    position: relative;
+}
+
+/* Hide trigger when form is shown */
+.category-insert-line.is-adding .category-insert-trigger {
+    display: none;
+}
+
+/* ----------------------------------------
+   4.1 INLINE ADD FORM
+   ---------------------------------------- */
+
+.category-insert-form {
+    display: none;
+    background: var(--bg-card);
+    border: 1px solid rgba(224, 172, 126, 0.3);
+    border-radius: 10px;
+    padding: 16px 20px;
+    margin: 12px 0;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+}
+
+.category-insert-line.is-adding .category-insert-form {
+    display: block;
+    animation: fadeInScale 0.25s ease-out;
+}
+
+/* Form row with input and buttons */
+.category-insert-form-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+/* Category icon preview (auto-color based on level) */
+.category-insert-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+/* Level colors MUST match main category icons from components.css */
+/* Level 0 - Blue (matches category-icon-level-0) */
+.category-insert-icon--level-0 {
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.2), rgba(37, 99, 235, 0.1));
+    color: #60a5fa;
+}
+
+/* Level 1 - Green (matches category-icon-level-1) */
+.category-insert-icon--level-1 {
+    background: linear-gradient(135deg, rgba(34, 197, 94, 0.2), rgba(22, 163, 74, 0.1));
+    color: #4ade80;
+}
+
+/* Level 2 - Purple (matches category-icon-level-2) */
+.category-insert-icon--level-2 {
+    background: linear-gradient(135deg, rgba(168, 85, 247, 0.2), rgba(147, 51, 234, 0.1));
+    color: #c084fc;
+}
+
+/* Level 3 - Orange (matches category-icon-level-3) */
+.category-insert-icon--level-3 {
+    background: linear-gradient(135deg, rgba(249, 115, 22, 0.2), rgba(234, 88, 12, 0.1));
+    color: #fb923c;
+}
+
+/* Level 4 - Pink/Magenta (distinct from levels 0-3) */
+.category-insert-icon--level-4 {
+    background: linear-gradient(135deg, rgba(236, 72, 153, 0.2), rgba(219, 39, 119, 0.1));
+    color: #f472b6;
+}
+
+/* Level 5+ - Teal/Cyan (distinct from levels 0-4) */
+.category-insert-icon--level-5 {
+    background: linear-gradient(135deg, rgba(20, 184, 166, 0.2), rgba(13, 148, 136, 0.1));
+    color: #2dd4bf;
+}
+
+/* Input wrapper with +OPIS button inside */
+.category-insert-input-wrapper {
+    flex: 1;
+    position: relative;
+    display: flex;
+    align-items: center;
+    background: var(--bg-nav);
+    border: 1px solid var(--text-muted);
+    border-radius: 8px;
+    overflow: hidden;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.category-insert-input-wrapper:focus-within {
+    border-color: var(--mpp-primary, #e0ac7e);
+    box-shadow: 0 0 0 2px rgba(224, 172, 126, 0.15);
+}
+
+.category-insert-form-input {
+    flex: 1;
+    background: transparent;
+    border: none;
+    padding: 10px 14px;
+    color: var(--text-primary);
+    font-size: 14px;
+    outline: none;
+}
+
+.category-insert-form-input::placeholder {
+    color: var(--text-muted);
+}
+
+/* +OPIS button inside input */
+.category-insert-desc-toggle {
+    padding: 6px 12px;
+    margin-right: 6px;
+    background: transparent;
+    border: 1px dashed var(--text-muted);
+    border-radius: 6px;
+    color: var(--text-muted);
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+}
+
+.category-insert-desc-toggle:hover {
+    border-color: var(--mpp-primary, #e0ac7e);
+    color: var(--mpp-primary, #e0ac7e);
+    background: rgba(224, 172, 126, 0.08);
+}
+
+.category-insert-desc-toggle.is-active {
+    background: var(--mpp-primary, #e0ac7e);
+    border-color: var(--mpp-primary, #e0ac7e);
+    color: white;
+}
+
+/* Action buttons */
+.category-insert-form-actions {
+    display: flex;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+.category-insert-form-btn {
+    padding: 10px 16px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    border: none;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.category-insert-form-btn--save {
+    background: var(--mpp-primary, #e0ac7e);
+    color: white;
+}
+
+.category-insert-form-btn--save:hover {
+    background: var(--mpp-primary-dark, #d1975a);
+    transform: translateY(-1px);
+}
+
+.category-insert-form-btn--save:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.category-insert-form-btn--cancel {
+    background: transparent;
+    color: var(--text-muted);
+    border: 1px solid var(--text-muted);
+}
+
+.category-insert-form-btn--cancel:hover {
+    background: rgba(100, 116, 139, 0.1);
+    color: var(--text-secondary);
+    border-color: var(--text-secondary);
+}
+
+/* Description textarea (hidden by default) */
+.category-insert-desc-row {
+    margin-top: 12px;
+    display: none;
+}
+
+.category-insert-desc-row.is-visible {
+    display: block;
+    animation: slideDown 0.2s ease-out;
+}
+
+.category-insert-form-textarea {
+    width: 100%;
+    background: var(--bg-nav);
+    border: 1px solid var(--text-muted);
+    border-radius: 8px;
+    padding: 10px 14px;
+    color: var(--text-primary);
+    font-size: 14px;
+    resize: vertical;
+    min-height: 80px;
+    max-height: 200px;
+    outline: none;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.category-insert-form-textarea:focus {
+    border-color: var(--mpp-primary, #e0ac7e);
+    box-shadow: 0 0 0 2px rgba(224, 172, 126, 0.15);
+}
+
+.category-insert-form-textarea::placeholder {
+    color: var(--text-muted);
+}
+
+@keyframes fadeInScale {
+    from {
+        opacity: 0;
+        transform: scale(0.95) translateY(-8px);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-8px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* ----------------------------------------
+   4.2 ADD CHILD INLINE FORM (POZIOM Column)
+   ----------------------------------------
+   Inline form in POZIOM column to add subcategory (child at deeper level)
+   Uses same Alpine.js component as insert-line for consistency
+
+   Structure:
+   - .category-level-column (relative container)
+     - .category-level-badge-wrapper (badge "Poziom X")
+     - .category-add-child-popup (absolute, slides DOWN below badge)
+       - .category-add-child-trigger (button with arrow + level preview)
+     - .category-add-child-form (absolute, the actual form)
+*/
+
+.category-level-column {
+    display: inline-block;
+    position: relative;
+    padding-bottom: 8px; /* Extra space for trigger popup to keep hover active */
+}
+
+.category-level-column.is-adding-child {
+    z-index: 30; /* Ensure form is above other elements */
+}
+
+/* Badge wrapper - extended hover area */
+.category-level-badge-wrapper {
+    display: inline-flex;
+    align-items: center;
+    padding: 8px 12px; /* Larger padding for easier hover */
+    border-radius: 6px;
+    transition: background 0.15s ease;
+    cursor: default;
+}
+
+.category-level-badge-wrapper:hover {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+/* Popup container - slides DOWN below badge, CENTERED */
+.category-add-child-popup {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    top: 100%; /* Below the badge */
+    margin-top: 0; /* Close to badge for easy hover */
+    z-index: 25;
+}
+
+/* Add child trigger button (horizontal: arrow + level preview) */
+.category-add-child-trigger {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border-radius: 6px;
+    background: rgba(30, 41, 59, 0.95);
+    border: 1px solid var(--mpp-primary, #e0ac7e);
+    color: var(--text-secondary, #cbd5e1);
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    white-space: nowrap;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+.category-add-child-trigger:hover {
+    background: rgba(224, 172, 126, 0.15);
+    border-color: var(--mpp-primary, #e0ac7e);
+    color: white;
+    transform: translateY(1px);
+    box-shadow: 0 2px 8px rgba(224, 172, 126, 0.3);
+}
+
+/* Arrow icon inside trigger */
+.category-add-child-arrow {
+    color: var(--mpp-primary, #e0ac7e);
+    font-size: 10px;
+}
+
+/* Level preview badge inside trigger (+3, +4, etc.) */
+.category-add-child-level-preview {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 700;
+    background: rgba(255, 255, 255, 0.1);
+    /* Color is set via data-level-color attribute in JS/CSS */
+}
+
+/* Level colors for preview badge (using attribute selector) */
+.category-add-child-level-preview[data-level-color="#60a5fa"] {
+    color: #60a5fa;
+    background: rgba(96, 165, 250, 0.15);
+}
+.category-add-child-level-preview[data-level-color="#4ade80"] {
+    color: #4ade80;
+    background: rgba(74, 222, 128, 0.15);
+}
+.category-add-child-level-preview[data-level-color="#c084fc"] {
+    color: #c084fc;
+    background: rgba(192, 132, 252, 0.15);
+}
+.category-add-child-level-preview[data-level-color="#fb923c"] {
+    color: #fb923c;
+    background: rgba(251, 146, 60, 0.15);
+}
+.category-add-child-level-preview[data-level-color="#f472b6"] {
+    color: #f472b6;
+    background: rgba(244, 114, 182, 0.15);
+}
+.category-add-child-level-preview[data-level-color="#2dd4bf"] {
+    color: #2dd4bf;
+    background: rgba(45, 212, 191, 0.15);
+}
+/* Level 6 - Lime */
+.category-add-child-level-preview[data-level-color="#a3e635"] {
+    color: #a3e635;
+    background: rgba(163, 230, 53, 0.15);
+}
+/* Level 7 - Red */
+.category-add-child-level-preview[data-level-color="#f87171"] {
+    color: #f87171;
+    background: rgba(248, 113, 113, 0.15);
+}
+/* Level 8 - Indigo */
+.category-add-child-level-preview[data-level-color="#818cf8"] {
+    color: #818cf8;
+    background: rgba(129, 140, 248, 0.15);
+}
+/* Level 9 - Amber */
+.category-add-child-level-preview[data-level-color="#fbbf24"] {
+    color: #fbbf24;
+    background: rgba(251, 191, 36, 0.15);
+}
+/* Level 10+ - Fuchsia */
+.category-add-child-level-preview[data-level-color="#e879f9"] {
+    color: #e879f9;
+    background: rgba(232, 121, 249, 0.15);
+}
+
+/* Inline form popup - positioned below popup, uses same styles as insert-line */
+.category-add-child-form {
+    position: absolute;
+    left: 0;
+    top: 100%;
+    margin-top: 6px;
+    min-width: 400px;
+    background: rgba(30, 41, 59, 0.98);
+    border: 1px solid rgba(224, 172, 126, 0.3);
+    border-radius: 8px;
+    padding: 12px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+    z-index: 50;
+}
+
+.category-add-child-form-inner {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+/* ----------------------------------------
+   5. LOADING STATES (NO FULL-PAGE OVERLAY!)
+   ---------------------------------------- */
+
+/* Inline loading indicator */
+.category-tree-loading-inline {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    color: #9ca3af;
+    font-size: 13px;
+}
+
+.category-tree-loading-spinner-sm {
+    width: 14px;
+    height: 14px;
+    border: 2px solid rgba(100, 116, 139, 0.2);
+    border-top-color: #f97316;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+
+/* Node-level loading (skeleton effect) */
+.category-row.is-loading {
+    position: relative;
+    overflow: hidden;
+}
+
+.category-row.is-loading::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(
+        90deg,
+        transparent,
+        rgba(255, 255, 255, 0.04),
+        transparent
+    );
+    animation: shimmer 1.5s infinite;
+}
+
+@keyframes shimmer {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
+}
+
+/* Saving indicator */
+.category-row.is-saving {
+    pointer-events: none;
+}
+
+.category-row.is-saving > td {
+    opacity: 0.7;
+}
+
+.category-saving-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    background: rgba(59, 130, 246, 0.15);
+    border: 1px solid rgba(59, 130, 246, 0.3);
+    border-radius: 12px;
+    color: #60a5fa;
+    font-size: 12px;
+    font-weight: 500;
+}
+
+.category-saving-badge i {
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+/* ----------------------------------------
+   6. HOVER STATES & ROW STYLING
+   ---------------------------------------- */
+
+/* Row hover - subtle background, NO transform */
+.category-row {
+    transition: background-color 0.15s ease;
+}
+
+.category-row:hover {
+    background-color: rgba(100, 116, 139, 0.06);
+}
+
+/* Row content hover - subtle, NO transform */
+.category-row-content {
+    display: flex;
+    align-items: center;
+    padding: 10px 16px;
+    border-radius: 8px;
+    background: transparent;
+    transition: background 0.15s ease, border-color 0.15s ease;
+    border: 1px solid transparent;
+}
+
+.category-row-content:hover {
+    background: rgba(100, 116, 139, 0.08);
+    border-color: rgba(100, 116, 139, 0.15);
+    /* NO transform - forbidden by PPM standards for large elements */
+}
+
+/* Selected row state */
+.category-row-selected {
+    background-color: rgba(249, 115, 22, 0.08) !important;
+    border-left: 3px solid #f97316;
+}
+
+/* Selected state */
+.category-row-content.is-selected {
+    background: rgba(249, 115, 22, 0.08);
+    border-color: rgba(249, 115, 22, 0.2);
+}
+
+.category-row-content.is-selected:hover {
+    background: rgba(249, 115, 22, 0.12);
+    border-color: rgba(249, 115, 22, 0.3);
+}
+
+/* Focus state (keyboard navigation) */
+.category-row:focus,
+.category-row:focus-visible,
+.category-row-content:focus-visible {
+    outline: none;
+    box-shadow: inset 0 0 0 2px rgba(249, 115, 22, 0.5);
+    background-color: rgba(249, 115, 22, 0.05);
+}
+
+/* Active/current item (keyboard selection) */
+.category-row.is-keyboard-active {
+    background-color: rgba(249, 115, 22, 0.08);
+    box-shadow: inset 0 0 0 2px rgba(249, 115, 22, 0.4);
+}
+
+/* Actions appear on hover */
+.category-row-actions {
+    opacity: 0;
+    transition: opacity 0.15s ease;
+}
+
+.category-row:hover .category-row-actions,
+.category-row:focus-within .category-row-actions {
+    opacity: 1;
+}
+
+/* Actions column - always visible buttons on hover */
+.category-actions-cell {
+    position: relative;
+}
+
+.category-actions-cell .action-buttons {
+    opacity: 0.3;
+    transition: opacity 0.15s ease;
+}
+
+.category-row:hover .category-actions-cell .action-buttons,
+.category-row:focus-within .category-actions-cell .action-buttons {
+    opacity: 1;
+}
+
+/* ----------------------------------------
+   7. TREE CONNECTOR LINES (optional visual enhancement)
+   ---------------------------------------- */
+
+.category-tree-connector {
+    position: relative;
+}
+
+/* Vertical line from parent */
+.category-tree-connector::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 50%;
+    width: 1px;
+    background: linear-gradient(
+        to bottom,
+        rgba(100, 116, 139, 0.4),
+        rgba(100, 116, 139, 0.2)
+    );
+}
+
+/* Horizontal line to node */
+.category-tree-connector::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 50%;
+    width: 16px;
+    height: 1px;
+    background: rgba(100, 116, 139, 0.3);
+}
+
+/* Position connector lines based on level */
+.category-tree-connector[data-level="1"]::before { left: 12px; }
+.category-tree-connector[data-level="2"]::before { left: 36px; }
+.category-tree-connector[data-level="3"]::before { left: 60px; }
+.category-tree-connector[data-level="4"]::before { left: 84px; }
+
+.category-tree-connector[data-level="1"]::after { left: 12px; }
+.category-tree-connector[data-level="2"]::after { left: 36px; }
+.category-tree-connector[data-level="3"]::after { left: 60px; }
+.category-tree-connector[data-level="4"]::after { left: 84px; }
+
+/* Last child gets shorter vertical line */
+.category-tree-connector:last-child::before {
+    bottom: 50%;
+    height: 50%;
+}
+
+/* Remove lines from root level */
+.category-tree-connector[data-level="0"]::before,
+.category-tree-connector[data-level="0"]::after {
+    display: none;
+}
+
+/* ----------------------------------------
+   8. VISIBILITY TRANSITIONS
+   ---------------------------------------- */
+
+/* For Alpine.js x-show with visibility transitions */
+.category-visibility-hidden {
+    visibility: hidden;
+    height: 0;
+    overflow: hidden;
+    opacity: 0;
+    margin: 0;
+    padding: 0;
+}
+
+.category-visibility-visible {
+    visibility: visible;
+    height: auto;
+    overflow: visible;
+    opacity: 1;
+}
+
+/* ----------------------------------------
+   9. FAZA 4 - VISUAL ENHANCEMENTS
+   ---------------------------------------- */
+
+/* 9.1 Folder Icons with Level Colors */
+.category-folder-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.category-folder-icon i {
+    font-size: 14px;
+    transition: transform 0.2s ease;
+}
+
+/* Level 0 - Blue */
+.category-folder-icon--level-0 {
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.2), rgba(37, 99, 235, 0.1));
+    border: 1px solid rgba(59, 130, 246, 0.3);
+}
+.category-folder-icon--level-0 i { color: #60a5fa; }
+
+/* Level 1 - Green */
+.category-folder-icon--level-1 {
+    background: linear-gradient(135deg, rgba(34, 197, 94, 0.2), rgba(22, 163, 74, 0.1));
+    border: 1px solid rgba(34, 197, 94, 0.3);
+}
+.category-folder-icon--level-1 i { color: #4ade80; }
+
+/* Level 2 - Purple */
+.category-folder-icon--level-2 {
+    background: linear-gradient(135deg, rgba(168, 85, 247, 0.2), rgba(147, 51, 234, 0.1));
+    border: 1px solid rgba(168, 85, 247, 0.3);
+}
+.category-folder-icon--level-2 i { color: #c084fc; }
+
+/* Level 3 - Orange */
+.category-folder-icon--level-3 {
+    background: linear-gradient(135deg, rgba(249, 115, 22, 0.2), rgba(234, 88, 12, 0.1));
+    border: 1px solid rgba(249, 115, 22, 0.3);
+}
+.category-folder-icon--level-3 i { color: #fb923c; }
+
+/* Level 4 - Pink */
+.category-folder-icon--level-4 {
+    background: linear-gradient(135deg, rgba(236, 72, 153, 0.2), rgba(219, 39, 119, 0.1));
+    border: 1px solid rgba(236, 72, 153, 0.3);
+}
+.category-folder-icon--level-4 i { color: #f472b6; }
+
+/* Level 5+ - Teal */
+.category-folder-icon--level-5 {
+    background: linear-gradient(135deg, rgba(20, 184, 166, 0.2), rgba(13, 148, 136, 0.1));
+    border: 1px solid rgba(20, 184, 166, 0.3);
+}
+.category-folder-icon--level-5 i { color: #2dd4bf; }
+
+/* Hover effect on folder icon */
+.category-row:hover .category-folder-icon {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+/* 9.2 Expand/Collapse Chevron Animation */
+.category-expand-chevron {
+    width: 24px;
+    height: 24px;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(100, 116, 139, 0.1);
+    border: 1px solid transparent;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.category-expand-chevron:hover {
+    background: rgba(249, 115, 22, 0.15);
+    border-color: rgba(249, 115, 22, 0.3);
+}
+
+.category-expand-chevron i {
+    font-size: 10px;
+    color: #9ca3af;
+    transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.category-expand-chevron:hover i {
+    color: #f97316;
+}
+
+/* Expanded state - rotate chevron */
+.category-expand-chevron.is-expanded i {
+    transform: rotate(90deg);
+}
+
+/* Alternative: Node toggle button enhanced */
+.category-node-toggle {
+    width: 22px;
+    height: 22px;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(100, 116, 139, 0.15);
+    border: 1px solid rgba(100, 116, 139, 0.2);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    flex-shrink: 0;
+}
+
+.category-node-toggle:hover {
+    background: rgba(249, 115, 22, 0.2);
+    border-color: rgba(249, 115, 22, 0.4);
+}
+
+.category-node-toggle i {
+    font-size: 9px;
+    transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Plus to minus animation */
+.category-node-toggle.is-expanded i.fa-plus {
+    transform: rotate(45deg);
+}
+
+/* 9.3 Product Count Badge - Enhanced */
+.category-product-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 8px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 500;
+    background: rgba(100, 116, 139, 0.15);
+    color: #9ca3af;
+    transition: all 0.2s ease;
+}
+
+.category-product-badge i {
+    font-size: 10px;
+}
+
+/* Badge with products */
+.category-product-badge--has-products {
+    background: rgba(59, 130, 246, 0.15);
+    color: #60a5fa;
+    border: 1px solid rgba(59, 130, 246, 0.2);
+}
+
+/* Badge hover */
+.category-row:hover .category-product-badge--has-products {
+    background: rgba(59, 130, 246, 0.25);
+    border-color: rgba(59, 130, 246, 0.4);
+}
+
+/* Primary products count */
+.category-primary-count {
+    color: #4ade80;
+    font-size: 11px;
+    font-weight: 500;
+}
+
+/* 9.4 Breadcrumb Tooltip */
+.category-breadcrumb-tooltip {
+    position: absolute;
+    left: 0;
+    bottom: calc(100% + 8px);
+    z-index: 100;
+    padding: 8px 12px;
+    background: rgba(15, 23, 42, 0.98);
+    border: 1px solid rgba(100, 116, 139, 0.3);
+    border-radius: 8px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+    white-space: nowrap;
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(4px);
+    transition: all 0.2s ease;
+    pointer-events: none;
+}
+
+.category-breadcrumb-tooltip::after {
+    content: '';
+    position: absolute;
+    bottom: -6px;
+    left: 20px;
+    border-width: 6px 6px 0 6px;
+    border-style: solid;
+    border-color: rgba(15, 23, 42, 0.98) transparent transparent transparent;
+}
+
+/* Show tooltip on hover */
+.category-name-cell:hover .category-breadcrumb-tooltip {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+}
+
+/* Tooltip content */
+.category-breadcrumb-tooltip-content {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: #e2e8f0;
+}
+
+.category-breadcrumb-tooltip-content .separator {
+    color: #64748b;
+    font-size: 10px;
+}
+
+.category-breadcrumb-tooltip-content .current {
+    color: #f97316;
+    font-weight: 600;
+}
+
+/* 9.5 Subcategories Badge Enhanced */
+.category-badge-subcategories {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: 500;
+    transition: all 0.2s ease;
+}
+
+.category-badge-subcategories-level-0 {
+    background: rgba(59, 130, 246, 0.15);
+    color: #60a5fa;
+    border: 1px solid rgba(59, 130, 246, 0.2);
+}
+
+.category-badge-subcategories-level-1 {
+    background: rgba(34, 197, 94, 0.15);
+    color: #4ade80;
+    border: 1px solid rgba(34, 197, 94, 0.2);
+}
+
+.category-badge-subcategories-level-2 {
+    background: rgba(168, 85, 247, 0.15);
+    color: #c084fc;
+    border: 1px solid rgba(168, 85, 247, 0.2);
+}
+
+/* ----------------------------------------
+   10. FAZA 4 - KEYBOARD NAVIGATION
+   ---------------------------------------- */
+
+/* Keyboard navigable tree container */
+.category-tree-keyboard {
+    outline: none;
+}
+
+/* Keyboard focus indicator */
+.category-row[tabindex="0"]:focus {
+    outline: none;
+}
+
+.category-row.keyboard-focused {
+    background-color: rgba(249, 115, 22, 0.08);
+    box-shadow: inset 0 0 0 2px rgba(249, 115, 22, 0.5);
+}
+
+/* Skip link for accessibility */
+.category-skip-link {
+    position: absolute;
+    top: -40px;
+    left: 0;
+    padding: 8px 16px;
+    background: #f97316;
+    color: white;
+    font-weight: 600;
+    border-radius: 0 0 8px 0;
+    z-index: 1000;
+    transition: top 0.2s ease;
+}
+
+.category-skip-link:focus {
+    top: 0;
+}
+
+/* ----------------------------------------
+   11. FAZA 4 - ARIA ACCESSIBILITY
+   ---------------------------------------- */
+
+/* Screen reader only text */
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+    .category-row:focus,
+    .category-row.keyboard-focused {
+        outline: 3px solid #f97316;
+        outline-offset: 2px;
+    }
+
+    .category-expand-chevron:focus {
+        outline: 2px solid #f97316;
+        outline-offset: 1px;
+    }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+    .category-expand-chevron i,
+    .category-node-toggle i,
+    .category-row,
+    .category-breadcrumb-tooltip {
+        transition: none;
+    }
+}

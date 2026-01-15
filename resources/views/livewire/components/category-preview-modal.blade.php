@@ -227,59 +227,90 @@
                      });
                  }}"
                  @category-created.window="scrollToCategory($event.detail.categoryId)">
-                @if(empty($categoryTree))
-                    <div class="text-center py-12">
-                        <svg class="w-16 h-16 mx-auto mb-4 text-green-500" fill="currentColor" viewBox="0 0 20 20">
-                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
-                        </svg>
-                        <h4 class="text-xl font-bold text-white mb-2">Wszystkie kategorie już istnieją!</h4>
-                        <p class="text-gray-300 text-sm max-w-md mx-auto">
-                            Wszystkie kategorie używane przez wybrane produkty są już dostępne w PPM.
-                            Możesz kontynuować import produktów bez potrzeby tworzenia nowych kategorii.
-                        </p>
-
-                        {{-- Category Mapping Info --}}
-                        @if(isset($sourceCategoryName) && $sourceCategoryName)
-                            <div class="mt-6 p-4 bg-gray-800/50 border border-gray-600/30 rounded-lg max-w-md mx-auto">
-                                <p class="text-sm text-gray-300 mb-2">
-                                    <strong class="text-white">Importujesz z kategorii PrestaShop:</strong><br>
-                                    <span class="text-brand-400">{{ $sourceCategoryName }}</span>
-                                </p>
-                                @if(isset($targetCategoryName) && $targetCategoryName)
-                                    <p class="text-sm text-gray-300">
-                                        <strong class="text-white">Produkty trafią do kategorii PPM:</strong><br>
-                                        <span class="text-green-400">{{ $targetCategoryName }}</span>
-                                    </p>
-                                @else
-                                    <p class="text-xs text-gray-400 mt-2 italic">
-                                        <svg class="w-4 h-4 inline-block mr-1 text-gray-500" fill="currentColor" viewBox="0 0 20 20">
-                                            <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"></path>
-                                        </svg>
-                                        Kategoria docelowa PPM: będzie przypisana podczas importu zgodnie z istniejącym mapowaniem produktów
-                                    </p>
-                                @endif
+                {{-- ETAP_07f: Enhanced Comparison View - Always show tree --}}
+                @if(!empty($comparisonTree))
+                    {{-- Summary Panel --}}
+                    <div class="mb-4 p-4 bg-gray-800/50 border border-gray-600/30 rounded-lg">
+                        <div class="flex items-center justify-between flex-wrap gap-4">
+                            <div class="flex items-center gap-6">
+                                {{-- Synced --}}
+                                <div class="flex items-center gap-2">
+                                    <span class="w-3 h-3 rounded-full bg-green-500"></span>
+                                    <span class="text-sm text-gray-300">
+                                        Zsynchronizowane: <strong class="text-green-400">{{ $comparisonSummary['categories_synced'] ?? 0 }}</strong>
+                                    </span>
+                                </div>
+                                {{-- To Add --}}
+                                <div class="flex items-center gap-2">
+                                    <span class="w-3 h-3 rounded-full bg-orange-500"></span>
+                                    <span class="text-sm text-gray-300">
+                                        Do dodania: <strong class="text-orange-400">{{ $comparisonSummary['categories_to_add'] ?? 0 }}</strong>
+                                    </span>
+                                </div>
+                                {{-- PPM Only --}}
+                                <div class="flex items-center gap-2">
+                                    <span class="w-3 h-3 rounded-full bg-red-500"></span>
+                                    <span class="text-sm text-gray-300">
+                                        Tylko PPM: <strong class="text-red-400">{{ $comparisonSummary['categories_to_remove'] ?? 0 }}</strong>
+                                    </span>
+                                </div>
                             </div>
-                        @endif
-
-                        <div class="mt-6 p-4 bg-blue-900/20 border border-blue-500/30 rounded-lg max-w-md mx-auto">
-                            <p class="text-sm text-blue-300 flex items-start gap-2">
-                                <svg class="w-5 h-5 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
-                                    <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"></path>
-                                </svg>
-                                <span>Kliknij <strong>"Importuj Produkty"</strong> poniżej aby kontynuować, lub zaznacz opcję "Importuj BEZ kategorii" jeśli chcesz pominąć przypisanie kategorii.</span>
-                            </p>
+                            <div class="text-sm text-gray-400">
+                                PS: {{ $comparisonSummary['total_prestashop'] ?? 0 }} | PPM: {{ $comparisonSummary['total_ppm'] ?? 0 }}
+                            </div>
                         </div>
                     </div>
-                @else
+
+                    {{-- Comparison Tree --}}
                     <div class="space-y-1">
-                        @foreach($categoryTree as $category)
-                            <x-category-tree-item
-                                :category="$category"
+                        @foreach($comparisonTree as $node)
+                            <x-comparison-tree-node
+                                :node="$node"
                                 :level="0"
-                                wire:key="cat-{{ $category['prestashop_id'] }}"
                             />
                         @endforeach
                     </div>
+
+                    {{-- Info about all synced --}}
+                    @if(empty($categoryTree))
+                        <div class="mt-4 p-4 bg-green-900/20 border border-green-500/30 rounded-lg">
+                            <div class="flex items-start gap-3">
+                                <svg class="w-6 h-6 text-green-400 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                                </svg>
+                                <div>
+                                    <h4 class="text-sm font-bold text-green-300">Wszystkie kategorie zsynchronizowane!</h4>
+                                    <p class="text-xs text-gray-400 mt-1">
+                                        Kategorie produktow sa juz dostepne w PPM. Mozesz kontynuowac import.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    @endif
+                @else
+                    {{-- Fallback: Original category tree (when comparison tree not available) --}}
+                    @if(!empty($categoryTree))
+                        <div class="space-y-1">
+                            @foreach($categoryTree as $category)
+                                <x-category-tree-item
+                                    :category="$category"
+                                    :level="0"
+                                    wire:key="cat-{{ $category['prestashop_id'] }}"
+                                />
+                            @endforeach
+                        </div>
+                    @else
+                        {{-- Empty state --}}
+                        <div class="text-center py-12">
+                            <svg class="w-16 h-16 mx-auto mb-4 text-gray-500" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"/>
+                            </svg>
+                            <h4 class="text-lg font-bold text-white mb-2">Brak kategorii do wyswietlenia</h4>
+                            <p class="text-gray-400 text-sm">
+                                Nie znaleziono kategorii do porownania.
+                            </p>
+                        </div>
+                    @endif
                 @endif
             </div>
 

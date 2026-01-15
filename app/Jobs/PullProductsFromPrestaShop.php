@@ -76,38 +76,55 @@ class PullProductsFromPrestaShop implements ShouldQueue
     /**
      * Create a new job instance.
      * ETAP_07 FAZA 9.2: Load dynamic settings (2025-11-13)
+     * FIX 2025-12-22: Accept existing SyncJob to avoid duplicate job creation
      *
      * @param PrestaShopShop $shop Shop to pull data from
+     * @param SyncJob|null $existingSyncJob Optional existing SyncJob (for SYNC NOW)
      */
     public function __construct(
-        public PrestaShopShop $shop
+        public PrestaShopShop $shop,
+        ?SyncJob $existingSyncJob = null
     ) {
         // Load batch size and timeout from system settings
         $this->batchSize = \App\Models\SystemSetting::get('sync.batch_size', 10);
         $this->timeout = \App\Models\SystemSetting::get('sync.timeout', 300);
-        // Create SyncJob for tracking (FIX #1 - BUG #7)
-        // Note: User ID captured here (web context), NULL in queue = SYSTEM
-        $syncJob = SyncJob::create([
-            'job_id' => \Str::uuid(),
-            'job_type' => 'import_products',
-            'job_name' => "Import Products from {$shop->name}",
-            'source_type' => SyncJob::TYPE_PRESTASHOP,
-            'source_id' => $shop->id,
-            'target_type' => SyncJob::TYPE_PPM,
-            'target_id' => null, // Multiple products
-            'status' => SyncJob::STATUS_PENDING,
-            'trigger_type' => SyncJob::TRIGGER_SCHEDULED, // Default to scheduled
-            'user_id' => auth()->id() ?? 1, // Fallback to admin
-            'queue_name' => 'default',
-            'total_items' => 0, // Will be updated after fetching products
-            'processed_items' => 0,
-            'successful_items' => 0,
-            'failed_items' => 0,
-            'scheduled_at' => now(),
-        ]);
 
-        // Store only ID (not model instance) to avoid serialization issues
-        $this->syncJobId = $syncJob->id;
+        // FIX 2025-12-22: Use existing SyncJob if provided (SYNC NOW scenario)
+        // Otherwise create new one (scheduler/manual dispatch scenario)
+        if ($existingSyncJob) {
+            // SYNC NOW: Use existing pending job - don't create duplicate!
+            $this->syncJobId = $existingSyncJob->id;
+
+            Log::debug('PullProductsFromPrestaShop using existing SyncJob', [
+                'sync_job_id' => $existingSyncJob->id,
+                'shop_id' => $shop->id,
+                'shop_name' => $shop->name,
+            ]);
+        } else {
+            // Scheduler/manual: Create new SyncJob for tracking
+            // Note: User ID captured here (web context), NULL in queue = SYSTEM
+            $syncJob = SyncJob::create([
+                'job_id' => \Str::uuid(),
+                'job_type' => 'import_products',
+                'job_name' => "Import Products from {$shop->name}",
+                'source_type' => SyncJob::TYPE_PRESTASHOP,
+                'source_id' => $shop->id,
+                'target_type' => SyncJob::TYPE_PPM,
+                'target_id' => null, // Multiple products
+                'status' => SyncJob::STATUS_PENDING,
+                'trigger_type' => SyncJob::TRIGGER_SCHEDULED, // Default to scheduled
+                'user_id' => auth()->id() ?? 1, // Fallback to admin
+                'queue_name' => 'default',
+                'total_items' => 0, // Will be updated after fetching products
+                'processed_items' => 0,
+                'successful_items' => 0,
+                'failed_items' => 0,
+                'scheduled_at' => now(),
+            ]);
+
+            // Store only ID (not model instance) to avoid serialization issues
+            $this->syncJobId = $syncJob->id;
+        }
     }
 
     /**
@@ -177,6 +194,25 @@ class PullProductsFromPrestaShop implements ShouldQueue
             $pricesImported = 0;
             $stockImported = 0;
 
+            // ENHANCEMENT 2025-12-22: Extended tracking for validation purposes
+            $fieldsUpdated = [
+                'name' => 0,
+                'slug' => 0,
+                'short_description' => 0,
+                'long_description' => 0,
+                'meta_title' => 0,
+                'meta_description' => 0,
+                'weight' => 0,
+                'height' => 0,
+                'width' => 0,
+                'length' => 0,
+                'ean' => 0,
+                'sku' => 0,
+                'manufacturer' => 0,
+                'is_active' => 0,
+            ];
+            $productsProcessed = [];
+
             foreach ($productsToSync as $index => $product) {
             try {
                 $shopData = $product->shopData()
@@ -201,7 +237,11 @@ class PullProductsFromPrestaShop implements ShouldQueue
                     $psData = $psData['product'];
                 }
 
-                // PROBLEM #9.3: RESOLVE CONFLICT BEFORE UPDATE (2025-11-13)
+                // ENHANCEMENT 2025-12-22: ALWAYS store full PrestaShop data for validation
+                // Validator needs ALL data to calculate % compatibility PPM vs PrestaShop
+                $fullPsData = $conflictResolver->normalizeFullProductData($psData);
+
+                // PROBLEM #9.3: RESOLVE CONFLICT FOR SYNC STATUS (2025-11-13)
                 $resolution = $conflictResolver->resolve($shopData, $psData);
 
                 Log::debug('Conflict resolution result', [
@@ -212,47 +252,71 @@ class PullProductsFromPrestaShop implements ShouldQueue
                     'has_conflicts' => !empty($resolution['conflicts']),
                 ]);
 
-                if ($resolution['should_update']) {
-                    // Update allowed - apply PrestaShop data
-                    $shopData->update(array_merge($resolution['data'], [
-                        'sync_status' => 'synced',
-                        'has_conflicts' => false,
-                        'conflict_log' => null,
-                        'conflicts_detected_at' => null,
-                    ]));
+                // ALWAYS store pulled PrestaShop data for validation purposes
+                // Conflict resolution only affects sync_status, NOT the data itself
+                $updateData = array_merge($fullPsData, [
+                    'last_pulled_at' => now(),
+                ]);
 
-                    Log::info('Product updated from PrestaShop', [
+                if ($resolution['should_update']) {
+                    // No conflicts - mark as synced
+                    $updateData['sync_status'] = 'synced';
+                    $updateData['has_conflicts'] = false;
+                    $updateData['conflict_log'] = null;
+                    $updateData['conflicts_detected_at'] = null;
+
+                    $shopData->update($updateData);
+
+                    Log::info('Product pulled from PrestaShop (synced)', [
                         'product_id' => $product->id,
                         'sku' => $product->sku,
                         'reason' => $resolution['reason'],
+                        'fields_updated' => array_keys($fullPsData),
                     ]);
                 } else {
-                    // Update blocked - store conflicts if detected
+                    // Conflicts detected - store data but mark conflict status
                     if ($resolution['conflicts']) {
-                        $shopData->update([
-                            'sync_status' => 'conflict',
-                            'conflict_log' => $resolution['conflicts'],
-                            'has_conflicts' => true,
-                            'conflicts_detected_at' => now(),
-                        ]);
+                        $updateData['sync_status'] = 'conflict';
+                        $updateData['conflict_log'] = $resolution['conflicts'];
+                        $updateData['has_conflicts'] = true;
+                        $updateData['conflicts_detected_at'] = now();
 
                         $conflicts++;
 
-                        Log::warning('Conflict detected - update blocked', [
+                        Log::warning('Product pulled from PrestaShop (conflict detected)', [
                             'product_id' => $product->id,
                             'sku' => $product->sku,
                             'reason' => $resolution['reason'],
                             'conflicts_count' => count($resolution['conflicts']),
+                            'fields_updated' => array_keys($fullPsData),
                         ]);
                     } else {
-                        // No conflicts, just different strategy (e.g., ppm_wins)
-                        Log::info('Update skipped by conflict resolution strategy', [
+                        // No conflicts, strategy prevents sync (e.g., ppm_wins)
+                        // Still store data for validation
+                        Log::info('Product pulled from PrestaShop (strategy: ' . $resolution['reason'] . ')', [
                             'product_id' => $product->id,
                             'sku' => $product->sku,
-                            'reason' => $resolution['reason'],
+                            'fields_updated' => array_keys($fullPsData),
                         ]);
                     }
+
+                    $shopData->update($updateData);
                 }
+
+                // Track field updates for extended result_summary
+                foreach ($fullPsData as $field => $value) {
+                    if ($value !== null && isset($fieldsUpdated[$field])) {
+                        $fieldsUpdated[$field]++;
+                    }
+                }
+
+                // Track processed product details
+                $productsProcessed[] = [
+                    'sku' => $product->sku,
+                    'prestashop_id' => $shopData->prestashop_product_id,
+                    'status' => $resolution['should_update'] ? 'synced' : ($resolution['conflicts'] ? 'conflict' : 'strategy_skip'),
+                    'fields_count' => count(array_filter($fullPsData, fn($v) => $v !== null)),
+                ];
 
                 // PROBLEM #4 - Task 16c: Import prices from PrestaShop
                 try {
@@ -400,16 +464,23 @@ class PullProductsFromPrestaShop implements ShouldQueue
                 failedItems: $errors
             );
 
+            // ENHANCEMENT 2025-12-22: Extended result_summary for validation
             $syncJob?->complete([
                 'synced' => $synced,
                 'conflicts' => $conflicts,
                 'prices_imported' => $pricesImported,
                 'stock_imported' => $stockImported,
                 'errors' => $errors,
+                // Extended data for cykliczny job
+                'fields_updated' => $fieldsUpdated,
+                'total_fields_updated' => array_sum($fieldsUpdated),
+                'products_details' => array_slice($productsProcessed, 0, 50), // Limit to 50 for storage
+                'job_type' => 'pull_for_validation',
             ]);
 
-            Log::debug('PullProductsFromPrestaShop COMPLETED', [
+            Log::info('PullProductsFromPrestaShop COMPLETED', [
                 'shop_id' => $this->shop->id,
+                'shop_name' => $this->shop->name,
                 'sync_job_id' => $syncJob?->id,
                 'total_items' => $total,
                 'synced' => $synced,
@@ -418,6 +489,9 @@ class PullProductsFromPrestaShop implements ShouldQueue
                 'stock_imported' => $stockImported,
                 'errors' => $errors,
                 'duration_seconds' => $duration,
+                // ENHANCEMENT 2025-12-22: Extended statistics
+                'total_fields_updated' => array_sum($fieldsUpdated),
+                'fields_breakdown' => $fieldsUpdated,
             ]);
 
         } catch (\Exception $e) {

@@ -78,6 +78,7 @@ class ProductList extends Component
 
     // Bulk Operations
     public array $selectedProducts = [];
+    public array $selectedVariants = [];
     public bool $selectAll = false;
     public bool $selectingAllPages = false; // True when user selects ALL products across pagination
 
@@ -128,6 +129,7 @@ class ProductList extends Component
     public array $cachedProductSearches = []; // Cache: search_term => products array
     public string $importSearch = ''; // CRITICAL: For name/SKU search
     public bool $importIncludeSubcategories = true;
+    public bool $importWithVariants = false; // Import variants (combinations) from PrestaShop
 
     // ETAP_07 FAZA 3D: Category Preview Loading State
     public bool $isAnalyzingCategories = false; // True when AnalyzeMissingCategories job is running
@@ -532,6 +534,51 @@ class ProductList extends Component
     }
 
     // ==========================================
+    // VARIANT ACTIONS
+    // ==========================================
+
+    /**
+     * Toggle variant active status
+     *
+     * @param int $variantId
+     */
+    public function toggleVariantStatus(int $variantId): void
+    {
+        $variant = \App\Models\ProductVariant::find($variantId);
+
+        if (!$variant) {
+            $this->dispatch('error', message: 'Wariant nie zostal znaleziony');
+            return;
+        }
+
+        $variant->is_active = !$variant->is_active;
+        $variant->save();
+
+        $status = $variant->is_active ? 'aktywowany' : 'deaktywowany';
+        $this->dispatch('success', message: "Wariant zostal {$status}");
+    }
+
+    /**
+     * Delete variant
+     *
+     * @param int $variantId
+     */
+    public function deleteVariant(int $variantId): void
+    {
+        $variant = \App\Models\ProductVariant::find($variantId);
+
+        if (!$variant) {
+            $this->dispatch('error', message: 'Wariant nie zostal znaleziony');
+            return;
+        }
+
+        $variantSku = $variant->sku;
+        $variant->delete();
+
+        $this->dispatch('success', message: "Wariant {$variantSku} zostal usuniety");
+    }
+
+    // ==========================================
     // FAZA 1.5: MULTI-STORE ACTIONS
     // ==========================================
 
@@ -760,7 +807,13 @@ class ProductList extends Component
                 // FAZA 1.5: Multi-Store Sync Status - Eager load shop data for sync status display
                 // ETAP_07 OPCJA B (2025-10-13): Consolidated sync tracking in product_shop_data
                 'shopData:id,product_id,shop_id,sync_status,is_published,last_sync_at',
-                'shopData.shop:id,name' // Load shop relation through shopData (replaces syncStatuses.shop)
+                'shopData.shop:id,name', // Load shop relation through shopData (replaces syncStatuses.shop)
+                // ETAP_07d FAZA 7: Primary image for thumbnail column
+                'media' => fn($q) => $q->where('is_primary', true)->where('is_active', true)->limit(1),
+                // FIX 2025-12-15: Eager load variants with attributes for expanded rows
+                'variants.images',
+                'variants.attributes.attributeType:id,name,code',
+                'variants.attributes.attributeValue:id,label,code'
             ])
             ->select([
                 'id', 'sku', 'name', 'product_type_id', 'manufacturer',
@@ -1330,6 +1383,9 @@ class ProductList extends Component
 
     /**
      * Import ALL products from shop
+     *
+     * ETAP_07c: Non-blocking import - user can continue working while analysis runs.
+     * Progress visible in "Aktywne operacje" bar with action button when ready.
      */
     public function importAllProducts(): void
     {
@@ -1345,14 +1401,14 @@ class ProductList extends Component
             return;
         }
 
-        // 🎯 FAZA 3D: Set loading state for Category Preview Modal
-        $this->isAnalyzingCategories = true;
-        $this->analyzingShopName = $shop->name;
+        // ETAP_07c: Non-blocking - NO isAnalyzingCategories blocking state!
+        // User can continue working, progress shown in JobProgressBar
 
-        // 🚀 CRITICAL: Create PENDING progress record BEFORE dispatch
+        // Create PENDING progress record BEFORE dispatch
         $jobId = (string) \Illuminate\Support\Str::uuid();
         $progressService = app(\App\Services\JobProgressService::class);
 
+        // ETAP_07c: Create import job progress with user_id and metadata
         $progressService->createPendingJobProgress(
             $jobId,
             $shop,
@@ -1360,9 +1416,26 @@ class ProductList extends Component
             0
         );
 
-        BulkImportProducts::dispatch($shop, 'all', [], $jobId);
+        // Update with rich metadata for progress bar display
+        $progress = \App\Models\JobProgress::where('job_id', $jobId)->first();
+        if ($progress) {
+            $progress->updateMetadata([
+                'mode' => 'all',
+                'shop_name' => $shop->name,
+                'initiated_by' => auth()->user()?->name ?? 'System',
+                'phase' => 'queued',
+                'phase_label' => 'W kolejce - oczekuje na uruchomienie',
+            ]);
+            $progress->user_id = auth()->id();
+            $progress->save();
+        }
 
-        $this->dispatch('success', message: 'Analizuję kategorie z PrestaShop... To może potrwać kilka sekund.');
+        BulkImportProducts::dispatch($shop, 'all', [
+            'import_with_variants' => $this->importWithVariants,
+        ], $jobId);
+
+        // ETAP_07c: Friendly non-blocking message
+        $this->dispatch('success', message: "Import z {$shop->name} uruchomiony. Postep widoczny w belce 'Aktywne operacje'.");
 
         $this->closeImportModal();
     }
@@ -1748,6 +1821,8 @@ class ProductList extends Component
 
     /**
      * Import products from selected category
+     *
+     * ETAP_07c: Non-blocking import - user can continue working while analysis runs.
      */
     public function importFromCategory(): void
     {
@@ -1763,13 +1838,10 @@ class ProductList extends Component
             return;
         }
 
-        // 🎯 FAZA 3D: Set loading state for Category Preview Modal
-        $this->isAnalyzingCategories = true;
-        $this->analyzingShopName = $shop->name;
+        // ETAP_07c: Non-blocking - NO isAnalyzingCategories blocking state!
+        // User can continue working, progress shown in JobProgressBar
 
-        // 🚀 CRITICAL: Create PENDING progress record BEFORE dispatch
-        // This ensures progress bar appears IMMEDIATELY when user clicks "Import"
-        // Wire:poll will detect it within 3s without timing issues
+        // Create PENDING progress record BEFORE dispatch
         $jobId = (string) \Illuminate\Support\Str::uuid();
         $progressService = app(\App\Services\JobProgressService::class);
 
@@ -1780,12 +1852,32 @@ class ProductList extends Component
             0 // Will be updated to actual count when job starts
         );
 
+        // ETAP_07c: Update with rich metadata
+        $progress = \App\Models\JobProgress::where('job_id', $jobId)->first();
+        if ($progress) {
+            $categoryName = $this->prestashopCategories[$this->importCategoryId]['name'] ?? "Kategoria #{$this->importCategoryId}";
+            $progress->updateMetadata([
+                'mode' => 'category',
+                'category_id' => $this->importCategoryId,
+                'category_name' => $categoryName,
+                'include_subcategories' => $this->importIncludeSubcategories,
+                'shop_name' => $shop->name,
+                'initiated_by' => auth()->user()?->name ?? 'System',
+                'phase' => 'queued',
+                'phase_label' => 'W kolejce - oczekuje na uruchomienie',
+            ]);
+            $progress->user_id = auth()->id();
+            $progress->save();
+        }
+
         BulkImportProducts::dispatch($shop, 'category', [
             'category_id' => $this->importCategoryId,
             'include_subcategories' => $this->importIncludeSubcategories,
-        ], $jobId); // Pass job_id to job
+            'import_with_variants' => $this->importWithVariants,
+        ], $jobId);
 
-        $this->dispatch('success', message: 'Analizuję kategorie z PrestaShop... To może potrwać kilka sekund.');
+        // ETAP_07c: Friendly non-blocking message
+        $this->dispatch('success', message: "Import z kategorii uruchomiony. Postep widoczny w belce 'Aktywne operacje'.");
 
         $this->closeImportModal();
     }
@@ -2677,6 +2769,9 @@ class ProductList extends Component
                 'from_cache' => false,
             ]);
 
+            // ETAP_07f: Auto-check variant checkbox when product has combinations
+            $this->autoCheckVariantCheckbox();
+
         } catch (\Exception $e) {
             Log::error('Failed to load PrestaShop products', [
                 'shop_id' => $this->importShopId,
@@ -2685,6 +2780,62 @@ class ProductList extends Component
 
             $this->dispatch('error', message: 'Nie udało się pobrać produktów: ' . $e->getMessage());
         }
+    }
+
+    /**
+     * ETAP_07f: Auto-check variant import checkbox when loaded products have combinations
+     *
+     * Checks if any loaded PrestaShop product has combinations (variants)
+     * and automatically enables the importWithVariants checkbox.
+     *
+     * PrestaShop product structure:
+     * - associations.combinations.combination[] - array of variant IDs
+     * - cache_has_attachments - sometimes indicates variants
+     */
+    private function autoCheckVariantCheckbox(): void
+    {
+        // Check if any loaded product has combinations
+        foreach ($this->prestashopProducts as $product) {
+            $hasCombinations = false;
+
+            // Check associations.combinations structure
+            if (isset($product['associations']['combinations'])) {
+                $combinations = $product['associations']['combinations'];
+
+                // Format 1: {'combination': [{'id': 1}, {'id': 2}]}
+                if (isset($combinations['combination']) && is_array($combinations['combination'])) {
+                    $combArray = $combinations['combination'];
+                    // Check if it's a single combination (associative) or array of combinations
+                    $hasCombinations = !empty($combArray) && (isset($combArray[0]) || isset($combArray['id']));
+                }
+                // Format 2: Direct array of combinations
+                elseif (is_array($combinations) && !empty($combinations)) {
+                    $hasCombinations = true;
+                }
+            }
+
+            if ($hasCombinations) {
+                // Auto-enable variant import checkbox
+                $this->importWithVariants = true;
+
+                Log::debug('Auto-enabled importWithVariants checkbox', [
+                    'product_id' => $product['id'] ?? 'unknown',
+                    'product_reference' => $product['reference'] ?? 'unknown',
+                    'combinations_structure' => isset($product['associations']['combinations'])
+                        ? array_keys($product['associations']['combinations'])
+                        : 'none',
+                ]);
+
+                // Found at least one product with variants - enable checkbox and exit
+                return;
+            }
+        }
+
+        // No products with combinations found - keep checkbox unchecked (don't auto-uncheck)
+        Log::debug('No products with combinations found - checkbox unchanged', [
+            'products_count' => count($this->prestashopProducts),
+            'current_checkbox_state' => $this->importWithVariants,
+        ]);
     }
 
     /**
@@ -2706,6 +2857,8 @@ class ProductList extends Component
 
     /**
      * Import selected products
+     *
+     * ETAP_07c: Non-blocking import - user can continue working while analysis runs.
      */
     public function importSelectedProducts(): void
     {
@@ -2721,11 +2874,12 @@ class ProductList extends Component
             return;
         }
 
-        // 🎯 FAZA 3D: Set loading state for Category Preview Modal
-        $this->isAnalyzingCategories = true;
-        $this->analyzingShopName = $shop->name;
+        // ETAP_07c: Non-blocking - NO isAnalyzingCategories blocking state!
+        // User can continue working, progress shown in JobProgressBar
 
-        // 🚀 CRITICAL: Create PENDING progress record BEFORE dispatch
+        $productCount = count($this->selectedProductsToImport);
+
+        // Create PENDING progress record BEFORE dispatch
         $jobId = (string) \Illuminate\Support\Str::uuid();
         $progressService = app(\App\Services\JobProgressService::class);
 
@@ -2733,14 +2887,32 @@ class ProductList extends Component
             $jobId,
             $shop,
             'import',
-            count($this->selectedProductsToImport) // We know exact count for individual mode
+            $productCount // We know exact count for individual mode
         );
+
+        // ETAP_07c: Update with rich metadata
+        $progress = \App\Models\JobProgress::where('job_id', $jobId)->first();
+        if ($progress) {
+            $progress->updateMetadata([
+                'mode' => 'individual',
+                'product_count' => $productCount,
+                'product_ids' => $this->selectedProductsToImport,
+                'shop_name' => $shop->name,
+                'initiated_by' => auth()->user()?->name ?? 'System',
+                'phase' => 'queued',
+                'phase_label' => 'W kolejce - oczekuje na uruchomienie',
+            ]);
+            $progress->user_id = auth()->id();
+            $progress->save();
+        }
 
         BulkImportProducts::dispatch($shop, 'individual', [
             'product_ids' => $this->selectedProductsToImport,
+            'import_with_variants' => $this->importWithVariants,
         ], $jobId);
 
-        $this->dispatch('success', message: sprintf('Analizuję kategorie dla %d produktów... To może potrwać kilka sekund.', count($this->selectedProductsToImport)));
+        // ETAP_07c: Friendly non-blocking message
+        $this->dispatch('success', message: sprintf("Import %d produktow uruchomiony. Postep widoczny w belce 'Aktywne operacje'.", $productCount));
 
         $this->closeImportModal();
     }
@@ -2860,15 +3032,13 @@ class ProductList extends Component
                 'total_categories' => $preview->total_categories,
             ]);
 
-            // Dispatch event to CategoryPreviewModal component
-            $this->dispatch('show-category-preview', previewId: $preview->id);
+            // ETAP_07c FIX: Do NOT auto-open modal
+            // User must click "Zobacz brakujace kategorie" button in JobProgressBar
+            // Modal will be opened via handleActionButton() -> dispatch('show-category-preview')
 
-            // 🎯 FAZA 3D: Hide loading state when modal appears
+            // 🎯 FAZA 3D: Hide loading state when analysis is complete
             $this->isAnalyzingCategories = false;
             $this->analyzingShopName = null;
-
-            // Show info notification
-            $this->dispatch('info', message: "Analiza kategorii ukończona. Znaleziono {$preview->total_categories} brakujących kategorii.");
 
             // 🔥 CRITICAL: Mark as shown to prevent polling from showing modal again
             // Polling runs every 3s, tracking prevents duplicate opens

@@ -111,11 +111,11 @@ class CompatibilitySource extends Model
     }
 
     /**
-     * Scope: Ordered by position
+     * Scope: Ordered by id (position column does not exist in this table)
      */
     public function scopeOrdered($query)
     {
-        return $query->orderBy('position', 'asc')->orderBy('id', 'asc');
+        return $query->orderBy('id', 'asc');
     }
 
     /*

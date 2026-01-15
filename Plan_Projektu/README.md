@@ -3,7 +3,7 @@
 
 **UWAGA** WYŁĄCZ autoryzację AdminMiddleware na czas developmentu! PRZED OSTATECZNYM DEPLOY UPEWNIJ SIĘ ŻE AUTORYZACJA JEST WSZĘDZIE WŁĄCZONA !
 
-**Ostatnia aktualizacja:** 2025-11-18  
+**Ostatnia aktualizacja:** 2026-01-14
 **Status projektu:** 🛠️ W TRAKCIE OPRACOWANIA  
 **Szacowany czas realizacji:** 20 tygodni  
 
@@ -75,8 +75,10 @@ Prestashop Product Manager (PPM) to zaawansowany system PIM (Product Information
 | [11](ETAP_11_Dopasowania.md) | System Dopasowań i Wariantów | ❌ NIE ROZPOCZĘTY | 40h | 🟢 ŚREDNI |
 | [12](ETAP_12_UI_Deploy.md) | UI/UX, Testy i Deploy Produkcyjny | ❌ NIE ROZPOCZĘTY | 45h | 🔴 KRYTYCZNY |
 | [13](ETAP_13_Sync_Panel_UX_Refactoring.md) | Sync Panel UX Refactoring | ✅ UKOŃCZONY (2025-11-18) | 68h (1h real) | 🟡 WYSOKI |
+| [14](ETAP_14_Jobs_Refactoring.md) | Jobs/Queue Refactoring | ❌ NIE ROZPOCZĘTY | 20h | 🟢 ŚREDNI |
+| [15](ETAP_15_Category_Panel_Enhancement.md) | Category Panel Enhancement | ✅ UKOŃCZONY (2025-12-23) | 14h | 🟢 ŚREDNI |
 
-**TOTAL:** ~583 godzin (≈ 23 tygodnie przy 25h/tydzień)
+**TOTAL:** ~617 godzin (≈ 25 tygodni przy 25h/tydzień)
 
 ---
 
@@ -162,6 +164,6 @@ Każdy etap uznawany jest za ukończony gdy:
 
 ---
 
-**Stworzony:** 2025-09-05 przez Claude Code AI  
-**Ostatnia aktualizacja:** 2025-11-18  
-**Wersja planu:** 1.0  
+**Stworzony:** 2025-09-05 przez Claude Code AI
+**Ostatnia aktualizacja:** 2026-01-14
+**Wersja planu:** 1.1  

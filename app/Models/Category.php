@@ -88,9 +88,9 @@ class Category extends Model
 
     /**
      * Maximum category tree depth (business rule)
-     * 5 poziomów: Kategoria główna -> Podkategoria -> ... -> Kategoria4
+     * 11 poziomów: Baza(0) -> Poziom1 -> ... -> Poziom10
      */
-    public const MAX_LEVEL = 4;
+    public const MAX_LEVEL = 10;
 
     /**
      * The attributes that are mass assignable.

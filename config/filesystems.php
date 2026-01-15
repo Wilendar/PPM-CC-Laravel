@@ -39,7 +39,9 @@ return [
         'public' => [
             'driver' => 'local',
             'root' => storage_path('app/public'),
-            'url' => env('APP_URL').'/storage',
+            // Hostido: Laravel public/ folder is at public_html/public/
+            // so symlink is at public_html/public/storage → storage/app/public
+            'url' => env('APP_URL').'/public/storage',
             'visibility' => 'public',
             'throw' => false,
         ],

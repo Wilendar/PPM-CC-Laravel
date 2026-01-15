@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Carbon\Carbon;
@@ -68,6 +69,12 @@ use Carbon\Carbon;
  * @property bool $notify_on_sync_complete
  * @property Carbon $created_at
  * @property Carbon $updated_at
+ * @property array|null $allowed_vehicle_brands Allowed vehicle brands (ETAP_05d: null=all, []=none, array=whitelist)
+ * @property array|null $compatibility_settings Smart suggestions settings (ETAP_05d)
+ *
+ * @property-read \Illuminate\Database\Eloquent\Collection|\App\Models\VehicleCompatibility[] $vehicleCompatibilities
+ * @property-read \Illuminate\Database\Eloquent\Collection|\App\Models\CompatibilitySuggestion[] $compatibilitySuggestions
+ * @property-read \Illuminate\Database\Eloquent\Collection|\App\Models\CompatibilityBulkOperation[] $compatibilityBulkOperations
  */
 class PrestaShopShop extends Model
 {
@@ -128,6 +135,29 @@ class PrestaShopShop extends Model
         'tax_rules_group_id_5',
         'tax_rules_group_id_0',
         'tax_rules_last_fetched_at',
+        // ETAP_05d: Vehicle Compatibility Settings (2025-12-05)
+        'allowed_vehicle_brands',
+        'compatibility_settings',
+        // ETAP_07f: CSS/JS Sync Configuration (2025-12-16)
+        'custom_css_url',
+        'custom_js_url',
+        'css_last_fetched_at',
+        'cached_custom_css',
+        'cached_custom_js',
+        'ftp_config',
+        'css_last_deployed_at',
+        'css_deploy_status',
+        'css_deploy_message',
+        // ETAP_07f_P3: Multi-file CSS cache (2025-12-17)
+        'cached_theme_css',
+        'theme_css_fetched_at',
+        'css_asset_manifest',
+        'css_manifest_fetched_at',
+        'selected_css_modules',
+        // ETAP_07f_P3.5: Multi-file CSS/JS configuration (2025-12-17)
+        'css_files',
+        'js_files',
+        'files_scanned_at',
     ];
 
     /**
@@ -156,6 +186,22 @@ class PrestaShopShop extends Model
         'quota_reset_at' => 'datetime',
         'last_response_time' => 'decimal:3',
         'avg_response_time' => 'decimal:3',
+        // ETAP_05d: Vehicle Compatibility Settings (2025-12-05)
+        'allowed_vehicle_brands' => 'array',
+        'compatibility_settings' => 'array',
+        // ETAP_07f: CSS/JS Sync Configuration (2025-12-16)
+        'ftp_config' => 'array',
+        'css_last_fetched_at' => 'datetime',
+        'css_last_deployed_at' => 'datetime',
+        // ETAP_07f_P3: Multi-file CSS cache (2025-12-17)
+        'css_asset_manifest' => 'array',
+        'css_manifest_fetched_at' => 'datetime',
+        'theme_css_fetched_at' => 'datetime',
+        'selected_css_modules' => 'array',
+        // ETAP_07f_P3.5: Multi-file CSS/JS configuration (2025-12-17)
+        'css_files' => 'array',
+        'js_files' => 'array',
+        'files_scanned_at' => 'datetime',
     ];
 
     /**
@@ -284,12 +330,13 @@ class PrestaShopShop extends Model
 
     /**
      * Get the decrypted API key.
+     * ETAP_07e FIX: Accept nullable values to prevent TypeError
      */
     protected function apiKey(): Attribute
     {
         return Attribute::make(
-            get: fn (string $value) => decrypt($value),
-            set: fn (string $value) => encrypt($value),
+            get: fn (?string $value) => $value ? decrypt($value) : null,
+            set: fn (?string $value) => $value ? encrypt($value) : null,
         );
     }
 
@@ -546,6 +593,133 @@ class PrestaShopShop extends Model
     }
 
     // ==========================================
+    // ETAP_05d: Vehicle Compatibility Relations & Methods
+    // 2025-12-05: Per-shop compatibility system
+    // ==========================================
+
+    /**
+     * Get vehicle compatibility records for this shop (ETAP_05d)
+     */
+    public function vehicleCompatibilities(): HasMany
+    {
+        return $this->hasMany(VehicleCompatibility::class, 'shop_id');
+    }
+
+    /**
+     * Get compatibility suggestions for this shop (ETAP_05d)
+     */
+    public function compatibilitySuggestions(): HasMany
+    {
+        return $this->hasMany(CompatibilitySuggestion::class, 'shop_id');
+    }
+
+    /**
+     * Get bulk operations for this shop (ETAP_05d)
+     */
+    public function compatibilityBulkOperations(): HasMany
+    {
+        return $this->hasMany(CompatibilityBulkOperation::class, 'shop_id');
+    }
+
+    /**
+     * Get stylesets for this shop (ETAP_07f: Visual Description Editor)
+     */
+    public function stylesets(): HasMany
+    {
+        return $this->hasMany(ShopStyleset::class, 'shop_id');
+    }
+
+    /**
+     * Get active styleset for this shop (ETAP_07f: Visual Description Editor)
+     */
+    public function activeStyleset(): HasOne
+    {
+        return $this->hasOne(ShopStyleset::class, 'shop_id')->where('is_active', true);
+    }
+
+    /**
+     * Get product descriptions for this shop (ETAP_07f: Visual Description Editor)
+     */
+    public function productDescriptions(): HasMany
+    {
+        return $this->hasMany(ProductDescription::class, 'shop_id');
+    }
+
+    /**
+     * Get block definitions for this shop (ETAP_07f_P3: Dedicated Blocks System)
+     */
+    public function blockDefinitions(): HasMany
+    {
+        return $this->hasMany(BlockDefinition::class, 'shop_id');
+    }
+
+    /**
+     * Get active block definitions for this shop (ETAP_07f_P3)
+     */
+    public function activeBlockDefinitions(): HasMany
+    {
+        return $this->hasMany(BlockDefinition::class, 'shop_id')->where('is_active', true);
+    }
+
+    /**
+     * Check if a vehicle brand is allowed for this shop (ETAP_05d)
+     *
+     * @param string $brand Vehicle brand name (e.g., "YCF", "KAYO")
+     * @return bool True if brand allowed (null = all, [] = none, array = whitelist)
+     */
+    public function isVehicleBrandAllowed(string $brand): bool
+    {
+        // null = all brands allowed
+        if ($this->allowed_vehicle_brands === null) {
+            return true;
+        }
+
+        // empty array = no brands allowed
+        if (empty($this->allowed_vehicle_brands)) {
+            return false;
+        }
+
+        // array = whitelist
+        return in_array($brand, $this->allowed_vehicle_brands, true);
+    }
+
+    /**
+     * Get compatibility setting value (ETAP_05d)
+     *
+     * @param string $key Setting key
+     * @param mixed $default Default value
+     * @return mixed Setting value or default
+     */
+    public function getCompatibilitySetting(string $key, mixed $default = null): mixed
+    {
+        return $this->compatibility_settings[$key] ?? $default;
+    }
+
+    /**
+     * Check if smart suggestions are enabled (ETAP_05d)
+     */
+    public function hasSmartSuggestionsEnabled(): bool
+    {
+        return $this->getCompatibilitySetting('enable_smart_suggestions', true);
+    }
+
+    /**
+     * Check if auto-apply suggestions is enabled (ETAP_05d)
+     */
+    public function hasAutoApplySuggestionsEnabled(): bool
+    {
+        return $this->getCompatibilitySetting('auto_apply_suggestions', false);
+    }
+
+    /**
+     * Get minimum confidence score for suggestions (ETAP_05d)
+     */
+    public function getMinConfidenceScore(): float
+    {
+        return (float) $this->getCompatibilitySetting('min_confidence_score', 0.50);
+    }
+
+    // ==========================================
     // COMPUTED PROPERTIES (Real-time from sync_jobs)
     // 2025-11-07: Fix outdated statistics columns
     // ==========================================
@@ -659,5 +833,108 @@ class PrestaShopShop extends Model
             ->whereIn('status', [SyncJob::STATUS_PENDING, SyncJob::STATUS_RUNNING])
             ->orderBy('created_at', 'desc')
             ->first();
+    }
+
+    // ==========================================
+    // ETAP_07f_P3.5: Multi-file CSS/JS Methods
+    // 2025-12-17: Auto-scan and multi-file support
+    // ==========================================
+
+    /**
+     * Get enabled CSS files for preview.
+     *
+     * @return array Array of enabled CSS file entries
+     */
+    public function getEnabledCssFiles(): array
+    {
+        $files = $this->css_files ?? [];
+        return array_filter($files, fn($f) => $f['enabled'] ?? false);
+    }
+
+    /**
+     * Get enabled JS files for preview.
+     *
+     * @return array Array of enabled JS file entries
+     */
+    public function getEnabledJsFiles(): array
+    {
+        $files = $this->js_files ?? [];
+        return array_filter($files, fn($f) => $f['enabled'] ?? false);
+    }
+
+    /**
+     * Get combined CSS content from all enabled files.
+     *
+     * @return string Combined CSS content
+     */
+    public function getCombinedCssContent(): string
+    {
+        $parts = [];
+        foreach ($this->getEnabledCssFiles() as $file) {
+            if (!empty($file['cached_content'])) {
+                $name = $file['name'] ?? basename($file['url'] ?? '');
+                $parts[] = "/* ========== {$name} ========== */\n" . $file['cached_content'];
+            }
+        }
+        return implode("\n\n", $parts);
+    }
+
+    /**
+     * Get combined JS content from all enabled files.
+     *
+     * @return string Combined JS content
+     */
+    public function getCombinedJsContent(): string
+    {
+        $parts = [];
+        foreach ($this->getEnabledJsFiles() as $file) {
+            if (!empty($file['cached_content'])) {
+                $name = $file['name'] ?? basename($file['url'] ?? '');
+                $parts[] = "/* ========== {$name} ========== */\n" . $file['cached_content'];
+            }
+        }
+        return implode("\n\n", $parts);
+    }
+
+    /**
+     * Check if shop has scanned files.
+     *
+     * @return bool
+     */
+    public function hasScannedFiles(): bool
+    {
+        return $this->files_scanned_at !== null && (!empty($this->css_files) || !empty($this->js_files));
+    }
+
+    /**
+     * Get total count of CSS files.
+     */
+    public function getCssFilesCount(): int
+    {
+        return count($this->css_files ?? []);
+    }
+
+    /**
+     * Get total count of JS files.
+     */
+    public function getJsFilesCount(): int
+    {
+        return count($this->js_files ?? []);
+    }
+
+    /**
+     * Get count of enabled CSS files.
+     */
+    public function getEnabledCssFilesCount(): int
+    {
+        return count($this->getEnabledCssFiles());
+    }
+
+    /**
+     * Get count of enabled JS files.
+     */
+    public function getEnabledJsFilesCount(): int
+    {
+        return count($this->getEnabledJsFiles());
     }
 }

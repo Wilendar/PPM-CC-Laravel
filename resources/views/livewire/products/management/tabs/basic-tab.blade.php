@@ -444,9 +444,15 @@
             @enderror
         </div>
 
-        {{-- Tax Rate Field - RELOCATED FROM PHYSICAL TAB (FAZA 5.2 - 2025-11-14) --}}
-        <div class="md:col-span-1">
-            <label for="tax_rate" class="form-label-enterprise">
+        {{-- ========== ETAP_07d: SEKCJA STAWKA VAT + STATUS + HARMONOGRAM + ZDJECIE GLOWNE ========== --}}
+        {{-- Grid 2-kolumnowy wewnatrz glownego grida: Lewa (VAT+Status+Harmonogram), Prawa (Zdjecie glowne) --}}
+        @if($isEditMode && $product && $product->id)
+        <div class="md:col-span-2 grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {{-- LEWA KOLUMNA: STAWKA VAT + Status produktu + Harmonogram publikacji --}}
+            <div class="space-y-6">
+            {{-- Tax Rate Field - RELOCATED FROM PHYSICAL TAB (FAZA 5.2 - 2025-11-14) --}}
+            <div>
+                <label for="tax_rate" class="form-label-enterprise">
                 <svg class="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path>
                 </svg>
@@ -544,8 +550,7 @@
             @endif
         </div>
 
-        {{-- Status Checkboxes --}}
-        <div class="md:col-span-2">
+            {{-- Status produktu --}}
             <fieldset class="space-y-3">
                 <legend class="text-sm font-medium text-gray-300">Status produktu</legend>
 
@@ -585,79 +590,60 @@
                            id="is_featured"
                            class="rounded border-gray-600 text-blue-600 shadow-sm focus:border-blue-500 focus:ring-blue-500">
                     <label for="is_featured" class="ml-2 text-sm text-gray-300">
-                        Produkt wyróżniony
+                        Produkt wyrozzniony
                         @if($is_featured)
                             <span class="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium product-featured-label">
-                                ⭐ Wyróżniony
+                                Wyrozzniony
                             </span>
                         @endif
                     </label>
                 </div>
             </fieldset>
-        </div>
 
-        {{-- Publishing Schedule Section --}}
-        <div class="md:col-span-2">
-            <fieldset class="space-y-4">
+            {{-- Harmonogram publikacji --}}
+            <fieldset class="space-y-3">
                 <legend class="text-sm font-medium text-gray-300">
-                    <svg class="w-4 h-4 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg class="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
                     </svg>
                     Harmonogram publikacji
                 </legend>
 
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div class="space-y-3">
                     <div>
-                        <label for="available_from" class="block text-sm font-medium text-gray-300 mb-2">
-                            Dostępny od
+                        <label for="available_from" class="block text-sm font-medium text-gray-400 mb-1">
+                            Dostepny od
                         </label>
                         <input wire:model.live="available_from"
                                type="datetime-local"
                                id="available_from"
                                class="block w-full rounded-md border-gray-600 bg-gray-700 text-white shadow-sm focus:border-orange-500 focus:ring-orange-500 sm:text-sm">
-                        <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                            Pozostaw puste dla "od zawsze"
-                        </p>
+                        <p class="mt-1 text-xs text-gray-500">Pozostaw puste dla "od zawsze"</p>
                     </div>
 
                     <div>
-                        <label for="available_to" class="block text-sm font-medium text-gray-300 mb-2">
-                            Dostępny do
+                        <label for="available_to" class="block text-sm font-medium text-gray-400 mb-1">
+                            Dostepny do
                         </label>
                         <input wire:model.live="available_to"
                                type="datetime-local"
                                id="available_to"
                                class="block w-full rounded-md border-gray-600 bg-gray-700 text-white shadow-sm focus:border-orange-500 focus:ring-orange-500 sm:text-sm">
-                        <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                            Pozostaw puste dla "na zawsze"
-                        </p>
+                        <p class="mt-1 text-xs text-gray-500">Pozostaw puste dla "na zawsze"</p>
                     </div>
                 </div>
-
-                {{-- Publishing Status Display --}}
-                @if($isEditMode && $product)
-                    <div class="mt-3 p-3 bg-gray-700 rounded-lg">
-                        <div class="flex items-center space-x-2">
-                            @php
-                            $status = $product->getPublishingStatus();
-                        @endphp
-                            @if($status['is_available'])
-                                <svg class="w-4 h-4 text-green-500" fill="currentColor" viewBox="0 0 20 20">
-                                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
-                                </svg>
-                                <span class="text-sm font-medium text-green-700 dark:text-green-300">Dostępny</span>
-                            @else
-                                <svg class="w-4 h-4 text-red-500" fill="currentColor" viewBox="0 0 20 20">
-                                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"/>
-                                </svg>
-                                <span class="text-sm font-medium text-red-700 dark:text-red-300">Niedostępny</span>
-                            @endif
-                            <span class="text-sm text-gray-400">{{ $status['status_text'] }}</span>
-                        </div>
-                    </div>
-                @endif
             </fieldset>
         </div>
+
+            {{-- PRAWA KOLUMNA: Zdjecie glowne (duze) - ETAP_07d --}}
+            <div class="h-full">
+                @include('livewire.products.management.partials.primary-image-preview', [
+                    'product' => $product
+                ])
+            </div>
+        </div>
+        @endif
+        {{-- ========== KONIEC SEKCJI ETAP_07d ========== --}}
 
         {{-- Categories Section --}}
         <div class="md:col-span-2">
@@ -815,6 +801,12 @@
                 $availableCategories = $this->getShopCategories();
             @endphp
 
+            {{-- ETAP_07b FAZA 4.2: Category Controls (Search, Expand/Collapse, Clear) --}}
+            {{-- FAZA 4.2.3: showCreateButton removed - inline creation via + buttons in tree --}}
+            @include('livewire.products.management.partials.category-controls', [
+                'context' => $activeShopId ?? 'default',
+            ])
+
             @if($availableCategories && count($availableCategories) > 0)
                 {{-- FIX 2025-11-24 (v3 - FINAL): Static wire:key to PREVENT forced re-renders --}}
                 {{-- wire:key includes ONLY activeShopId (to distinguish shop contexts) --}}
@@ -824,7 +816,8 @@
                     $categoryContainerClasses = $this->getCategoryClasses();
                 @endphp
                 {{-- FIX 2025-11-25: Add frozen state when sync job is running for current shop --}}
-                <div class="{{ $categoryContainerClasses }} max-h-64 overflow-y-auto"
+                {{-- FIX 2025-11-26: Added resize-y for expandable category tree --}}
+                <div class="{{ $categoryContainerClasses }} min-h-40 max-h-96 overflow-y-auto resize-y"
                      wire:key="categories-ctx-{{ $activeShopId ?? 'default' }}"
                      :class="{ 'category-tree-frozen': $wire.activeShopId !== null && ($wire.activeJobStatus === 'pending' || $wire.activeJobStatus === 'processing') }">
                     @foreach($availableCategories as $rootCategory)

@@ -410,9 +410,13 @@ input[type="checkbox"]:checked {
 }
 
 .category-tree {
-    max-height: 300px;
+    max-height: 400px;
+    min-height: 150px;
     overflow-y: auto;
     padding: 0.5rem 0;
+    resize: vertical;
+    /* Resize handle styling */
+    scrollbar-gutter: stable;
 }
 
 .category-tree-item {

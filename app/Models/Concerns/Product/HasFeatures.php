@@ -70,6 +70,18 @@ trait HasFeatures
     }
 
     /**
+     * Alias for features() - used by PrestaShop sync services
+     *
+     * ETAP_07e FAZA 4.4 - Feature Sync to PrestaShop
+     *
+     * @return \Illuminate\Database\Eloquent\Relations\HasMany
+     */
+    public function productFeatures(): HasMany
+    {
+        return $this->hasMany(ProductFeature::class, 'product_id', 'id');
+    }
+
+    /**
      * Product media/images polymorphic relationship (1:many) - FAZA C ✅ IMPLEMENTED
      *
      * Obsługa: max 20 zdjęć na produkt, różne rozmiary, watermarki, optymalizacja

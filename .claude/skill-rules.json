@@ -1,8 +1,8 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "description": "PPM Project - Skills Auto-Activation Configuration",
-  "version": "1.2.0",
-  "lastUpdated": "2025-11-21",
+  "version": "1.3.0",
+  "lastUpdated": "2025-12-05",
 
   "skills": {
     "ppm-styling-guidelines": {
@@ -660,6 +660,35 @@
       "description": "Skill-Creator: Meta-skill for creating/updating skills, auto-activation, feedback system"
     },
 
+    "agent-creator": {
+      "type": "meta",
+      "enforcement": "require",
+      "priority": "critical",
+      "promptTriggers": {
+        "keywords": [
+          "agent",
+          "create agent",
+          "new agent",
+          "build agent",
+          "agent creation",
+          "agent template",
+          "subagent",
+          "sub-agent",
+          "agent_start",
+          "generate agent"
+        ],
+        "intentPatterns": [
+          "(create|add|build|make|generate).*?agent",
+          "agent.*?(creation|template|pattern)",
+          "new.*?agent",
+          "(stwórz|utwórz).*?agent",
+          "sub.?agent",
+          "agent_start"
+        ]
+      },
+      "description": "Agent-Creator: Meta-skill for creating/updating agents based on Anthropic best practices (session state, verification-first, model:default)"
+    },
+
     "prestashop-xml-integration": {
       "type": "domain",
       "enforcement": "require",
@@ -760,9 +789,9 @@
     },
 
     "prestashop-api-integration": {
-      "type": "workflow",
-      "enforcement": "suggest",
-      "priority": "high",
+      "type": "domain",
+      "enforcement": "require",
+      "priority": "critical",
       "promptTriggers": {
         "keywords": [
           "prestashop api",
@@ -776,7 +805,69 @@
           "cqrscreate",
           "api workflow",
           "prestashop endpoint",
-          "resource schema"
+          "resource schema",
+          "prestashop product",
+          "product field",
+          "product fields",
+          "pola produktu",
+          "pole produktu",
+          "prestashop field",
+          "prestashop fields",
+          "required field",
+          "wymagane pole",
+          "readonly field",
+          "pole readonly",
+          "not writable",
+          "id_manufacturer",
+          "id_category_default",
+          "minimal_quantity",
+          "redirect_type",
+          "additional_delivery_times",
+          "ps_specific_price",
+          "admin panel invisible",
+          "niewidoczny w admin",
+          "produkt znika",
+          "product disappear",
+          "import product",
+          "export product",
+          "sync product",
+          "create product prestashop",
+          "update product prestashop",
+          "produkty prestashop",
+          "synchronizacja produktu",
+          "eksport produktu",
+          "import produktu",
+          "multilang field",
+          "pole wielojęzyczne",
+          "cena produktu",
+          "product price",
+          "product name",
+          "nazwa produktu",
+          "product description",
+          "opis produktu",
+          "product category",
+          "kategoria produktu",
+          "product manufacturer",
+          "producent produktu",
+          "product sku",
+          "sku produktu",
+          "product reference",
+          "product ean",
+          "ean produktu",
+          "product weight",
+          "waga produktu",
+          "product active",
+          "aktywny produkt",
+          "product visibility",
+          "widoczność produktu",
+          "product stock",
+          "stan magazynowy",
+          "transformToPrestaShop",
+          "toPrestaShop",
+          "ProductTransformer",
+          "get-modify-put",
+          "PUT replace",
+          "PUT zastępuje"
         ],
         "intentPatterns": [
           "prestashop.*?(api|webservice|integration)",
@@ -785,14 +876,41 @@
           "(authenticate|connect).*?prestashop",
           "api.*?(call|request|response)",
           "(create|update|delete).*?prestashop.*?(product|category)",
-          "prestashop.*?(workflow|pipeline)"
+          "prestashop.*?(workflow|pipeline)",
+          "prestashop.*?product.*?(field|pole|create|update|sync|import|export)",
+          "product.*?prestashop.*?(field|pole|create|update|sync|import|export)",
+          "(import|export|sync).*?(product|produkt).*?prestashop",
+          "prestashop.*?(import|export|sync).*?(product|produkt)",
+          "(create|update|add|dodaj|utwórz|aktualizuj).*?product.*?prestashop",
+          "prestashop.*?(create|update|add|dodaj|utwórz|aktualizuj).*?product",
+          "(required|wymagane|mandatory|obowiązkowe).*?(field|pole).*?prestashop",
+          "prestashop.*?(required|wymagane|mandatory|obowiązkowe).*?(field|pole)",
+          "(readonly|not writable|niemodyfikowalne).*?(field|pole)",
+          "product.*?(invisible|niewidoczny|znika|disappear).*?(admin|panel)",
+          "(admin|panel).*?product.*?(invisible|niewidoczny|znika|disappear)",
+          "manufacturer.*?(lookup|id|name)",
+          "id_manufacturer.*?(required|null|zero|0)",
+          "minimal_quantity.*?(required|0|zero)",
+          "redirect_type.*?(required|empty)",
+          "ps_specific_price.*?(missing|required|create)",
+          "(multilang|wielojęzyczne).*?(field|pole)",
+          "(pole|field).*?(multilang|wielojęzyczne)",
+          "PUT.*?(replace|zastępuje|overwrites)",
+          "get.*?modify.*?put",
+          "ProductTransformer",
+          "transformToPrestaShop",
+          "(price|cena|name|nazwa|description|opis|category|kategoria|manufacturer|producent|sku|ean|weight|waga|stock|magazyn).*?prestashop",
+          "prestashop.*?(price|cena|name|nazwa|description|opis|category|kategoria|manufacturer|producent|sku|ean|weight|waga|stock|magazyn)"
         ]
       },
       "fileTriggers": {
         "pathPatterns": [
           "app/Services/PrestaShop/**/*Client.php",
           "app/Services/PrestaShop/**/*Sync*.php",
-          "app/Console/Commands/PrestaShop*.php"
+          "app/Services/PrestaShop/**/*Transformer*.php",
+          "app/Console/Commands/PrestaShop*.php",
+          "app/Jobs/PrestaShop/*.php",
+          "app/Models/ProductShopData.php"
         ],
         "contentPatterns": [
           "PrestaShopApiClient",
@@ -803,10 +921,39 @@
           "CQRSUpdate",
           "output_format.*?JSON",
           "schema.*?blank",
-          "schema.*?synopsis"
+          "schema.*?synopsis",
+          "ProductTransformer",
+          "transformToPrestaShop",
+          "toPrestaShop",
+          "id_manufacturer",
+          "id_category_default",
+          "minimal_quantity",
+          "redirect_type",
+          "additional_delivery_times",
+          "ps_specific_price",
+          "manufacturer_name",
+          "readonly",
+          "multilang",
+          "prepareMultilangField",
+          "filterReadonlyFields",
+          "ensureRequiredFields",
+          "getManufacturerId",
+          "price.*?0\\.01",
+          "state.*?1",
+          "makeRequest.*?products",
+          "POST.*?products",
+          "PUT.*?products"
         ]
       },
-      "description": "PrestaShop API integration: Complete workflow - Authentication, CRUD operations, Error handling, Performance optimization"
+      "criticalRules": [
+        "7 WYMAGANYCH pól dla widoczności: id_manufacturer>0, minimal_quantity=1, redirect_type='301-category', state=1, additional_delivery_times=1, price>0, ps_specific_price EXISTS",
+        "8 READONLY pól (NIE WYSYŁAJ!): manufacturer_name, supplier_name, date_add, date_upd, cache_*, indexed",
+        "PUT ZASTĘPUJE cały zasób - używaj wzorca GET-MODIFY-PUT",
+        "Multilang format: [['id' => lang_id, 'value' => text]]",
+        "CDATA wrapping wszystkich wartości w XML",
+        "manufacturer_name → id_manufacturer (lookup + auto-create)"
+      ],
+      "description": "PrestaShop API integration v2.0: Complete workflow (Auth, CRUD, Errors, Performance) + Product fields reference (7 required, 8 readonly, multilang, GET-MODIFY-PUT)"
     },
 
     "deployment-testing-cycle": {
@@ -894,6 +1041,153 @@
         ]
       },
       "description": "Hook creation: SessionStart, PreCompact, PostToolUse, PreToolUse templates with best practices"
+    },
+
+    "uve-visual-editor": {
+      "type": "domain",
+      "enforcement": "require",
+      "priority": "critical",
+      "promptTriggers": {
+        "keywords": [
+          "uve",
+          "visual editor",
+          "edytor wizualny",
+          "opis produktu",
+          "product description",
+          "css sync",
+          "css isolation",
+          "inline styles",
+          "css classes",
+          "prestashop description",
+          "uve-content",
+          "uve-s",
+          "css leaks",
+          "style sync",
+          "ftp css",
+          "custom.css",
+          "uve-custom",
+          "css specificity",
+          "scoped css",
+          "layout fix",
+          "pd-intro",
+          "pd-cover",
+          "bg-brand",
+          "product-description"
+        ],
+        "intentPatterns": [
+          "uve.*?(visual|editor|css|style)",
+          "visual.*?(editor|description)",
+          "(opis|description).*?(produkt|product).*?(edit|style|css)",
+          "css.*?(sync|isolation|leak|scope)",
+          "inline.*?style.*?(remove|migrate|convert)",
+          "(sync|upload).*?css.*?(prestashop|ftp)",
+          "prestashop.*?(description|css|style)",
+          "(edit|modify|update).*?uve",
+          "css.*?(class|hash|naming)",
+          "uve-s.*?hash",
+          "product.*?description.*?(css|style)",
+          "layout.*?fix.*?(css|prestashop)",
+          "(wrapper|scope).*?uve-content",
+          "css.*?validate.*?leak"
+        ]
+      },
+      "fileTriggers": {
+        "pathPatterns": [
+          "app/Services/VisualEditor/**/*.php",
+          "app/Http/Livewire/Products/VisualDescription/**/*.php",
+          "app/Jobs/VisualEditor/**/*.php",
+          "app/Console/Commands/*UveInlineStyles*.php"
+        ],
+        "contentPatterns": [
+          "CssSyncOrchestrator",
+          "UVE_CssClassGeneration",
+          "UVE_PropertyPanel",
+          "UVE_BlockManagement",
+          "InlineStyleMigrator",
+          "SyncProductCssJob",
+          "validateCssForLeaks",
+          "getLayoutFixCss",
+          "uve-content",
+          "uve-s",
+          "@uve-styles-start",
+          "css_rules",
+          "css_class_map",
+          "css_mode.*external"
+        ]
+      },
+      "criticalRules": [
+        "ZAKAZ: Inline styles (style=\"...\") - ZERO TOLERANCE!",
+        "ZAKAZ: Global :root variables for UVE - use .uve-content scoped",
+        "ZAKAZ: Unscoped selectors (.container, .btn, .nav, .breadcrumb)",
+        "ZAKAZ: inline_style_block mode - ONLY external mode!",
+        "ZAKAZ: Different CSS markers between components - UNIFIED markers only!",
+        "WYMAGANE: All CSS selectors scoped to .uve-content or .product-description",
+        "WYMAGANE: Per-style hash naming (.uve-s{hash})",
+        "WYMAGANE: validateCssForLeaks() before CSS sync",
+        "WYMAGANE: FULL REPLACE strategy (not append) with markers",
+        "WYMAGANE: Lock mechanism (Cache::lock) for sync safety",
+        "WYMAGANE: Backup and rollback on sync errors",
+        "WYMAGANE: forceFetch=true in fetchExistingCssWithValidation() - ALWAYS fresh from FTP!",
+        "WYMAGANE: Cache update after successful upload (cached_custom_css, css_last_fetched_at)",
+        "WYMAGANE: Unified markers: /* @uve-styles-start */ and /* @uve-styles-end */ in ALL components"
+      ],
+      "description": "UVE Visual Editor (CSS-First Architecture v2.3): Zero inline styles, CSS isolation, scoped selectors, per-style hash, sync safety (lock, backup, rollback), forceFetch, unified markers"
+    },
+
+    "settings-protection": {
+      "type": "safety",
+      "enforcement": "require",
+      "priority": "critical",
+      "promptTriggers": {
+        "keywords": [
+          "settings.json",
+          "settings.local.json",
+          "edycja ustawien",
+          "edit settings",
+          "clean settings",
+          "wyczysc ustawienia",
+          "hooks section",
+          "permissions section",
+          "skill permissions",
+          "mcp permissions",
+          "usuwanie hooks",
+          "remove hooks",
+          "backup settings",
+          "restore settings"
+        ],
+        "intentPatterns": [
+          "(edit|edytuj|modify|modyfikuj).*?(settings|ustawienia)",
+          "(clean|wyczysc|remove|usun).*?(settings|permissions|hooks)",
+          "(backup|restore|przywroc).*?(settings|ustawienia)",
+          "(hooks|permissions).*?(section|sekcja)",
+          "settings.*?(json|local|file|plik)",
+          "(Skill|mcp).*?permissions?"
+        ]
+      },
+      "fileTriggers": {
+        "pathPatterns": [
+          ".claude/settings.json",
+          ".claude/settings.local.json",
+          "C:/Users/*/\\.claude/settings.json",
+          "C:/Users/*/\\.claude/settings.local.json"
+        ],
+        "contentPatterns": [
+          "\"hooks\":",
+          "\"permissions\":",
+          "\"allow\":",
+          "Skill\\(",
+          "mcp__"
+        ]
+      },
+      "criticalRules": [
+        "ZAKAZ: Usuwania sekcji 'hooks' podczas edycji settings",
+        "ZAKAZ: Usuwania 'Skill(:*)' lub 'Skill(nazwa)' permissions",
+        "ZAKAZ: Usuwania 'mcp__*' permissions",
+        "WYMAGANE: Backup przed edycja settings (Copy-Item)",
+        "WYMAGANE: Walidacja po edycji (sprawdz hooks i permissions)",
+        "WYMAGANE: Uzyj MERGE zamiast REPLACE calego pliku"
+      ],
+      "description": "Settings protection: CHRONI hooks i skills permissions przed przypadkowym usunieciem podczas edycji/czyszczenia settings.json"
     }
   },
 

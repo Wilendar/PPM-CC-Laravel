@@ -479,7 +479,7 @@ class PrestaShop9Client extends BasePrestaShopClient
                 'display' => 'full',
             ]);
 
-            $response = $this->makeRequest('GET', "tax_rule_groups?{$queryParams}");
+            $response = $this->makeRequest('GET', "/tax_rule_groups?{$queryParams}");
 
             // PrestaShop API returns: {"tax_rule_groups": [{"id": 1, "name": {...}, "active": "1"}, ...]}
             $taxRuleGroups = [];

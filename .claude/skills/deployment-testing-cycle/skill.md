@@ -1,14 +1,6 @@
 ---
-name: deployment-testing-cycle
-description: Universal deployment-testing workflow for Laravel/Livewire applications. Use AUTOMATICALLY after ANY code creation, update, or refactoring - includes deploy to production, manual testing, plan updates, and continuous decision loop.
-version: 1.0.0
-author: Claude Code + User Workflow
-created: 2025-10-30
-updated: 2025-10-30
-category: workflow
-tags: [deployment, testing, production, laravel, livewire, workflow, cycle, mandatory]
-project: PPM-CC-Laravel
-auto_trigger: true
+name: "deployment-testing-cycle"
+description: "Universal deployment-testing workflow for Laravel/Livewire applications. Use AUTOMATICALLY after ANY code creation, update, or refactoring."
 ---
 
 # Deployment-Testing-Cycle Skill

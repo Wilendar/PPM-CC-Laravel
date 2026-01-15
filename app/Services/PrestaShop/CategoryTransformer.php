@@ -245,31 +245,61 @@ class CategoryTransformer
             $descriptionEN = $this->extractMultilangValue($prestashopCategory, 'description', 2);
 
             // Map parent category (recursive mapping)
+            // FIX 2025-12-22: DO NOT hardcode id=2! Find "Wszystko" dynamically
             $parentId = null;
+
+            // Helper: Find "Wszystko" category dynamically (level=1 = child of root "Baza")
+            $getWszystkoId = function () {
+                $wszystko = Category::where('name', 'Wszystko')
+                    ->where('level', 1)
+                    ->first();
+                return $wszystko?->id;
+            };
+
             if (isset($prestashopCategory['id_parent'])) {
                 $prestashopParentId = (int) $prestashopCategory['id_parent'];
 
-                // PrestaShop root categories have id_parent = 1 or 2
-                // id_parent = 1: Root of all categories
-                // id_parent = 2: Home category (default parent for root categories)
-                if ($prestashopParentId > 2) {
+                // PrestaShop root categories:
+                // id_parent = 1: Root of all categories → PPM: null (root)
+                // id_parent = 2: Home category (Wszystko) → PPM: "Wszystko" (level=1)
+                // id_parent > 2: Specific category → Map via CategoryMapper
+
+                if ($prestashopParentId === 2) {
+                    // PrestaShop Home (id=2) → PPM "Wszystko" (level=1)
+                    // Categories with id_parent=2 in PrestaShop are children of "Home/Wszystko"
+                    $parentId = $getWszystkoId();
+
+                    Log::debug('PrestaShop id_parent=2 mapped to PPM "Wszystko"', [
+                        'prestashop_category_id' => $prestashopCategory['id'],
+                        'shop_id' => $shop->id,
+                        'wszystko_id' => $parentId,
+                    ]);
+                } elseif ($prestashopParentId > 2) {
                     // Map parent category from PrestaShop ID to PPM ID
                     $parentId = $this->categoryMapper->mapFromPrestaShop($prestashopParentId, $shop);
 
                     if ($parentId === null) {
-                        Log::warning('PrestaShop parent category not mapped to PPM', [
+                        // Fallback to "Wszystko" if parent not mapped
+                        $parentId = $getWszystkoId();
+
+                        Log::warning('PrestaShop parent category not mapped to PPM - using Wszystko fallback', [
                             'prestashop_category_id' => $prestashopCategory['id'],
                             'prestashop_parent_id' => $prestashopParentId,
                             'shop_id' => $shop->id,
+                            'fallback_parent_id' => $parentId,
                         ]);
                     }
                 }
+                // id_parent = 1 → parentId remains null (root in PPM hierarchy, but will get default in import)
             }
 
             // Build PPM category data
             $ppmCategory = [
                 // Identifiers
                 'prestashop_category_id' => (int) ($prestashopCategory['id'] ?? 0),
+
+                // FIX 2025-12-09: Include original PrestaShop parent ID for root detection
+                'prestashop_parent_id' => (int) ($prestashopCategory['id_parent'] ?? 0),
 
                 // Names (multilingual)
                 'name' => $namePL ?? 'Unnamed Category',

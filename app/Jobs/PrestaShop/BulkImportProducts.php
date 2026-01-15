@@ -15,6 +15,7 @@ use App\Services\PrestaShop\PrestaShopClientFactory;
 use App\Services\PrestaShop\PrestaShopImportService;
 use App\Services\JobProgressService;
 use App\Models\CategoryPreview;
+use App\Jobs\Media\SyncMediaFromPrestaShop;
 
 /**
  * BulkImportProducts Job - Import products from PrestaShop to PPM-CC-Laravel
@@ -301,10 +302,36 @@ class BulkImportProducts implements ShouldQueue
                 'progress_id' => $progressId,
             ]);
 
+            // ETAP_07c FAZA 2: Collect sample SKUs for progress bar display (first 5)
+            $sampleSkus = [];
+            foreach (array_slice($productsToImport, 0, 5) as $sampleProduct) {
+                $sku = $sampleProduct['reference'] ?? null;
+                if ($sku) {
+                    $sampleSkus[] = $sku;
+                }
+            }
+
+            // Store sample SKUs in metadata for accordion display
+            if ($progressId && !empty($sampleSkus)) {
+                $progressService->updateMetadata($progressId, [
+                    'sample_skus' => $sampleSkus,
+                    'mode' => $this->mode,
+                    'import_mode' => $this->options['import_mode'] ?? 'all',
+                ]);
+            }
+
             $imported = 0;
             $updated = 0;
             $skipped = 0;
             $errors = [];
+
+            // FIX 2025-12-22: Extended counters for detailed Result Summary
+            $categoriesAssigned = 0;
+            $featuresImported = 0;
+            $variantsImported = 0;
+            $typesDetected = 0;
+            $compatibilitiesImported = 0;
+            $mediaSynced = 0;
 
             foreach ($productsToImport as $index => $psProduct) {
                 try {
@@ -319,15 +346,32 @@ class BulkImportProducts implements ShouldQueue
 
                     $result = $this->importProduct($prestashopProductId, $sku, $importService);
 
-                    if ($result === 'imported') {
+                    // FIX 2025-12-22: Handle both legacy string and new array result
+                    if (is_array($result)) {
+                        $status = $result['status'] ?? 'unknown';
+                        $categoriesAssigned += $result['categories_count'] ?? 0;
+                        $featuresImported += $result['features_count'] ?? 0;
+                        $variantsImported += $result['variants_count'] ?? 0;
+                        $compatibilitiesImported += $result['compatibilities_count'] ?? 0;
+                        if (!empty($result['type_detected'])) {
+                            $typesDetected++;
+                        }
+                        if (!empty($result['media_synced'])) {
+                            $mediaSynced++;
+                        }
+                    } else {
+                        $status = $result;
+                    }
+
+                    if ($status === 'imported') {
                         $imported++;
-                    } elseif ($result === 'updated') {
+                    } elseif ($status === 'updated') {
                         $updated++;
-                    } elseif (str_starts_with($result, 'skipped_')) {
+                    } elseif (str_starts_with($status, 'skipped_')) {
                         $skipped++;
 
                         // Add skip reason to errors for user visibility
-                        $skipReason = match($result) {
+                        $skipReason = match($status) {
                             'skipped_no_id' => 'Brak ID produktu PrestaShop',
                             'skipped_no_sku' => 'Brak SKU w danych PrestaShop',
                             default => 'Pominięto z nieznanego powodu'
@@ -393,12 +437,20 @@ class BulkImportProducts implements ShouldQueue
             }
 
             // 📊 MARK AS COMPLETED with summary + warning message
+            // FIX 2025-12-22: Extended Result Summary with detailed import stats
             if ($progressId) {
                 $summary = [
                     'imported' => $imported,
                     'updated' => $updated,
                     'skipped' => $skipped,
                     'execution_time_ms' => $executionTime,
+                    // Extended stats
+                    'categories_assigned' => $categoriesAssigned,
+                    'features_imported' => $featuresImported,
+                    'variants_imported' => $variantsImported,
+                    'types_detected' => $typesDetected,
+                    'compatibilities_imported' => $compatibilitiesImported,
+                    'media_synced' => $mediaSynced,
                 ];
 
                 // Add warning message to summary if zero imported/updated
@@ -410,6 +462,7 @@ class BulkImportProducts implements ShouldQueue
             }
 
             // FIX 2025-11-25: Update SyncJob progress and complete
+            // FIX 2025-12-22: Extended Result Summary
             $syncJob?->updateProgress(
                 processedItems: $total,
                 successfulItems: $imported + $updated,
@@ -421,6 +474,13 @@ class BulkImportProducts implements ShouldQueue
                 'skipped' => $skipped,
                 'errors_count' => count($errors),
                 'execution_time_ms' => $executionTime,
+                // Extended stats for detailed Result Summary
+                'categories_assigned' => $categoriesAssigned,
+                'features_imported' => $featuresImported,
+                'variants_imported' => $variantsImported,
+                'types_detected' => $typesDetected,
+                'compatibilities_imported' => $compatibilitiesImported,
+                'media_synced' => $mediaSynced,
             ]);
 
             Log::info('BulkImportProducts job completed', [
@@ -436,6 +496,13 @@ class BulkImportProducts implements ShouldQueue
                 'execution_time_ms' => $executionTime,
                 'execution_time_readable' => round($executionTime / 1000, 2) . 's',
                 'progress_id' => $progressId,
+                // Extended stats
+                'categories_assigned' => $categoriesAssigned,
+                'features_imported' => $featuresImported,
+                'variants_imported' => $variantsImported,
+                'types_detected' => $typesDetected,
+                'compatibilities_imported' => $compatibilitiesImported,
+                'media_synced' => $mediaSynced,
             ]);
 
         } catch (\Exception $e) {
@@ -772,14 +839,14 @@ class BulkImportProducts implements ShouldQueue
         int $prestashopProductId,
         ?string $sku,
         PrestaShopImportService $importService
-    ): string
+    ): array
     {
         if (!$prestashopProductId) {
             Log::warning('Product without PrestaShop ID - skipped', [
                 'shop_id' => $this->shop->id,
                 'sku' => $sku,
             ]);
-            return 'skipped_no_id';
+            return ['status' => 'skipped_no_id'];
         }
 
         if (!$sku) {
@@ -787,7 +854,7 @@ class BulkImportProducts implements ShouldQueue
                 'shop_id' => $this->shop->id,
                 'prestashop_product_id' => $prestashopProductId,
             ]);
-            return 'skipped_no_sku';
+            return ['status' => 'skipped_no_sku'];
         }
 
         // Check if product already exists (for logging purposes)
@@ -804,10 +871,22 @@ class BulkImportProducts implements ShouldQueue
             // 5. Stock records (if Stock model exists)
             // 6. Product categories (CRITICAL FIX: syncProductCategories works for UPDATE!)
             // 7. SyncLog audit entry
+            // 8. Product variants/combinations (if import_with_variants=true)
+            $importWithVariants = $this->options['import_with_variants'] ?? false;
+
             $product = $importService->importProductFromPrestaShop(
                 $prestashopProductId,
-                $this->shop
+                $this->shop,
+                $importWithVariants
             );
+
+            // FIX 2025-12-22: Collect extended stats for Result Summary
+            $categoriesCount = $product->categories()->count();
+            $featuresCount = $product->features()->count();
+            $variantsCount = $product->variants()->count();
+            // FIX 2025-12-22: Use correct relation name (vehicleCompatibility not compatibilities)
+            $compatibilitiesCount = $product->vehicleCompatibility()->count();
+            $typeDetected = $product->product_type_id !== null;
 
             Log::info($isUpdate ? 'Product updated successfully' : 'Product imported successfully', [
                 'shop_id' => $this->shop->id,
@@ -817,9 +896,25 @@ class BulkImportProducts implements ShouldQueue
                 'ppm_id' => $product->id,
                 'product_name' => $product->name,
                 'operation' => $isUpdate ? 'update' : 'create',
+                'categories_count' => $categoriesCount,
+                'features_count' => $featuresCount,
+                'variants_count' => $variantsCount,
+                'type_detected' => $typeDetected,
             ]);
 
-            return $isUpdate ? 'updated' : 'imported';
+            // 🆕 ETAP_07d: Dispatch media sync if enabled in options
+            $mediaSynced = $this->dispatchMediaSync($product);
+
+            // FIX 2025-12-22: Return array with extended data for Result Summary
+            return [
+                'status' => $isUpdate ? 'updated' : 'imported',
+                'categories_count' => $categoriesCount,
+                'features_count' => $featuresCount,
+                'variants_count' => $variantsCount,
+                'compatibilities_count' => $compatibilitiesCount,
+                'type_detected' => $typeDetected,
+                'media_synced' => $mediaSynced,
+            ];
 
         } catch (\Exception $e) {
             Log::error('Failed to import/update product via PrestaShopImportService', [
@@ -918,5 +1013,52 @@ class BulkImportProducts implements ShouldQueue
         ]);
 
         // TODO: Send failure notification to user
+    }
+
+    /**
+     * Dispatch media sync job for imported product (ETAP_07d)
+     *
+     * Pulls images from PrestaShop if:
+     * - 'sync_media' option is enabled (default: true)
+     * - Product was successfully imported/updated
+     *
+     * @param Product $product Imported product
+     */
+    protected function dispatchMediaSync(Product $product): void
+    {
+        // Check if media sync is enabled (default: true for imports)
+        $syncMedia = $this->options['sync_media'] ?? true;
+
+        if (!$syncMedia) {
+            Log::debug('Media sync disabled for this import', [
+                'product_id' => $product->id,
+                'sku' => $product->sku,
+            ]);
+            return;
+        }
+
+        try {
+            // Dispatch async job to pull images from PrestaShop
+            SyncMediaFromPrestaShop::dispatch(
+                $product->id,
+                $this->shop->id,
+                auth()->id() ?? 1
+            );
+
+            Log::info('Media sync job dispatched for imported product', [
+                'product_id' => $product->id,
+                'sku' => $product->sku,
+                'shop_id' => $this->shop->id,
+            ]);
+
+        } catch (\Exception $e) {
+            // Don't fail import if media sync dispatch fails
+            Log::warning('Failed to dispatch media sync job (non-fatal)', [
+                'product_id' => $product->id,
+                'sku' => $product->sku,
+                'shop_id' => $this->shop->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 }

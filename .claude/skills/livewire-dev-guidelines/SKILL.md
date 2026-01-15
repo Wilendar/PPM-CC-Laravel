@@ -1,10 +1,15 @@
+---
+name: "livewire-dev-guidelines"
+description: "Livewire 3.x development patterns and best practices for PPM project."
+---
+
 # Livewire Development Guidelines
 
 **Type:** domain
 **Enforcement:** require
 **Priority:** critical
-**Version:** 1.0.0
-**Last Updated:** 2025-11-04
+**Version:** 1.1.0
+**Last Updated:** 2026-01-08
 
 ---
 

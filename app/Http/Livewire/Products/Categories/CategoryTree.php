@@ -219,6 +219,34 @@ class CategoryTree extends Component
      */
     public $mergeWarnings = [];
 
+    /**
+     * Show bulk delete confirmation modal
+     *
+     * @var bool
+     */
+    public $showBulkDeleteModal = false;
+
+    /**
+     * Warnings for bulk delete (products, children)
+     *
+     * @var array
+     */
+    public $bulkDeleteWarnings = [];
+
+    /**
+     * Categories to bulk delete (after confirmation)
+     *
+     * @var array
+     */
+    public $categoriesToBulkDelete = [];
+
+    /**
+     * Force bulk delete (include categories with children/products)
+     *
+     * @var bool
+     */
+    public $forceBulkDelete = false;
+
     // ==========================================
     // LIVEWIRE LIFECYCLE METHODS
     // ==========================================
@@ -482,6 +510,35 @@ class CategoryTree extends Component
         $this->selectedCategories = [];
     }
 
+    /**
+     * Toggle select/deselect all visible categories
+     *
+     * CRITICAL: This method provides deterministic toggle behavior
+     * - If ANY categories are selected → deselect ALL
+     * - If NO categories are selected → select ALL
+     *
+     * This prevents the "random checkbox" bug caused by:
+     * - Conditional wire:click that checks count equality
+     * - Race conditions between UI state and Livewire state
+     */
+    public function toggleSelectAll(): void
+    {
+        // Get current visible category IDs
+        $visibleCategoryIds = $this->categories->pluck('id')->toArray();
+        $totalVisible = count($visibleCategoryIds);
+        $currentlySelected = count($this->selectedCategories);
+
+        // Correct logic: if ALL are selected → deselect all, otherwise → select all
+        // This ensures "Select All" always selects everything unless everything is already selected
+        if ($currentlySelected === $totalVisible && $totalVisible > 0) {
+            // All are selected - deselect everything
+            $this->selectedCategories = [];
+        } else {
+            // Not all selected (including partial selection) - select all visible
+            $this->selectedCategories = $visibleCategoryIds;
+        }
+    }
+
     // ==========================================
     // CATEGORY CRUD OPERATIONS
     // ==========================================
@@ -518,6 +575,60 @@ class CategoryTree extends Component
             'default_values' => null,
         ];
         $this->showModal = true;
+    }
+
+    /**
+     * Save category from inline form (quick add)
+     * FAZA 2 ETAP_15 - Inline Insert functionality
+     *
+     * @param string $name
+     * @param string $description
+     * @param int|null $parentId
+     */
+    public function saveInlineCategory(string $name, string $description, ?int $parentId = null): void
+    {
+        $name = trim($name);
+
+        if (empty($name)) {
+            session()->flash('error', 'Nazwa kategorii jest wymagana.');
+            return;
+        }
+
+        try {
+            // Validate max depth
+            if ($parentId) {
+                $parent = Category::find($parentId);
+                if ($parent && $parent->level >= Category::MAX_LEVEL) {
+                    session()->flash('error', 'Nie można utworzyć kategorii - przekroczono maksymalną głębokość drzewa.');
+                    return;
+                }
+            }
+
+            DB::transaction(function () use ($name, $description, $parentId) {
+                $category = Category::create([
+                    'parent_id' => $parentId,
+                    'name' => $name,
+                    'description' => !empty($description) ? $description : null,
+                    'is_active' => true,
+                    'sort_order' => 0,
+                ]);
+
+                // Auto-expand parent node to show new category
+                if ($category->parent_id && !in_array($category->parent_id, $this->expandedNodes)) {
+                    $this->expandedNodes[] = $category->parent_id;
+                }
+
+                session()->flash('message', "Kategoria \"{$name}\" została utworzona.");
+            });
+
+        } catch (\Exception $e) {
+            Log::error('saveInlineCategory error', [
+                'name' => $name,
+                'parentId' => $parentId,
+                'error' => $e->getMessage(),
+            ]);
+            session()->flash('error', 'Błąd podczas tworzenia kategorii: ' . $e->getMessage());
+        }
     }
 
     /**
@@ -675,9 +786,9 @@ class CategoryTree extends Component
                 return;
             }
 
-            // Safe to delete without force
+            // Safe to delete - use forceDelete to permanently remove from DB
             DB::transaction(function () use ($category) {
-                $category->delete();
+                $category->forceDelete();
             });
 
             // Remove from selections and expanded nodes
@@ -974,8 +1085,8 @@ class CategoryTree extends Component
                         continue;
                     }
 
-                    // Safe to delete
-                    $category->delete();
+                    // Safe to delete - use forceDelete to permanently remove from DB
+                    $category->forceDelete();
                     $deleted++;
                 }
             });
@@ -1005,6 +1116,159 @@ class CategoryTree extends Component
 
             session()->flash('error', 'Błąd podczas usuwania kategorii: ' . $e->getMessage());
         }
+    }
+
+    /**
+     * Show bulk delete confirmation modal with warnings
+     *
+     * Analyzes selected categories and shows modal with:
+     * - List of categories to delete
+     * - Warnings about products/children
+     * - Option to force delete (with children)
+     * - Confirmation button
+     */
+    public function showBulkDeleteConfirmation(): void
+    {
+        if (empty($this->selectedCategories)) {
+            session()->flash('error', 'Nie wybrano zadnych kategorii.');
+            return;
+        }
+
+        $this->bulkDeleteWarnings = [];
+        $this->categoriesToBulkDelete = [];
+        $this->forceBulkDelete = false; // Reset force flag
+
+        foreach ($this->selectedCategories as $categoryId) {
+            $category = Category::withCount(['products', 'children'])->find($categoryId);
+
+            if (!$category) {
+                continue;
+            }
+
+            // Count all descendants (not just direct children)
+            $descendantsCount = $category->descendants->count();
+
+            $warning = [
+                'id' => $category->id,
+                'name' => $category->name,
+                'level' => $category->level,
+                'products_count' => $category->products_count,
+                'children_count' => $category->children_count,
+                'descendants_count' => $descendantsCount,
+                'can_delete' => ($category->products_count == 0 && $category->children_count == 0),
+            ];
+
+            $this->bulkDeleteWarnings[] = $warning;
+            $this->categoriesToBulkDelete[] = $categoryId;
+        }
+
+        $this->showBulkDeleteModal = true;
+    }
+
+    /**
+     * Confirm bulk delete - execute permanent deletion
+     *
+     * If forceBulkDelete is true, dispatches BulkDeleteCategoriesJob
+     * which handles cascade deletion of children and products.
+     */
+    public function confirmBulkDelete(): void
+    {
+        $this->showBulkDeleteModal = false;
+
+        if ($this->forceBulkDelete) {
+            // Use Job for force delete (handles children recursively)
+            $this->executeForceBulkDelete();
+        } else {
+            // Standard bulk delete (only empty categories)
+            $this->bulkDelete();
+        }
+
+        // Clear warnings and state
+        $this->bulkDeleteWarnings = [];
+        $this->categoriesToBulkDelete = [];
+        $this->forceBulkDelete = false;
+    }
+
+    /**
+     * Execute force bulk delete via Job
+     *
+     * Uses BulkDeleteCategoriesJob to handle cascade deletion
+     * of categories with children and products.
+     */
+    private function executeForceBulkDelete(): void
+    {
+        if (empty($this->categoriesToBulkDelete)) {
+            session()->flash('error', 'Nie wybrano żadnych kategorii do usunięcia.');
+            return;
+        }
+
+        try {
+            // Generate unique job ID for progress tracking
+            $jobId = (string) \Illuminate\Support\Str::uuid();
+
+            // Calculate total count (categories + all descendants)
+            $totalCount = 0;
+            foreach ($this->categoriesToBulkDelete as $categoryId) {
+                $category = Category::find($categoryId);
+                if ($category) {
+                    $totalCount += 1 + $category->descendants->count();
+                }
+            }
+
+            // Create PENDING progress record
+            $progress = \App\Models\JobProgress::create([
+                'job_id' => $jobId,
+                'job_type' => 'category_delete',
+                'shop_id' => null,
+                'status' => 'pending',
+                'current_count' => 0,
+                'total_count' => $totalCount,
+                'error_count' => 0,
+                'error_details' => [],
+                'started_at' => now(),
+            ]);
+
+            // Save progress ID for UI
+            $this->deleteProgressId = $progress->id;
+
+            Log::info('CategoryTree: Starting force bulk delete', [
+                'job_id' => $jobId,
+                'progress_id' => $progress->id,
+                'categories' => $this->categoriesToBulkDelete,
+                'total_count' => $totalCount,
+            ]);
+
+            // Dispatch Job with force=true
+            \App\Jobs\Categories\BulkDeleteCategoriesJob::dispatch(
+                $this->categoriesToBulkDelete,
+                true, // force delete
+                $jobId
+            );
+
+            // Clear selection
+            $this->selectedCategories = [];
+
+            session()->flash('info', "Proces usuwania {$totalCount} kategorii rozpoczęty. Postęp zobaczysz poniżej.");
+
+        } catch (\Exception $e) {
+            Log::error('CategoryTree: Error starting force bulk delete', [
+                'error' => $e->getMessage(),
+                'categories' => $this->categoriesToBulkDelete
+            ]);
+
+            session()->flash('error', 'Błąd podczas uruchamiania usuwania: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Cancel bulk delete - close modal
+     */
+    public function cancelBulkDelete(): void
+    {
+        $this->showBulkDeleteModal = false;
+        $this->bulkDeleteWarnings = [];
+        $this->categoriesToBulkDelete = [];
+        $this->forceBulkDelete = false;
     }
 
     /**
@@ -1453,8 +1717,8 @@ class CategoryTree extends Component
                     }
                 }
 
-                // 3. Delete source category (safe now - no products/children)
-                $sourceCategory->delete();
+                // 3. Delete source category permanently (safe now - no products/children)
+                $sourceCategory->forceDelete();
             });
 
             // Remove from selections and expanded nodes

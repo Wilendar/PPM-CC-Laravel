@@ -82,7 +82,7 @@
                                            min="0"
                                            wire:model.defer="prices.{{ $groupId }}.net"
                                            @input="calculateGross($event.target.value, {{ $groupId }})"
-                                           class="w-full bg-gray-700 border border-gray-600 text-white text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 p-2"
+                                           class="w-full bg-gray-700 border border-gray-600 text-white text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 px-3 py-2"
                                            placeholder="0.00">
                                 </td>
 
@@ -93,7 +93,7 @@
                                            min="0"
                                            wire:model.defer="prices.{{ $groupId }}.gross"
                                            @input="calculateNet($event.target.value, {{ $groupId }})"
-                                           class="w-full bg-gray-700 border border-gray-600 text-white text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 p-2"
+                                           class="w-full bg-gray-700 border border-gray-600 text-white text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 px-3 py-2"
                                            placeholder="0.00">
                                 </td>
 

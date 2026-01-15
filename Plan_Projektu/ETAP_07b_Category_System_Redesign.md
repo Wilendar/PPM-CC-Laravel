@@ -1,11 +1,12 @@
 # ETAP_07b: Category System Redesign
 
-**Status**: 🛠️ **W TRAKCIE** (FAZA 1-3 + 2 BUGFIXY COMPLETED, FAZA 4 IN PROGRESS 40.6%)
+**Status**: 🛠️ **W TRAKCIE** (FAZA 1-3 + 2 BUGFIXY COMPLETED, FAZA 4 IN PROGRESS 81.8%)
 **Priority**: WYSOKI (Blocks proper category management)
 **Estimated Time**: 40-60h (4 FAZY)
 **Dependencies**: ETAP_07 (PrestaShop API), ETAP_05 (Products), ETAP_13 (Sync Panel)
 **Started**: 2025-11-19
-**Current Phase**: FAZA 4 - Category Management UI (4.2 UI Controls remaining)
+**Current Phase**: FAZA 4.2.3 - Utwórz nową kategorię (modal + PrestaShop API)
+**Last Update**: 2025-11-26 - Zaimplementowano kontrolki kategorii (wyszukiwarka, zwiń/rozwiń, odznacz)
 
 ---
 
@@ -289,27 +290,61 @@ Current category system has **FUNDAMENTAL ARCHITECTURAL FLAW**:
         ✅ 4.1.1.4 Primary category indicator (radio button)
             └── PLIK: resources/views/livewire/products/management/partials/category-tree-item.blade.php (isPrimary, "Główna"/"Ustaw główną" buttons)
 
-### ❌ 4.2 UI Controls (NOT in ProductForm yet - exist in separate components)
-#### ❌ 4.2.1 Zwiń/Rozwiń wszystkie
-        ❌ 4.2.1.1 Add button to collapse all nodes
-        ❌ 4.2.1.2 Add button to expand all nodes
-        ❌ 4.2.1.3 Remember state per user (localStorage)
-        ⚠️ NOTE: Istnieje w category-tree-ultra-clean.blade.php ale NIE w ProductForm
+### 🛠️ 4.2 UI Controls (COMPLETED 2025-11-26 - except 4.2.3 Create Category)
 
-#### ❌ 4.2.2 Odznacz wszystkie
-        ❌ 4.2.2.1 Add button to clear shop selection
-        ❌ 4.2.2.2 Show confirmation dialog
-        ❌ 4.2.2.3 Inherit from default after clearing
-        ⚠️ NOTE: Istnieje w category-tree-ultra-clean.blade.php ale NIE w ProductForm
+**⚠️ CRITICAL:** Wszystkie kontrolki muszą być dostępne ZARÓWNO w:
+- **Default TAB** (dane domyślne produktu) - operuje na PPM categories ✅
+- **Shop TAB** (dane per sklep) - operuje na PrestaShop categories via shop_mappings ✅
 
-#### ❌ 4.2.3 Utwórz nową kategorię
+#### ✅ 4.2.1 Zwiń/Rozwiń wszystkie (COMPLETED 2025-11-26)
+        ✅ 4.2.1.1 Add button to collapse all nodes
+            └── PLIK: resources/views/livewire/products/management/partials/category-controls.blade.php
+        ✅ 4.2.1.2 Add button to expand all nodes
+            └── PLIK: resources/views/livewire/products/management/partials/category-controls.blade.php
+        ⚠️ 4.2.1.3 Remember state per user (localStorage) - DEFERRED (nice-to-have)
+        ✅ 4.2.1.4 Implement in Default TAB (PPM categories)
+            └── PLIK: resources/views/livewire/products/management/tabs/basic-tab.blade.php
+        ✅ 4.2.1.5 Implement in Shop TAB (PrestaShop categories)
+            └── PLIK: resources/views/livewire/products/management/tabs/basic-tab.blade.php (context-aware)
+
+#### ✅ 4.2.2 Odznacz wszystkie (COMPLETED 2025-11-26)
+        ✅ 4.2.2.1 Add button to clear selection
+            └── PLIK: resources/views/livewire/products/management/partials/category-controls.blade.php
+        ✅ 4.2.2.2 Show confirmation dialog (Shop TAB only)
+            └── PLIK: resources/views/livewire/products/management/partials/category-controls.blade.php (Alpine.js showClearConfirm)
+        ✅ 4.2.2.3 Inherit from default after clearing (tylko Shop TAB) - clears shop-specific
+        ✅ 4.2.2.4 Implement in Default TAB (czyści wszystkie PPM kategorie)
+            └── PLIK: app/Http/Livewire/Products/Management/ProductForm.php (clearCategorySelection)
+        ✅ 4.2.2.5 Implement in Shop TAB (czyści shop-specific)
+            └── PLIK: app/Http/Livewire/Products/Management/ProductForm.php (clearCategorySelection)
+
+#### ❌ 4.2.3 Utwórz nową kategorię (NOT IMPLEMENTED - requires modal + PS API)
         ❌ 4.2.3.1 Add button to open modal
-        ❌ 4.2.3.2 Modal shows PrestaShop category tree
+            ⚠️ Button exists but dispatches event to non-existent modal
+        ❌ 4.2.3.2 Modal shows PrestaShop category tree (tylko Shop TAB - tworzy w PS)
         ❌ 4.2.3.3 User selects parent category
         ❌ 4.2.3.4 User enters new category name (multi-lang)
         ❌ 4.2.3.5 Creates in PrestaShop + PPM + shop_mappings
-        ❌ 4.2.3.6 Modal korzysta z istniejącej warstwy domenowej: po utworzeniu kategorii w PrestaShop (dedykowany serwis PS, jeżeli istnieje) wywołuje CategoryAutoCreateService + CategoryCreationJob (lub dedykowaną metodę) do wpisu w categories + shop_mappings
-        ❌ 4.2.3.7 Po sukcesie: PrestaShopCategoryService::clearCache() + Livewire $refresh wymusza odświeżenie drzewa i spójność z mapowaniami
+        ❌ 4.2.3.6 Modal korzysta z CategoryAutoCreateService + CategoryCreationJob
+        ❌ 4.2.3.7 Po sukcesie: PrestaShopCategoryService::clearCache() + Livewire $refresh
+        ⚠️ NOTE: Ta funkcja dostępna TYLKO w Shop TAB (tworzenie w PrestaShop)
+
+#### ✅ 4.2.4 Wyszukiwarka kategorii po nazwie (COMPLETED 2025-11-26)
+        ✅ 4.2.4.1 Add search input field above category tree
+            └── PLIK: resources/views/livewire/products/management/partials/category-controls.blade.php
+        ✅ 4.2.4.2 Implement real-time filtering (Alpine.js x-model)
+            └── PLIK: resources/views/livewire/products/management/partials/category-tree-item.blade.php (category-search event)
+        ✅ 4.2.4.3 Highlight matching categories
+            └── PLIK: resources/css/admin/components.css (.category-highlighted class)
+        ✅ 4.2.4.4 Auto-expand parents of matching categories
+            └── PLIK: resources/views/livewire/products/management/partials/category-tree-item.blade.php (collapsed = false on match)
+        ⚠️ 4.2.4.5 Show "Brak wyników" when no match - DEFERRED (CSS hides non-matching)
+        ✅ 4.2.4.6 Implement in Default TAB (search PPM categories)
+            └── PLIK: category-controls context='default'
+        ✅ 4.2.4.7 Implement in Shop TAB (search PrestaShop categories)
+            └── PLIK: category-controls context=shopId
+        ✅ 4.2.4.8 Clear search button (X icon)
+            └── PLIK: resources/views/livewire/products/management/partials/category-controls.blade.php
 
 ### ✅ 4.3 ProductForm Integration (COMPLETED - uses category-tree-item.blade.php)
 #### ✅ 4.3.1 Replace old category UI
@@ -346,7 +381,7 @@ Current category system has **FUNDAMENTAL ARCHITECTURAL FLAW**:
 
 ## 📊 PROGRESS SUMMARY
 
-**ETAP Status:** 🛠️ W TRAKCIE (3/4 FAZY + 2 BUGFIXY completed, FAZA 4 częściowo ukończona)
+**ETAP Status:** 🛠️ W TRAKCIE (3/4 FAZY + 2 BUGFIXY completed, FAZA 4 prawie ukończona)
 
 **Completion:**
 - FAZA 1: ✅ **COMPLETED** - 13/13 tasks (100%) - User confirmed "działa idealnie" 2025-11-19
@@ -354,24 +389,22 @@ Current category system has **FUNDAMENTAL ARCHITECTURAL FLAW**:
 - FAZA 3: ✅ **COMPLETED** - 15/15 tasks (100%) - DEPLOYED to production 2025-11-19
 - BUGFIX (FIX #7 + #8): ✅ **COMPLETED** - 13/13 tasks (100%) - Chrome DevTools verified 2025-11-21
 - BUGFIX (FIX #9): ✅ **COMPLETED** - 14/14 tasks (100%) - Root Categories Auto-Repair verified 2025-11-25
-- FAZA 4: 🛠️ **IN PROGRESS** - 13/32 tasks (40.6%)
+- FAZA 4: 🛠️ **IN PROGRESS** - 36/44 tasks (81.8%)
   - ✅ 4.1 CategoryTree Component: 4/4 (100%) - already integrated
-  - ❌ 4.2 UI Controls: 0/13 (0%) - buttons not in ProductForm
+  - 🛠️ 4.2 UI Controls: 18/25 (72%) - 4.2.1, 4.2.2, 4.2.4 COMPLETED, 4.2.3 pending
   - ✅ 4.3 ProductForm Integration: 3/3 (100%) - uses category-tree-item
-  - 🛠️ 4.4 Testing: 3/9 (33%) - partial via BUGFIX verification
+  - 🛠️ 4.4 Testing: 5/9 (55.5%) - partial via Chrome DevTools verification
   - ✅ 4.5 Kontrakt stanu UI: 3/3 (100%) - verified in BUGFIX
 
 Bugfixy są integralną częścią stabilnej wersji ETAP_07b:
 - FIX #7+#8: uproszczony kontrakt isCategoryEditingDisabled() + brak wire:loading.attr w drzewie kategorii
 - FIX #9: 3-warstwowa ochrona root categories (Import/Pull/Load) + auto-repair przy ładowaniu danych
 
-**Total:** 75/94 tasks (79.8%)
+**Total:** 98/106 tasks (92.5%)
 
-**Remaining for FAZA 4:**
-- 4.2.1 Zwiń/Rozwiń wszystkie - dodać do ProductForm (istnieje w oddzielnych komponentach)
-- 4.2.2 Odznacz wszystkie - dodać do ProductForm
-- 4.2.3 Utwórz nową kategorię - nowa funkcjonalność (modal + PS API)
-- 4.4.2 Testy tworzenia kategorii - po implementacji 4.2.3
+**Remaining for FAZA 4 (8 tasks):**
+- 4.2.3 Utwórz nową kategorię (7 tasks) - modal + PS API (tylko Shop TAB)
+- 4.4.2 Testy tworzenia kategorii (5 tasks) - po implementacji 4.2.3
 
 ---
 
@@ -389,9 +422,19 @@ Bugfixy są integralną częścią stabilnej wersji ETAP_07b:
 2. ✅ **FAZA 1** - PrestaShop Category API Integration - **COMPLETED** 2025-11-19 (User: "działa idealnie")
 3. ✅ **FAZA 2** - Category Validator - **COMPLETED** 2025-11-19 (All tests PASSED)
 4. ✅ **FAZA 3** - Auto-Create Missing Categories - **COMPLETED** 2025-11-19 (DEPLOYED to production)
-5. 🛠️ **FAZA 4** - Category Management UI (12-16h) - **IN PROGRESS** (40.6%)
-   - ✅ 4.1, 4.3, 4.5 - CategoryTree component + ProductForm integration + kontrakt UI
-   - ⏳ **NEXT:** 4.2 UI Controls (Zwiń/Rozwiń, Odznacz wszystkie, Utwórz nową) - add to ProductForm
+5. 🛠️ **FAZA 4** - Category Management UI (12-16h) - **IN PROGRESS** (81.8%)
+   - ✅ 4.1 CategoryTree component - COMPLETED (already integrated)
+   - ✅ 4.2.1 Zwiń/Rozwiń wszystkie - COMPLETED 2025-11-26
+   - ✅ 4.2.2 Odznacz wszystkie - COMPLETED 2025-11-26
+   - ❌ **4.2.3 Utwórz nową kategorię** - PENDING (modal + PrestaShop API)
+   - ✅ 4.2.4 Wyszukiwarka kategorii po nazwie - COMPLETED 2025-11-26
+   - ✅ 4.3 ProductForm Integration - COMPLETED
+   - ✅ 4.5 Kontrakt stanu UI - COMPLETED
+
+   **⏳ NEXT:** 4.2.3 - Modal tworzenia nowej kategorii w PrestaShop:
+   - Button "Nowa" już istnieje (dispatchuje event 'openCreateCategoryModal')
+   - Wymaga: Modal UI, PrestaShop category tree, parent selection, name input (multi-lang)
+   - Integracja z CategoryAutoCreateService + CategoryCreationJob
 
 ### FAZA 1 Deliverables (COMPLETED):
 - ✅ PrestaShop category API integration via existing PrestaShopCategoryService

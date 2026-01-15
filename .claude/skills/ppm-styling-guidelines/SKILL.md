@@ -1,10 +1,15 @@
+---
+name: "ppm-styling-guidelines"
+description: "PPM-specific styling standards for enterprise-grade UI consistency. Color palettes, component naming, z-index layer system."
+---
+
 # PPM Styling Guidelines
 
 **Type:** domain
 **Enforcement:** require
 **Priority:** critical
-**Version:** 1.0.0
-**Last Updated:** 2025-11-19
+**Version:** 1.1.0
+**Last Updated:** 2026-01-08
 
 ---
 

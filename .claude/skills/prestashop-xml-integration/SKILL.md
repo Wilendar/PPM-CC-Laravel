@@ -1,12 +1,6 @@
 ---
-name: prestashop-xml-integration
-description: PrestaShop Web Services API integration - XML format requirements, readonly fields, manufacturer lookup, CREATE vs UPDATE patterns. Use when implementing PrestaShop 8.x/9.x API calls.
-version: 1.0.0
-author: Kamil Wilinski
-created: 2025-11-05
-updated: 2025-11-05
-tags: [prestashop, api, xml, webservices, integration, ecommerce]
-dependencies: []
+name: "prestashop-xml-integration"
+description: "PrestaShop Web Services API integration - XML format requirements, readonly fields, manufacturer lookup, CREATE vs UPDATE patterns."
 ---
 
 # PrestaShop XML Integration Workflow

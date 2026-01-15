@@ -998,19 +998,21 @@ class SyncController extends Component
             // 3. Execute pending job IMMEDIATELY based on job type
             if ($pendingSyncJob->job_type === SyncJob::JOB_IMPORT_PRODUCTS) {
                 // Import: PrestaShop → PPM
-                \App\Jobs\PullProductsFromPrestaShop::dispatchSync($shop);
+                // FIX 2025-12-22: Pass existing SyncJob to avoid creating duplicate!
+                \App\Jobs\PullProductsFromPrestaShop::dispatchSync($shop, $pendingSyncJob);
 
                 $this->dispatch('notify', [
                     'type' => 'info',
                     'message' => "Import z '{$shop->name}' uruchomiony NATYCHMIAST (Job ID: {$pendingSyncJob->id})"
                 ]);
 
-                Log::info("SYNC NOW: Import job executed immediately", [
+                Log::info("SYNC NOW: Import job executed immediately (using existing SyncJob)", [
                     'sync_job_id' => $pendingSyncJob->id,
                     'job_type' => 'import_products',
                     'shop_id' => $shop->id,
                     'shop_name' => $shop->name,
                     'user_id' => auth()->id(),
+                    'fix' => 'passing_existing_syncjob',
                 ]);
 
             } else {

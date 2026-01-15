@@ -85,7 +85,7 @@
                                     <input type="number"
                                            min="0"
                                            wire:model.defer="stock.{{ $warehouseId }}.quantity"
-                                           class="w-full bg-gray-700 border border-gray-600 text-white text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 p-2"
+                                           class="w-full bg-gray-700 border border-gray-600 text-white text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 px-3 py-2"
                                            placeholder="0">
                                     @if($actualAvailable != $available)
                                         <span class="text-xs text-gray-500 mt-1 block">Dostępne: {{ $actualAvailable }}</span>
@@ -97,7 +97,7 @@
                                     <input type="number"
                                            min="0"
                                            wire:model.defer="stock.{{ $warehouseId }}.reserved"
-                                           class="w-full bg-gray-700 border border-gray-600 text-orange-400 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 p-2"
+                                           class="w-full bg-gray-700 border border-gray-600 text-orange-400 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 px-3 py-2"
                                            placeholder="0">
                                 </td>
 
@@ -106,7 +106,7 @@
                                     <input type="number"
                                            min="0"
                                            wire:model.defer="stock.{{ $warehouseId }}.minimum"
-                                           class="w-full bg-gray-700 border border-gray-600 text-white text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 p-2"
+                                           class="w-full bg-gray-700 border border-gray-600 text-white text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 px-3 py-2"
                                            placeholder="0">
                                 </td>
 

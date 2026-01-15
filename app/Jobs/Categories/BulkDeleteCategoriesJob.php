@@ -341,9 +341,9 @@ class BulkDeleteCategoriesJob implements ShouldQueue
             $deletedCount += $this->deleteCategoryTree($child->id);
         }
 
-        // Delete the category itself
+        // Delete the category permanently (forceDelete to remove from DB)
         try {
-            $category->delete();
+            $category->forceDelete();
             $deletedCount++;
 
             Log::info('Category deleted successfully', [

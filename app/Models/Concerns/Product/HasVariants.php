@@ -139,4 +139,110 @@ trait HasVariants
     {
         return $this->has_variants && $this->variants()->exists();
     }
+
+    // NOTE: Shop variant methods (shopVariants, shopVariantsForShop, getVariantsForShop)
+    // are implemented in HasMultiStore trait to avoid duplication
+
+    /*
+    |--------------------------------------------------------------------------
+    | SCOPES - Variant-based Product Filtering (Variant Panel Redesign)
+    |--------------------------------------------------------------------------
+    */
+
+    /**
+     * Scope: Products with ANY of the specified variant values (OR mode)
+     *
+     * Usage: Product::withAnyVariantValues([1, 2, 3])->get()
+     * Returns products where ANY variant has ANY of the specified value IDs
+     *
+     * @param \Illuminate\Database\Eloquent\Builder $query
+     * @param array $valueIds Array of AttributeValue IDs
+     * @return \Illuminate\Database\Eloquent\Builder
+     */
+    public function scopeWithAnyVariantValues($query, array $valueIds)
+    {
+        if (empty($valueIds)) {
+            return $query;
+        }
+
+        return $query->whereHas('variants.attributes', function ($q) use ($valueIds) {
+            $q->whereIn('value_id', $valueIds);
+        });
+    }
+
+    /**
+     * Scope: Products with ALL of the specified variant values (AND mode)
+     *
+     * Usage: Product::withAllVariantValues([1, 2, 3])->get()
+     * Returns products where variants collectively have ALL specified value IDs
+     *
+     * @param \Illuminate\Database\Eloquent\Builder $query
+     * @param array $valueIds Array of AttributeValue IDs
+     * @return \Illuminate\Database\Eloquent\Builder
+     */
+    public function scopeWithAllVariantValues($query, array $valueIds)
+    {
+        if (empty($valueIds)) {
+            return $query;
+        }
+
+        foreach ($valueIds as $valueId) {
+            $query->whereHas('variants.attributes', function ($q) use ($valueId) {
+                $q->where('value_id', $valueId);
+            });
+        }
+
+        return $query;
+    }
+
+    /**
+     * Scope: Products with variants of specific attribute type
+     *
+     * Usage: Product::withVariantAttributeType(1)->get()
+     * Returns products that have variants with the specified attribute type
+     *
+     * @param \Illuminate\Database\Eloquent\Builder $query
+     * @param int $attributeTypeId
+     * @return \Illuminate\Database\Eloquent\Builder
+     */
+    public function scopeWithVariantAttributeType($query, int $attributeTypeId)
+    {
+        return $query->whereHas('variants.attributes', function ($q) use ($attributeTypeId) {
+            $q->where('attribute_type_id', $attributeTypeId);
+        });
+    }
+
+    /**
+     * Scope: Products filtered by variant attribute type and values (combined)
+     *
+     * Usage: Product::withVariantFilter(['type_id' => 1, 'value_ids' => [1,2,3], 'mode' => 'any'])->get()
+     *
+     * @param \Illuminate\Database\Eloquent\Builder $query
+     * @param array $filter ['type_id' => int, 'value_ids' => array, 'mode' => 'any'|'all']
+     * @return \Illuminate\Database\Eloquent\Builder
+     */
+    public function scopeWithVariantFilter($query, array $filter)
+    {
+        $typeId = $filter['type_id'] ?? null;
+        $valueIds = $filter['value_ids'] ?? [];
+        $mode = $filter['mode'] ?? 'any';
+
+        // Filter by type if specified
+        if ($typeId) {
+            $query->whereHas('variants.attributes', function ($q) use ($typeId) {
+                $q->where('attribute_type_id', $typeId);
+            });
+        }
+
+        // Filter by values if specified
+        if (!empty($valueIds)) {
+            if ($mode === 'all') {
+                return $query->withAllVariantValues($valueIds);
+            } else {
+                return $query->withAnyVariantValues($valueIds);
+            }
+        }
+
+        return $query;
+    }
 }

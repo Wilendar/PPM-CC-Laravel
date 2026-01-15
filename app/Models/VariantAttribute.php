@@ -10,12 +10,12 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * Variant Attribute Model
  *
  * Wartość atrybutu dla konkretnego wariantu
- * (np. Variant "XL Czerwony" ma: attributeType=size, value=XL oraz attributeType=color, value=Czerwony)
+ * (np. Variant "XL Czerwony" ma: attributeType=size, value_id=123 oraz attributeType=color, value_id=456)
  *
  * @property int $id
  * @property int $variant_id
  * @property int $attribute_type_id
- * @property string $value Wartość atrybutu (text)
+ * @property int $value_id FK to attribute_values.id
  * @property string|null $color_hex Kod hex dla koloru (jeśli typ=color)
  * @property \Illuminate\Support\Carbon|null $created_at
  * @property \Illuminate\Support\Carbon|null $updated_at
@@ -31,12 +31,14 @@ class VariantAttribute extends Model
 
     /**
      * Fillable attributes
+     *
+     * UPDATED 2025-12-04: Changed from value/value_code (string) to value_id (FK)
+     * per migration 2025_10_28_000001_refactor_variant_attributes_value_id.php
      */
     protected $fillable = [
         'variant_id',
         'attribute_type_id',
-        'value',
-        'value_code',
+        'value_id', // FK to attribute_values.id (replaces old 'value' string)
         'color_hex',
     ];
 
@@ -46,6 +48,7 @@ class VariantAttribute extends Model
     protected $casts = [
         'variant_id' => 'integer',
         'attribute_type_id' => 'integer',
+        'value_id' => 'integer',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
     ];
@@ -72,6 +75,14 @@ class VariantAttribute extends Model
         return $this->belongsTo(AttributeType::class, 'attribute_type_id');
     }
 
+    /**
+     * Attribute value (via value_id FK)
+     */
+    public function attributeValue(): BelongsTo
+    {
+        return $this->belongsTo(AttributeValue::class, 'value_id');
+    }
+
     /*
     |--------------------------------------------------------------------------
     | METHODS
@@ -83,15 +94,21 @@ class VariantAttribute extends Model
      */
     public function getDisplayValue(): string
     {
-        if ($this->attributeType->isColorType() && $this->color_hex) {
+        $value = $this->attributeValue;
+
+        if (!$value) {
+            return '';
+        }
+
+        if ($this->attributeType && $this->attributeType->isColorType() && $value->color_hex) {
             return sprintf(
                 '<span style="display:inline-block;width:20px;height:20px;background:%s;border:1px solid #ccc;margin-right:5px;"></span>%s',
-                $this->color_hex,
-                $this->value
+                $value->color_hex,
+                $value->value
             );
         }
 
-        return $this->value;
+        return $value->value ?? '';
     }
 
     /**

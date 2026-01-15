@@ -273,13 +273,43 @@ class PrestaShopImportService
                 // CRITICAL: ProductForm reads from category_mappings, not product_categories!
                 $this->buildCategoryMappingsFromProductCategories($product, $shop);
 
+                // 11b. FIX 2025-12-22: Auto-detect ProductType from category hierarchy
+                // If product has no type, detect from level-2 (main) category
+                if (!$product->product_type_id) {
+                    $primaryCategory = $product->categories()
+                        ->wherePivot('is_primary', true)
+                        ->first();
+
+                    if (!$primaryCategory) {
+                        $primaryCategory = $product->categories()->first();
+                    }
+
+                    if ($primaryCategory) {
+                        $detectedType = \App\Models\ProductType::detectFromCategory($primaryCategory);
+
+                        if ($detectedType) {
+                            $product->update(['product_type_id' => $detectedType->id]);
+
+                            Log::info('ProductType auto-detected from category', [
+                                'product_id' => $product->id,
+                                'sku' => $product->sku,
+                                'category_id' => $primaryCategory->id,
+                                'category_name' => $primaryCategory->name,
+                                'detected_type_id' => $detectedType->id,
+                                'detected_type_name' => $detectedType->name,
+                            ]);
+                        }
+                    }
+                }
+
                 // 12. ETAP_07e FIX 2025-12-03: Import product features from PrestaShop
                 // CRITICAL: Features must be imported for products to have technical specifications!
                 $this->syncProductFeatures($product, $prestashopData, $shop, $client);
 
                 // 13. ETAP_05d FIX 2025-12-22: Import vehicle compatibilities from PrestaShop features
-                // Only for spare parts (czesc-zamienna) that have compatibility features (431 Oryginal, 433 Zamiennik)
-                if ($product->productType?->slug === 'czesc-zamienna') {
+                // Only for spare parts that have compatibility features (431 Oryginal, 433 Zamiennik)
+                // FIX 2025-12-22: Support both old (czesc-zamienna) and new (czesci-zamienne) slug
+                if (in_array($product->productType?->slug, ['czesc-zamienna', 'czesci-zamienne'])) {
                     try {
                         $compatService = new VehicleCompatibilitySyncService();
                         $compatService->setClient($client);
@@ -511,28 +541,60 @@ class PrestaShopImportService
                     $prestashopParentId = (int) data_get($categoryData, 'prestashop_parent_id', 0);
 
                     if (empty($categoryData['parent_id'])) {
-                        // Check if this is PrestaShop's root category (id=2, "Wszystko")
-                        // Root categories should not have a parent (parent_id = null)
+                        // FIX 2025-12-22: Correct category hierarchy
+                        // PPM Structure: Baza (level=0) → Wszystko (level=1) → Categories (level=2+)
+                        // PrestaShop: Root (id=1) → Home/Wszystko (id=2) → Categories
+
+                        // Find "Baza" (root category, level=0)
+                        $bazaCategory = Category::where('name', 'Baza')
+                            ->where('level', 0)
+                            ->first();
+
+                        // Find "Wszystko" (level=1, child of Baza)
+                        $wszystkoCategory = Category::where('name', 'Wszystko')
+                            ->where('level', 1)
+                            ->first();
+
+                        // Check if this is PrestaShop's root category (id=2, "Wszystko/Home")
                         if ($prestashopCategoryId === 2 || $prestashopParentId <= 1) {
-                            // This is the root category - leave parent_id as null
-                            $categoryData['parent_id'] = null;
-
-                            Log::info('Root category detected - no parent', [
-                                'prestashop_category_id' => $prestashopCategoryId,
-                                'name' => $categoryData['name'],
-                            ]);
-                        } else {
-                            // Non-root category: try to set parent to "Wszystko" (id=2)
-                            // But only if "Wszystko" exists in PPM
-                            $wszystkoExists = Category::where('id', 2)->exists();
-
-                            if ($wszystkoExists) {
-                                $categoryData['parent_id'] = 2; // Wszystko as default parent
+                            // This is PrestaShop's root category (Home/Wszystko)
+                            // It should be child of "Baza" in PPM (NOT a root category!)
+                            if ($bazaCategory) {
+                                $categoryData['parent_id'] = $bazaCategory->id;
+                                Log::info('PrestaShop root category - assigning to Baza', [
+                                    'prestashop_category_id' => $prestashopCategoryId,
+                                    'name' => $categoryData['name'],
+                                    'baza_id' => $bazaCategory->id,
+                                ]);
                             } else {
-                                // Wszystko doesn't exist - create as root category
+                                // Baza doesn't exist - create as actual root (this should be rare)
                                 $categoryData['parent_id'] = null;
-
-                                Log::warning('Wszystko (id=2) not found - creating as root category', [
+                                Log::warning('Baza category not found - creating as root', [
+                                    'prestashop_category_id' => $prestashopCategoryId,
+                                    'name' => $categoryData['name'],
+                                ]);
+                            }
+                        } else {
+                            // Non-root category - should be child of "Wszystko"
+                            if ($wszystkoCategory) {
+                                $categoryData['parent_id'] = $wszystkoCategory->id;
+                                Log::info('Found "Wszystko" category dynamically', [
+                                    'wszystko_id' => $wszystkoCategory->id,
+                                    'prestashop_category_id' => $prestashopCategoryId,
+                                    'category_name' => $categoryData['name'],
+                                ]);
+                            } elseif ($bazaCategory) {
+                                // Wszystko doesn't exist but Baza does - use Baza as fallback
+                                $categoryData['parent_id'] = $bazaCategory->id;
+                                Log::warning('"Wszystko" not found - using Baza as fallback parent', [
+                                    'prestashop_category_id' => $prestashopCategoryId,
+                                    'name' => $categoryData['name'],
+                                    'baza_id' => $bazaCategory->id,
+                                ]);
+                            } else {
+                                // Neither exists - create as root (edge case)
+                                $categoryData['parent_id'] = null;
+                                Log::warning('Neither Baza nor Wszystko found - creating as root', [
                                     'prestashop_category_id' => $prestashopCategoryId,
                                     'name' => $categoryData['name'],
                                 ]);

@@ -9,22 +9,33 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 /**
  * Vehicle Compatibility Model
  *
- * Dopasowanie części (Product) do pojazdu (VehicleModel)
- * SKU-first pattern z backup columns (part_sku, vehicle_sku)
+ * Dopasowanie części (Product) do pojazdu (Product type='pojazd')
+ *
+ * ETAP_05d: Per-shop compatibility with SmartSuggestionEngine support
+ * 2025-12-08: Changed vehicle_model_id FK from vehicle_models to products
  *
  * @property int $id
- * @property int $product_id
- * @property string $part_sku SKU części (backup for SKU-first)
- * @property int $vehicle_model_id
- * @property string $vehicle_sku SKU pojazdu (backup for SKU-first)
+ * @property int $product_id Part (czesc zamienna)
+ * @property int $vehicle_model_id Vehicle product (pojazd) - NOW points to products!
+ * @property int $shop_id Per-shop compatibility (ETAP_05d)
  * @property int|null $compatibility_attribute_id Typ dopasowania (original/replacement)
  * @property int $compatibility_source_id Źródło informacji
- * @property bool $is_verified Czy zweryfikowane
+ * @property bool $verified Czy zweryfikowane
  * @property int|null $verified_by User ID weryfikatora
  * @property \Illuminate\Support\Carbon|null $verified_at Data weryfikacji
  * @property string|null $notes Notatki
+ * @property bool $is_suggested Added via SmartSuggestionEngine (ETAP_05d)
+ * @property float|null $confidence_score AI confidence 0.00-1.00 (ETAP_05d)
+ * @property array|null $metadata Additional JSON metadata (ETAP_05d)
  * @property \Illuminate\Support\Carbon|null $created_at
  * @property \Illuminate\Support\Carbon|null $updated_at
+ *
+ * @property-read \App\Models\Product $product Part (czesc)
+ * @property-read \App\Models\Product $vehicleProduct Vehicle (pojazd) - points to products!
+ * @property-read \App\Models\PrestaShopShop $shop
+ * @property-read \App\Models\CompatibilityAttribute|null $compatibilityAttribute
+ * @property-read \App\Models\CompatibilitySource $compatibilitySource
+ * @property-read \App\Models\User|null $verifier
  */
 class VehicleCompatibility extends Model
 {
@@ -37,40 +48,51 @@ class VehicleCompatibility extends Model
 
     /**
      * Fillable attributes
+     *
+     * ETAP_05d: Added shop_id, is_suggested, confidence_score, metadata
      */
     protected $fillable = [
         'product_id',
-        'part_sku',
         'vehicle_model_id',
-        'vehicle_sku',
+        'shop_id',                      // ETAP_05d: Per-shop compatibility
         'compatibility_attribute_id',
         'compatibility_source_id',
-        'is_verified',
+        'verified',                     // Flag: czy zweryfikowane
         'verified_by',
         'verified_at',
         'notes',
+        'is_suggested',                 // ETAP_05d: SmartSuggestionEngine
+        'confidence_score',             // ETAP_05d: AI confidence 0.00-1.00
+        'metadata',                     // ETAP_05d: Additional JSON data
     ];
 
     /**
      * Attribute casts
+     *
+     * ETAP_05d: Added shop_id, is_suggested, confidence_score, metadata
      */
     protected $casts = [
         'product_id' => 'integer',
         'vehicle_model_id' => 'integer',
+        'shop_id' => 'integer',                 // ETAP_05d: Per-shop
         'compatibility_attribute_id' => 'integer',
         'compatibility_source_id' => 'integer',
-        'is_verified' => 'boolean',
+        'verified' => 'boolean',                // czy zweryfikowane
         'verified_by' => 'integer',
         'verified_at' => 'datetime',
+        'is_suggested' => 'boolean',            // ETAP_05d: SmartSuggestionEngine
+        'confidence_score' => 'decimal:2',      // ETAP_05d: 0.00-1.00
+        'metadata' => 'array',                  // ETAP_05d: JSON metadata
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
     ];
 
     /**
      * Eager load relationships
+     * 2025-12-08: Changed vehicleModel to vehicleProduct (FK now points to products)
      */
     protected $with = [
-        'vehicleModel',
+        'vehicleProduct',
         'compatibilityAttribute',
         'compatibilitySource',
     ];
@@ -90,11 +112,29 @@ class VehicleCompatibility extends Model
     }
 
     /**
-     * Vehicle model
+     * Vehicle product (pojazd) - points to products table
+     * 2025-12-08: Changed from VehicleModel to Product
+     */
+    public function vehicleProduct(): BelongsTo
+    {
+        return $this->belongsTo(Product::class, 'vehicle_model_id');
+    }
+
+    /**
+     * Alias for backward compatibility
+     * @deprecated Use vehicleProduct() instead
      */
     public function vehicleModel(): BelongsTo
     {
-        return $this->belongsTo(VehicleModel::class, 'vehicle_model_id');
+        return $this->vehicleProduct();
+    }
+
+    /**
+     * Shop (ETAP_05d: Per-shop compatibility)
+     */
+    public function shop(): BelongsTo
+    {
+        return $this->belongsTo(PrestaShopShop::class, 'shop_id');
     }
 
     /**
@@ -132,23 +172,7 @@ class VehicleCompatibility extends Model
      */
     public function scopeVerified($query)
     {
-        return $query->where('is_verified', true);
-    }
-
-    /**
-     * Scope: Find by part SKU (SKU-first pattern)
-     */
-    public function scopeByPartSku($query, string $sku)
-    {
-        return $query->where('part_sku', $sku);
-    }
-
-    /**
-     * Scope: Find by vehicle SKU (SKU-first pattern)
-     */
-    public function scopeByVehicleSku($query, string $sku)
-    {
-        return $query->where('vehicle_sku', $sku);
+        return $query->where('verified', true);
     }
 
     /**
@@ -167,6 +191,30 @@ class VehicleCompatibility extends Model
         return $query->where('vehicle_model_id', $vehicleModelId);
     }
 
+    /**
+     * Scope: Filter by shop (ETAP_05d: Per-shop compatibility)
+     */
+    public function scopeByShop($query, int $shopId)
+    {
+        return $query->where('shop_id', $shopId);
+    }
+
+    /**
+     * Scope: Filter by suggested status (ETAP_05d: SmartSuggestionEngine)
+     */
+    public function scopeSuggested($query)
+    {
+        return $query->where('is_suggested', true);
+    }
+
+    /**
+     * Scope: Filter by minimum confidence (ETAP_05d: SmartSuggestionEngine)
+     */
+    public function scopeWithMinConfidence($query, float $minScore)
+    {
+        return $query->where('confidence_score', '>=', $minScore);
+    }
+
     /*
     |--------------------------------------------------------------------------
     | METHODS
@@ -178,7 +226,7 @@ class VehicleCompatibility extends Model
      */
     public function verify(User $user): void
     {
-        $this->is_verified = true;
+        $this->verified = true;
         $this->verified_by = $user->id;
         $this->verified_at = now();
         $this->save();
@@ -189,7 +237,7 @@ class VehicleCompatibility extends Model
      */
     public function isVerified(): bool
     {
-        return $this->is_verified;
+        return $this->verified;
     }
 
     /**
@@ -233,11 +281,11 @@ class VehicleCompatibility extends Model
      */
     public function getTrustBadge(): string
     {
-        $color = $this->is_verified
+        $color = $this->verified
             ? 'success'
             : $this->compatibilitySource->getTrustBadgeColor();
 
-        $label = $this->is_verified
+        $label = $this->verified
             ? 'Zweryfikowane'
             : $this->compatibilitySource->getTrustLevelName();
 

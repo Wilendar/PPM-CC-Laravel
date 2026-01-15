@@ -1,10 +1,15 @@
+---
+name: "frontend-dev-guidelines"
+description: "Frontend development rules for PPM project. STRICT enforcement of CSS practices - no inline styles, no arbitrary Tailwind values."
+---
+
 # Frontend Development Guidelines
 
 **Type:** domain
 **Enforcement:** require
 **Priority:** critical
-**Version:** 1.0.0
-**Last Updated:** 2025-11-04
+**Version:** 1.1.0
+**Last Updated:** 2026-01-08
 
 ---
 

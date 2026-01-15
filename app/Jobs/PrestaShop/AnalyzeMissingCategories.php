@@ -139,6 +139,19 @@ class AnalyzeMissingCategories implements ShouldQueue
             'job_id' => $this->jobId,
         ]);
 
+        // ETAP_07c: Get or create JobProgress for this analysis
+        $progress = \App\Models\JobProgress::where('job_id', $this->jobId)->first();
+        $progressId = $progress?->id;
+
+        // Update status to running
+        if ($progressId) {
+            $progressService->updateProgress($progressId, 0);
+            $progressService->updateMetadata($progressId, [
+                'phase' => 'extracting_categories',
+                'phase_label' => 'Pobieranie kategorii z produktow',
+            ]);
+        }
+
         try {
             $client = $clientFactory->create($this->shop);
 
@@ -149,6 +162,16 @@ class AnalyzeMissingCategories implements ShouldQueue
                 'total_categories' => count($categoryIds),
                 'category_ids' => $categoryIds,
             ]);
+
+            // ETAP_07c: Update progress - categories extracted
+            if ($progressId) {
+                $progressService->updateProgress($progressId, (int)(count($this->productIds) * 0.3));
+                $progressService->updateMetadata($progressId, [
+                    'phase' => 'checking_existing',
+                    'phase_label' => 'Sprawdzanie istniejacych kategorii',
+                    'total_categories_found' => count($categoryIds),
+                ]);
+            }
 
             // STEP 2: Check which categories exist in PPM via ShopMappings
             $existingCategoryIds = $this->getExistingCategoryIds($categoryIds);
@@ -165,6 +188,17 @@ class AnalyzeMissingCategories implements ShouldQueue
                 'missing_count' => count($missingCategoryIds),
                 'missing_ids' => $missingCategoryIds,
             ]);
+
+            // ETAP_07c: Update progress - missing categories found
+            if ($progressId) {
+                $progressService->updateProgress($progressId, (int)(count($this->productIds) * 0.5));
+                $progressService->updateMetadata($progressId, [
+                    'phase' => 'analyzing_missing',
+                    'phase_label' => 'Analiza brakujacych kategorii',
+                    'existing_count' => count($existingCategoryIds),
+                    'missing_count' => count($missingCategoryIds),
+                ]);
+            }
 
             // STEP 4: If NO missing categories → STILL create preview for user approval!
             // 🔧 FIX: User MUST approve import via modal (even when all categories exist)
@@ -196,6 +230,18 @@ class AnalyzeMissingCategories implements ShouldQueue
                 ExpirePendingCategoryPreview::dispatch($preview->id)
                     ->delay(now()->addMinutes(CategoryPreview::EXPIRATION_HOURS * 60));
 
+                // ETAP_07c: Mark job as awaiting_user with action button
+                if ($progressId) {
+                    $progressService->markAwaitingUser(
+                        $progressId,
+                        'preview',
+                        'Zobacz podglad kategorii',
+                        'open_category_preview_modal',
+                        ['preview_id' => $preview->id, 'shop_id' => $this->shop->id],
+                        'Analiza zakonczona - wszystkie kategorie istnieja w PPM. Kliknij aby kontynuowac import.'
+                    );
+                }
+
                 Log::info('Empty preview created - waiting for user approval', [
                     'preview_id' => $preview->id,
                     'job_id' => $this->jobId,
@@ -203,6 +249,15 @@ class AnalyzeMissingCategories implements ShouldQueue
                 ]);
 
                 return; // ✅ Wait for user approval via modal!
+            }
+
+            // ETAP_07c: Update progress - fetching category details
+            if ($progressId) {
+                $progressService->updateProgress($progressId, (int)(count($this->productIds) * 0.6));
+                $progressService->updateMetadata($progressId, [
+                    'phase' => 'fetching_details',
+                    'phase_label' => 'Pobieranie szczegolowych danych kategorii',
+                ]);
             }
 
             // STEP 5: Fetch missing category details from PrestaShop API
@@ -217,18 +272,38 @@ class AnalyzeMissingCategories implements ShouldQueue
                 return ($a['level_depth'] ?? 0) <=> ($b['level_depth'] ?? 0);
             });
 
+            // ETAP_07c: Update progress - building tree
+            if ($progressId) {
+                $progressService->updateProgress($progressId, (int)(count($this->productIds) * 0.8));
+                $progressService->updateMetadata($progressId, [
+                    'phase' => 'building_tree',
+                    'phase_label' => 'Budowanie drzewa kategorii',
+                    'categories_to_process' => count($categories),
+                ]);
+            }
+
             // STEP 7: Build hierarchical tree structure
             $tree = $this->buildCategoryTree($categories);
+
+            // ETAP_07c: Update progress - storing preview
+            if ($progressId) {
+                $progressService->updateProgress($progressId, (int)(count($this->productIds) * 0.95));
+                $progressService->updateMetadata($progressId, [
+                    'phase' => 'storing_preview',
+                    'phase_label' => 'Zapisywanie podgladu',
+                ]);
+            }
 
             // STEP 8: Store preview in database
             $preview = $this->storePreview($tree, count($categories));
 
             $executionTime = (int) ((microtime(true) - $startTime) * 1000);
 
+            $depths = array_column($categories, 'level_depth');
             Log::info('Category preview created successfully', [
                 'preview_id' => $preview->id,
                 'total_categories' => count($categories),
-                'max_depth' => max(array_column($categories, 'level_depth')),
+                'max_depth' => !empty($depths) ? max($depths) : 0,
                 'execution_time_ms' => $executionTime,
             ]);
 
@@ -249,6 +324,18 @@ class AnalyzeMissingCategories implements ShouldQueue
             // Dispatch timeout job (expire preview after 15 minutes if no user action)
             ExpirePendingCategoryPreview::dispatch($preview->id)
                 ->delay(now()->addMinutes(CategoryPreview::EXPIRATION_HOURS * 60));
+
+            // ETAP_07c: Mark job as awaiting_user with action button (missing categories found)
+            if ($progressId) {
+                $progressService->markAwaitingUser(
+                    $progressId,
+                    'preview',
+                    'Zobacz brakujace kategorie (' . count($missingCategoryIds) . ')',
+                    'open_category_preview_modal',
+                    ['preview_id' => $preview->id, 'shop_id' => $this->shop->id],
+                    'Analiza zakonczona - znaleziono ' . count($missingCategoryIds) . ' brakujacych kategorii. Kliknij aby zobaczyc podglad.'
+                );
+            }
 
             Log::info('Timeout job dispatched for normal preview', [
                 'preview_id' => $preview->id,
@@ -350,9 +437,31 @@ class AnalyzeMissingCategories implements ShouldQueue
      */
     protected function getExistingCategoryIds(array $categoryIds): array
     {
-        return ShopMapping::where('shop_id', $this->shop->id)
+        // FIX 2025-12-08: Must check BOTH:
+        // 1. ShopMapping exists for this prestashop_id
+        // 2. AND the actual Category in PPM (ppm_value) exists in categories table
+        // Without this, orphaned mappings (pointing to deleted categories) would show as "existing"
+
+        $mappings = ShopMapping::where('shop_id', $this->shop->id)
             ->where('mapping_type', ShopMapping::TYPE_CATEGORY)
             ->whereIn('prestashop_id', $categoryIds)
+            ->get(['prestashop_id', 'ppm_value']);
+
+        if ($mappings->isEmpty()) {
+            return [];
+        }
+
+        // Get PPM category IDs from mappings
+        $ppmCategoryIds = $mappings->pluck('ppm_value')->unique()->toArray();
+
+        // Check which PPM categories actually exist in the database
+        $existingPpmIds = \App\Models\Category::whereIn('id', $ppmCategoryIds)
+            ->pluck('id')
+            ->toArray();
+
+        // Return only prestashop_ids where the PPM category actually exists
+        return $mappings
+            ->filter(fn($mapping) => in_array($mapping->ppm_value, $existingPpmIds))
             ->pluck('prestashop_id')
             ->toArray();
     }

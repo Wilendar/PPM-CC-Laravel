@@ -17,6 +17,9 @@ export default {
   theme: {
     extend: {
       colors: {
+        // PPM Color Tokens (zgodne z CSS Custom Properties)
+        'mpp-primary': '#e0ac7e',
+        'mpp-primary-dark': '#d1975a',
         'mpp-orange': '#e0ac7e',
         'mpp-orange-dark': '#d1975a',
         'dark-primary': '#ffffff',

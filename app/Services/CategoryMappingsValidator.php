@@ -27,14 +27,16 @@ class CategoryMappingsValidator
     public function validate(array $data): array
     {
         // Validate basic structure
+        // FIX (2025-12-02): Increased max categories from 10 to 50 (PrestaShop products can have many categories)
         $validator = Validator::make($data, [
             'ui' => 'required|array',
-            'ui.selected' => 'required|array|min:1|max:10',
+            'ui.selected' => 'required|array|min:1|max:50',
             'ui.selected.*' => 'required|integer|min:1',
             'ui.primary' => 'nullable|integer|min:1',
 
-            'mappings' => 'required|array|min:1|max:10',
-            'mappings.*' => 'required|integer|min:1',
+            'mappings' => 'required|array|min:1|max:50',
+            // FIX 2025-12-08: Allow 0 as "unmapped placeholder" for PPM-only categories (root cats 1,2)
+            'mappings.*' => 'required|integer|min:0',
 
             'metadata' => 'nullable|array',
             'metadata.last_updated' => 'nullable|date_format:Y-m-d\TH:i:sP',
@@ -98,9 +100,9 @@ class CategoryMappingsValidator
         // Sanitize selected (remove duplicates, ensure integers)
         $data['ui']['selected'] = array_values(array_unique(array_map('intval', $data['ui']['selected'])));
 
-        // Limit to 10 categories
-        if (count($data['ui']['selected']) > 10) {
-            $data['ui']['selected'] = array_slice($data['ui']['selected'], 0, 10);
+        // Limit to 50 categories (FIX 2025-12-02: increased from 10)
+        if (count($data['ui']['selected']) > 50) {
+            $data['ui']['selected'] = array_slice($data['ui']['selected'], 0, 50);
         }
 
         // Sanitize primary (must be in selected)
@@ -121,6 +123,34 @@ class CategoryMappingsValidator
             $sanitizedMappings[(string) $key] = (int) $value;
         }
         $data['mappings'] = $sanitizedMappings;
+
+        // ========================================================================
+        // FIX 2025-12-08: SYNC MAPPINGS WITH SELECTED (CRITICAL FOR IMPORT)
+        // ========================================================================
+        // Problem: Import from PrestaShop can have selected=[1,2,64,65,66] but
+        // mappings only has keys [64,65,66]. This caused validation to fail with:
+        // "Mappings keys must match selected categories"
+        //
+        // Solution: Auto-sync mappings to match selected:
+        // 1. Add missing mappings with value 0 (unmapped placeholder)
+        // 2. Remove mappings for categories not in selected
+        // ========================================================================
+        $selectedIds = array_map('intval', $data['ui']['selected']);
+        $existingMappingKeys = array_map('intval', array_keys($data['mappings']));
+
+        // Add missing mappings (categories in selected but not in mappings)
+        foreach ($selectedIds as $ppmId) {
+            if (!isset($data['mappings'][(string) $ppmId])) {
+                $data['mappings'][(string) $ppmId] = 0; // 0 = unmapped placeholder
+            }
+        }
+
+        // Remove orphan mappings (categories in mappings but not in selected)
+        foreach ($existingMappingKeys as $mappingKey) {
+            if (!in_array($mappingKey, $selectedIds)) {
+                unset($data['mappings'][(string) $mappingKey]);
+            }
+        }
 
         // Ensure metadata exists
         if (!isset($data['metadata'])) {

@@ -1,0 +1,15 @@
+HTTP/1.1 200 OK
+Connection: Keep-Alive
+Keep-Alive: timeout=5, max=100
+Cache-Control: public, max-age=604800
+Expires: Fri, 05 Dec 2025 13:56:46 GMT
+Content-Type: text/css
+Last-Modified: Fri, 28 Nov 2025 13:56:20 GMT
+Etag: "162c4-6929aa04-d10c7ab25121ce08;;;"
+Accept-Ranges: bytes
+Content-Length: 90820
+Date: Fri, 28 Nov 2025 13:56:46 GMT
+Server: LiteSpeed
+Vary: User-Agent
+alt-svc: h3=":443"; ma=2592000, h3-29=":443"; ma=2592000, h3-Q050=":443"; ma=2592000, h3-Q046=":443"; ma=2592000, h3-Q043=":443"; ma=2592000, quic=":443"; ma=2592000; v="43,46"
+

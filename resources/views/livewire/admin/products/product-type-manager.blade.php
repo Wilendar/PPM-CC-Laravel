@@ -1,5 +1,6 @@
-<div class="min-h-screen bg-main-gradient">
-    {{-- Header Section --}}
+<div class="{{ $embedded ? '' : 'min-h-screen bg-main-gradient' }}">
+    @if(!$embedded)
+    {{-- Header Section (only for standalone mode) --}}
     <div class="sticky top-0 z-40 glass-effect border-b border-primary shadow-lg">
         <div class="px-6 sm:px-8 lg:px-12 py-4">
             {{-- Title & Action Bar --}}
@@ -11,7 +12,7 @@
                     </p>
                 </div>
                 <div class="flex items-center space-x-3">
-                    <button wire:click="showCreateModal"
+                    <button wire:click="openCreateModal"
                            class="btn-primary inline-flex items-center px-4 py-2 text-white text-sm font-medium rounded-lg transition-all duration-300">
                         <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
@@ -22,6 +23,7 @@
             </div>
         </div>
     </div>
+    @endif
 
     {{-- Messages --}}
     @if($successMessage)
@@ -61,9 +63,9 @@
     @endif
 
     {{-- Main Content --}}
-    <div class="px-6 sm:px-8 lg:px-12 py-6">
+    <div class="{{ $embedded ? 'py-2' : 'px-6 sm:px-8 lg:px-12 py-6' }}">
         {{-- Controls Bar --}}
-        <div class="glass-effect rounded-lg p-4 mb-6">
+        <div class="{{ $embedded ? 'bg-gray-800/50 border border-gray-700' : 'glass-effect' }} rounded-lg p-4 mb-6">
             <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-3 sm:space-y-0">
                 {{-- Search --}}
                 <div class="flex-1 max-w-md">
@@ -75,30 +77,40 @@
                         </div>
                         <input wire:model.live="search"
                                type="text"
-                               placeholder="Wyszukaj typy produktów..."
-                               class="block w-full pl-10 pr-3 py-2 border border-gray-600 rounded-md bg-card text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"/>
+                               placeholder="Wyszukaj typy produktow..."
+                               class="block w-full pl-10 pr-3 py-2 border border-gray-600 rounded-md bg-gray-800 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"/>
                     </div>
                 </div>
 
-                {{-- Bulk Actions --}}
-                @if(!empty($selected))
-                    <div class="flex items-center space-x-2">
+                {{-- Actions --}}
+                <div class="flex items-center space-x-2">
+                    @if(!empty($selected))
                         <span class="text-sm text-gray-400">{{ count($selected) }} zaznaczonych</span>
                         <button wire:click="bulkActivate"
-                               class="btn-secondary px-3 py-1 text-sm">
+                               class="px-3 py-1.5 text-sm bg-gray-700 hover:bg-gray-600 text-gray-200 rounded-md transition-colors">
                             Aktywuj
                         </button>
                         <button wire:click="bulkDeactivate"
-                               class="btn-secondary px-3 py-1 text-sm">
+                               class="px-3 py-1.5 text-sm bg-gray-700 hover:bg-gray-600 text-gray-200 rounded-md transition-colors">
                             Dezaktywuj
                         </button>
-                    </div>
-                @endif
+                    @endif
+                    {{-- Add button (always visible in embedded mode) --}}
+                    @if($embedded)
+                        <button wire:click="openCreateModal"
+                               class="inline-flex items-center px-3 py-1.5 text-sm font-medium text-white bg-orange-600 hover:bg-orange-700 rounded-md transition-colors">
+                            <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
+                            </svg>
+                            Dodaj typ
+                        </button>
+                    @endif
+                </div>
             </div>
         </div>
 
         {{-- Product Types Table --}}
-        <div class="glass-effect rounded-lg overflow-hidden">
+        <div class="{{ $embedded ? 'bg-gray-800/50 border border-gray-700' : 'glass-effect' }} rounded-lg overflow-hidden">
             <div class="overflow-x-auto">
                 <table class="min-w-full divide-y divide-gray-700">
                     <thead>
@@ -182,13 +194,13 @@
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                                     <div class="flex items-center justify-end space-x-2">
-                                        <button wire:click="showEditModal({{ $type->id }})"
+                                        <button wire:click="openEditModal({{ $type->id }})"
                                                class="text-orange-400 hover:text-orange-300 transition-colors duration-200">
                                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
                                             </svg>
                                         </button>
-                                        <button wire:click="showDeleteModal({{ $type->id }})"
+                                        <button wire:click="openDeleteModal({{ $type->id }})"
                                                class="text-red-400 hover:text-red-300 transition-colors duration-200
                                                       {{ $type->products_count > 0 ? 'opacity-50 cursor-not-allowed' : '' }}">
                                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -217,213 +229,340 @@
         </div>
     </div>
 
-    {{-- Create Modal --}}
-    @if($showCreateModal)
-        <div class="fixed inset-0 z-50 overflow-y-auto">
-            <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
-                <div class="fixed inset-0 bg-gray-900 bg-opacity-75 transition-opacity" wire:click="closeModal"></div>
+    {{-- Create Modal - Centered --}}
+    @if($isCreateModalOpen)
+        <div class="fixed inset-0 z-50 flex items-center justify-center p-4">
+            {{-- Backdrop --}}
+            <div class="fixed inset-0 bg-gray-900 bg-opacity-75 transition-opacity" wire:click="closeModal"></div>
 
-                <div class="inline-block align-bottom bg-card rounded-lg px-4 pt-5 pb-4 text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full sm:p-6">
-                    <div class="mb-4">
-                        <h3 class="text-lg font-medium text-white">Dodaj nowy typ produktu</h3>
-                        <p class="mt-1 text-sm text-gray-400">Utwórz nowy edytowalny typ produktu.</p>
-                    </div>
-
-                    <div class="space-y-4">
-                        {{-- Name --}}
-                        <div>
-                            <label class="block text-sm font-medium text-gray-300 mb-1">Nazwa typu *</label>
-                            <input wire:model.live="name"
-                                   type="text"
-                                   placeholder="np. Części zamienne"
-                                   class="block w-full px-3 py-2 border border-gray-600 rounded-md bg-card text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent">
-                            @error('name') <span class="text-red-400 text-xs">{{ $message }}</span> @enderror
-                        </div>
-
-                        {{-- Slug --}}
-                        <div>
-                            <label class="block text-sm font-medium text-gray-300 mb-1">Slug URL *</label>
-                            <input wire:model.live="slug"
-                                   type="text"
-                                   placeholder="czesci-zamienne"
-                                   class="block w-full px-3 py-2 border border-gray-600 rounded-md bg-card text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent font-mono">
-                            @error('slug') <span class="text-red-400 text-xs">{{ $message }}</span> @enderror
-                        </div>
-
-                        {{-- Description --}}
-                        <div>
-                            <label class="block text-sm font-medium text-gray-300 mb-1">Opis</label>
-                            <textarea wire:model="description"
-                                     rows="3"
-                                     placeholder="Krótki opis typu produktu..."
-                                     class="block w-full px-3 py-2 border border-gray-600 rounded-md bg-card text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"></textarea>
-                            @error('description') <span class="text-red-400 text-xs">{{ $message }}</span> @enderror
-                        </div>
-
-                        {{-- Icon --}}
-                        <div>
-                            <label class="block text-sm font-medium text-gray-300 mb-1">Ikona (CSS class)</label>
-                            <input wire:model="icon"
-                                   type="text"
-                                   placeholder="fas fa-cog"
-                                   class="block w-full px-3 py-2 border border-gray-600 rounded-md bg-card text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent">
-                            @error('icon') <span class="text-red-400 text-xs">{{ $message }}</span> @enderror
-                        </div>
-
-                        {{-- Active Status --}}
-                        <div class="flex items-center">
-                            <input wire:model="is_active"
-                                   type="checkbox"
-                                   id="is_active"
-                                   class="rounded border-gray-600 text-orange-600 shadow-sm focus:border-orange-500 focus:ring-orange-500">
-                            <label for="is_active" class="ml-2 text-sm text-gray-300">Typ aktywny</label>
-                        </div>
-                    </div>
-
-                    <div class="mt-6 flex justify-end space-x-3">
-                        <button wire:click="closeModal"
-                               class="btn-secondary px-4 py-2">
-                            Anuluj
-                        </button>
-                        <button wire:click="create"
-                               class="btn-primary px-4 py-2">
-                            Utwórz typ
-                        </button>
-                    </div>
+            {{-- Modal Content --}}
+            <div class="relative bg-card rounded-lg shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto p-6">
+                <div class="mb-4">
+                    <h3 class="text-lg font-medium text-white">Dodaj nowy typ produktu</h3>
+                    <p class="mt-1 text-sm text-gray-400">Utwórz nowy edytowalny typ produktu.</p>
                 </div>
-            </div>
-        </div>
-    @endif
 
-    {{-- Edit Modal --}}
-    @if($showEditModal && $selectedType)
-        <div class="fixed inset-0 z-50 overflow-y-auto">
-            <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
-                <div class="fixed inset-0 bg-gray-900 bg-opacity-75 transition-opacity" wire:click="closeModal"></div>
-
-                <div class="inline-block align-bottom bg-card rounded-lg px-4 pt-5 pb-4 text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full sm:p-6">
-                    <div class="mb-4">
-                        <h3 class="text-lg font-medium text-white">Edytuj typ produktu</h3>
-                        <p class="mt-1 text-sm text-gray-400">Modyfikuj właściwości typu produktu.</p>
+                <div class="space-y-4">
+                    {{-- Name --}}
+                    <div>
+                        <label class="block text-sm font-medium text-gray-300 mb-1">Nazwa typu *</label>
+                        <input wire:model.live="name"
+                               type="text"
+                               placeholder="np. Części zamienne"
+                               class="block w-full px-3 py-2 border border-gray-600 rounded-md bg-gray-800 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent">
+                        @error('name') <span class="text-red-400 text-xs">{{ $message }}</span> @enderror
                     </div>
 
-                    <div class="space-y-4">
-                        {{-- Name --}}
-                        <div>
-                            <label class="block text-sm font-medium text-gray-300 mb-1">Nazwa typu *</label>
-                            <input wire:model.live="name"
-                                   type="text"
-                                   class="block w-full px-3 py-2 border border-gray-600 rounded-md bg-card text-white focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent">
-                            @error('name') <span class="text-red-400 text-xs">{{ $message }}</span> @enderror
-                        </div>
-
-                        {{-- Slug --}}
-                        <div>
-                            <label class="block text-sm font-medium text-gray-300 mb-1">Slug URL *</label>
-                            <input wire:model.live="slug"
-                                   type="text"
-                                   class="block w-full px-3 py-2 border border-gray-600 rounded-md bg-card text-white focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent font-mono">
-                            @error('slug') <span class="text-red-400 text-xs">{{ $message }}</span> @enderror
-                        </div>
-
-                        {{-- Description --}}
-                        <div>
-                            <label class="block text-sm font-medium text-gray-300 mb-1">Opis</label>
-                            <textarea wire:model="description"
-                                     rows="3"
-                                     class="block w-full px-3 py-2 border border-gray-600 rounded-md bg-card text-white focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"></textarea>
-                            @error('description') <span class="text-red-400 text-xs">{{ $message }}</span> @enderror
-                        </div>
-
-                        {{-- Icon --}}
-                        <div>
-                            <label class="block text-sm font-medium text-gray-300 mb-1">Ikona (CSS class)</label>
-                            <input wire:model="icon"
-                                   type="text"
-                                   class="block w-full px-3 py-2 border border-gray-600 rounded-md bg-card text-white focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent">
-                            @error('icon') <span class="text-red-400 text-xs">{{ $message }}</span> @enderror
-                        </div>
-
-                        {{-- Sort Order --}}
-                        <div>
-                            <label class="block text-sm font-medium text-gray-300 mb-1">Kolejność</label>
-                            <input wire:model="sort_order"
-                                   type="number"
-                                   min="0"
-                                   class="block w-full px-3 py-2 border border-gray-600 rounded-md bg-card text-white focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent">
-                            @error('sort_order') <span class="text-red-400 text-xs">{{ $message }}</span> @enderror
-                        </div>
-
-                        {{-- Active Status --}}
-                        <div class="flex items-center">
-                            <input wire:model="is_active"
-                                   type="checkbox"
-                                   id="edit_is_active"
-                                   class="rounded border-gray-600 text-orange-600 shadow-sm focus:border-orange-500 focus:ring-orange-500">
-                            <label for="edit_is_active" class="ml-2 text-sm text-gray-300">Typ aktywny</label>
-                        </div>
+                    {{-- Slug --}}
+                    <div>
+                        <label class="block text-sm font-medium text-gray-300 mb-1">Slug URL *</label>
+                        <input wire:model.live="slug"
+                               type="text"
+                               placeholder="czesci-zamienne"
+                               class="block w-full px-3 py-2 border border-gray-600 rounded-md bg-gray-800 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent font-mono">
+                        @error('slug') <span class="text-red-400 text-xs">{{ $message }}</span> @enderror
                     </div>
 
-                    <div class="mt-6 flex justify-end space-x-3">
-                        <button wire:click="closeModal"
-                               class="btn-secondary px-4 py-2">
-                            Anuluj
-                        </button>
-                        <button wire:click="update"
-                               class="btn-primary px-4 py-2">
-                            Zapisz zmiany
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    @endif
-
-    {{-- Delete Confirmation Modal --}}
-    @if($showDeleteModal && $selectedType)
-        <div class="fixed inset-0 z-50 overflow-y-auto">
-            <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
-                <div class="fixed inset-0 bg-gray-900 bg-opacity-75 transition-opacity" wire:click="closeModal"></div>
-
-                <div class="inline-block align-bottom bg-card rounded-lg px-4 pt-5 pb-4 text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-md sm:w-full sm:p-6">
-                    <div class="flex items-center mb-4">
-                        <div class="flex-shrink-0">
-                            <svg class="w-6 h-6 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"/>
-                            </svg>
-                        </div>
-                        <div class="ml-3">
-                            <h3 class="text-lg font-medium text-white">Usuń typ produktu</h3>
-                        </div>
+                    {{-- Description --}}
+                    <div>
+                        <label class="block text-sm font-medium text-gray-300 mb-1">Opis</label>
+                        <textarea wire:model="description"
+                                 rows="2"
+                                 placeholder="Krótki opis typu produktu..."
+                                 class="block w-full px-3 py-2 border border-gray-600 rounded-md bg-gray-800 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"></textarea>
+                        @error('description') <span class="text-red-400 text-xs">{{ $message }}</span> @enderror
                     </div>
 
-                    <div class="mb-4">
-                        <p class="text-sm text-gray-400">
-                            Czy na pewno chcesz usunąć typ produktu <strong class="text-white">{{ $selectedType->name }}</strong>?
-                        </p>
-                        @if($selectedType->products_count > 0)
-                            <div class="mt-3 p-3 bg-red-900/20 border border-red-800 rounded-lg">
-                                <p class="text-sm text-red-200">
-                                    <strong>Uwaga:</strong> Ten typ ma przypisanych {{ $selectedType->products_count }} produktów.
-                                    Nie można usunąć typu produktu, który jest używany przez produkty.
-                                </p>
+                    {{-- Icon Picker --}}
+                    <div x-data="{ showIconPicker: false }">
+                        <label class="block text-sm font-medium text-gray-300 mb-1">Ikona</label>
+                        <div class="flex items-center space-x-3">
+                            {{-- Icon Preview --}}
+                            <div class="flex-shrink-0 w-12 h-12 flex items-center justify-center bg-gray-700 rounded-lg border border-gray-600">
+                                @if($icon)
+                                    <i class="{{ $icon }} text-xl text-orange-400"></i>
+                                @else
+                                    <span class="text-gray-500 text-xs">Brak</span>
+                                @endif
                             </div>
-                        @else
-                            <p class="text-xs text-gray-500 mt-2">Ta operacja jest nieodwracalna.</p>
-                        @endif
+                            {{-- Icon Input --}}
+                            <div class="flex-1">
+                                <input wire:model.live="icon"
+                                       type="text"
+                                       placeholder="np. fas fa-car"
+                                       class="block w-full px-3 py-2 border border-gray-600 rounded-md bg-gray-800 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent text-sm">
+                            </div>
+                            {{-- Toggle Picker --}}
+                            <button type="button" @click="showIconPicker = !showIconPicker"
+                                    class="px-3 py-2 bg-gray-700 hover:bg-gray-600 text-gray-300 rounded-md transition-colors text-sm">
+                                <i class="fas fa-th"></i>
+                            </button>
+                        </div>
+
+                        {{-- Icon Picker Grid --}}
+                        <div x-show="showIconPicker" x-transition class="mt-3 p-3 bg-gray-800 rounded-lg border border-gray-600">
+                            <p class="text-xs text-gray-400 mb-2">Popularne ikony dla typów produktów:</p>
+                            <div class="grid grid-cols-8 gap-2">
+                                @php
+                                    $popularIcons = [
+                                        'fas fa-car' => 'Samochód',
+                                        'fas fa-motorcycle' => 'Motocykl',
+                                        'fas fa-cog' => 'Część',
+                                        'fas fa-cogs' => 'Części',
+                                        'fas fa-wrench' => 'Narzędzie',
+                                        'fas fa-tools' => 'Narzędzia',
+                                        'fas fa-tshirt' => 'Odzież',
+                                        'fas fa-hard-hat' => 'Kask',
+                                        'fas fa-oil-can' => 'Olej',
+                                        'fas fa-gas-pump' => 'Paliwo',
+                                        'fas fa-battery-full' => 'Akumulator',
+                                        'fas fa-lightbulb' => 'Oświetlenie',
+                                        'fas fa-plug' => 'Elektryka',
+                                        'fas fa-fan' => 'Chłodzenie',
+                                        'fas fa-filter' => 'Filtr',
+                                        'fas fa-truck' => 'Ciężarówka',
+                                        'fas fa-bicycle' => 'Rower',
+                                        'fas fa-snowplow' => 'Quad',
+                                        'fas fa-box' => 'Inne',
+                                        'fas fa-boxes' => 'Zestaw',
+                                        'fas fa-shopping-bag' => 'Akcesoria',
+                                        'fas fa-shield-alt' => 'Ochrona',
+                                        'fas fa-key' => 'Kluczyk',
+                                        'fas fa-tag' => 'Etykieta',
+                                    ];
+                                @endphp
+                                @foreach($popularIcons as $iconClass => $iconName)
+                                    <button type="button"
+                                            wire:click="$set('icon', '{{ $iconClass }}')"
+                                            @click="showIconPicker = false"
+                                            title="{{ $iconName }}"
+                                            class="w-9 h-9 flex items-center justify-center rounded-md transition-colors
+                                                   {{ $icon === $iconClass ? 'bg-orange-600 text-white' : 'bg-gray-700 hover:bg-gray-600 text-gray-300' }}">
+                                        <i class="{{ $iconClass }}"></i>
+                                    </button>
+                                @endforeach
+                            </div>
+                        </div>
+                        @error('icon') <span class="text-red-400 text-xs">{{ $message }}</span> @enderror
                     </div>
 
-                    <div class="flex justify-end space-x-3">
-                        <button wire:click="closeModal"
-                               class="btn-secondary px-4 py-2">
-                            Anuluj
-                        </button>
-                        <button wire:click="delete"
-                               {{ $selectedType->products_count > 0 ? 'disabled' : '' }}
-                               class="bg-red-600 hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed text-white px-4 py-2 rounded-lg transition-colors duration-200">
-                            Usuń typ
-                        </button>
+                    {{-- Active Status --}}
+                    <div class="flex items-center">
+                        <input wire:model="is_active"
+                               type="checkbox"
+                               id="is_active"
+                               class="rounded border-gray-600 text-orange-600 shadow-sm focus:border-orange-500 focus:ring-orange-500">
+                        <label for="is_active" class="ml-2 text-sm text-gray-300">Typ aktywny</label>
                     </div>
+                </div>
+
+                <div class="mt-6 flex justify-end space-x-3">
+                    <button wire:click="closeModal"
+                           class="btn-secondary px-4 py-2 rounded-lg">
+                        Anuluj
+                    </button>
+                    <button wire:click="create"
+                           class="btn-primary px-4 py-2 rounded-lg">
+                        Utwórz typ
+                    </button>
+                </div>
+            </div>
+        </div>
+    @endif
+
+    {{-- Edit Modal - Centered --}}
+    @if($isEditModalOpen && $selectedType)
+        <div class="fixed inset-0 z-50 flex items-center justify-center p-4">
+            {{-- Backdrop --}}
+            <div class="fixed inset-0 bg-gray-900 bg-opacity-75 transition-opacity" wire:click="closeModal"></div>
+
+            {{-- Modal Content --}}
+            <div class="relative bg-card rounded-lg shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto p-6">
+                <div class="mb-4">
+                    <h3 class="text-lg font-medium text-white">Edytuj typ produktu</h3>
+                    <p class="mt-1 text-sm text-gray-400">Modyfikuj właściwości typu produktu.</p>
+                </div>
+
+                <div class="space-y-4">
+                    {{-- Name --}}
+                    <div>
+                        <label class="block text-sm font-medium text-gray-300 mb-1">Nazwa typu *</label>
+                        <input wire:model.live="name"
+                               type="text"
+                               class="block w-full px-3 py-2 border border-gray-600 rounded-md bg-gray-800 text-white focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent">
+                        @error('name') <span class="text-red-400 text-xs">{{ $message }}</span> @enderror
+                    </div>
+
+                    {{-- Slug --}}
+                    <div>
+                        <label class="block text-sm font-medium text-gray-300 mb-1">Slug URL *</label>
+                        <input wire:model.live="slug"
+                               type="text"
+                               class="block w-full px-3 py-2 border border-gray-600 rounded-md bg-gray-800 text-white focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent font-mono">
+                        @error('slug') <span class="text-red-400 text-xs">{{ $message }}</span> @enderror
+                    </div>
+
+                    {{-- Description --}}
+                    <div>
+                        <label class="block text-sm font-medium text-gray-300 mb-1">Opis</label>
+                        <textarea wire:model="description"
+                                 rows="2"
+                                 class="block w-full px-3 py-2 border border-gray-600 rounded-md bg-gray-800 text-white focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"></textarea>
+                        @error('description') <span class="text-red-400 text-xs">{{ $message }}</span> @enderror
+                    </div>
+
+                    {{-- Icon Picker --}}
+                    <div x-data="{ showIconPicker: false }">
+                        <label class="block text-sm font-medium text-gray-300 mb-1">Ikona</label>
+                        <div class="flex items-center space-x-3">
+                            {{-- Icon Preview --}}
+                            <div class="flex-shrink-0 w-12 h-12 flex items-center justify-center bg-gray-700 rounded-lg border border-gray-600">
+                                @if($icon)
+                                    <i class="{{ $icon }} text-xl text-orange-400"></i>
+                                @else
+                                    <span class="text-gray-500 text-xs">Brak</span>
+                                @endif
+                            </div>
+                            {{-- Icon Input --}}
+                            <div class="flex-1">
+                                <input wire:model.live="icon"
+                                       type="text"
+                                       placeholder="np. fas fa-car"
+                                       class="block w-full px-3 py-2 border border-gray-600 rounded-md bg-gray-800 text-white focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent text-sm">
+                            </div>
+                            {{-- Toggle Picker --}}
+                            <button type="button" @click="showIconPicker = !showIconPicker"
+                                    class="px-3 py-2 bg-gray-700 hover:bg-gray-600 text-gray-300 rounded-md transition-colors text-sm">
+                                <i class="fas fa-th"></i>
+                            </button>
+                        </div>
+
+                        {{-- Icon Picker Grid --}}
+                        <div x-show="showIconPicker" x-transition class="mt-3 p-3 bg-gray-800 rounded-lg border border-gray-600">
+                            <p class="text-xs text-gray-400 mb-2">Popularne ikony dla typów produktów:</p>
+                            <div class="grid grid-cols-8 gap-2">
+                                @php
+                                    $popularIcons = [
+                                        'fas fa-car' => 'Samochód',
+                                        'fas fa-motorcycle' => 'Motocykl',
+                                        'fas fa-cog' => 'Część',
+                                        'fas fa-cogs' => 'Części',
+                                        'fas fa-wrench' => 'Narzędzie',
+                                        'fas fa-tools' => 'Narzędzia',
+                                        'fas fa-tshirt' => 'Odzież',
+                                        'fas fa-hard-hat' => 'Kask',
+                                        'fas fa-oil-can' => 'Olej',
+                                        'fas fa-gas-pump' => 'Paliwo',
+                                        'fas fa-battery-full' => 'Akumulator',
+                                        'fas fa-lightbulb' => 'Oświetlenie',
+                                        'fas fa-plug' => 'Elektryka',
+                                        'fas fa-fan' => 'Chłodzenie',
+                                        'fas fa-filter' => 'Filtr',
+                                        'fas fa-truck' => 'Ciężarówka',
+                                        'fas fa-bicycle' => 'Rower',
+                                        'fas fa-snowplow' => 'Quad',
+                                        'fas fa-box' => 'Inne',
+                                        'fas fa-boxes' => 'Zestaw',
+                                        'fas fa-shopping-bag' => 'Akcesoria',
+                                        'fas fa-shield-alt' => 'Ochrona',
+                                        'fas fa-key' => 'Kluczyk',
+                                        'fas fa-tag' => 'Etykieta',
+                                    ];
+                                @endphp
+                                @foreach($popularIcons as $iconClass => $iconName)
+                                    <button type="button"
+                                            wire:click="$set('icon', '{{ $iconClass }}')"
+                                            @click="showIconPicker = false"
+                                            title="{{ $iconName }}"
+                                            class="w-9 h-9 flex items-center justify-center rounded-md transition-colors
+                                                   {{ $icon === $iconClass ? 'bg-orange-600 text-white' : 'bg-gray-700 hover:bg-gray-600 text-gray-300' }}">
+                                        <i class="{{ $iconClass }}"></i>
+                                    </button>
+                                @endforeach
+                            </div>
+                        </div>
+                        @error('icon') <span class="text-red-400 text-xs">{{ $message }}</span> @enderror
+                    </div>
+
+                    {{-- Sort Order --}}
+                    <div>
+                        <label class="block text-sm font-medium text-gray-300 mb-1">Kolejność</label>
+                        <input wire:model="sort_order"
+                               type="number"
+                               min="0"
+                               class="block w-full px-3 py-2 border border-gray-600 rounded-md bg-gray-800 text-white focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent">
+                        @error('sort_order') <span class="text-red-400 text-xs">{{ $message }}</span> @enderror
+                    </div>
+
+                    {{-- Active Status --}}
+                    <div class="flex items-center">
+                        <input wire:model="is_active"
+                               type="checkbox"
+                               id="edit_is_active"
+                               class="rounded border-gray-600 text-orange-600 shadow-sm focus:border-orange-500 focus:ring-orange-500">
+                        <label for="edit_is_active" class="ml-2 text-sm text-gray-300">Typ aktywny</label>
+                    </div>
+                </div>
+
+                <div class="mt-6 flex justify-end space-x-3">
+                    <button wire:click="closeModal"
+                           class="btn-secondary px-4 py-2 rounded-lg">
+                        Anuluj
+                    </button>
+                    <button wire:click="update"
+                           class="btn-primary px-4 py-2 rounded-lg">
+                        Zapisz zmiany
+                    </button>
+                </div>
+            </div>
+        </div>
+    @endif
+
+    {{-- Delete Confirmation Modal - Centered --}}
+    @if($isDeleteModalOpen && $selectedType)
+        <div class="fixed inset-0 z-50 flex items-center justify-center p-4">
+            {{-- Backdrop --}}
+            <div class="fixed inset-0 bg-gray-900 bg-opacity-75 transition-opacity" wire:click="closeModal"></div>
+
+            {{-- Modal Content --}}
+            <div class="relative bg-card rounded-lg shadow-xl w-full max-w-md p-6">
+                <div class="flex items-center mb-4">
+                    <div class="flex-shrink-0">
+                        <svg class="w-6 h-6 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"/>
+                        </svg>
+                    </div>
+                    <div class="ml-3">
+                        <h3 class="text-lg font-medium text-white">Usuń typ produktu</h3>
+                    </div>
+                </div>
+
+                <div class="mb-4">
+                    <p class="text-sm text-gray-400">
+                        Czy na pewno chcesz usunąć typ produktu <strong class="text-white">{{ $selectedType->name }}</strong>?
+                    </p>
+                    @if($selectedType->products_count > 0)
+                        <div class="mt-3 p-3 bg-red-900/20 border border-red-800 rounded-lg">
+                            <p class="text-sm text-red-200">
+                                <strong>Uwaga:</strong> Ten typ ma przypisanych {{ $selectedType->products_count }} produktów.
+                                Nie można usunąć typu produktu, który jest używany przez produkty.
+                            </p>
+                        </div>
+                    @else
+                        <p class="text-xs text-gray-500 mt-2">Ta operacja jest nieodwracalna.</p>
+                    @endif
+                </div>
+
+                <div class="flex justify-end space-x-3">
+                    <button wire:click="closeModal"
+                           class="btn-secondary px-4 py-2 rounded-lg">
+                        Anuluj
+                    </button>
+                    <button wire:click="delete"
+                           {{ $selectedType->products_count > 0 ? 'disabled' : '' }}
+                           class="bg-red-600 hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed text-white px-4 py-2 rounded-lg transition-colors duration-200">
+                        Usuń typ
+                    </button>
                 </div>
             </div>
         </div>

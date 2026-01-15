@@ -4,6 +4,7 @@ namespace App\Http\Livewire\Products\Management\Traits;
 
 use App\Jobs\PrestaShop\SyncProductToPrestaShop;
 use App\Jobs\PrestaShop\PullSingleProductFromPrestaShop;
+use App\Services\PrestaShop\ShopVariantService;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -32,7 +33,20 @@ trait ProductFormShopTabs
     public ?int $selectedShopId = null;
 
     /**
+     * Variants pulled from PrestaShop API for current shop
+     * Format: ['variants' => Collection, 'synced' => bool, 'error' => ?string]
+     */
+    public array $prestaShopVariants = [];
+
+    /**
+     * Flag indicating if variants are being pulled from PrestaShop
+     */
+    public bool $pullingShopVariants = false;
+
+    /**
      * Select shop tab and set active shop
+     *
+     * ETAP_05c FIX: Pulls variants LIVE from PrestaShop API when entering shop tab
      *
      * @param int $shopId
      * @return void
@@ -42,9 +56,95 @@ trait ProductFormShopTabs
         $this->selectedShopId = $shopId;
         $this->activeShopTab = "shop_{$shopId}";
 
+        // FIX PROBLEM 1: Set activeShopId for getAllVariantsForDisplay() to use PrestaShop data
+        // Without this, activeShopId stays null and variants tab shows local data instead of API data
+        $this->activeShopId = $shopId;
+
+        // ETAP_05c: Pull variants from PrestaShop API when entering shop tab
+        if ($this->product && $this->isEditMode) {
+            $this->pullVariantsFromPrestaShop($shopId);
+
+            // FIX: Switch variant context to enable shop-specific overrides
+            $this->switchVariantContextToShop($shopId);
+        }
+
         Log::info('Shop tab selected', [
-            'product_id' => $this->product->id,
+            'product_id' => $this->product->id ?? null,
             'shop_id' => $shopId,
+            'active_shop_id' => $this->activeShopId,
+            'variants_pulled' => !empty($this->prestaShopVariants),
+        ]);
+    }
+
+    /**
+     * Pull variants from PrestaShop API for specific shop
+     *
+     * ETAP_05c: Called when entering shop tab to get LIVE data from PrestaShop
+     *
+     * @param int $shopId
+     * @return void
+     */
+    protected function pullVariantsFromPrestaShop(int $shopId): void
+    {
+        if (!$this->product) {
+            return;
+        }
+
+        $this->pullingShopVariants = true;
+
+        try {
+            $service = app(ShopVariantService::class);
+            $result = $service->pullShopVariants($this->product, $shopId);
+
+            $this->prestaShopVariants = $result;
+
+            Log::info('[ProductFormShopTabs] Pulled variants from PrestaShop', [
+                'product_id' => $this->product->id,
+                'shop_id' => $shopId,
+                'variants_count' => $result['variants']->count(),
+                'synced' => $result['synced'],
+                'error' => $result['error'] ?? null,
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('[ProductFormShopTabs] Failed to pull variants from PrestaShop', [
+                'product_id' => $this->product->id,
+                'shop_id' => $shopId,
+                'error' => $e->getMessage(),
+            ]);
+
+            $this->prestaShopVariants = [
+                'variants' => collect(),
+                'synced' => false,
+                'error' => $e->getMessage(),
+            ];
+        }
+
+        $this->pullingShopVariants = false;
+    }
+
+    /**
+     * Reset shop to default (Dane Domyslne)
+     *
+     * @return void
+     */
+    public function selectDefaultTab(): void
+    {
+        $this->selectedShopId = null;
+        $this->activeShopTab = 'all';
+        $this->prestaShopVariants = []; // Clear PS variants when going back to default
+
+        // FIX PROBLEM 1: Reset activeShopId to null for getAllVariantsForDisplay() to use local data
+        $this->activeShopId = null;
+
+        // Restore variant context to default
+        if (method_exists($this, 'restoreVariantContextToDefault')) {
+            $this->restoreVariantContextToDefault();
+        }
+
+        Log::info('Default tab selected (Dane Domyslne)', [
+            'product_id' => $this->product->id ?? null,
+            'active_shop_id' => $this->activeShopId,
         ]);
     }
 

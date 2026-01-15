@@ -1,7 +1,4 @@
 <div>
-    {{-- Flash Messages Component --}}
-    <x-flash-messages />
-
     <div class="bg-gray-800 border-b border-gray-700 px-6 py-4">
         <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
             <div class="flex items-center space-x-4">
@@ -57,7 +54,10 @@
                     </div>
                 @endif
 
-                <a href="/admin/products/categories/create" class="category-add-btn">
+                {{-- NOTE: Creates a main category (level 2) - levels 0 and 1 are reserved for PrestaShop structure --}}
+                <a href="/admin/products/categories/create?level=2"
+                   class="category-add-btn"
+                   title="Dodaje nową kategorię główną (poziom 2)">
                     <i class="fas fa-plus mr-2"></i>
                     Dodaj kategorię
                 </a>
@@ -116,7 +116,7 @@
 
                             <hr class="my-1 border-gray-200 dark:border-gray-600">
 
-                            <button wire:click="bulkDelete"
+                            <button wire:click="showBulkDeleteConfirmation"
                                     @click="bulkMenuOpen = false"
                                     class="w-full flex items-center px-4 py-2 text-sm text-gray-300 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-700 dark:hover:text-red-400 transition-colors">
                                 <i class="fas fa-trash w-5 text-red-600 dark:text-red-400"></i>
@@ -151,13 +151,22 @@
                 <thead class="bg-gray-900/50">
                     <tr>
                         {{-- Checkbox Column (Master) --}}
-                        <th class="px-3 py-3 text-left w-12">
+                        <th class="px-3 py-3 text-left w-12"
+                            x-data="{
+                                selectedCount: {{ count($selectedCategories) }},
+                                totalCount: {{ count($categories) }}
+                            }"
+                            x-init="$nextTick(() => {
+                                const cb = $el.querySelector('input[type=checkbox]');
+                                if (cb) cb.indeterminate = (selectedCount > 0 && selectedCount < totalCount);
+                            })">
                             <input type="checkbox"
-                                   wire:click="{{ count($selectedCategories) === count($categories) && count($categories) > 0 ? 'deselectAll' : 'selectAll' }}"
-                                   {{ count($selectedCategories) === count($categories) && count($categories) > 0 ? 'checked' : '' }}
+                                   wire:key="master-checkbox-{{ count($selectedCategories) === count($categories) && count($categories) > 0 ? '1' : '0' }}"
+                                   wire:click="toggleSelectAll"
+                                   @checked(count($selectedCategories) === count($categories) && count($categories) > 0)
                                    class="category-checkbox"
                                    aria-label="Zaznacz/odznacz wszystkie kategorie"
-                                   title="Zaznacz/odznacz wszystkie widoczne kategorie">
+                                   title="{{ count($selectedCategories) > 0 ? 'Odznacz wszystkie' : 'Zaznacz wszystkie widoczne kategorie' }}">
                         </th>
 
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
@@ -173,22 +182,35 @@
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Akcje</th>
                     </tr>
                 </thead>
-                <tbody class="bg-gray-800 divide-y divide-gray-700 sortable-tbody"
+                <tbody class="bg-gray-800 divide-y divide-gray-700 sortable-tbody category-tree-keyboard"
                        style="overflow: visible !important;"
+                       role="tree"
+                       aria-label="Drzewo kategorii produktow"
                        @if($viewMode === 'tree')
-                           x-data="categoryDragDrop"
-                           x-init="initSortable()"
+                           x-data="{ ...categoryDragDrop(), ...categoryKeyboardNav() }"
+                           x-init="initSortable(); initKeyboardNav()"
+                           @keydown="handleKeydown($event)"
+                           tabindex="0"
                        @endif>
+                    {{-- NOTE: Poziomy 0 i 1 są zarezerwowane dla struktury PrestaShop --}}
+                    {{-- Przycisk "Dodaj kategorię" w headerze dodaje kategorię na poziomie 2 (główna kategoria użytkownika) --}}
                     @forelse($categories as $category)
-                        <tr class="transition-colors category-row {{ in_array($category->id, $selectedCategories) ? 'category-row-selected' : 'bg-gray-800 hover:bg-gray-700/50' }} {{ $viewMode === 'tree' && ($category->level ?? 0) > 0 ? 'category-level-border' : '' }}"
+                        <tr wire:key="category-row-{{ $category->id }}"
+                            class="transition-colors category-row {{ in_array($category->id, $selectedCategories) ? 'category-row-selected' : 'bg-gray-800 hover:bg-gray-700/50' }} {{ $viewMode === 'tree' && ($category->level ?? 0) > 0 ? 'category-level-border' : '' }}"
                             data-category-id="{{ $category->id }}"
-                            data-level="{{ $category->level ?? 0 }}">
+                            data-level="{{ $category->level ?? 0 }}"
+                            role="treeitem"
+                            aria-level="{{ ($category->level ?? 0) + 1 }}"
+                            aria-expanded="{{ $category->children_count > 0 ? (in_array($category->id, $expandedNodes) ? 'true' : 'false') : 'undefined' }}"
+                            aria-selected="{{ in_array($category->id, $selectedCategories) ? 'true' : 'false' }}"
+                            tabindex="-1">
 
                             {{-- Checkbox Column --}}
                             <td class="px-3 py-4 whitespace-nowrap w-12">
                                 <input type="checkbox"
+                                       wire:key="checkbox-{{ $category->id }}-{{ in_array($category->id, $selectedCategories) ? '1' : '0' }}"
                                        wire:click="toggleSelection({{ $category->id }})"
-                                       {{ in_array($category->id, $selectedCategories) ? 'checked' : '' }}
+                                       @checked(in_array($category->id, $selectedCategories))
                                        class="category-checkbox"
                                        aria-label="Zaznacz kategorię {{ $category->name }}"
                                        title="Zaznacz kategorię">
@@ -217,26 +239,23 @@
                                     {{-- Category Expand/Collapse Button (Tree Mode Only) --}}
                                     @if($viewMode === 'tree' && $category->children_count > 0)
                                         <button wire:click="toggleNode({{ $category->id }})"
-                                                class="category-node-toggle"
-                                                title="{{ in_array($category->id, $expandedNodes) ? 'Zwiń' : 'Rozwiń' }} podkategorie">
-                                            <i class="fas fa-{{ in_array($category->id, $expandedNodes) ? 'minus' : 'plus' }} text-gray-300"></i>
+                                                class="category-expand-chevron {{ in_array($category->id, $expandedNodes) ? 'is-expanded' : '' }}"
+                                                title="{{ in_array($category->id, $expandedNodes) ? 'Zwiń' : 'Rozwiń' }} podkategorie"
+                                                aria-label="{{ in_array($category->id, $expandedNodes) ? 'Zwiń' : 'Rozwiń' }} {{ $category->name }}">
+                                            <i class="fas fa-chevron-right"></i>
                                         </button>
                                     @else
-                                        <div class="w-5 h-5"></div> {{-- Spacer for alignment --}}
+                                        <div class="w-6 h-6"></div> {{-- Spacer for alignment --}}
                                     @endif
 
                                     {{-- Category Icon & Details --}}
                                     @if($viewMode === 'tree')
-                                        <div class="category-icon-bg
-                                            {{ ($category->level ?? 0) === 0 ? 'category-icon-bg-level-0' :
-                                               (($category->level ?? 0) === 1 ? 'category-icon-bg-level-1' :
-                                                (($category->level ?? 0) === 2 ? 'category-icon-bg-level-2' :
-                                                 'category-icon-bg-level-3')) }}">
-                                            <i class="fas fa-{{ $category->children_count > 0 ? 'folder-open' : 'folder' }} category-icon
-                                                {{ ($category->level ?? 0) === 0 ? 'category-icon-level-0' :
-                                                   (($category->level ?? 0) === 1 ? 'category-icon-level-1' :
-                                                    (($category->level ?? 0) === 2 ? 'category-icon-level-2' :
-                                                     'category-icon-level-3')) }}"></i>
+                                        @php
+                                            // Level-based folder icon classes (0-5+)
+                                            $folderLevel = min($category->level ?? 0, 5);
+                                        @endphp
+                                        <div class="category-folder-icon category-folder-icon--level-{{ $folderLevel }}">
+                                            <i class="fas fa-{{ $category->children_count > 0 && in_array($category->id, $expandedNodes) ? 'folder-open' : 'folder' }}"></i>
                                         </div>
                                     @else
                                         <div class="w-8 h-8 bg-gray-700 rounded-lg flex items-center justify-center">
@@ -244,17 +263,14 @@
                                         </div>
                                     @endif
 
-                                    <div>
+                                    <div class="category-name-cell relative">
                                         <div class="text-sm font-medium text-white
                                              {{ $viewMode === 'tree' && ($category->level ?? 0) > 0 ? 'text-sm' : 'text-base' }}">
                                             {{ $category->name }}
 
                                             {{-- Child Count Badge (Tree Mode) --}}
                                             @if($viewMode === 'tree' && $category->children_count > 0)
-                                                <span class="ml-2 category-badge-subcategories
-                                                    {{ ($category->level ?? 0) === 0 ? 'category-badge-subcategories-level-0' :
-                                                       (($category->level ?? 0) === 1 ? 'category-badge-subcategories-level-1' :
-                                                        'category-badge-subcategories-level-2') }}">
+                                                <span class="ml-2 category-badge-subcategories category-badge-subcategories-level-{{ min($category->level ?? 0, 2) }}">
                                                     {{ $category->children_count }} {{ $category->children_count === 1 ? 'podkategoria' : 'podkategorii' }}
                                                 </span>
                                             @endif
@@ -262,22 +278,161 @@
                                         @if($category->description)
                                             <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">{{ Str::limit($category->description, 50) }}</div>
                                         @endif
+
+                                        {{-- Breadcrumb Tooltip (hover reveal) --}}
+                                        @if($viewMode === 'tree' && ($category->level ?? 0) > 0)
+                                            @php
+                                                $breadcrumbParts = [];
+                                                $parent = $category->parent;
+                                                while ($parent) {
+                                                    array_unshift($breadcrumbParts, $parent->name);
+                                                    $parent = $parent->parent;
+                                                }
+                                            @endphp
+                                            @if(count($breadcrumbParts) > 0)
+                                            <div class="category-breadcrumb-tooltip">
+                                                <div class="category-breadcrumb-tooltip-content">
+                                                    @foreach($breadcrumbParts as $index => $part)
+                                                        <span>{{ $part }}</span>
+                                                        <span class="separator"><i class="fas fa-chevron-right"></i></span>
+                                                    @endforeach
+                                                    <span class="current">{{ $category->name }}</span>
+                                                </div>
+                                            </div>
+                                            @endif
+                                        @endif
                                     </div>
                                 </div>
                             </td>
 
                             <td class="px-6 py-4 whitespace-nowrap">
-                                <span class="category-badge-level">
-                                    Poziom {{ $category->level ?? 0 }}
-                                </span>
+                                {{-- Level column with add child inline form (FAZA 2.1 ETAP_15) --}}
+                                @php
+                                    $childLevel = ($category->level ?? 0) + 1;
+                                    $childIconClass = match($childLevel) {
+                                        0 => 'category-insert-icon--level-0',
+                                        1 => 'category-insert-icon--level-1',
+                                        2 => 'category-insert-icon--level-2',
+                                        3 => 'category-insert-icon--level-3',
+                                        4 => 'category-insert-icon--level-4',
+                                        default => 'category-insert-icon--level-5',
+                                    };
+                                    // Color for level preview badge (levels 0-10)
+                                    $childLevelColor = match($childLevel) {
+                                        0 => '#60a5fa', // Blue
+                                        1 => '#4ade80', // Green
+                                        2 => '#c084fc', // Purple
+                                        3 => '#fb923c', // Orange
+                                        4 => '#f472b6', // Pink
+                                        5 => '#2dd4bf', // Teal
+                                        6 => '#a3e635', // Lime
+                                        7 => '#f87171', // Red
+                                        8 => '#818cf8', // Indigo
+                                        9 => '#fbbf24', // Amber
+                                        default => '#e879f9', // Fuchsia (10+)
+                                    };
+                                @endphp
+                                <div class="category-level-column"
+                                     x-data="{ ...categoryInlineForm({ parentId: {{ $category->id }}, level: {{ $childLevel }} }), hideTimeout: null }"
+                                     :class="{ 'is-adding-child': isOpen }"
+                                     @mouseenter="clearTimeout(hideTimeout); showTrigger = true"
+                                     @mouseleave="if (!isOpen) { hideTimeout = setTimeout(() => showTrigger = false, 400) }">
+                                    {{-- Badge with expanded hover area --}}
+                                    <div class="category-level-badge-wrapper">
+                                        <span class="category-badge-level">
+                                            Poziom {{ $category->level ?? 0 }}
+                                        </span>
+                                    </div>
+
+                                    {{-- Add child trigger (slides DOWN below badge, CENTERED) --}}
+                                    {{-- Block level 1 creation (only Baza/level 0 can have level 1 children via other methods) --}}
+                                    @if($childLevel > 1)
+                                    <div class="category-add-child-popup"
+                                         x-show="showTrigger && !isOpen"
+                                         x-cloak
+                                         x-transition:enter="transition ease-out duration-150"
+                                         x-transition:enter-start="opacity-0 -translate-y-1"
+                                         x-transition:enter-end="opacity-100 translate-y-0"
+                                         x-transition:leave="transition ease-in duration-100"
+                                         x-transition:leave-start="opacity-100 translate-y-0"
+                                         x-transition:leave-end="opacity-0 -translate-y-1">
+                                        <button type="button"
+                                                class="category-add-child-trigger"
+                                                @click="open()"
+                                                title="Dodaj podkategorię (poziom {{ $childLevel }})">
+                                            {{-- Arrow and level preview --}}
+                                            <i class="fas fa-arrow-down category-add-child-arrow"></i>
+                                            <span class="category-add-child-level-preview" data-level-color="{{ $childLevelColor }}">+{{ $childLevel }}</span>
+                                        </button>
+                                    </div>
+
+                                    {{-- Inline form popup (below trigger) --}}
+                                    @endif
+                                    @if($childLevel > 1)
+                                    <div class="category-add-child-form"
+                                         x-show="isOpen"
+                                         x-cloak
+                                         x-transition:enter="transition ease-out duration-150"
+                                         x-transition:enter-start="opacity-0 translate-y-1"
+                                         x-transition:enter-end="opacity-100 translate-y-0"
+                                         @click.outside="close()">
+                                        <div class="category-add-child-form-inner">
+                                            {{-- Folder icon with level color --}}
+                                            <div class="category-insert-icon {{ $childIconClass }}">
+                                                <i class="fas fa-folder"></i>
+                                            </div>
+
+                                            {{-- Input with +OPIS toggle --}}
+                                            <div class="category-insert-input-wrapper">
+                                                <input type="text"
+                                                       x-model="name"
+                                                       x-ref="nameInput"
+                                                       @keydown.enter="save()"
+                                                       @keydown.escape="close()"
+                                                       class="category-insert-form-input"
+                                                       placeholder="Nazwa podkategorii...">
+                                                <button type="button"
+                                                        @click="showDescription = !showDescription"
+                                                        :class="{ 'is-active': showDescription }"
+                                                        class="category-insert-desc-toggle">
+                                                    <i class="fas fa-plus mr-1"></i>OPIS
+                                                </button>
+                                            </div>
+
+                                            {{-- Action buttons --}}
+                                            <div class="category-insert-form-actions">
+                                                <button type="button"
+                                                        @click="save()"
+                                                        :disabled="!name.trim()"
+                                                        class="category-insert-form-btn category-insert-form-btn--save">
+                                                    <i class="fas fa-check"></i>
+                                                </button>
+                                                <button type="button"
+                                                        @click="close()"
+                                                        class="category-insert-form-btn category-insert-form-btn--cancel">
+                                                    <i class="fas fa-times"></i>
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        {{-- Description textarea --}}
+                                        <div class="category-insert-desc-row" :class="{ 'is-visible': showDescription }">
+                                            <textarea x-model="description"
+                                                      @keydown.escape="close()"
+                                                      class="category-insert-form-textarea"
+                                                      placeholder="Opis podkategorii (opcjonalny)..."></textarea>
+                                        </div>
+                                    </div>
+                                </div>
+                                @endif
                             </td>
 
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                                <div class="flex items-center space-x-2">
-                                    <i class="fas fa-box text-xs"></i>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm">
+                                <div class="category-product-badge {{ ($category->products_count ?? 0) > 0 ? 'category-product-badge--has-products' : '' }}">
+                                    <i class="fas fa-box"></i>
                                     <span>{{ $category->products_count ?? 0 }}</span>
-                                    @if($category->products_count > 0)
-                                        <span class="category-primary-count">(+{{ $category->primary_products_count ?? 0 }} głównych)</span>
+                                    @if(($category->products_count ?? 0) > 0)
+                                        <span class="category-primary-count">({{ $category->primary_products_count ?? 0 }} glownych)</span>
                                     @endif
                                 </div>
                             </td>
@@ -300,6 +455,90 @@
                                 @include('livewire.products.categories.partials.compact-category-actions', ['category' => $category])
                             </td>
                         </tr>
+
+                        {{-- Inline Insert Line (+ between categories) - FAZA 2 ETAP_15 --}}
+                        {{-- RESTRICTION: Levels 0 and 1 are reserved for PrestaShop structure - no insert allowed --}}
+                        @if($viewMode === 'tree' && ($category->level ?? 0) >= 2)
+                            @php
+                                $insertLevel = $category->level ?? 0;
+                                $insertParentId = $category->parent_id;
+                                // Level colors match main category icons from components.css
+                                $iconLevelClass = match($insertLevel) {
+                                    0 => 'category-insert-icon--level-0', // Blue (never shown - restricted)
+                                    1 => 'category-insert-icon--level-1', // Green (never shown - restricted)
+                                    2 => 'category-insert-icon--level-2', // Purple
+                                    3 => 'category-insert-icon--level-3', // Orange
+                                    4 => 'category-insert-icon--level-4', // Pink
+                                    default => 'category-insert-icon--level-5', // Teal (5+)
+                                };
+                            @endphp
+                            <tr class="category-insert-line"
+                                wire:key="insert-line-{{ $category->id }}"
+                                x-data="categoryInlineForm({ parentId: {{ $insertParentId ?? 'null' }}, level: {{ $insertLevel }} })"
+                                :class="{ 'is-adding': isOpen }">
+                                <td class="w-12"></td>
+                                <td colspan="5" class="px-6 category-insert-cell">
+                                    {{-- Trigger button --}}
+                                    <button class="category-insert-trigger"
+                                            @click="open()"
+                                            x-show="!isOpen"
+                                            title="Dodaj kategorię na tym poziomie">
+                                        <i class="fas fa-plus"></i>
+                                    </button>
+
+                                    {{-- Inline form --}}
+                                    <div class="category-insert-form" x-show="isOpen" x-cloak>
+                                        <div class="category-insert-form-row">
+                                            {{-- Folder icon (auto-color based on level) --}}
+                                            <div class="category-insert-icon {{ $iconLevelClass }}">
+                                                <i class="fas fa-folder"></i>
+                                            </div>
+
+                                            {{-- Input wrapper with +OPIS button --}}
+                                            <div class="category-insert-input-wrapper">
+                                                <input type="text"
+                                                       x-model="name"
+                                                       x-ref="nameInput"
+                                                       @keydown.enter="save()"
+                                                       @keydown.escape="close()"
+                                                       class="category-insert-form-input"
+                                                       placeholder="Nazwa nowej kategorii...">
+                                                <button type="button"
+                                                        @click="showDescription = !showDescription"
+                                                        :class="{ 'is-active': showDescription }"
+                                                        class="category-insert-desc-toggle">
+                                                    <i class="fas fa-plus mr-1"></i>OPIS
+                                                </button>
+                                            </div>
+
+                                            {{-- Action buttons --}}
+                                            <div class="category-insert-form-actions">
+                                                <button type="button"
+                                                        @click="save()"
+                                                        :disabled="!name.trim()"
+                                                        class="category-insert-form-btn category-insert-form-btn--save">
+                                                    <i class="fas fa-check"></i>
+                                                    Dodaj
+                                                </button>
+                                                <button type="button"
+                                                        @click="close()"
+                                                        class="category-insert-form-btn category-insert-form-btn--cancel">
+                                                    <i class="fas fa-times"></i>
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        {{-- Description textarea (expandable) --}}
+                                        <div class="category-insert-desc-row" :class="{ 'is-visible': showDescription }">
+                                            <textarea x-model="description"
+                                                      @keydown.escape="close()"
+                                                      class="category-insert-form-textarea"
+                                                      placeholder="Opis kategorii (opcjonalny)..."></textarea>
+                                        </div>
+                                    </div>
+                                </td>
+                            </tr>
+                        @endif
                     @empty
                         <tr>
                             <td colspan="6" class="px-6 py-12 text-center">
@@ -319,12 +558,15 @@
             </table>
         </div>
     </div>
-    <div wire:loading class="fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center z-50">
+    {{-- Loading overlay - TYLKO dla ciężkich operacji (nie toggleNode!) --}}
+    <div wire:loading.delay.longer
+         wire:target="saveCategory, deleteCategory, confirmForceDelete, bulkDelete, bulkActivate, bulkDeactivate, mergeCategories, reorderCategory"
+         class="fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center z-50">
         <div class="bg-gray-800 rounded-lg p-6 max-w-sm w-full mx-4">
             <div class="flex items-center space-x-4">
                 <div class="animate-spin category-loading-spinner"></div>
                 <div>
-                    <h4 class="text-lg font-medium text-white">Ładowanie...</h4>
+                    <h4 class="text-lg font-medium text-white">Zapisywanie...</h4>
                     <p class="text-sm text-gray-500 dark:text-gray-400">Proszę czekać</p>
                 </div>
             </div>
@@ -457,51 +699,201 @@ document.addEventListener('alpine:init', () => {
             }, 3000);
         }
     }));
+
+    // Keyboard Navigation Component - FAZA 4 ETAP_15
+    Alpine.data('categoryKeyboardNav', () => ({
+        currentIndex: -1,
+        rows: [],
+
+        initKeyboardNav() {
+            this.updateRows();
+            // Listen for Livewire updates
+            document.addEventListener('livewire:navigated', () => this.updateRows());
+        },
+
+        updateRows() {
+            this.rows = Array.from(this.$el.querySelectorAll('tr[role="treeitem"]'));
+        },
+
+        handleKeydown(event) {
+            // Skip if inside an input field
+            if (event.target.tagName === 'INPUT' || event.target.tagName === 'TEXTAREA') {
+                return;
+            }
+
+            const handlers = {
+                'ArrowDown': () => this.moveDown(),
+                'ArrowUp': () => this.moveUp(),
+                'ArrowRight': () => this.expandCurrent(),
+                'ArrowLeft': () => this.collapseCurrent(),
+                'Enter': () => this.editCurrent(),
+                'Delete': () => this.deleteCurrent(),
+                'n': () => this.addChildToCurrent(),
+                'N': () => this.addChildToCurrent(),
+                'Space': () => this.toggleSelectCurrent(),
+            };
+
+            if (handlers[event.key]) {
+                event.preventDefault();
+                handlers[event.key]();
+            }
+        },
+
+        moveDown() {
+            this.updateRows();
+            if (this.rows.length === 0) return;
+
+            // Remove current focus
+            if (this.currentIndex >= 0 && this.rows[this.currentIndex]) {
+                this.rows[this.currentIndex].classList.remove('keyboard-focused');
+            }
+
+            // Move to next row
+            this.currentIndex = Math.min(this.currentIndex + 1, this.rows.length - 1);
+            this.focusRow(this.currentIndex);
+        },
+
+        moveUp() {
+            this.updateRows();
+            if (this.rows.length === 0) return;
+
+            // Remove current focus
+            if (this.currentIndex >= 0 && this.rows[this.currentIndex]) {
+                this.rows[this.currentIndex].classList.remove('keyboard-focused');
+            }
+
+            // Move to previous row
+            this.currentIndex = Math.max(this.currentIndex - 1, 0);
+            this.focusRow(this.currentIndex);
+        },
+
+        focusRow(index) {
+            if (index < 0 || index >= this.rows.length) return;
+
+            const row = this.rows[index];
+            row.classList.add('keyboard-focused');
+            row.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+            // Update ARIA
+            this.rows.forEach(r => r.setAttribute('tabindex', '-1'));
+            row.setAttribute('tabindex', '0');
+            row.focus();
+        },
+
+        expandCurrent() {
+            const row = this.rows[this.currentIndex];
+            if (!row) return;
+
+            const categoryId = row.dataset.categoryId;
+            const isExpanded = row.getAttribute('aria-expanded') === 'true';
+
+            if (!isExpanded && row.getAttribute('aria-expanded') !== 'undefined') {
+                this.$wire.toggleNode(parseInt(categoryId));
+            }
+        },
+
+        collapseCurrent() {
+            const row = this.rows[this.currentIndex];
+            if (!row) return;
+
+            const categoryId = row.dataset.categoryId;
+            const isExpanded = row.getAttribute('aria-expanded') === 'true';
+
+            if (isExpanded) {
+                this.$wire.toggleNode(parseInt(categoryId));
+            }
+        },
+
+        editCurrent() {
+            const row = this.rows[this.currentIndex];
+            if (!row) return;
+
+            const categoryId = row.dataset.categoryId;
+            // Use existing editCategory method
+            this.$wire.editCategory(parseInt(categoryId));
+        },
+
+        deleteCurrent() {
+            const row = this.rows[this.currentIndex];
+            if (!row) return;
+
+            const categoryId = row.dataset.categoryId;
+            // Confirm before delete
+            if (confirm('Czy na pewno chcesz usunac te kategorie?')) {
+                this.$wire.deleteCategory(parseInt(categoryId));
+            }
+        },
+
+        addChildToCurrent() {
+            const row = this.rows[this.currentIndex];
+            if (!row) return;
+
+            // Navigate to create page with parent_id parameter
+            const categoryId = row.dataset.categoryId;
+            const level = parseInt(row.dataset.level) + 1;
+            window.location.href = `/admin/products/categories/create?parent_id=${categoryId}&level=${level}`;
+        },
+
+        toggleSelectCurrent() {
+            const row = this.rows[this.currentIndex];
+            if (!row) return;
+
+            const categoryId = row.dataset.categoryId;
+            this.$wire.toggleSelection(parseInt(categoryId));
+        }
+    }));
+
+    // Inline Form Component for adding categories - FAZA 2 ETAP_15
+    Alpine.data('categoryInlineForm', (config) => ({
+        isOpen: false,
+        showTrigger: false, // For hover reveal in POZIOM column
+        name: '',
+        description: '',
+        showDescription: false,
+        parentId: config.parentId,
+        level: config.level,
+
+        open() {
+            this.isOpen = true;
+            this.name = '';
+            this.description = '';
+            this.showDescription = false;
+
+            // Focus input after DOM update
+            this.$nextTick(() => {
+                if (this.$refs.nameInput) {
+                    this.$refs.nameInput.focus();
+                }
+            });
+        },
+
+        close() {
+            this.isOpen = false;
+            this.name = '';
+            this.description = '';
+            this.showDescription = false;
+        },
+
+        save() {
+            const trimmedName = this.name.trim();
+            if (!trimmedName) return;
+
+            // Call Livewire method to save category
+            this.$wire.saveInlineCategory(
+                trimmedName,
+                this.description.trim(),
+                this.parentId
+            ).then(() => {
+                this.close();
+            }).catch((error) => {
+                console.error('Error saving category:', error);
+            });
+        }
+    }));
 });
     </script>
 
-    {{-- Drag and Drop Styles - MOVED INSIDE ROOT DIV --}}
-    <style>
-/* Drag states */
-.category-ghost {
-    background: rgba(59, 130, 246, 0.1) !important;
-    border: 2px dashed rgba(59, 130, 246, 0.3) !important;
-}
-
-.category-drag {
-    transform: rotate(5deg);
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
-}
-
-.category-chosen {
-    background: rgba(59, 130, 246, 0.05) !important;
-}
-
-/* Drag handle enhancement */
-.drag-handle:hover {
-    background: rgba(59, 130, 246, 0.1);
-    border-radius: 4px;
-}
-
-/* Global drag state */
-body.category-dragging {
-    cursor: grabbing !important;
-}
-
-body.category-dragging * {
-    cursor: grabbing !important;
-}
-
-/* Enhanced row hover when dragging */
-.sortable-tbody tr:hover .drag-handle {
-    opacity: 0.8;
-}
-
-.sortable-tbody tr.category-chosen .drag-handle {
-    opacity: 1;
-    background: rgba(59, 130, 246, 0.2);
-}
-    </style>
+    {{-- Drag and Drop Styles - MOVED TO category-tree.css --}}
 
     {{-- SortableJS CDN - Load if not already present - MOVED INSIDE ROOT DIV --}}
     <script>
@@ -528,8 +920,8 @@ if (typeof Sortable === 'undefined') {
 }
     </script>
 
-    {{-- Enhanced Category Modal with Tabs - DISABLED: Using CategoryForm page instead --}}
-    @if(false && $showModal)
+    {{-- Enhanced Category Modal with Tabs - RE-ENABLED for inline insert (FAZA 2 ETAP_15) --}}
+    @if($showModal)
         <div class="fixed inset-0 z-50 overflow-y-auto"
              x-data="{
                  show: @entangle('showModal'),
@@ -556,28 +948,28 @@ if (typeof Sortable === 'undefined') {
                             <div class="px-6 py-4">
                                 <div class="flex items-center justify-between mb-4">
                                     <div class="flex items-center">
-                                        <div class="flex-shrink-0 flex items-center justify-center h-10 w-10 rounded-full bg-blue-100 dark:bg-blue-900">
-                                            <i class="fas fa-folder text-blue-600 dark:text-blue-400"></i>
+                                        <div class="icon-chip">
+                                            <i class="fas fa-folder"></i>
                                         </div>
                                         <h3 class="ml-4 text-xl font-semibold text-white">
                                             {{ $modalMode === 'create' ? 'Dodaj kategorię' : 'Edytuj kategorię' }}
                                         </h3>
                                     </div>
                                     <button type="button" @click="$wire.closeModal()"
-                                            class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
+                                            class="text-gray-400 hover:text-white transition-colors">
                                         <i class="fas fa-times text-xl"></i>
                                     </button>
                                 </div>
 
                                 {{-- Tab Navigation --}}
-                                <div class="border-b border-gray-200 dark:border-gray-600">
+                                <div class="border-b border-gray-600">
                                     <nav class="-mb-px flex space-x-8">
                                         <template x-for="(tab, key) in tabs" :key="key">
                                             <button type="button"
                                                     @click="setActiveTab(key)"
                                                     :class="{
-                                                        'border-blue-500 text-blue-600 dark:text-blue-400': activeTab === key,
-                                                        'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300': activeTab !== key
+                                                        'border-mpp-primary text-mpp-primary': activeTab === key,
+                                                        'border-transparent text-gray-400 hover:text-gray-300': activeTab !== key
                                                     }"
                                                     class="whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm flex items-center transition-colors">
                                                 <i :class="tab.icon" class="mr-2"></i>
@@ -603,7 +995,7 @@ if (typeof Sortable === 'undefined') {
                                         <input type="text" wire:model.defer="categoryForm.name"
                                                class="w-full px-3 py-2 border border-gray-600 rounded-md
                                                       bg-gray-700 text-white
-                                                      focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                                                      focus:border-mpp-primary focus:ring-1 focus:ring-mpp-primary"
                                                required>
                                         @error('categoryForm.name')
                                             <p class="mt-1 text-sm text-red-600 dark:text-red-400">{{ $message }}</p>
@@ -618,7 +1010,7 @@ if (typeof Sortable === 'undefined') {
                                         <input type="text" wire:model.defer="categoryForm.slug"
                                                class="w-full px-3 py-2 border border-gray-600 rounded-md
                                                       bg-gray-700 text-white
-                                                      focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
+                                                      focus:border-mpp-primary focus:ring-1 focus:ring-mpp-primary">
                                         @error('categoryForm.slug')
                                             <p class="mt-1 text-sm text-red-600 dark:text-red-400">{{ $message }}</p>
                                         @enderror
@@ -632,7 +1024,7 @@ if (typeof Sortable === 'undefined') {
                                         <input type="number" wire:model.defer="categoryForm.sort_order"
                                                class="w-full px-3 py-2 border border-gray-600 rounded-md
                                                       bg-gray-700 text-white
-                                                      focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                                                      focus:border-mpp-primary focus:ring-1 focus:ring-mpp-primary"
                                                min="0">
                                         @error('categoryForm.sort_order')
                                             <p class="mt-1 text-sm text-red-600 dark:text-red-400">{{ $message }}</p>
@@ -648,7 +1040,7 @@ if (typeof Sortable === 'undefined') {
                                     <textarea wire:model.defer="categoryForm.description" rows="4"
                                               class="w-full px-3 py-2 border border-gray-600 rounded-md
                                                      bg-gray-700 text-white
-                                                     focus:border-blue-500 focus:ring-1 focus:ring-blue-500"></textarea>
+                                                     focus:border-mpp-primary focus:ring-1 focus:ring-mpp-primary"></textarea>
                                     @error('categoryForm.description')
                                         <p class="mt-1 text-sm text-red-600 dark:text-red-400">{{ $message }}</p>
                                     @enderror
@@ -662,7 +1054,7 @@ if (typeof Sortable === 'undefined') {
                                     <textarea wire:model.defer="categoryForm.short_description" rows="2"
                                               class="w-full px-3 py-2 border border-gray-600 rounded-md
                                                      bg-gray-700 text-white
-                                                     focus:border-blue-500 focus:ring-1 focus:ring-blue-500"></textarea>
+                                                     focus:border-mpp-primary focus:ring-1 focus:ring-mpp-primary"></textarea>
                                     @error('categoryForm.short_description')
                                         <p class="mt-1 text-sm text-red-600 dark:text-red-400">{{ $message }}</p>
                                     @enderror
@@ -698,7 +1090,7 @@ if (typeof Sortable === 'undefined') {
                                         <input type="text" wire:model.defer="categoryForm.meta_title"
                                                class="w-full px-3 py-2 border border-gray-600 rounded-md
                                                       bg-gray-700 text-white
-                                                      focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
+                                                      focus:border-mpp-primary focus:ring-1 focus:ring-mpp-primary">
                                         @error('categoryForm.meta_title')
                                             <p class="mt-1 text-sm text-red-600 dark:text-red-400">{{ $message }}</p>
                                         @enderror
@@ -712,7 +1104,7 @@ if (typeof Sortable === 'undefined') {
                                         <textarea wire:model.defer="categoryForm.meta_description" rows="3"
                                                   class="w-full px-3 py-2 border border-gray-600 rounded-md
                                                          bg-gray-700 text-white
-                                                         focus:border-blue-500 focus:ring-1 focus:ring-blue-500"></textarea>
+                                                         focus:border-mpp-primary focus:ring-1 focus:ring-mpp-primary"></textarea>
                                         @error('categoryForm.meta_description')
                                             <p class="mt-1 text-sm text-red-600 dark:text-red-400">{{ $message }}</p>
                                         @enderror
@@ -726,7 +1118,7 @@ if (typeof Sortable === 'undefined') {
                                         <input type="text" wire:model.defer="categoryForm.meta_keywords"
                                                class="w-full px-3 py-2 border border-gray-600 rounded-md
                                                       bg-gray-700 text-white
-                                                      focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
+                                                      focus:border-mpp-primary focus:ring-1 focus:ring-mpp-primary">
                                         @error('categoryForm.meta_keywords')
                                             <p class="mt-1 text-sm text-red-600 dark:text-red-400">{{ $message }}</p>
                                         @enderror
@@ -740,7 +1132,7 @@ if (typeof Sortable === 'undefined') {
                                         <input type="url" wire:model.defer="categoryForm.canonical_url"
                                                class="w-full px-3 py-2 border border-gray-600 rounded-md
                                                       bg-gray-700 text-white
-                                                      focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
+                                                      focus:border-mpp-primary focus:ring-1 focus:ring-mpp-primary">
                                         @error('categoryForm.canonical_url')
                                             <p class="mt-1 text-sm text-red-600 dark:text-red-400">{{ $message }}</p>
                                         @enderror
@@ -757,7 +1149,7 @@ if (typeof Sortable === 'undefined') {
                                                 <input type="text" wire:model.defer="categoryForm.og_title"
                                                        class="w-full px-3 py-2 border border-gray-600 rounded-md
                                                               bg-gray-700 text-white
-                                                              focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
+                                                              focus:border-mpp-primary focus:ring-1 focus:ring-mpp-primary">
                                             </div>
                                             <div>
                                                 <label class="block text-sm font-medium text-gray-300 mb-2">
@@ -766,7 +1158,7 @@ if (typeof Sortable === 'undefined') {
                                                 <input type="url" wire:model.defer="categoryForm.og_image"
                                                        class="w-full px-3 py-2 border border-gray-600 rounded-md
                                                               bg-gray-700 text-white
-                                                              focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
+                                                              focus:border-mpp-primary focus:ring-1 focus:ring-mpp-primary">
                                             </div>
                                             <div class="md:col-span-2">
                                                 <label class="block text-sm font-medium text-gray-300 mb-2">
@@ -775,7 +1167,7 @@ if (typeof Sortable === 'undefined') {
                                                 <textarea wire:model.defer="categoryForm.og_description" rows="2"
                                                           class="w-full px-3 py-2 border border-gray-600 rounded-md
                                                                  bg-gray-700 text-white
-                                                                 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"></textarea>
+                                                                 focus:border-mpp-primary focus:ring-1 focus:ring-mpp-primary"></textarea>
                                             </div>
                                         </div>
                                     </div>
@@ -794,7 +1186,7 @@ if (typeof Sortable === 'undefined') {
                                                placeholder="np. fas fa-car"
                                                class="w-full px-3 py-2 border border-gray-600 rounded-md
                                                       bg-gray-700 text-white
-                                                      focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
+                                                      focus:border-mpp-primary focus:ring-1 focus:ring-mpp-primary">
                                         @error('categoryForm.icon')
                                             <p class="mt-1 text-sm text-red-600 dark:text-red-400">{{ $message }}</p>
                                         @enderror
@@ -808,7 +1200,7 @@ if (typeof Sortable === 'undefined') {
                                         <input type="text" wire:model.defer="categoryForm.icon_path"
                                                class="w-full px-3 py-2 border border-gray-600 rounded-md
                                                       bg-gray-700 text-white
-                                                      focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
+                                                      focus:border-mpp-primary focus:ring-1 focus:ring-mpp-primary">
                                         @error('categoryForm.icon_path')
                                             <p class="mt-1 text-sm text-red-600 dark:text-red-400">{{ $message }}</p>
                                         @enderror
@@ -822,7 +1214,7 @@ if (typeof Sortable === 'undefined') {
                                         <input type="text" wire:model.defer="categoryForm.banner_path"
                                                class="w-full px-3 py-2 border border-gray-600 rounded-md
                                                       bg-gray-700 text-white
-                                                      focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
+                                                      focus:border-mpp-primary focus:ring-1 focus:ring-mpp-primary">
                                         @error('categoryForm.banner_path')
                                             <p class="mt-1 text-sm text-red-600 dark:text-red-400">{{ $message }}</p>
                                         @enderror
@@ -837,7 +1229,7 @@ if (typeof Sortable === 'undefined') {
                                                   placeholder='{"color_primary": "#3B82F6", "color_secondary": "#EFF6FF"}'
                                                   class="w-full px-3 py-2 border border-gray-600 rounded-md
                                                          bg-gray-700 text-white font-mono text-sm
-                                                         focus:border-blue-500 focus:ring-1 focus:ring-blue-500"></textarea>
+                                                         focus:border-mpp-primary focus:ring-1 focus:ring-mpp-primary"></textarea>
                                         @error('categoryForm.visual_settings')
                                             <p class="mt-1 text-sm text-red-600 dark:text-red-400">{{ $message }}</p>
                                         @enderror
@@ -857,7 +1249,7 @@ if (typeof Sortable === 'undefined') {
                                                   placeholder='{"is_visible": true, "show_in_menu": true, "show_in_filter": true, "show_product_count": true}'
                                                   class="w-full px-3 py-2 border border-gray-600 rounded-md
                                                          bg-gray-700 text-white font-mono text-sm
-                                                         focus:border-blue-500 focus:ring-1 focus:ring-blue-500"></textarea>
+                                                         focus:border-mpp-primary focus:ring-1 focus:ring-mpp-primary"></textarea>
                                         @error('categoryForm.visibility_settings')
                                             <p class="mt-1 text-sm text-red-600 dark:text-red-400">{{ $message }}</p>
                                         @enderror
@@ -877,7 +1269,7 @@ if (typeof Sortable === 'undefined') {
                                                   placeholder='{"default_tax_rate": 23.00, "default_weight": null, "default_dimensions": {"height": null, "width": null, "length": null}}'
                                                   class="w-full px-3 py-2 border border-gray-600 rounded-md
                                                          bg-gray-700 text-white font-mono text-sm
-                                                         focus:border-blue-500 focus:ring-1 focus:ring-blue-500"></textarea>
+                                                         focus:border-mpp-primary focus:ring-1 focus:ring-mpp-primary"></textarea>
                                         @error('categoryForm.default_values')
                                             <p class="mt-1 text-sm text-red-600 dark:text-red-400">{{ $message }}</p>
                                         @enderror
@@ -888,11 +1280,11 @@ if (typeof Sortable === 'undefined') {
                         </div>
 
                         {{-- Modal Footer --}}
-                        <div class="bg-gray-50 dark:bg-gray-700 px-6 py-4 flex flex-row-reverse space-x-reverse space-x-3">
+                        <div class="bg-gray-700 px-6 py-4 flex flex-row-reverse space-x-reverse space-x-3">
                             <button type="submit"
-                                    class="inline-flex justify-center rounded-md border border-transparent shadow-sm px-6 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
+                                    class="btn-enterprise-primary"
                                     wire:loading.attr="disabled">
-                                <span wire:loading.remove>
+                                <span wire:loading.remove class="flex items-center">
                                     <i class="fas fa-save mr-2"></i>
                                     {{ $modalMode === 'create' ? 'Dodaj kategorię' : 'Zapisz zmiany' }}
                                 </span>
@@ -902,7 +1294,7 @@ if (typeof Sortable === 'undefined') {
                                 </span>
                             </button>
                             <button type="button" wire:click="closeModal"
-                                    class="inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-6 py-2 bg-gray-800 text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 dark:bg-gray-600 dark:text-gray-300 dark:border-gray-500 dark:hover:bg-gray-500 transition-colors">
+                                    class="btn-enterprise-secondary">
                                 <i class="fas fa-times mr-2"></i>
                                 Anuluj
                             </button>
@@ -996,6 +1388,160 @@ if (typeof Sortable === 'undefined') {
     </div>
     @endif
 
+    {{-- Bulk Delete Confirmation Modal --}}
+    @if($showBulkDeleteModal)
+    <div class="fixed inset-0 z-[9999] overflow-y-auto"
+         x-data="{ show: @entangle('showBulkDeleteModal') }"
+         x-show="show"
+         x-transition:enter="ease-out duration-300"
+         x-transition:enter-start="opacity-0"
+         x-transition:enter-end="opacity-100">
+
+        {{-- Backdrop --}}
+        <div class="fixed inset-0 bg-gray-900 bg-opacity-75 transition-opacity"></div>
+
+        {{-- Modal Content --}}
+        <div class="flex min-h-full items-center justify-center p-4">
+            <div class="relative bg-gray-800 rounded-lg shadow-xl max-w-2xl w-full p-6"
+                 x-transition:enter="ease-out duration-300"
+                 x-transition:enter-start="opacity-0 translate-y-4"
+                 x-transition:enter-end="opacity-100 translate-y-0">
+
+                {{-- Header --}}
+                <div class="flex items-start mb-4">
+                    <div class="flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-red-100 dark:bg-red-900/20">
+                        <i class="fas fa-exclamation-triangle text-red-600 dark:text-red-400 text-xl"></i>
+                    </div>
+                    <div class="ml-4 flex-1">
+                        <h3 class="text-lg font-semibold text-white">
+                            Potwierdzenie usuniecia {{ count($bulkDeleteWarnings) }} kategorii
+                        </h3>
+                        <p class="text-sm text-gray-400 mt-1">
+                            Ta operacja jest <strong class="text-red-400">nieodwracalna</strong>. Kategorie zostana permanentnie usuniete z bazy danych.
+                        </p>
+                    </div>
+                    <button wire:click="cancelBulkDelete"
+                            class="text-gray-400 hover:text-gray-300">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+
+                {{-- Categories List --}}
+                @if(!empty($bulkDeleteWarnings))
+                <div class="bg-gray-700/50 border border-gray-600 rounded-lg p-4 mb-4 max-h-64 overflow-y-auto">
+                    <h4 class="text-sm font-medium text-gray-300 mb-3">
+                        <i class="fas fa-list mr-1"></i> Kategorie do usuniecia:
+                    </h4>
+                    <div class="space-y-2">
+                        @foreach($bulkDeleteWarnings as $warning)
+                        <div class="flex items-center justify-between p-2 rounded {{ $warning['can_delete'] ? 'bg-green-900/20 border border-green-700/50' : 'bg-red-900/20 border border-red-700/50' }}">
+                            <div class="flex items-center">
+                                <i class="fas {{ $warning['can_delete'] ? 'fa-check-circle text-green-400' : 'fa-times-circle text-red-400' }} mr-2"></i>
+                                <span class="text-sm text-gray-200">{{ $warning['name'] }}</span>
+                                <span class="text-xs text-gray-500 ml-2">(L{{ $warning['level'] }})</span>
+                            </div>
+                            <div class="flex items-center space-x-3 text-xs">
+                                @if($warning['products_count'] > 0)
+                                <span class="text-yellow-400">
+                                    <i class="fas fa-box mr-1"></i>{{ $warning['products_count'] }} produktow
+                                </span>
+                                @endif
+                                @if($warning['children_count'] > 0)
+                                <span class="text-orange-400">
+                                    <i class="fas fa-folder mr-1"></i>{{ $warning['children_count'] }} podkategorii
+                                </span>
+                                @endif
+                                @if($warning['can_delete'])
+                                <span class="text-green-400">
+                                    <i class="fas fa-check mr-1"></i>mozna usunac
+                                </span>
+                                @else
+                                <span class="text-red-400">
+                                    <i class="fas fa-ban mr-1"></i>nie mozna usunac
+                                </span>
+                                @endif
+                            </div>
+                        </div>
+                        @endforeach
+                    </div>
+                </div>
+
+                {{-- Summary --}}
+                @php
+                    $canDelete = collect($bulkDeleteWarnings)->where('can_delete', true)->count();
+                    $cannotDelete = collect($bulkDeleteWarnings)->where('can_delete', false)->count();
+                    $totalDescendants = collect($bulkDeleteWarnings)->sum('descendants_count');
+                    $totalProducts = collect($bulkDeleteWarnings)->sum('products_count');
+                @endphp
+                <div class="bg-yellow-900/20 border border-yellow-700 rounded-lg p-4 mb-4">
+                    <h4 class="text-sm font-medium text-yellow-400 mb-2">
+                        <i class="fas fa-info-circle mr-1"></i> Podsumowanie:
+                    </h4>
+                    <ul class="list-disc list-inside space-y-1 text-sm text-gray-300">
+                        <li><span class="text-green-400">{{ $canDelete }}</span> kategorii mozna usunac bezposrednio</li>
+                        @if($cannotDelete > 0)
+                        <li><span class="text-orange-400">{{ $cannotDelete }}</span> kategorii zawiera podkategorie lub produkty</li>
+                        @endif
+                        @if($totalDescendants > 0)
+                        <li><span class="text-orange-400">{{ $totalDescendants }}</span> podkategorii (potomkow) do usuniecia</li>
+                        @endif
+                        @if($totalProducts > 0)
+                        <li><span class="text-yellow-400">{{ $totalProducts }}</span> produktow straci przypisanie kategorii</li>
+                        @endif
+                    </ul>
+                </div>
+
+                {{-- Force Delete Option --}}
+                @if($cannotDelete > 0)
+                <div class="bg-red-900/30 border border-red-700 rounded-lg p-4 mb-4">
+                    <label class="flex items-start cursor-pointer">
+                        <input type="checkbox"
+                               wire:model.live="forceBulkDelete"
+                               class="mt-1 h-4 w-4 rounded border-gray-500 bg-gray-700 text-red-600 focus:ring-red-500">
+                        <div class="ml-3">
+                            <span class="text-sm font-medium text-red-400">
+                                <i class="fas fa-exclamation-triangle mr-1"></i>
+                                Usun rowniez kategorie z podkategoriami i produktami
+                            </span>
+                            <p class="text-xs text-gray-400 mt-1">
+                                Zaznacz aby usunac wszystkie wybrane kategorie wraz z ich podkategoriami.
+                                Produkty nie zostana usuniete, ale straca przypisanie do tych kategorii.
+                            </p>
+                        </div>
+                    </label>
+                </div>
+                @endif
+                @endif
+
+                {{-- Actions --}}
+                <div class="flex justify-end space-x-3">
+                    <button wire:click="cancelBulkDelete"
+                            class="px-4 py-2 text-sm font-medium text-gray-300 bg-gray-700 border border-gray-600 rounded-lg hover:bg-gray-600">
+                        Anuluj
+                    </button>
+                    @if($canDelete > 0 || $forceBulkDelete)
+                    <button wire:click="confirmBulkDelete"
+                            class="px-4 py-2 text-sm font-medium text-white {{ $forceBulkDelete ? 'bg-red-700 hover:bg-red-800' : 'bg-red-600 hover:bg-red-700' }} rounded-lg">
+                        <i class="fas fa-trash mr-2"></i>
+                        @if($forceBulkDelete)
+                            Usun wszystkie ({{ count($bulkDeleteWarnings) + $totalDescendants }})
+                        @else
+                            Usun {{ $canDelete }} {{ $canDelete === 1 ? 'kategorie' : 'kategorii' }}
+                        @endif
+                    </button>
+                    @else
+                    <button disabled
+                            class="px-4 py-2 text-sm font-medium text-gray-500 bg-gray-700 border border-gray-600 rounded-lg cursor-not-allowed">
+                        <i class="fas fa-ban mr-2"></i>
+                        Brak kategorii do usuniecia
+                    </button>
+                    @endif
+                </div>
+            </div>
+        </div>
+    </div>
+    @endif
+
     {{-- Category Merge Modal --}}
     @if($showMergeCategoriesModal)
     <div class="fixed inset-0 z-[9999] overflow-y-auto"
@@ -1071,7 +1617,7 @@ if (typeof Sortable === 'undefined') {
                                 id="targetCategoryId"
                                 class="w-full px-3 py-2 border border-gray-600 rounded-lg
                                        bg-gray-700 text-white
-                                       focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                                       focus:border-mpp-primary focus:ring-1 focus:ring-mpp-primary"
                                 required>
                             <option value="">-- Wybierz kategorię docelową --</option>
                             @foreach($parentOptions as $categoryId => $categoryName)
