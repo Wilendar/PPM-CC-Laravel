@@ -5,6 +5,7 @@ namespace App\Http\Livewire\Admin\Shops;
 use Livewire\Component;
 use Livewire\WithPagination;
 use App\Models\PrestaShopShop;
+use App\Models\ERPConnection;
 use App\Models\SyncJob;
 use App\Models\SystemSetting;
 use App\Services\QueueJobsService;
@@ -13,6 +14,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use App\Jobs\PullProductsFromPrestaShop;
+use App\Jobs\ERP\SyncProductToERP;
 
 /**
  * SyncController Livewire Component
@@ -206,12 +208,14 @@ class SyncController extends Component
         $shops = $this->getShops();
         $stats = $this->getSyncStats();
         $recentSyncJobs = $this->getRecentSyncJobs(); // BUG #9 FIX #7 - renamed for consistency
+        $erpConnections = $this->getErpConnections(); // BUG #4 FIX - ETAP_08.4: Add ERP connections
 
         return view('livewire.admin.shops.sync-controller', [
             'shops' => $shops,
             'stats' => $stats,
             'recentJobs' => $recentSyncJobs,            // Keep old name for backward compatibility
             'recentSyncJobs' => $recentSyncJobs,        // BUG #9 FIX #7 - new name with pagination
+            'erpConnections' => $erpConnections,        // BUG #4 FIX - ERP connections list
 
             // BUG #9 FIX #7 - Filter options (2025-11-12)
             'filterUsers' => $this->getUsersForFilter(),
@@ -262,6 +266,20 @@ class SyncController extends Component
     }
 
     /**
+     * BUG #4 FIX - ETAP_08.4: Get ERP connections for sync panel
+     *
+     * Returns all ERP connections with their sync status.
+     *
+     * @return \Illuminate\Database\Eloquent\Collection
+     */
+    protected function getErpConnections()
+    {
+        return ERPConnection::orderBy('priority', 'asc')
+            ->orderBy('instance_name', 'asc')
+            ->get();
+    }
+
+    /**
      * Get QueueJobsService instance (lazy loading via app() helper)
      *
      * Uses app() helper instead of constructor DI to avoid Livewire 3.x wire:snapshot issues
@@ -299,6 +317,12 @@ class SyncController extends Component
             'active_queue_jobs' => $queueService->getActiveJobs()->count(),
             'failed_queue_jobs' => $queueService->getFailedJobs()->count(),
             'queue_health' => $this->calculateQueueHealth($queueService),
+
+            // BUG #4 FIX - ETAP_08.4: ERP Statistics
+            'total_erp_connections' => ERPConnection::count(),
+            'active_erp_connections' => ERPConnection::active()->count(),
+            'healthy_erp_connections' => ERPConnection::healthy()->count(),
+            'erp_jobs_in_queue' => DB::table('jobs')->where('queue', 'erp_default')->count(),
         ];
     }
 
@@ -2053,5 +2077,76 @@ class SyncController extends Component
                 'message' => 'Błąd podczas czyszczenia cache: ' . $e->getMessage()
             ]);
         }
+    }
+
+    /**
+     * BUG #4 FIX - ETAP_08.4: Run queue worker for ERP jobs
+     *
+     * Processes pending jobs in the queue without needing a background worker.
+     * Useful for shared hosting without supervisor/systemd.
+     *
+     * @param int $maxJobs Maximum jobs to process (default 10)
+     * @return void
+     */
+    public function runQueueWorker(int $maxJobs = 10): void
+    {
+        try {
+            Log::info('Manual queue worker triggered', [
+                'user_id' => auth()->id(),
+                'max_jobs' => $maxJobs,
+            ]);
+
+            // Get pending jobs count before
+            $pendingBefore = DB::table('jobs')->count();
+
+            // Run queue:work with limited jobs
+            $output = new \Symfony\Component\Console\Output\BufferedOutput();
+            \Artisan::call('queue:work', [
+                'connection' => 'database',
+                '--queue' => 'erp_default,prestashop_sync,default',
+                '--max-jobs' => $maxJobs,
+                '--timeout' => 120,
+                '--stop-when-empty' => true,
+            ], $output);
+
+            // Get pending jobs count after
+            $pendingAfter = DB::table('jobs')->count();
+            $processedCount = $pendingBefore - $pendingAfter;
+
+            Log::info('Manual queue worker completed', [
+                'user_id' => auth()->id(),
+                'pending_before' => $pendingBefore,
+                'pending_after' => $pendingAfter,
+                'processed' => $processedCount,
+                'output' => $output->fetch(),
+            ]);
+
+            $this->dispatch('notify', [
+                'type' => 'success',
+                'message' => "Queue worker przetworzyl {$processedCount} z {$pendingBefore} zadan. Pozostalo: {$pendingAfter}"
+            ]);
+
+            // Refresh page data
+            $this->loadActiveSyncJobs();
+
+        } catch (\Exception $e) {
+            Log::error('Manual queue worker failed', [
+                'error' => $e->getMessage(),
+                'user_id' => auth()->id(),
+            ]);
+
+            $this->dispatch('notify', [
+                'type' => 'error',
+                'message' => 'Blad podczas uruchamiania queue workera: ' . $e->getMessage()
+            ]);
+        }
+    }
+
+    /**
+     * Refresh component data (used after operations that change state)
+     */
+    protected function refreshData(): void
+    {
+        $this->loadActiveSyncJobs();
     }
 }

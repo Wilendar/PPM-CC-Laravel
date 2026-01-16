@@ -1167,6 +1167,234 @@
             @endif
         </div>
 
+        <!-- BUG #4 FIX - ETAP_08.4: ERP Connections Section -->
+        <div class="mt-8 relative backdrop-blur-xl shadow-lg rounded-lg border"
+             style="background: linear-gradient(135deg, rgba(31, 41, 55, 0.8), rgba(17, 24, 39, 0.8)); border: 1px solid rgba(37, 99, 235, 0.3);">
+
+            <div class="px-6 py-4 border-b border-blue-600/30">
+                <div class="flex items-center justify-between">
+                    <h3 class="text-lg font-semibold text-white flex items-center">
+                        <svg class="w-5 h-5 text-blue-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
+                        </svg>
+                        Polaczenia ERP
+                        <span class="ml-2 px-2 py-0.5 text-xs font-medium bg-blue-500/20 text-blue-300 rounded-full">
+                            {{ $stats['total_erp_connections'] ?? 0 }}
+                        </span>
+                    </h3>
+
+                    <div class="flex items-center gap-3">
+                        <!-- Queue Worker Button -->
+                        <button wire:click="runQueueWorker(10)"
+                                type="button"
+                                class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-lg text-white transition-all duration-200 hover:scale-105 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800">
+                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path>
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                            Uruchom Queue Worker
+                            @if(($stats['erp_jobs_in_queue'] ?? 0) > 0)
+                                <span class="ml-1 px-1.5 py-0.5 text-xs bg-yellow-500 text-black rounded-full">
+                                    {{ $stats['erp_jobs_in_queue'] }}
+                                </span>
+                            @endif
+                        </button>
+
+                        <a href="{{ route('admin.integrations') }}"
+                           class="inline-flex items-center px-4 py-2 border border-blue-500/50 text-sm font-medium rounded-lg text-blue-300 hover:bg-blue-500/10 transition-all duration-200">
+                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                            </svg>
+                            Zarzadzaj ERP
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ERP Statistics Cards -->
+            <div class="px-6 py-4 grid grid-cols-1 md:grid-cols-4 gap-4 border-b border-blue-600/20">
+                <div class="flex items-center p-3 rounded-lg bg-blue-500/10">
+                    <div class="w-8 h-8 bg-blue-500/20 rounded-lg flex items-center justify-center mr-3">
+                        <svg class="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
+                        </svg>
+                    </div>
+                    <div>
+                        <p class="text-xs text-gray-400">Wszystkie</p>
+                        <p class="text-lg font-bold text-white">{{ $stats['total_erp_connections'] ?? 0 }}</p>
+                    </div>
+                </div>
+
+                <div class="flex items-center p-3 rounded-lg bg-green-500/10">
+                    <div class="w-8 h-8 bg-green-500/20 rounded-lg flex items-center justify-center mr-3">
+                        <svg class="w-4 h-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                        </svg>
+                    </div>
+                    <div>
+                        <p class="text-xs text-gray-400">Aktywne</p>
+                        <p class="text-lg font-bold text-white">{{ $stats['active_erp_connections'] ?? 0 }}</p>
+                    </div>
+                </div>
+
+                <div class="flex items-center p-3 rounded-lg bg-emerald-500/10">
+                    <div class="w-8 h-8 bg-emerald-500/20 rounded-lg flex items-center justify-center mr-3">
+                        <svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                    </div>
+                    <div>
+                        <p class="text-xs text-gray-400">Zdrowe</p>
+                        <p class="text-lg font-bold text-white">{{ $stats['healthy_erp_connections'] ?? 0 }}</p>
+                    </div>
+                </div>
+
+                <div class="flex items-center p-3 rounded-lg bg-yellow-500/10">
+                    <div class="w-8 h-8 bg-yellow-500/20 rounded-lg flex items-center justify-center mr-3">
+                        <svg class="w-4 h-4 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                    </div>
+                    <div>
+                        <p class="text-xs text-gray-400">Jobs w kolejce</p>
+                        <p class="text-lg font-bold text-white">{{ $stats['erp_jobs_in_queue'] ?? 0 }}</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ERP Connections Table -->
+            <div class="overflow-x-auto">
+                <table class="w-full">
+                    <thead class="bg-blue-900/20 border-b border-blue-600/30">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-blue-300 uppercase tracking-wider">Typ ERP</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-blue-300 uppercase tracking-wider">Instancja</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-blue-300 uppercase tracking-wider">Status</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-blue-300 uppercase tracking-wider">Auth</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-blue-300 uppercase tracking-wider">Ostatnia sync</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-blue-300 uppercase tracking-wider">Statystyki</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-blue-600/20">
+                        @forelse($erpConnections as $erp)
+                            <tr class="hover:bg-blue-900/10 transition-colors duration-200">
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <div class="flex items-center">
+                                        <div class="w-8 h-8 rounded-lg flex items-center justify-center mr-3
+                                            @if($erp->erp_type === 'baselinker') bg-orange-500/20
+                                            @elseif($erp->erp_type === 'subiekt_gt') bg-blue-500/20
+                                            @elseif($erp->erp_type === 'dynamics') bg-purple-500/20
+                                            @else bg-gray-500/20 @endif">
+                                            @if($erp->erp_type === 'baselinker')
+                                                <span class="text-orange-400 font-bold text-xs">BL</span>
+                                            @elseif($erp->erp_type === 'subiekt_gt')
+                                                <span class="text-blue-400 font-bold text-xs">SG</span>
+                                            @elseif($erp->erp_type === 'dynamics')
+                                                <span class="text-purple-400 font-bold text-xs">MD</span>
+                                            @else
+                                                <span class="text-gray-400 font-bold text-xs">ERP</span>
+                                            @endif
+                                        </div>
+                                        <span class="text-sm font-medium text-white">
+                                            {{ ucfirst(str_replace('_', ' ', $erp->erp_type)) }}
+                                        </span>
+                                    </div>
+                                </td>
+
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <div>
+                                        <div class="text-sm font-medium text-white">{{ $erp->instance_name }}</div>
+                                        <div class="text-xs text-gray-400">{{ Str::limit($erp->description, 30) }}</div>
+                                    </div>
+                                </td>
+
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    @if($erp->is_active)
+                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
+                                            @if($erp->connection_status === 'connected') bg-green-900/40 text-green-300
+                                            @elseif($erp->connection_status === 'error') bg-red-900/40 text-red-300
+                                            @elseif($erp->connection_status === 'rate_limited') bg-yellow-900/40 text-yellow-300
+                                            @else bg-gray-700/40 text-gray-300 @endif">
+                                            @if($erp->connection_status === 'connected')
+                                                <svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 8 8"><circle cx="4" cy="4" r="3"/></svg>
+                                                Polaczony
+                                            @elseif($erp->connection_status === 'error')
+                                                <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                                                </svg>
+                                                Blad
+                                            @elseif($erp->connection_status === 'rate_limited')
+                                                Rate Limited
+                                            @else
+                                                {{ ucfirst($erp->connection_status ?? 'nieznany') }}
+                                            @endif
+                                        </span>
+                                    @else
+                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-700/40 text-gray-400">
+                                            Nieaktywny
+                                        </span>
+                                    @endif
+                                </td>
+
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
+                                        @if($erp->auth_status === 'authenticated') bg-green-900/40 text-green-300
+                                        @elseif($erp->auth_status === 'expired') bg-red-900/40 text-red-300
+                                        @elseif($erp->auth_status === 'pending') bg-yellow-900/40 text-yellow-300
+                                        @else bg-gray-700/40 text-gray-300 @endif">
+                                        @if($erp->auth_status === 'authenticated') Autoryzowany
+                                        @elseif($erp->auth_status === 'expired') Wygasly
+                                        @elseif($erp->auth_status === 'pending') Oczekuje
+                                        @else {{ ucfirst($erp->auth_status ?? 'nieznany') }}
+                                        @endif
+                                    </span>
+                                </td>
+
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    @if($erp->last_sync_at)
+                                        <div class="text-sm text-white">{{ $erp->last_sync_at->format('d.m.Y H:i') }}</div>
+                                        <div class="text-xs text-gray-400">{{ $erp->last_sync_at->diffForHumans() }}</div>
+                                    @else
+                                        <span class="text-sm text-gray-400">Nigdy</span>
+                                    @endif
+                                </td>
+
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <div class="flex items-center gap-3">
+                                        <div class="text-center">
+                                            <span class="text-xs text-gray-400 block">Sukces</span>
+                                            <span class="text-sm font-medium text-green-400">{{ $erp->sync_success_count ?? 0 }}</span>
+                                        </div>
+                                        <div class="text-center">
+                                            <span class="text-xs text-gray-400 block">Bledy</span>
+                                            <span class="text-sm font-medium text-red-400">{{ $erp->sync_error_count ?? 0 }}</span>
+                                        </div>
+                                        @if($erp->sync_success_rate > 0)
+                                            <div class="text-center">
+                                                <span class="text-xs text-gray-400 block">Rate</span>
+                                                <span class="text-sm font-medium text-blue-400">{{ number_format($erp->sync_success_rate, 0) }}%</span>
+                                            </div>
+                                        @endif
+                                    </div>
+                                </td>
+                            </tr>
+                        @empty
+                            <tr>
+                                <td colspan="6" class="px-6 py-12 text-center text-gray-400">
+                                    <svg class="w-12 h-12 mx-auto mb-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
+                                    </svg>
+                                    <p class="text-lg font-medium">Brak polaczen ERP</p>
+                                    <p class="text-sm mt-1">Dodaj polaczenie w sekcji Integracje ERP</p>
+                                </td>
+                            </tr>
+                        @endforelse
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
         <!-- Recent Sync Jobs (BUG #9 FIX #2: Added wire:poll.5s for auto-refresh) -->
         <div class="mt-8 relative backdrop-blur-xl shadow-lg rounded-lg border"
              style="background: linear-gradient(135deg, rgba(31, 41, 55, 0.8), rgba(17, 24, 39, 0.8)); border: 1px solid rgba(224, 172, 126, 0.2);"
