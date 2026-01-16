@@ -100,6 +100,12 @@
                         @include('livewire.products.management.partials.shop-management')
                     @endif
 
+                    {{-- ETAP_08.3: ERP Integration Management --}}
+                    {{-- Shows ERP connections with sync status and actions --}}
+                    @if($isEditMode && !in_array($activeTab, ['gallery', 'stock', 'prices']))
+                        @include('livewire.products.management.partials.erp-management')
+                    @endif
+
                     {{-- TAB CONTENT AREA - CONDITIONAL RENDERING (Only 1 tab in DOM at a time) --}}
                     {{-- FIX 2025-12-08: Wrap in div with activeTab in wire:key to force full replacement instead of morphing --}}
                     <div wire:key="tab-content-{{ $activeTab }}-{{ $product?->id ?? 'new' }}">

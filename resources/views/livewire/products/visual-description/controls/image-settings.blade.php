@@ -245,10 +245,21 @@
             <input
                 type="text"
                 x-model="imageUrl"
-                @input="emitChange()"
                 class="uve-input"
                 placeholder="https://..."
             />
+            {{-- FIX FAZA 3: Przycisk "Zastosuj" dla zewnetrznego URL --}}
+            <button
+                type="button"
+                @click="applyExternalUrl()"
+                class="uve-btn uve-btn-sm uve-btn-primary"
+                title="Zastosuj URL"
+                :disabled="!imageUrl || imageUrl.trim() === ''"
+            >
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                </svg>
+            </button>
             <button
                 type="button"
                 wire:click="openMediaPicker('{{ $selectedElementId }}')"
@@ -752,6 +763,23 @@
 .uve-img-url-input .uve-btn:hover {
     background: #475569;
     color: #e2e8f0;
+}
+
+/* FIX FAZA 3: Primary button style for "Zastosuj" */
+.uve-img-url-input .uve-btn-primary {
+    background: var(--mpp-primary, #e0ac7e);
+    border-color: var(--mpp-primary, #e0ac7e);
+    color: #0f172a;
+}
+
+.uve-img-url-input .uve-btn-primary:hover {
+    background: var(--mpp-primary-dark, #d1975a);
+    border-color: var(--mpp-primary-dark, #d1975a);
+}
+
+.uve-img-url-input .uve-btn-primary:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
 }
 
 /* x-cloak for Alpine */

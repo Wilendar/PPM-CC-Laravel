@@ -26,6 +26,9 @@
         'itemGap' => '0.75rem',
         'iconSize' => 'medium',
         'indentation' => '0',
+        // FIX #16: Numbering and bullet style variants
+        'numberingStyle' => 'decimal',
+        'bulletStyle' => 'disc',
     ];
     $currentValue = array_merge($defaults, $value ?? []);
 
@@ -119,6 +122,41 @@
             @endforeach
         </div>
     </div>
+
+    {{-- FIX #16: Numbering Style (only visible when listStyle is 'numbers') --}}
+    <template x-if="value.listStyle === 'numbers'">
+        <div class="uve-control__group">
+            <label class="uve-control__label">Styl numeracji</label>
+            <select
+                class="uve-control__select"
+                x-model="value.numberingStyle"
+                @change="emitChange()"
+            >
+                <option value="decimal">1. 2. 3.</option>
+                <option value="upper-roman">I. II. III.</option>
+                <option value="lower-roman">i. ii. iii.</option>
+                <option value="upper-alpha">A. B. C.</option>
+                <option value="lower-alpha">a. b. c.</option>
+            </select>
+        </div>
+    </template>
+
+    {{-- FIX #16: Bullet Style (only visible when listStyle is 'bullets') --}}
+    <template x-if="value.listStyle === 'bullets'">
+        <div class="uve-control__group">
+            <label class="uve-control__label">Styl punktow</label>
+            <select
+                class="uve-control__select"
+                x-model="value.bulletStyle"
+                @change="emitChange()"
+            >
+                <option value="disc">● Pelne kolo</option>
+                <option value="circle">○ Puste kolo</option>
+                <option value="square">■ Kwadrat</option>
+                <option value="none">Brak</option>
+            </select>
+        </div>
+    </template>
 
     {{-- Icon Style (only visible when listStyle is checkmarks/icons/arrows) --}}
     <template x-if="['checkmarks', 'icons', 'arrows'].includes(value.listStyle)">

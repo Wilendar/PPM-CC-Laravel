@@ -721,6 +721,10 @@ class PropertyPanelService
                 }
             }
 
+            // NOTE: Background control receives ONLY CSS background-image/background-color
+            // Nested <img> elements are handled by image-settings control, NOT background control
+            // IMG ≠ Background Image - these are conceptually different!
+
             // Only add if there are any values for this control
             // Include empty array so control can initialize with defaults
             $grouped[$type] = $controlValues;

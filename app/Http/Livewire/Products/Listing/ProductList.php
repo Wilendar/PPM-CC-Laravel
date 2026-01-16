@@ -17,6 +17,7 @@ use Illuminate\Support\Facades\Log;
 use App\Services\PrestaShop\PrestaShopClientFactory;
 use App\Jobs\PrestaShop\BulkImportProducts;
 use App\Services\JobProgressService;
+use App\Http\Livewire\Products\Listing\Traits\ProductListERPImport;
 
 /**
  * ProductList Component - Main product listing interface
@@ -47,6 +48,7 @@ use App\Services\JobProgressService;
 class ProductList extends Component
 {
     use WithPagination;
+    use ProductListERPImport;
 
     /*
     |--------------------------------------------------------------------------

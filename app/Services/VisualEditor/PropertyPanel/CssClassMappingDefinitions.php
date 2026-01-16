@@ -111,7 +111,8 @@ final class CssClassMappingDefinitions
                 'description' => 'Nazwa produktu',
             ],
             'pd-cover' => [
-                'controls' => ['layout-flex', 'layout-grid'],
+                // FIX #13d: Added 'background' control - gradient is inherited from .pd-cover__picture child
+                'controls' => ['background', 'layout-flex', 'layout-grid'],
                 'defaults' => ['gridColumn' => '1 / -1', 'display' => 'flex', 'justifyContent' => 'center'],
                 'readonly' => false,
                 'description' => 'Sekcja glownego obrazu',

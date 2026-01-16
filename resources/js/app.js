@@ -1013,37 +1013,114 @@ function registerAlpineComponents(Alpine) {
     }));
 
     // Background Control
+    // NOTE: Background control receives ONLY CSS background-image/background-color
+    // Nested <img> elements are handled by image-settings control, NOT background control
+    // IMG ≠ Background Image - these are conceptually different!
     Alpine.data('uveBackgroundControl', (initialValue) => ({
         activeTab: 'color',
         backgroundColor: initialValue.backgroundColor || '',
-        backgroundImage: initialValue.backgroundImage?.replace(/url\(['"]?|['"]?\)/g, '') || '',
+        // FIX #13b: Separate storage for image URL vs gradient
+        backgroundImage: '',
+        backgroundGradient: '',
         backgroundSize: initialValue.backgroundSize || 'cover',
         backgroundPosition: initialValue.backgroundPosition || 'center center',
         backgroundRepeat: initialValue.backgroundRepeat || 'no-repeat',
         backgroundAttachment: initialValue.backgroundAttachment || 'scroll',
         showFullPreview: false,
 
+        // FIX #13b: Helper to detect CSS gradient values
+        isGradient(value) {
+            if (!value) return false;
+            const gradientPatterns = [
+                'linear-gradient',
+                'radial-gradient',
+                'conic-gradient',
+                'repeating-linear-gradient',
+                'repeating-radial-gradient',
+                'repeating-conic-gradient'
+            ];
+            return gradientPatterns.some(pattern => value.includes(pattern));
+        },
+
+        // FIX #13b: Parse background-image value (URL or gradient)
+        parseBackgroundImage(rawValue) {
+            if (!rawValue) return { image: '', gradient: '' };
+
+            // Check if it's a gradient
+            if (this.isGradient(rawValue)) {
+                return { image: '', gradient: rawValue };
+            }
+
+            // It's a URL - clean the url() wrapper
+            const cleanUrl = rawValue.replace(/url\(['"]?|['"]?\)/g, '');
+            return { image: cleanUrl, gradient: '' };
+        },
+
         // FIX #12: Listen for Livewire event to update background when element changes
         // This is needed because wire:ignore.self prevents Alpine from reinitializing
         init() {
+            // FIX #13b: Parse initial value for gradient vs URL
+            const initialBg = initialValue.backgroundImage || '';
+            const parsed = this.parseBackgroundImage(initialBg);
+            this.backgroundImage = parsed.image;
+            this.backgroundGradient = parsed.gradient;
+
+            // Set initial active tab based on content
+            if (parsed.gradient) {
+                this.activeTab = 'gradient';
+            } else if (parsed.image) {
+                this.activeTab = 'image';
+            } else if (this.backgroundColor) {
+                this.activeTab = 'color';
+            }
+
             Livewire.on('uve-background-updated', (data) => {
                 // Handle both array format and object format
                 const d = Array.isArray(data) ? data[0] : data;
                 if (d) {
-                    // Clean url() wrapper from backgroundImage
-                    const bgImage = d.backgroundImage?.replace(/url\(['"]?|['"]?\)/g, '') || '';
-                    this.backgroundImage = bgImage;
+                    // FIX #13b: Parse background-image for gradient vs URL
+                    const bgValue = d.backgroundImage || '';
+                    const parsed = this.parseBackgroundImage(bgValue);
+
+                    // FIX #14d: ALWAYS update - event is now dispatched for EVERY element selection
+                    // This ensures proper RESET when switching from element with gradient to element without
+                    // Previous FIX #13c logic prevented reset - REMOVED
+                    this.backgroundImage = parsed.image;
+                    this.backgroundGradient = parsed.gradient;
+
+                    // FIX #14d: Also reset/update backgroundColor (may be empty for reset)
                     this.backgroundColor = d.backgroundColor || '';
+
                     this.backgroundSize = d.backgroundSize || 'cover';
                     this.backgroundPosition = d.backgroundPosition || 'center center';
                     this.backgroundRepeat = d.backgroundRepeat || 'no-repeat';
                     this.backgroundAttachment = d.backgroundAttachment || 'scroll';
-                    // Switch to image tab if there's a background image
-                    if (bgImage) {
+
+                    // FIX #13b: Switch to appropriate tab based on content
+                    if (this.backgroundGradient) {
+                        this.activeTab = 'gradient';
+                    } else if (this.backgroundImage) {
                         this.activeTab = 'image';
                     } else if (this.backgroundColor) {
                         this.activeTab = 'color';
+                    } else {
+                        // FIX #14d: Default to color tab when no background
+                        this.activeTab = 'color';
                     }
+
+                    // FIX #14d: Dispatch event for gradient editor sync
+                    // This notifies the nested uveGradientEditorInline component
+                    window.dispatchEvent(new CustomEvent('uve-gradient-sync', {
+                        detail: { gradient: parsed.gradient }
+                    }));
+                }
+            });
+
+            // FIX #14: Listen for tab switch command from Livewire
+            Livewire.on('uve-switch-background-tab', (data) => {
+                const d = Array.isArray(data) ? data[0] : data;
+                if (d && d.tab) {
+                    this.activeTab = d.tab;
                 }
             });
         },
@@ -1060,14 +1137,22 @@ function registerAlpineComponents(Alpine) {
             { value: 'right bottom', label: 'Prawo dol' },
         ],
 
+        // FIX #13b: Include gradient in hasBackground check
         get hasBackground() {
-            return this.backgroundColor || this.backgroundImage;
+            return this.backgroundColor || this.backgroundImage || this.backgroundGradient;
         },
 
+        // FIX #13b: Handle gradients properly in preview (don't wrap in url())
         get previewStyle() {
             let style = '';
             if (this.backgroundColor) style += `background-color: ${this.backgroundColor};`;
-            if (this.backgroundImage) {
+
+            // FIX #13b: Gradient gets used directly, URL gets wrapped
+            if (this.backgroundGradient) {
+                // Gradient - use directly without url() wrapper
+                style += `background-image: ${this.backgroundGradient};`;
+            } else if (this.backgroundImage) {
+                // URL - wrap in url()
                 style += `background-image: url('${this.backgroundImage}');`;
                 style += `background-size: ${this.backgroundSize};`;
                 style += `background-position: ${this.backgroundPosition};`;
@@ -1084,6 +1169,7 @@ function registerAlpineComponents(Alpine) {
         clearBackground() {
             this.backgroundColor = '';
             this.backgroundImage = '';
+            this.backgroundGradient = '';  // FIX #13b: Clear gradient too
             this.backgroundSize = 'cover';
             this.backgroundPosition = 'center center';
             this.backgroundRepeat = 'no-repeat';
@@ -1091,16 +1177,243 @@ function registerAlpineComponents(Alpine) {
             this.emitChange();
         },
 
+        // FIX #13b: Handle gradients properly when emitting changes
         emitChange() {
+            let bgImageValue = '';
+
+            // FIX #13b: Gradient used directly, URL wrapped in url()
+            if (this.backgroundGradient) {
+                bgImageValue = this.backgroundGradient;  // Gradient - direct
+            } else if (this.backgroundImage) {
+                bgImageValue = `url('${this.backgroundImage}')`;  // URL - wrapped
+            }
+
             const value = {
                 backgroundColor: this.backgroundColor,
-                backgroundImage: this.backgroundImage ? `url('${this.backgroundImage}')` : '',
+                backgroundImage: bgImageValue,
                 backgroundSize: this.backgroundSize,
                 backgroundPosition: this.backgroundPosition,
                 backgroundRepeat: this.backgroundRepeat,
                 backgroundAttachment: this.backgroundAttachment,
             };
             this.$wire?.updateControlValue('background', value);
+        }
+    }));
+
+    // FIX #14: Inline Gradient Editor (nested inside Background Control)
+    // This component is used within the Gradient tab of uveBackgroundControl
+    Alpine.data('uveGradientEditorInline', () => ({
+        gradientType: 'linear',
+        angle: 180,
+        colorStops: [
+            { color: '#f6f6f6', position: 0 },
+            { color: '#ef8248', position: 100 }
+        ],
+        selectedStop: 0,
+        draggingIndex: null,
+        barElement: null,
+
+        // Presets configuration
+        presets: {
+            brand: { type: 'linear', angle: 135, stops: [{ color: '#e0ac7e', position: 0 }, { color: '#d1975a', position: 50 }, { color: '#c08449', position: 100 }] },
+            cover: { type: 'linear', angle: 180, stops: [{ color: '#f6f6f6', position: 70 }, { color: '#ef8248', position: 70 }] },
+            dark: { type: 'linear', angle: 180, stops: [{ color: '#1a1a1a', position: 0 }, { color: '#333333', position: 100 }] },
+            light: { type: 'linear', angle: 180, stops: [{ color: '#ffffff', position: 0 }, { color: '#f6f6f6', position: 100 }] },
+            sunset: { type: 'linear', angle: 135, stops: [{ color: '#f6f6f6', position: 0 }, { color: '#ef8248', position: 100 }] },
+            ocean: { type: 'linear', angle: 135, stops: [{ color: '#667eea', position: 0 }, { color: '#764ba2', position: 100 }] }
+        },
+
+        init() {
+            // FIX #14d: Try to parse initial gradient from parent backgroundGradient
+            // Use _x_dataStack[0] (Alpine 3.x) instead of __x (Alpine 2.x)
+            const parentEl = this.$el.closest('[x-data*="uveBackgroundControl"]');
+            if (parentEl && parentEl._x_dataStack && parentEl._x_dataStack[0]) {
+                const parentGradient = parentEl._x_dataStack[0].backgroundGradient;
+                if (parentGradient) {
+                    this.parseGradient(parentGradient);
+                }
+            }
+
+            // FIX #14d: Listen for gradient sync event from parent uveBackgroundControl
+            // This replaces the broken $watch approach that used old Alpine 2.x syntax
+            window.addEventListener('uve-gradient-sync', (event) => {
+                const gradient = event.detail?.gradient;
+                if (gradient && gradient !== this.gradientCss) {
+                    this.parseGradient(gradient);
+                } else if (!gradient) {
+                    // FIX #14d: Reset to default when no gradient (switching to element without gradient)
+                    this.resetToDefault();
+                }
+            });
+
+            // FIX #14b: Set up drag event listeners for color stop markers
+            document.addEventListener('mousemove', (e) => this.onDrag(e));
+            document.addEventListener('mouseup', () => this.stopDrag());
+            document.addEventListener('touchmove', (e) => this.onDrag(e));
+            document.addEventListener('touchend', () => this.stopDrag());
+
+            // FIX #14c: Cache bar element reference after DOM is ready
+            this.$nextTick(() => {
+                this.barElement = this.$el.querySelector('.uve-gradient-stops-bar');
+            });
+        },
+
+        // FIX #14d: Reset gradient editor to default state
+        resetToDefault() {
+            this.gradientType = 'linear';
+            this.angle = 180;
+            this.colorStops = [
+                { color: '#f6f6f6', position: 0 },
+                { color: '#ef8248', position: 100 }
+            ];
+            this.selectedStop = 0;
+        },
+
+        // FIX #14b: Start dragging a color stop marker
+        startDrag(index, event) {
+            event.preventDefault();
+            this.draggingIndex = index;
+            this.selectedStop = index;
+            // FIX #14c: Ensure barElement is set (fallback if init cache failed)
+            if (!this.barElement) {
+                this.barElement = this.$el.querySelector('.uve-gradient-stops-bar')
+                    || document.querySelector('.uve-gradient-stops-bar');
+            }
+        },
+
+        // FIX #14b: Handle drag movement
+        onDrag(event) {
+            if (this.draggingIndex === null || !this.barElement) return;
+
+            const bar = this.barElement;
+            const rect = bar.getBoundingClientRect();
+
+            // Get X position (handle both mouse and touch)
+            const clientX = event.touches ? event.touches[0].clientX : event.clientX;
+            const relativeX = clientX - rect.left;
+            const barWidth = rect.width;
+
+            // Calculate position as percentage (0-100)
+            let newPosition = Math.round((relativeX / barWidth) * 100);
+            newPosition = Math.max(0, Math.min(100, newPosition));
+
+            // Update the color stop position
+            this.colorStops[this.draggingIndex].position = newPosition;
+        },
+
+        // FIX #14b: Stop dragging
+        stopDrag() {
+            if (this.draggingIndex !== null) {
+                this.updateParent();
+                this.draggingIndex = null;
+            }
+        },
+
+        // Generate CSS gradient string
+        get gradientCss() {
+            const sortedStops = [...this.colorStops].sort((a, b) => a.position - b.position);
+            const stopsStr = sortedStops.map(s => `${s.color} ${s.position}%`).join(', ');
+
+            if (this.gradientType === 'linear') {
+                return `linear-gradient(${this.angle}deg, ${stopsStr})`;
+            } else {
+                return `radial-gradient(circle, ${stopsStr})`;
+            }
+        },
+
+        // Parse CSS gradient string into components
+        parseGradient(cssGradient) {
+            if (!cssGradient) return;
+
+            // Detect type
+            if (cssGradient.startsWith('radial-gradient')) {
+                this.gradientType = 'radial';
+            } else {
+                this.gradientType = 'linear';
+            }
+
+            // Extract angle for linear gradients
+            const angleMatch = cssGradient.match(/linear-gradient\s*\(\s*(\d+)deg/);
+            if (angleMatch) {
+                this.angle = parseInt(angleMatch[1], 10);
+            }
+
+            // Extract color stops
+            // Match patterns like: #ffffff 0%, rgb(246, 246, 246) 70%
+            const colorStopRegex = /(#[0-9a-fA-F]{3,8}|rgba?\([^)]+\)|[a-z]+)\s*(\d+)%/g;
+            const stops = [];
+            let match;
+
+            while ((match = colorStopRegex.exec(cssGradient)) !== null) {
+                stops.push({
+                    color: match[1],
+                    position: parseInt(match[2], 10)
+                });
+            }
+
+            if (stops.length >= 2) {
+                this.colorStops = stops;
+            }
+        },
+
+        // Add a new color stop
+        addStop() {
+            if (this.colorStops.length >= 5) return;
+
+            // Find the largest gap and add stop there
+            const sorted = [...this.colorStops].sort((a, b) => a.position - b.position);
+            let maxGap = 0;
+            let gapStart = 0;
+
+            for (let i = 0; i < sorted.length - 1; i++) {
+                const gap = sorted[i + 1].position - sorted[i].position;
+                if (gap > maxGap) {
+                    maxGap = gap;
+                    gapStart = sorted[i].position;
+                }
+            }
+
+            const newPosition = Math.round(gapStart + maxGap / 2);
+            this.colorStops.push({ color: '#888888', position: newPosition });
+            this.selectedStop = this.colorStops.length - 1;
+            this.updateParent();
+        },
+
+        // Remove a color stop
+        removeStop(index) {
+            if (this.colorStops.length <= 2) return;
+            this.colorStops.splice(index, 1);
+            if (this.selectedStop >= this.colorStops.length) {
+                this.selectedStop = this.colorStops.length - 1;
+            }
+            this.updateParent();
+        },
+
+        // Apply a preset gradient
+        applyPreset(presetName) {
+            const preset = this.presets[presetName];
+            if (!preset) return;
+
+            this.gradientType = preset.type;
+            this.angle = preset.angle;
+            this.colorStops = JSON.parse(JSON.stringify(preset.stops));
+            this.selectedStop = 0;
+            this.updateParent();
+        },
+
+        // Update parent component's backgroundGradient
+        updateParent() {
+            // FIX #14d: Find the parent uveBackgroundControl component
+            // Use _x_dataStack[0] (Alpine 3.x) instead of __x (Alpine 2.x)
+            const parentEl = this.$el.closest('[x-data*="uveBackgroundControl"]');
+            if (parentEl && parentEl._x_dataStack && parentEl._x_dataStack[0]) {
+                const parentData = parentEl._x_dataStack[0];
+                parentData.backgroundGradient = this.gradientCss;
+                // Trigger parent's emitChange to sync with Livewire
+                if (typeof parentData.emitChange === 'function') {
+                    parentData.emitChange();
+                }
+            }
         }
     }));
 
@@ -1256,6 +1569,22 @@ function registerAlpineComponents(Alpine) {
         setBorderRadius(newRadius) {
             this.borderRadius = newRadius;
             this.emitChange();
+        },
+
+        /**
+         * FIX FAZA 3: Apply external URL to element
+         * Called from "Zastosuj" button in image-settings control
+         */
+        applyExternalUrl() {
+            if (!this.imageUrl || this.imageUrl.trim() === '') {
+                console.warn('[UVE ImageSettings] applyExternalUrl: No URL provided');
+                return;
+            }
+
+            console.log('[UVE ImageSettings] Applying external URL:', this.imageUrl);
+
+            // Call Livewire method to apply URL to selected element
+            this.$wire?.call('applyExternalImageUrl', this.imageUrl);
         },
 
         _nextClientSeq() {

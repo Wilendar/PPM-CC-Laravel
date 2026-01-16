@@ -2186,31 +2186,57 @@ window.uveApplyStyles = function(data) {
                 'text-align': 'left'
             };
 
+            // FIX #14f: Check if background styles should be applied to child element
+            // When childBackgroundSource is set, gradient comes from child (e.g. .pd-cover__picture)
+            const childBgSource = styles['childBackgroundSource'] || styles['child-background-source'];
+            let bgTargetElement = element;
+
+            if (childBgSource) {
+                // Find the child element that actually has the background
+                const childEl = element.querySelector(childBgSource);
+                if (childEl) {
+                    bgTargetElement = childEl;
+                    console.log('[UVE Global] FIX #14f: Background will be applied to child:', childBgSource);
+                } else {
+                    console.warn('[UVE Global] FIX #14f: Child element not found:', childBgSource);
+                }
+            }
+
+            // Background-related properties (to apply to bgTargetElement)
+            const bgProps = ['background-image', 'background-color', 'background-size',
+                             'background-position', 'background-repeat', 'background-attachment'];
+
             Object.entries(styles).forEach(([prop, value]) => {
                 // Skip empty/null values
                 if (value === null || value === undefined || value === '') return;
+
+                // Skip metadata properties (not actual CSS)
+                if (prop === 'childBackgroundSource' || prop === 'child-background-source') return;
 
                 // CRITICAL FIX: Convert camelCase to kebab-case
                 // PHP sends mixed formats - setProperty() only accepts kebab-case!
                 const cssProp = camelToKebab(prop);
 
+                // FIX #14f: Determine target element for this property
+                const targetEl = bgProps.includes(cssProp) ? bgTargetElement : element;
+
                 // For properties with defaults - handle reset properly
                 if (defaultValues[cssProp] !== undefined) {
                     if (value !== defaultValues[cssProp]) {
                         // Non-default value - apply it
-                        element.style.setProperty(cssProp, value);
-                        console.log('[UVE Global] Set style:', cssProp, '=', value);
+                        targetEl.style.setProperty(cssProp, value);
+                        console.log('[UVE Global] Set style:', cssProp, '=', value, targetEl === bgTargetElement && childBgSource ? '(on child)' : '');
                     } else {
                         // Default value - REMOVE inline style so CSS cascade takes over
-                        element.style.removeProperty(cssProp);
+                        targetEl.style.removeProperty(cssProp);
                         console.log('[UVE Global] Reset to default (removed):', cssProp);
                     }
                     return;
                 }
 
                 // All other properties - apply directly
-                element.style.setProperty(cssProp, value);
-                console.log('[UVE Global] Set style:', cssProp, '=', value);
+                targetEl.style.setProperty(cssProp, value);
+                console.log('[UVE Global] Set style:', cssProp, '=', value, targetEl === bgTargetElement && childBgSource ? '(on child)' : '');
             });
         }
 

@@ -34,6 +34,17 @@
                         <span class="lg:hidden ml-1">Import</span>
                     </button>
 
+                    {{-- Import from ERP Button (FAZA 10) --}}
+                    <button wire:click="openERPImportModal"
+                            class="btn-secondary inline-flex items-center px-3 sm:px-4 py-2 text-sm font-medium rounded-lg transition-all duration-300 whitespace-nowrap">
+                        <svg class="w-4 h-4 sm:w-5 sm:h-5 sm:mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                  d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
+                        </svg>
+                        <span class="hidden lg:inline">Import z ERP</span>
+                        <span class="lg:hidden ml-1">ERP</span>
+                    </button>
+
                     {{-- View Mode Toggle --}}
                     <div class="flex bg-card rounded-lg p-1">
                         <button wire:click="changeViewMode('table')"
@@ -2403,6 +2414,9 @@ class="fixed top-4 right-4 z-50">
 
 {{-- ETAP_07 FAZA 3D: Category Preview Modal --}}
 <livewire:components.category-preview-modal />
+
+{{-- FAZA 10: ERP Import Modal --}}
+@include('livewire.products.listing.partials.erp-import-modal')
 
 {{-- MPP TRADE Custom Styles --}}
 <style>

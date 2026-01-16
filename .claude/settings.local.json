@@ -130,7 +130,14 @@
       "Bash(git status:*)",
       "Bash(git add:*)",
       "Bash(cmd /c \"del nul 2>nul\")",
-      "Bash(git reset:*)"
+      "Bash(git reset:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nUVE: FIX #12 Background control wire:ignore.self sync\n\n- Add uve-background-updated dispatch in UVE_PropertyPanel.php\n- Add Alpine init\\(\\) listener in app.js uveBackgroundControl\n- Fix background control not updating when switching elements\n- Remove duplicate inline script from background.blade.php\n- Update uve-visual-editor skill to v2.6 with FIX documentation\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(git push:*)",
+      "WebFetch(domain:api.baselinker.com)",
+      "Bash(__NEW_LINE_eaf6a4b5da8224e9__ pscp -i $HostidoKey -P 64321 \"D:\\\\Skrypty\\\\PPM-CC-Laravel\\\\app\\\\Services\\\\ERP\\\\DynamicsService.php\" \"host379076@host379076.hostido.net.pl:domains/ppm.mpptrade.pl/public_html/app/Services/ERP/DynamicsService.php\")",
+      "Bash(cd:*)",
+      "Bash(curl:*)",
+      "Bash(git commit:*)"
     ],
     "deny": [],
     "ask": []
@@ -224,5 +231,6 @@
         ]
       }
     ]
-  }
+  },
+  "plansDirectory": "Plan_Projektu"
 }

@@ -237,18 +237,96 @@
         </div>
     </div>
 
-    {{-- Gradient Tab --}}
-    <div class="uve-bg-content" x-show="activeTab === 'gradient'">
-        <p class="uve-bg-gradient-note">
-            Uzyj kontrolki "Gradient" do szczegolowej edycji gradientow.
-        </p>
-        <button
-            type="button"
-            wire:click="openGradientEditor"
-            class="uve-btn uve-btn-sm w-full"
-        >
-            Otworz edytor gradientow
-        </button>
+    {{-- Gradient Tab - FIX #14: Full inline gradient editor --}}
+    <div class="uve-bg-content" x-show="activeTab === 'gradient'" x-data="uveGradientEditorInline()">
+        {{-- Gradient Preview --}}
+        <div class="uve-gradient-preview-lg" :style="'background: ' + gradientCss"></div>
+
+        {{-- Gradient Type --}}
+        <div class="uve-control__field">
+            <label class="uve-control__label">Typ gradientu</label>
+            <div class="uve-btn-group-full">
+                <button type="button" @click="gradientType = 'linear'; updateParent()" class="uve-btn uve-btn-sm" :class="{ 'uve-btn-active': gradientType === 'linear' }">Liniowy</button>
+                <button type="button" @click="gradientType = 'radial'; updateParent()" class="uve-btn uve-btn-sm" :class="{ 'uve-btn-active': gradientType === 'radial' }">Radialny</button>
+            </div>
+        </div>
+
+        {{-- Angle Control (linear only) --}}
+        <div class="uve-control__field" x-show="gradientType === 'linear'">
+            <label class="uve-control__label">Kat</label>
+            <div class="uve-gradient-angle-row">
+                <input type="range" x-model.number="angle" @input="updateParent()" min="0" max="360" class="uve-range" />
+                <input type="number" x-model.number="angle" @input="updateParent()" min="0" max="360" class="uve-input uve-input--sm" style="width: 60px" />
+                <span class="uve-gradient-angle-unit">deg</span>
+            </div>
+            <div class="uve-gradient-angle-presets">
+                <template x-for="preset in [0, 45, 90, 135, 180, 225, 270, 315]" :key="preset">
+                    <button type="button" @click="angle = preset; updateParent()" class="uve-btn uve-btn-xs" :class="{ 'uve-btn-active': angle === preset }" x-text="preset + '\u00B0'"></button>
+                </template>
+            </div>
+        </div>
+
+        {{-- Color Stops --}}
+        <div class="uve-control__field">
+            <div class="uve-stops-header">
+                <label class="uve-control__label">Kolory</label>
+                <button type="button" @click="addStop()" class="uve-btn uve-btn-xs" :disabled="colorStops.length >= 5" title="Dodaj kolor">
+                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+                </button>
+            </div>
+
+            {{-- Color stops bar - FIX #14b: Draggable markers --}}
+            <div class="uve-gradient-stops-bar" :style="'background: ' + gradientCss">
+                <template x-for="(stop, index) in colorStops" :key="index">
+                    <div
+                        class="uve-gradient-stop-marker"
+                        :class="{ 'uve-gradient-stop-marker--selected': selectedStop === index, 'uve-gradient-stop-marker--dragging': draggingIndex === index }"
+                        :style="'left: ' + stop.position + '%'"
+                        @mousedown="startDrag(index, $event)"
+                        @touchstart="startDrag(index, $event)"
+                    >
+                        <div class="uve-gradient-stop-handle" :style="'background: ' + stop.color"></div>
+                    </div>
+                </template>
+            </div>
+
+            {{-- Color stops list --}}
+            <div class="uve-stops-list">
+                <template x-for="(stop, index) in colorStops" :key="index">
+                    <div class="uve-stop-item" :class="{ 'uve-stop-item--selected': selectedStop === index }" @click="selectedStop = index">
+                        <div class="uve-stop-color-wrapper">
+                            <input type="color" :value="stop.color.startsWith('#') ? stop.color : '#888888'" @input="stop.color = $event.target.value; updateParent()" class="uve-stop-color-input" />
+                            <div class="uve-stop-color-preview" :style="'background: ' + stop.color"></div>
+                        </div>
+                        <input type="text" x-model="stop.color" @input="updateParent()" class="uve-input uve-input--sm" style="width: 80px" placeholder="#ffffff" />
+                        <input type="number" x-model.number="stop.position" @input="updateParent()" min="0" max="100" class="uve-input uve-input--sm" style="width: 50px" />
+                        <span class="uve-stop-unit">%</span>
+                        <button type="button" @click="removeStop(index)" class="uve-btn uve-btn-xs uve-btn-danger" :disabled="colorStops.length <= 2">
+                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                        </button>
+                    </div>
+                </template>
+            </div>
+        </div>
+
+        {{-- Gradient Presets --}}
+        <div class="uve-control__field">
+            <label class="uve-control__label">Gotowe gradienty</label>
+            <div class="uve-gradient-presets-grid">
+                <button type="button" @click="applyPreset('brand')" class="uve-gradient-preset-btn" style="background: linear-gradient(135deg, #e0ac7e 0%, #d1975a 50%, #c08449 100%)" title="Brand"></button>
+                <button type="button" @click="applyPreset('cover')" class="uve-gradient-preset-btn" style="background: linear-gradient(180deg, #f6f6f6 70%, #ef8248 70%)" title="Cover"></button>
+                <button type="button" @click="applyPreset('dark')" class="uve-gradient-preset-btn" style="background: linear-gradient(180deg, #1a1a1a 0%, #333333 100%)" title="Dark"></button>
+                <button type="button" @click="applyPreset('light')" class="uve-gradient-preset-btn" style="background: linear-gradient(180deg, #ffffff 0%, #f6f6f6 100%)" title="Light"></button>
+                <button type="button" @click="applyPreset('sunset')" class="uve-gradient-preset-btn" style="background: linear-gradient(135deg, #f6f6f6 0%, #ef8248 100%)" title="Sunset"></button>
+                <button type="button" @click="applyPreset('ocean')" class="uve-gradient-preset-btn" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%)" title="Ocean"></button>
+            </div>
+        </div>
+
+        {{-- CSS Output (readonly) --}}
+        <div class="uve-control__field">
+            <label class="uve-control__label">CSS</label>
+            <textarea x-model="gradientCss" readonly class="uve-textarea uve-textarea--gradient" rows="2"></textarea>
+        </div>
     </div>
 
     {{-- Clear Button --}}
@@ -430,6 +508,232 @@
     color: #64748b;
     text-align: center;
     padding: 0.5rem;
+}
+
+/* FIX #13b: Gradient Preview */
+.uve-gradient-preview {
+    height: 60px;
+    border-radius: 0.375rem;
+    border: 2px solid #475569;
+    margin-bottom: 0.5rem;
+}
+
+/* FIX #14: Gradient Editor Large Preview */
+.uve-gradient-preview-lg {
+    height: 80px;
+    border-radius: 0.375rem;
+    border: 2px solid #475569;
+    margin-bottom: 0.75rem;
+}
+
+/* FIX #14: Gradient Angle Row */
+.uve-gradient-angle-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.uve-range {
+    flex: 1;
+    -webkit-appearance: none;
+    height: 6px;
+    background: #334155;
+    border-radius: 3px;
+    outline: none;
+}
+
+.uve-range::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 14px;
+    height: 14px;
+    background: #e0ac7e;
+    border-radius: 50%;
+    cursor: pointer;
+}
+
+.uve-range::-moz-range-thumb {
+    width: 14px;
+    height: 14px;
+    background: #e0ac7e;
+    border-radius: 50%;
+    cursor: pointer;
+    border: none;
+}
+
+.uve-gradient-angle-unit {
+    color: #64748b;
+    font-size: 0.75rem;
+}
+
+.uve-gradient-angle-presets {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+    margin-top: 0.5rem;
+}
+
+/* FIX #14: Gradient Stops Bar */
+.uve-gradient-stops-bar {
+    height: 20px;
+    border-radius: 0.25rem;
+    border: 1px solid #475569;
+    position: relative;
+    margin-bottom: 0.75rem;
+}
+
+.uve-gradient-stop-marker {
+    position: absolute;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    cursor: grab;
+    z-index: 1;
+    user-select: none;
+    touch-action: none;
+}
+
+.uve-gradient-stop-marker--selected {
+    z-index: 2;
+}
+
+.uve-gradient-stop-marker--dragging {
+    cursor: grabbing;
+    z-index: 3;
+}
+
+.uve-gradient-stop-handle {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    border: 2px solid #fff;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+    transition: transform 0.1s, box-shadow 0.1s;
+}
+
+.uve-gradient-stop-marker:hover .uve-gradient-stop-handle,
+.uve-gradient-stop-marker--selected .uve-gradient-stop-handle {
+    transform: scale(1.2);
+    border-color: #e0ac7e;
+}
+
+.uve-gradient-stop-marker--dragging .uve-gradient-stop-handle {
+    transform: scale(1.3);
+    border-color: #e0ac7e;
+    box-shadow: 0 2px 6px rgba(224, 172, 126, 0.5);
+}
+
+/* FIX #14: Color Stops Header */
+.uve-stops-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+}
+
+/* FIX #14: Color Stops List */
+.uve-stops-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.375rem;
+}
+
+.uve-stop-item {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.375rem;
+    background: #1e293b;
+    border-radius: 0.25rem;
+    border: 1px solid transparent;
+    transition: all 0.1s;
+}
+
+.uve-stop-item--selected {
+    border-color: #e0ac7e;
+}
+
+.uve-stop-color-wrapper {
+    position: relative;
+    width: 24px;
+    height: 24px;
+    flex-shrink: 0;
+}
+
+.uve-stop-color-input {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0;
+    cursor: pointer;
+}
+
+.uve-stop-color-preview {
+    width: 100%;
+    height: 100%;
+    border-radius: 0.25rem;
+    border: 2px solid #475569;
+}
+
+.uve-stop-unit {
+    color: #64748b;
+    font-size: 0.7rem;
+}
+
+/* FIX #14: Gradient Presets Grid */
+.uve-gradient-presets-grid {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 0.375rem;
+}
+
+.uve-gradient-preset-btn {
+    aspect-ratio: 1;
+    border-radius: 0.25rem;
+    border: 2px solid #475569;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.uve-gradient-preset-btn:hover {
+    border-color: #e0ac7e;
+    transform: scale(1.05);
+}
+
+/* FIX #14: Button styles */
+.uve-btn-xs {
+    padding: 0.25rem 0.375rem;
+    font-size: 0.7rem;
+}
+
+.uve-btn-danger {
+    color: #f87171;
+}
+
+.uve-btn-danger:hover {
+    background: rgba(248, 113, 113, 0.2);
+}
+
+.uve-btn-danger:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+}
+
+/* FIX #13b: Gradient Textarea */
+.uve-textarea--gradient {
+    width: 100%;
+    background: #1e293b;
+    border: 1px solid #475569;
+    border-radius: 0.375rem;
+    color: #e2e8f0;
+    font-size: 0.75rem;
+    font-family: monospace;
+    padding: 0.5rem;
+    resize: vertical;
+}
+
+.uve-textarea--gradient:focus {
+    outline: none;
+    border-color: #e0ac7e;
 }
 
 /* Actions */

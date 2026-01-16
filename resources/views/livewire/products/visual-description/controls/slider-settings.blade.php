@@ -600,6 +600,31 @@ function uveSliderSettingsControl(initialValue) {
         // UI state
         showBreakpoints: false,
 
+        // FIX #14: Listen for Livewire event to update slider config when element changes
+        // This is needed because wire:ignore.self prevents Alpine from reinitializing
+        init() {
+            Livewire.on('uve-slider-config-updated', (data) => {
+                // Handle both array format and object format
+                const config = Array.isArray(data) ? data[0]?.config : data?.config;
+                if (config && typeof config === 'object') {
+                    if (config.type) this.type = config.type;
+                    if (config.perPage) this.perPage = parseInt(config.perPage);
+                    if (config.autoplay !== undefined) this.autoplay = config.autoplay;
+                    if (config.interval) this.interval = parseInt(config.interval);
+                    if (config.arrows !== undefined) this.arrows = config.arrows;
+                    if (config.pagination !== undefined) this.pagination = config.pagination;
+                    if (config.speed) this.speed = parseInt(config.speed);
+                    if (config.gap) {
+                        const gapValue = parseInt(config.gap);
+                        const gapUnit = config.gap.toString().replace(/[\d.-]/g, '') || 'px';
+                        this.gap = gapValue;
+                        this.gapUnit = gapUnit;
+                    }
+                    console.log('[UVE SliderSettings] Updated from uve-slider-config-updated', config);
+                }
+            });
+        },
+
         get previewSlides() {
             return Math.min(this.perPage + 1, 6);
         },

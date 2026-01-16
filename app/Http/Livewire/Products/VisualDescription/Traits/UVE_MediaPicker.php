@@ -390,6 +390,54 @@ trait UVE_MediaPicker
     }
 
     /**
+     * FIX FAZA 3: Apply external URL to selected element
+     * Called from image-settings control "Zastosuj" button
+     *
+     * This method is called directly from Property Panel (not Media Picker)
+     * so it uses selectedElementId from PropertyPanel trait.
+     */
+    public function applyExternalImageUrl(string $url): void
+    {
+        Log::info('applyExternalImageUrl CALLED', [
+            'url' => $url,
+            'selectedElementId' => $this->selectedElementId ?? null,
+        ]);
+
+        // Check if we have a selected element
+        if (empty($this->selectedElementId)) {
+            $this->dispatch('notify', type: 'error', message: 'Nie wybrano elementu');
+            return;
+        }
+
+        // Validate URL
+        if (empty($url) || !filter_var($url, FILTER_VALIDATE_URL)) {
+            $this->dispatch('notify', type: 'error', message: 'Nieprawidlowy URL');
+            return;
+        }
+
+        // Apply to element (reuse existing logic)
+        $media = [
+            'id' => null,
+            'url' => $url,
+            'alt' => '',
+            'source' => 'external',
+        ];
+
+        $this->applyMediaToElement($this->selectedElementId, $media);
+
+        // Dispatch update for Property Panel (sync miniaturka)
+        $this->dispatch('uve-image-url-updated', url: $url);
+
+        // Notify success
+        $this->dispatch('notify', type: 'success', message: 'URL obrazka zastosowany');
+
+        Log::info('applyExternalImageUrl SUCCESS', [
+            'elementId' => $this->selectedElementId,
+            'url' => $url,
+        ]);
+    }
+
+    /**
      * Clear selected media
      */
     public function clearMedia(): void
@@ -603,8 +651,10 @@ trait UVE_MediaPicker
         ]);
 
         // Find visual blocks in HTML - MUST match injectEditableMarkers() XPath EXACTLY!
-        // FIX #11: Use SAME XPath as UVE_Preview::injectEditableMarkers()
-        $blockXPath = '//*[contains(@class, "pd-block") or contains(@class, "pd-intro") or contains(@class, "pd-cover")]';
+        // FIX #11b: Use IDENTICAL XPath as UVE_Preview::injectEditableMarkers() line 715
+        // CRITICAL: Must include "and not(contains(@class, '__'))" to exclude BEM child elements!
+        // Without this, 'pd-intro__heading' matches 'pd-intro' and wrong block is selected
+        $blockXPath = '//*[(contains(@class, "pd-block") or contains(@class, "pd-intro") or contains(@class, "pd-merits") or contains(@class, "pd-specification") or contains(@class, "pd-features") or contains(@class, "pd-cover") or contains(@class, "pd-slider") or contains(@class, "pd-pseudo-parallax") or contains(@class, "pd-parallax") or contains(@class, "pd-more-links") or contains(@class, "pd-footer") or contains(@class, "pd-header") or contains(@class, "pd-asset-list") or contains(@class, "pd-where-2-ride")) and not(contains(@class, "__"))]';
         $visualBlocks = $xpath->query($blockXPath);
 
         Log::info('findElementByStructuralMatching: Found visual blocks', [

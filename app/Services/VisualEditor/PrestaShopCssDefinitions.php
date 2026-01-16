@@ -154,12 +154,15 @@ class PrestaShopCssDefinitions
 
         // ==============================================
         // PD-MERITS (Benefits Section)
+        // FIX: Added horizontal padding (32px) and centered layout
         // ==============================================
         'pd-merits' => [
             'display' => 'grid',
             'gridTemplateColumns' => 'repeat(auto-fit, minmax(280px, 1fr))',
             'gap' => '1.5rem',
-            'padding' => '2rem 0',
+            'padding' => '2rem 32px',
+            'maxWidth' => '1300px',
+            'margin' => '0 auto',
         ],
         'pd-merit' => [
             'display' => 'flex',

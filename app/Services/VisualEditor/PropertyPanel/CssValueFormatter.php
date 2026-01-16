@@ -59,6 +59,7 @@ class CssValueFormatter
             'position' => $this->formatPosition($value),
             'size' => $this->formatSize($value),
             'image-settings' => $this->formatImageSettings($value),
+            'list-settings' => $this->formatListSettings($value), // FIX #16
             default => $this->formatGeneric($value),
         };
     }
@@ -417,6 +418,45 @@ class CssValueFormatter
     public function formatBackground(array $value): array
     {
         $css = [];
+
+        // FIX #14e: Handle Alpine emitChange() format (camelCase CSS properties)
+        // Alpine sends: { backgroundColor, backgroundImage, backgroundSize, ... }
+        // Old format sends: { type: 'color|image|gradient', color: '...', image: '...' }
+
+        // Check if this is Alpine format (has backgroundImage or backgroundColor keys)
+        $isAlpineFormat = isset($value['backgroundImage']) || isset($value['backgroundColor']);
+
+        if ($isAlpineFormat) {
+            // Alpine format - direct CSS properties
+            if (!empty($value['backgroundColor'])) {
+                $css['background-color'] = $value['backgroundColor'];
+            }
+
+            if (!empty($value['backgroundImage'])) {
+                // backgroundImage can be gradient string or url('...')
+                $css['background-image'] = $value['backgroundImage'];
+            }
+
+            if (!empty($value['backgroundSize'])) {
+                $css['background-size'] = $value['backgroundSize'];
+            }
+
+            if (!empty($value['backgroundPosition'])) {
+                $css['background-position'] = $value['backgroundPosition'];
+            }
+
+            if (!empty($value['backgroundRepeat'])) {
+                $css['background-repeat'] = $value['backgroundRepeat'];
+            }
+
+            if (!empty($value['backgroundAttachment']) && $value['backgroundAttachment'] !== 'scroll') {
+                $css['background-attachment'] = $value['backgroundAttachment'];
+            }
+
+            return $css;
+        }
+
+        // Legacy format with 'type' key
         $type = $value['type'] ?? 'color';
 
         switch ($type) {
@@ -574,6 +614,62 @@ class CssValueFormatter
         $shadow = $value['shadow'] ?? false;
         if ($shadow === true || $shadow === 'true' || $shadow === '1') {
             $css['box-shadow'] = '0 4px 12px rgba(0, 0, 0, 0.15)';
+        }
+
+        return $css;
+    }
+
+    /**
+     * Format list-settings value to CSS.
+     *
+     * FIX #16: Handles list-specific properties: list-style-type (numbering/bullets),
+     * gap for item spacing, and padding for indentation.
+     *
+     * @param array<string, mixed> $value List settings configuration
+     * @return array<string, string> CSS properties
+     */
+    public function formatListSettings(array $value): array
+    {
+        $css = [];
+
+        // Determine list-style-type based on listStyle, numberingStyle, or bulletStyle
+        $listStyle = $value['listStyle'] ?? 'checkmarks';
+
+        if ($listStyle === 'numbers') {
+            // FIX #16: Numbering style variants
+            $numberingStyle = $value['numberingStyle'] ?? 'decimal';
+            $css['list-style-type'] = $numberingStyle;
+        } elseif ($listStyle === 'bullets') {
+            // FIX #16: Bullet style variants
+            $bulletStyle = $value['bulletStyle'] ?? 'disc';
+            $css['list-style-type'] = $bulletStyle;
+        } elseif ($listStyle === 'none') {
+            $css['list-style-type'] = 'none';
+        }
+        // Note: checkmarks, icons, arrows use custom markers (handled via CSS pseudo-elements)
+
+        // Item gap - applies to list container
+        $itemGap = $value['itemGap'] ?? '';
+        if ($itemGap !== '' && $itemGap !== '0') {
+            $css['gap'] = $itemGap;
+        }
+
+        // Indentation - padding-left on the list
+        $indentation = $value['indentation'] ?? '';
+        if ($indentation !== '' && $indentation !== '0') {
+            $css['padding-left'] = $indentation;
+        }
+
+        // Columns layout (grid)
+        $layout = $value['layout'] ?? 'vertical';
+        $columns = $value['columns'] ?? 1;
+
+        if ($layout === 'grid' || ($layout === 'horizontal' && $columns > 1)) {
+            $css['display'] = 'grid';
+            $css['grid-template-columns'] = "repeat({$columns}, 1fr)";
+        } elseif ($layout === 'horizontal') {
+            $css['display'] = 'flex';
+            $css['flex-wrap'] = 'wrap';
         }
 
         return $css;

@@ -940,21 +940,50 @@ HTML;
                 .replace(/['"]?\)$/, '');
         }
 
-        // ETAP_07h PP.3: Also extract src attribute for IMG elements
-        // PrestaShop parallax sections use <img> instead of CSS background-image
-        // FIX: Also set src and imageUrl for image-settings control compatibility
+        // FIX #13d: For pd-cover blocks, check child elements for gradient background
+        // The visual gradient is on .pd-cover__picture (child), not .pd-cover (parent)
+        // When selecting the block, we should show the gradient in Property Panel
+        if (el.classList && el.classList.contains('pd-cover')) {
+            const pictureChild = el.querySelector('.pd-cover__picture');
+            if (pictureChild) {
+                const childComputed = window.getComputedStyle(pictureChild);
+                const childBgImage = childComputed.backgroundImage;
+                // Check if child has gradient (not 'none')
+                if (childBgImage && childBgImage !== 'none' && childBgImage.includes('gradient')) {
+                    styles.backgroundImage = childBgImage;
+                    styles.childBackgroundSource = '.pd-cover__picture'; // Mark source for debugging
+                }
+            }
+        }
+
+        // FIX #13d: Generic handler for any block with __picture child containing gradient
+        // Handles pd-intro, pd-section, etc. with similar structure
+        if (!styles.backgroundImage || styles.backgroundImage === 'none') {
+            const pictureChild = el.querySelector('[class*="__picture"]');
+            if (pictureChild) {
+                const childComputed = window.getComputedStyle(pictureChild);
+                const childBgImage = childComputed.backgroundImage;
+                if (childBgImage && childBgImage !== 'none' && childBgImage.includes('gradient')) {
+                    styles.backgroundImage = childBgImage;
+                    styles.childBackgroundSource = pictureChild.className;
+                }
+            }
+        }
+
+        // ETAP_07h PP.3: Extract src attribute for IMG elements
+        // FIX #13 CORRECTED: Set ONLY src/imageUrl for image-settings control
+        // DO NOT set backgroundImage - that's for CSS background-image only!
+        // IMG ≠ Background Image - these are conceptually different!
         if (el.tagName === 'IMG' && el.src) {
-            styles.backgroundImage = el.src;
             styles.src = el.src;
             styles.imageUrl = el.src;
         }
 
         // Also check for PICTURE element - extract src from nested IMG
-        // FIX: Also set src and imageUrl for image-settings control compatibility
+        // FIX #13 CORRECTED: Set ONLY src/imageUrl, NOT backgroundImage
         if (el.tagName === 'PICTURE') {
             const img = el.querySelector('img');
             if (img && img.src) {
-                styles.backgroundImage = img.src;
                 styles.src = img.src;
                 styles.imageUrl = img.src;
             }
@@ -962,14 +991,14 @@ HTML;
 
         // ETAP_07h PP.3.1: Check for nested images in parallax/cover containers
         // PrestaShop uses <picture><img> inside containers like pd-pseudo-parallax
-        // FIX: Also set src and imageUrl for image-settings control compatibility
-        if (!styles.backgroundImage || styles.backgroundImage === 'none') {
+        // FIX #13 CORRECTED: Set ONLY src/imageUrl for nested images
+        // backgroundImage should come from CSS only, not from nested <img> elements
+        if (!styles.src && !styles.imageUrl) {
             // Check for pd-pseudo-parallax__img class (PrestaShop pattern)
             const parallaxImg = el.querySelector('.pd-pseudo-parallax__img') ||
                                el.querySelector('picture img') ||
                                el.querySelector('img');
             if (parallaxImg && parallaxImg.src) {
-                styles.backgroundImage = parallaxImg.src;
                 styles.src = parallaxImg.src;
                 styles.imageUrl = parallaxImg.src;
             }

@@ -599,12 +599,36 @@ class CssSyncOrchestrator
     [row-end];
 }
 
-/* Full width for UVE content */
-.product-description .uve-content,
-.product-description .rte-content,
-.product-description .rte-content .pd-base-grid {
+/* Full width for UVE content wrappers ONLY */
+/* NOTE: Do NOT add .pd-base-grid here - it breaks inner blocks like .pd-brand-backdrop */
+/* Individual blocks (.pd-intro, .pd-cover, .bg-brand) have their own grid-column rules */
+.product-description .rte-content {
   grid-column: 1 / -1;
   width: 100%;
+}
+
+/* FIX: UVE content wrapper breaks grid layout for its children */
+/* Using display: contents makes .uve-content "transparent" in layout */
+/* So its children become direct grid items of the parent .rte-content grid */
+.product-description .uve-content {
+  display: contents;
+}
+
+/* FIX: Theme CSS uses :where(.rte-content) > div for grid-column: block */
+/* But CSS selectors don't change with display:contents, so we need explicit rules */
+/* Apply grid-column: block to .uve-content children that should have it */
+/* FIX #15: Exclude pd-pseudo-parallax from block constraint - it must be full-width */
+.uve-content > .pd-block:not(.pd-intro):not([class*="grid-row"]):not(.pd-pseudo-parallax),
+.uve-content > .pd-specification,
+.uve-content > div:not(.pd-intro):not(.bg-brand):not(.pd-cover):not([class*="grid-row"]):not(.pd-pseudo-parallax) {
+  grid-column: block;
+}
+
+/* FIX #15: pd-pseudo-parallax MUST be full-width (same as original sklep.kayomoto.pl) */
+.uve-content > .pd-pseudo-parallax,
+.uve-content > .pd-block.pd-pseudo-parallax,
+.product-description .pd-pseudo-parallax {
+  grid-column: 1 / -1;
 }
 
 /* === END SCOPED LAYOUT FIX === */
@@ -698,7 +722,7 @@ class CssSyncOrchestrator
   margin: 0 auto;
   max-width: 1300px;
   list-style: none;
-  color: #fff;
+  /* FIX: color removed - inherit from original CSS (black on orange background) */
 }
 
 .uve-content .pd-asset-list li,
@@ -715,6 +739,15 @@ class CssSyncOrchestrator
 .product-description .pd-asset-list li b {
   font-size: 32px;
   font-weight: 700;
+}
+
+/* Merits list - SCOPED with margins (FIX: horizontal padding for edge spacing) */
+.uve-content .pd-merits,
+.product-description .pd-merits {
+  max-width: 1300px;
+  margin: 0 auto;
+  padding-left: 32px;
+  padding-right: 32px;
 }
 
 /* === END SCOPED PRODUCT DESCRIPTION STYLES === */

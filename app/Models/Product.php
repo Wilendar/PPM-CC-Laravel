@@ -736,4 +736,92 @@ class Product extends Model
     {
         return static::where('sku', strtoupper(trim($sku)))->first();
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | ERP INTEGRATION RELATIONSHIPS (ETAP_08.3)
+    |--------------------------------------------------------------------------
+    */
+
+    /**
+     * Product ERP data relationship (1:many) - ETAP_08.3: ERP Tab (Shop-Tab Pattern)
+     *
+     * Business Logic: Kazdy produkt moze miec rozne dane per system ERP
+     * Performance: Eager loading ready z proper indexing
+     * Multi-ERP: Connection-specific names, mappings, sync status
+     *
+     * @return \Illuminate\Database\Eloquent\Relations\HasMany
+     */
+    public function erpData(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(\App\Models\ProductErpData::class, 'product_id', 'id')
+                    ->orderBy('erp_connection_id', 'asc');
+    }
+
+    /**
+     * Active ERP data only (sync enabled)
+     *
+     * @return \Illuminate\Database\Eloquent\Relations\HasMany
+     */
+    public function activeErpData(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->erpData()
+                    ->where('sync_status', '!=', 'disabled');
+    }
+
+    /**
+     * ERP data for specific connection
+     *
+     * @param int $erpConnectionId
+     * @return \Illuminate\Database\Eloquent\Relations\HasMany
+     */
+    public function dataForErpConnection(int $erpConnectionId): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->erpData()
+                    ->where('erp_connection_id', $erpConnectionId);
+    }
+
+    /**
+     * Get or create ERP data for specific connection
+     *
+     * @param int $erpConnectionId
+     * @return \App\Models\ProductErpData
+     */
+    public function getOrCreateErpData(int $erpConnectionId): \App\Models\ProductErpData
+    {
+        return $this->erpData()
+                    ->where('erp_connection_id', $erpConnectionId)
+                    ->firstOrCreate([
+                        'product_id' => $this->id,
+                        'erp_connection_id' => $erpConnectionId,
+                    ]);
+    }
+
+    /**
+     * Check if product has ERP data for specific connection
+     *
+     * @param int $erpConnectionId
+     * @return bool
+     */
+    public function hasErpData(int $erpConnectionId): bool
+    {
+        return $this->erpData()
+                    ->where('erp_connection_id', $erpConnectionId)
+                    ->exists();
+    }
+
+    /**
+     * Get ERP sync status for specific connection
+     *
+     * @param int $erpConnectionId
+     * @return string|null
+     */
+    public function getErpSyncStatus(int $erpConnectionId): ?string
+    {
+        $data = $this->erpData()
+                    ->where('erp_connection_id', $erpConnectionId)
+                    ->first();
+
+        return $data?->sync_status;
+    }
 }

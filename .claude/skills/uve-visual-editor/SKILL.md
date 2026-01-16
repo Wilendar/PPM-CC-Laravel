@@ -1,11 +1,11 @@
 # SKILL: UVE Visual Editor (CSS-First Architecture)
 
 ## Metadata
-- **Version:** 2.6
+- **Version:** 2.11
 - **Type:** domain
 - **Enforcement:** require
 - **Priority:** critical
-- **Last Updated:** 2026-01-15
+- **Last Updated:** 2026-01-16
 
 ---
 
@@ -424,6 +424,448 @@ init() {
 
 ---
 
+## Child Element Background Inheritance (v2.7) ⚠️
+
+### KRYTYCZNE: Gradient z child elementu! (FIX #13d)
+
+**Problem:** Niektóre bloki (np. `.pd-cover`) mają `background-image: none` na rodzicu, ale gradient jest zdefiniowany na child elemencie (np. `.pd-cover__picture`). Property Panel pokazywał pusty background zamiast rzeczywistego gradientu.
+
+### Symptom:
+Wybranie bloku `.pd-cover` → Background control w Property Panel jest pusty, mimo że wizualnie widać gradient.
+
+### Przyczyna:
+`getElementStyles()` odczytywał tylko style wybranego elementu, nie sprawdzając child elementów.
+
+### Rozwiązanie:
+W `getElementStyles()` (UVE_Preview.php) dodano logikę dziedziczenia gradientu z child elementów:
+
+```javascript
+// UVE_Preview.php - getElementStyles() (~linia 943)
+
+// FIX #13d: For pd-cover blocks, check child elements for gradient background
+if (el.classList && el.classList.contains('pd-cover')) {
+    const pictureChild = el.querySelector('.pd-cover__picture');
+    if (pictureChild) {
+        const childComputed = window.getComputedStyle(pictureChild);
+        const childBgImage = childComputed.backgroundImage;
+        if (childBgImage && childBgImage !== 'none' && childBgImage.includes('gradient')) {
+            styles.backgroundImage = childBgImage;
+            styles.childBackgroundSource = '.pd-cover__picture';
+        }
+    }
+}
+
+// FIX #13d: Generic handler for any block with __picture child containing gradient
+if (!styles.backgroundImage || styles.backgroundImage === 'none') {
+    const pictureChild = el.querySelector('[class*="__picture"]');
+    if (pictureChild) {
+        const childComputed = window.getComputedStyle(pictureChild);
+        const childBgImage = childComputed.backgroundImage;
+        if (childBgImage && childBgImage !== 'none' && childBgImage.includes('gradient')) {
+            styles.backgroundImage = childBgImage;
+            styles.childBackgroundSource = pictureChild.className;
+        }
+    }
+}
+```
+
+### Mapowanie kontrolek:
+W `CssClassMappingDefinitions.php` dodano kontrolkę `background` dla `pd-cover`:
+
+```php
+'pd-cover' => [
+    // FIX #13d: Added 'background' control - gradient inherited from .pd-cover__picture child
+    'controls' => ['background', 'layout-flex', 'layout-grid'],
+    'defaults' => [...],
+],
+```
+
+### Dodatkowe informacje:
+- `childBackgroundSource` - wskazuje z którego child elementu pochodzi gradient
+- Generic handler dla `[class*="__picture"]` obsługuje inne bloki z podobnym wzorcem
+
+### ⚠️ CACHE IFRAME:
+Po zmianie `getElementStyles()` wymagany hard reload iframe (`window.location.reload(true)`) - browser cache może serwować starą wersję skryptu!
+
+### WYMAGANE:
+- ✅ Sprawdzaj child elementy `__picture` dla gradientów
+- ✅ Dodaj kontrolkę `background` do bloków z child gradientami
+- ✅ Hard reload po deploy zmian w iframe scripts
+
+---
+
+## Child Element Style Application (v2.10) ⚠️
+
+### KRYTYCZNE: uveApplyStyles dla child elementów! (FIX #14f)
+
+**Problem:** FIX #13d odczytuje gradient z child elementu i ustawia `childBackgroundSource`, ale `uveApplyStyles` aplikowało WSZYSTKIE style do parent elementu. Efekt: Property Panel pokazywał gradient, ale zmiany NIE aktualizowały canvas.
+
+### Symptom:
+1. Wybierz blok `.pd-cover` (który ma gradient na `.pd-cover__picture`)
+2. Property Panel pokazuje gradient poprawnie
+3. Zmień kąt gradientu w Property Panel
+4. Canvas NIE aktualizuje się (nadal pokazuje stary gradient)
+
+### Przyczyna:
+`uveApplyStyles` ignorowało `childBackgroundSource` i aplikowało `background-image` do parent elementu, który ma `background-image: none`.
+
+### Rozwiązanie:
+W `uveApplyStyles` (unified-visual-editor.blade.php) dodano logikę aplikowania `background-*` stylów do child elementu:
+
+```javascript
+// unified-visual-editor.blade.php - window.uveApplyStyles()
+
+// FIX #14f: Check if background styles should be applied to child element
+const childBgSource = styles['childBackgroundSource'] || styles['child-background-source'];
+let bgTargetElement = element;
+
+if (childBgSource) {
+    const childEl = element.querySelector(childBgSource);
+    if (childEl) {
+        bgTargetElement = childEl;
+        console.log('[UVE Global] FIX #14f: Background will be applied to child:', childBgSource);
+    }
+}
+
+// Background-related properties (to apply to bgTargetElement)
+const bgProps = ['background-image', 'background-color', 'background-size',
+                 'background-position', 'background-repeat', 'background-attachment'];
+
+Object.entries(styles).forEach(([prop, value]) => {
+    // Skip metadata properties
+    if (prop === 'childBackgroundSource' || prop === 'child-background-source') return;
+
+    const cssProp = camelToKebab(prop);
+
+    // FIX #14f: Apply background props to child, others to parent
+    const targetEl = bgProps.includes(cssProp) ? bgTargetElement : element;
+    targetEl.style.setProperty(cssProp, value);
+});
+```
+
+### Powiązanie z FIX #13d:
+- **FIX #13d**: Odczytuje gradient z child elementu → ustawia `childBackgroundSource`
+- **FIX #14f**: Aplikuje gradient DO child elementu → respektuje `childBackgroundSource`
+
+### WYMAGANE:
+- ✅ `uveApplyStyles` sprawdza `childBackgroundSource`
+- ✅ Background-* style aplikowane do child elementu gdy `childBackgroundSource` jest ustawione
+- ✅ Inne style (typography, box-model) nadal aplikowane do parent elementu
+
+---
+
+## Full-Width Block CSS Rules (v2.11) ⚠️
+
+### KRYTYCZNE: pd-pseudo-parallax musi być full-width! (FIX #15)
+
+**Problem:** Bloki `.pd-pseudo-parallax` były "boxed" (1300px) zamiast full-width (2553px) jak na oryginalnym sklep.kayomoto.pl.
+
+### Symptom:
+Na test.kayomoto.pl sekcje parallax miały szerokość 1300px (grid-column: block) zamiast pełnej szerokości strony.
+
+### Przyczyna:
+W `getLayoutFixCss()` CSS selector `.uve-content > div:not(...)` aplikował `grid-column: block` do wszystkich divów, włącznie z `.pd-pseudo-parallax` który powinien być full-width.
+
+### Rozwiązanie:
+W `CssSyncOrchestrator.php` (~linia 617):
+
+```css
+/* FIX #15: Exclude pd-pseudo-parallax from block constraint - it must be full-width */
+.uve-content > .pd-block:not(.pd-intro):not([class*="grid-row"]):not(.pd-pseudo-parallax),
+.uve-content > .pd-specification,
+.uve-content > div:not(.pd-intro):not(.bg-brand):not(.pd-cover):not([class*="grid-row"]):not(.pd-pseudo-parallax) {
+  grid-column: block;
+}
+
+/* FIX #15: pd-pseudo-parallax MUST be full-width (same as original sklep.kayomoto.pl) */
+.uve-content > .pd-pseudo-parallax,
+.uve-content > .pd-block.pd-pseudo-parallax,
+.product-description .pd-pseudo-parallax {
+  grid-column: 1 / -1;
+}
+```
+
+### Bloki wymagające full-width:
+
+| Blok | grid-column | Powód |
+|------|-------------|-------|
+| `.pd-intro` | `1 / -1` | Intro sekcja z nagłówkiem |
+| `.bg-brand` | `1 / -1` | Tło na całą szerokość |
+| `.pd-cover` | `1 / -1` | Hero image section |
+| `.pd-pseudo-parallax` | `1 / -1` | **FIX #15** - Parallax sections |
+| `[class*="grid-row"]` | `1 / -1` | Grid rows |
+
+### Bloki z constraint (1300px):
+
+| Blok | grid-column | Powód |
+|------|-------------|-------|
+| `.pd-block` (inne) | `block` | Standardowa szerokość content |
+| `.pd-specification` | `block` | Tabela specyfikacji |
+| Inne `div` | `block` | Domyślna szerokość |
+
+### Weryfikacja:
+
+```javascript
+// Chrome DevTools - sprawdź szerokość pd-pseudo-parallax
+document.querySelectorAll('.pd-pseudo-parallax').forEach((el, i) => {
+    console.log(`pd-pseudo-parallax #${i}: ${el.offsetWidth}px`);
+});
+// Oczekiwane: 2553px (full-width), NIE 1300px (boxed)
+```
+
+### WYMAGANE:
+- ✅ `:not(.pd-pseudo-parallax)` w selektorach `grid-column: block`
+- ✅ Explicit rule `grid-column: 1 / -1` dla pd-pseudo-parallax
+- ✅ Wszystkie 3 selektory (`.uve-content >`, `.pd-block.`, `.product-description`) dla pewności
+- ✅ Browser hard refresh (Ctrl+Shift+R) po CSS sync
+
+---
+
+## Inline Gradient Editor (v2.8) ⚠️
+
+### FIX #14: Pełny Inline Gradient Editor w Property Panel
+
+**Problem:** Kontrolka Background w Property Panel miała tylko prosty color picker. Użytkownicy nie mogli tworzyć/edytować gradientów inline - musieli ręcznie wpisywać CSS.
+
+### Rozwiązanie:
+Zaimplementowano pełny inline gradient editor jako Alpine component `uveGradientEditorInline()`:
+
+**Plik:** `resources/js/app.js` (~linia 1050)
+
+```javascript
+Alpine.data('uveGradientEditorInline', () => ({
+    gradientType: 'linear',      // linear | radial
+    angle: 180,                   // 0-360 dla linear
+    colorStops: [                 // Array color stops
+        { color: '#f6f6f6', position: 0 },
+        { color: '#ef8248', position: 100 }
+    ],
+    selectedStop: 0,
+
+    init() {
+        // Parse initial gradient from parent
+        Livewire.on('uve-background-updated', (data) => {
+            const bgImage = data?.backgroundImage || data[0]?.backgroundImage;
+            if (bgImage && bgImage.includes('gradient')) {
+                this.parseGradient(bgImage);
+            }
+        });
+    },
+
+    parseGradient(gradientCss) { /* ... */ },
+    generateGradientCss() { /* ... */ },
+    updateParent() { /* ... */ },
+    addColorStop() { /* ... */ },
+    removeColorStop(index) { /* ... */ },
+}));
+```
+
+### Funkcjonalności:
+- **Zakładki**: Kolor | Obraz | Gradient
+- **Typ gradientu**: Linear / Radial
+- **Kąt**: Slider + presety (0°, 45°, 90°, 135°, 180°, 225°, 270°, 315°)
+- **Color stops**: Lista z color picker + pozycja (0-100%)
+- **Pasek podglądu**: Wizualizacja gradientu z markerami
+- **Gotowe gradienty**: Presety do szybkiego wyboru
+- **CSS output**: Podgląd wygenerowanego CSS
+
+### FIX #14b: Drag Functionality dla Markerów
+
+**Problem:** Markery kolorów na pasku gradientu nie mogły być przeciągane myszką.
+
+**Rozwiązanie:** Dodano pełny drag & drop:
+
+```javascript
+// State
+draggingIndex: null,
+barElement: null,
+
+init() {
+    // ... existing code ...
+
+    // FIX #14b: Drag event listeners
+    document.addEventListener('mousemove', (e) => this.onDrag(e));
+    document.addEventListener('mouseup', () => this.stopDrag());
+    document.addEventListener('touchmove', (e) => this.onDrag(e));
+    document.addEventListener('touchend', () => this.stopDrag());
+},
+
+startDrag(index, event) {
+    event.preventDefault();
+    this.draggingIndex = index;
+    this.selectedStop = index;
+    this.barElement = this.$el.querySelector('.uve-gradient-stops-bar');
+},
+
+onDrag(event) {
+    if (this.draggingIndex === null || !this.barElement) return;
+
+    const rect = this.barElement.getBoundingClientRect();
+    const clientX = event.touches ? event.touches[0].clientX : event.clientX;
+    const relativeX = clientX - rect.left;
+
+    let newPosition = Math.round((relativeX / rect.width) * 100);
+    newPosition = Math.max(0, Math.min(100, newPosition));
+    this.colorStops[this.draggingIndex].position = newPosition;
+},
+
+stopDrag() {
+    if (this.draggingIndex !== null) {
+        this.updateParent();
+        this.draggingIndex = null;
+    }
+}
+```
+
+### Blade Template:
+
+**Plik:** `resources/views/livewire/products/visual-description/controls/background.blade.php`
+
+```blade
+{{-- Color stops bar with draggable markers --}}
+<div class="uve-gradient-stops-bar" :style="'background: ' + gradientCss">
+    <template x-for="(stop, index) in colorStops" :key="index">
+        <div
+            class="uve-gradient-stop-marker"
+            :class="{
+                'uve-gradient-stop-marker--selected': selectedStop === index,
+                'uve-gradient-stop-marker--dragging': draggingIndex === index
+            }"
+            :style="'left: ' + stop.position + '%'"
+            @mousedown="startDrag(index, $event)"
+            @touchstart="startDrag(index, $event)"
+        >
+            <div class="uve-gradient-stop-handle" :style="'background: ' + stop.color"></div>
+        </div>
+    </template>
+</div>
+```
+
+### CSS dla markerów:
+
+```css
+.uve-gradient-stop-marker {
+    position: absolute;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    cursor: grab;
+    z-index: 1;
+    user-select: none;
+    touch-action: none;
+}
+
+.uve-gradient-stop-marker--dragging {
+    cursor: grabbing;
+    z-index: 3;
+}
+
+.uve-gradient-stop-marker--dragging .uve-gradient-stop-handle {
+    transform: scale(1.3);
+    border-color: #e0ac7e;
+    box-shadow: 0 2px 6px rgba(224, 172, 126, 0.5);
+}
+```
+
+### WYMAGANE:
+- ✅ Alpine component `uveGradientEditorInline` w app.js
+- ✅ Zakładki Kolor/Obraz/Gradient w background.blade.php
+- ✅ Drag handlers: `startDrag()`, `onDrag()`, `stopDrag()`
+- ✅ Event listeners w `init()` dla mouse/touch events
+- ✅ CSS classes dla marker states (selected, dragging)
+
+### FIX #14e: CssValueFormatter Format Compatibility (v2.9)
+
+**Problem:** Property Panel → Canvas sync nie działał dla gradientów. Po przesunięciu markera koloru, canvas nie aktualizował się mimo że Livewire request był wysyłany (HTTP 200).
+
+### Symptom:
+Przesunięcie markera koloru gradientu w Property Panel → Canvas pokazuje stary gradient (bez zmian).
+
+### Root Cause:
+`formatBackground()` w `CssValueFormatter.php` oczekiwało formatu z kluczem `type`:
+```php
+// Oczekiwany format (legacy):
+['type' => 'color|image|gradient', 'color' => '...', 'image' => '...']
+
+// Ale Alpine emitChange() wysyła:
+['backgroundColor' => '...', 'backgroundImage' => 'linear-gradient(...)', ...]
+```
+
+Bez klucza `type`, metoda defaultowała do `'color'` i szukała `$value['color']` który nie istniał → zwracała pusty array `[]`.
+
+### Rozwiązanie:
+W `formatBackground()` dodano detekcję formatu Alpine i bezpośrednie mapowanie CSS:
+
+```php
+// app/Services/VisualEditor/PropertyPanel/CssValueFormatter.php
+
+public function formatBackground(array $value): array
+{
+    $css = [];
+
+    // FIX #14e: Handle Alpine emitChange() format (camelCase CSS properties)
+    // Alpine sends: { backgroundColor, backgroundImage, backgroundSize, ... }
+    // Legacy format sends: { type: 'color|image|gradient', color: '...', image: '...' }
+
+    // Check if this is Alpine format (has backgroundImage or backgroundColor keys)
+    $isAlpineFormat = isset($value['backgroundImage']) || isset($value['backgroundColor']);
+
+    if ($isAlpineFormat) {
+        // Alpine format - direct CSS properties
+        if (!empty($value['backgroundColor'])) {
+            $css['background-color'] = $value['backgroundColor'];
+        }
+
+        if (!empty($value['backgroundImage'])) {
+            // backgroundImage can be gradient string or url('...')
+            $css['background-image'] = $value['backgroundImage'];
+        }
+
+        if (!empty($value['backgroundSize'])) {
+            $css['background-size'] = $value['backgroundSize'];
+        }
+
+        if (!empty($value['backgroundPosition'])) {
+            $css['background-position'] = $value['backgroundPosition'];
+        }
+
+        if (!empty($value['backgroundRepeat'])) {
+            $css['background-repeat'] = $value['backgroundRepeat'];
+        }
+
+        if (!empty($value['backgroundAttachment']) && $value['backgroundAttachment'] !== 'scroll') {
+            $css['background-attachment'] = $value['backgroundAttachment'];
+        }
+
+        return $css;
+    }
+
+    // Legacy format with 'type' key
+    $type = $value['type'] ?? 'color';
+    // ... existing switch statement ...
+}
+```
+
+### Data Flow (po naprawie):
+```
+Alpine uveGradientEditorInline.stopDrag()
+    → updateParent()
+    → uveBackgroundControl.emitChange()
+    → $wire.updateControlValue('background', { backgroundColor, backgroundImage, ... })
+    → UVE_PropertyPanel.updateNormalControlValue()
+    → CssValueFormatter.formatToCss('background', $value)
+    → formatBackground($value) // FIX #14e: teraz rozpoznaje Alpine format!
+    → return ['background-image' => 'linear-gradient(...)']
+    → syncToIframe() → window.uveApplyStyles()
+    → Canvas aktualizuje gradient ✅
+```
+
+### WYMAGANE:
+- ✅ `formatBackground()` MUSI rozpoznawać oba formaty (Alpine i legacy)
+- ✅ Backward compatibility z formatem `{ type, color, image }`
+- ✅ Direct CSS property mapping dla formatu Alpine
+
+---
+
 ## Image URL Update Rules (v2.4) ⚠️
 
 ### KRYTYCZNE: srcset ma priorytet nad src!
@@ -550,11 +992,17 @@ $result = $orchestrator->validateCssForLeaks($css);
 - [ ] Logi pokazują `has_btn_primary: true`
 - [ ] Oryginalne style theme'u zachowane na stronie produktu
 
-### Media Picker / Property Panel (v2.6)
+### Media Picker / Property Panel (v2.7)
 - [ ] **srcset aktualizowany** razem z src (FIX #8)
 - [ ] **GLOBAL indexing** w markChildElements i findElementInContext (FIX #10)
 - [ ] **XPath IDENTYCZNY** w injectEditableMarkers i findElementByStructuralMatching (FIX #11)
 - [ ] **Dispatch imageUrl** dla kontrolek z wire:ignore.self (FIX #12)
+- [ ] **Child gradient inheritance** dla bloków z `__picture` child (FIX #13d)
+
+### Layout CSS Rules (v2.11)
+- [ ] **pd-pseudo-parallax** ma `grid-column: 1 / -1` (FIX #15)
+- [ ] **Full-width blocks** (.pd-intro, .bg-brand, .pd-cover, .pd-pseudo-parallax) excluded from block constraint
+- [ ] **Browser hard refresh** (Ctrl+Shift+R) po CSS sync dla weryfikacji
 
 ---
 
@@ -567,6 +1015,44 @@ $result = $orchestrator->validateCssForLeaks($css);
 ---
 
 ## Changelog
+
+### v2.11 (2026-01-16)
+- **[CRITICAL FIX]** FIX #15: Full-Width Block CSS Rules for pd-pseudo-parallax
+- **[ROOT CAUSE]** CSS selector `.uve-content > div:not(...)` aplikował `grid-column: block` do pd-pseudo-parallax
+- **[SYMPTOM]** Bloki parallax miały 1300px (boxed) zamiast full-width (2553px) jak na sklep.kayomoto.pl
+- **[FIX]** Dodano `:not(.pd-pseudo-parallax)` + explicit rule `grid-column: 1 / -1`
+- **[FILE]** `app/Services/VisualEditor/CssSyncOrchestrator.php`
+- **[VERIFIED]** Chrome DevTools - wszystkie pd-pseudo-parallax = 2553px full-width
+- **[DOC]** Dodano sekcję: Full-Width Block CSS Rules z tabelą bloków full-width vs boxed
+
+### v2.10 (2026-01-16)
+- **[CRITICAL FIX]** FIX #14f: uveApplyStyles Child Element Gradient Application
+- **[ROOT CAUSE]** `uveApplyStyles` aplikowało WSZYSTKIE style do parent elementu, ignorując `childBackgroundSource`
+- **[SYMPTOM]** Property Panel pokazywał gradient z child elementu, ale zmiany NIE aktualizowały canvas
+- **[FIX]** `uveApplyStyles` teraz sprawdza `childBackgroundSource` i aplikuje `background-*` style do child elementu
+- **[FILE]** `resources/views/livewire/products/visual-description/unified-visual-editor.blade.php`
+- **[VERIFIED]** Chrome DevTools - canvas aktualizuje się w real-time przy zmianie gradientu
+
+### v2.9 (2026-01-16)
+- **[CRITICAL FIX]** FIX #14e: CssValueFormatter Format Compatibility
+- **[ROOT CAUSE]** `formatBackground()` oczekiwało `{ type, color, image }` ale Alpine wysyła `{ backgroundColor, backgroundImage, ... }`
+- **[FIX]** Dodano detekcję formatu Alpine i bezpośrednie mapowanie CSS properties
+- **[FEATURE]** Backward compatibility - obsługiwane oba formaty (Alpine i legacy)
+- **[DOC]** Dodano sekcję: FIX #14e z pełnym data flow diagramem
+
+### v2.8 (2026-01-16)
+- **[FEATURE]** FIX #14: Inline Gradient Editor w Property Panel
+- **[FEATURE]** FIX #14b: Drag & Drop dla markerów kolorów gradientu
+- **[FEATURE]** FIX #14d: Canvas → Property Panel sync dla gradientów
+- **[DOC]** Dodano sekcję: Inline Gradient Editor (kompletna dokumentacja)
+
+### v2.7 (2026-01-16)
+- **[CRITICAL FIX]** FIX #13d: Child Element Background Inheritance
+- **[ROOT CAUSE]** Bloki jak `.pd-cover` mają `background-image: none`, gradient jest na child `.pd-cover__picture`
+- **[FIX]** `getElementStyles()` teraz sprawdza child elementy `__picture` dla gradientów
+- **[MAPPING]** Dodano kontrolkę `background` do `pd-cover` w CssClassMappingDefinitions
+- **[DOC]** Dodano sekcję: Child Element Background Inheritance
+- **[CACHE]** Po zmianach w iframe scripts wymagany hard reload (`window.location.reload(true)`)
 
 ### v2.6 (2026-01-15)
 - **[CRITICAL FIX]** FIX #10: GLOBAL indexing (rollback from FIX #9)

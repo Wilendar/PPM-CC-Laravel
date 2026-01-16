@@ -46,7 +46,8 @@
 
     {{-- Content Tab --}}
     <div x-show="activeTab === 'content'" class="uve-property-content">
-        @if(in_array($type, ['heading', 'text', 'button', 'link']))
+        {{-- FIX #15: Added 'list-item' to allow text editing for list items --}}
+        @if(in_array($type, ['heading', 'text', 'button', 'link', 'list-item']))
             <div class="uve-property-field">
                 <label class="uve-property-label">Tekst</label>
                 <textarea

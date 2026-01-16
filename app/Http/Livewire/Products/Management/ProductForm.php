@@ -20,6 +20,7 @@ use App\Http\Livewire\Products\Management\Traits\ProductFormValidation;
 use App\Http\Livewire\Products\Management\Traits\ProductFormUpdates;
 use App\Http\Livewire\Products\Management\Traits\ProductFormComputed;
 use App\Http\Livewire\Products\Management\Traits\ProductFormShopTabs;
+use App\Http\Livewire\Products\Management\Traits\ProductFormERPTabs;
 use App\Http\Livewire\Products\Management\Traits\ProductFormFeatures;
 use App\Http\Livewire\Products\Management\Traits\ProductFormVariants;
 use App\Http\Livewire\Products\Management\Traits\VariantShopContextTrait;
@@ -57,6 +58,7 @@ class ProductForm extends Component
     use ProductFormUpdates;
     use ProductFormComputed;
     use ProductFormShopTabs;
+    use ProductFormERPTabs;
     use ProductFormFeatures;
     use ProductFormVariants;
     use VariantShopContextTrait;
@@ -1570,9 +1572,34 @@ class ProductForm extends Component
 
     /**
      * Switch between tabs
+     *
+     * ETAP_08.4 FIX: Reset ERP context when switching to non-ERP tabs
+     * to prevent data leakage from ERP-specific values to default product.
      */
     public function switchTab(string $tab): void
     {
+        // ETAP_08.4 FIX: If we were in ERP context and switching away from 'integrations' tab,
+        // reset ERP context and restore default PPM data to form fields
+        $wasInErpContext = $this->activeErpConnectionId !== null;
+        $leavingIntegrationsTab = $this->activeTab !== $tab && $tab !== 'integrations';
+
+        if ($wasInErpContext && $leavingIntegrationsTab) {
+            Log::info('[ETAP_08.4 FIX] Leaving ERP context - restoring PPM defaults', [
+                'from_tab' => $this->activeTab,
+                'to_tab' => $tab,
+                'erp_connection_id' => $this->activeErpConnectionId,
+            ]);
+
+            // Reset ERP context
+            $this->activeErpConnectionId = null;
+            $this->activeErpTab = 'all';
+            $this->erpExternalData = [];
+            $this->erpDefaultData = [];
+
+            // Restore PPM default data to form fields
+            $this->loadDefaultDataToForm();
+        }
+
         $this->activeTab = $tab;
         $this->dispatch('tab-switched', ['tab' => $tab]);
     }
@@ -4626,17 +4653,40 @@ class ProductForm extends Component
      * Get field status for visual indication (3-level system) - REACTIVE VERSION
      *
      * ENHANCED: Now uses current form values for real-time color coding
+     * ETAP_08.3: Added ERP context support (Shop-Tab Pattern)
+     *
+     * Priority:
+     * 1. ERP context (activeErpConnectionId !== null) -> compare with ERP external_data
+     * 2. Shop context (activeShopId !== null) -> compare with defaultData
+     * 3. Default mode -> always 'default'
      *
      * @param string $field
      * @return string 'default'|'inherited'|'same'|'different'
      */
     public function getFieldStatus(string $field): string
     {
-        // If we're in default mode, it's always default
-        if ($this->activeShopId === null) {
-            return 'default';
+        // PRIORITY 1: ERP context (ETAP_08.3)
+        if ($this->activeErpConnectionId !== null) {
+            return $this->getErpFieldStatusInternal($field);
         }
 
+        // PRIORITY 2: Shop context
+        if ($this->activeShopId !== null) {
+            return $this->getShopFieldStatusInternal($field);
+        }
+
+        // DEFAULT: No context active
+        return 'default';
+    }
+
+    /**
+     * Get field status for Shop context (internal implementation)
+     *
+     * @param string $field
+     * @return string 'default'|'inherited'|'same'|'different'
+     */
+    protected function getShopFieldStatusInternal(string $field): string
+    {
         // SPECIAL CASE: tax_rate - check if override exists (not just value)
         if ($field === 'tax_rate') {
             // If no override set for this shop → inherited (uses default PPM tax_rate)
@@ -4683,6 +4733,69 @@ class ProductForm extends Component
 
         // Otherwise they're different
         return 'different';
+    }
+
+    /**
+     * Get field status for ERP context (ETAP_08.3)
+     *
+     * Compares current PPM form value with ERP external_data
+     *
+     * @param string $field
+     * @return string 'default'|'inherited'|'same'|'different'
+     */
+    protected function getErpFieldStatusInternal(string $field): string
+    {
+        // Get ERP value from external_data cache
+        $erpValue = $this->getErpExternalFieldValue($field);
+        $ppmValue = $this->defaultData[$field] ?? $this->getCurrentFieldValue($field);
+
+        // Normalize for comparison
+        $erpValueNorm = $this->normalizeValueForComparison($erpValue);
+        $ppmValueNorm = $this->normalizeValueForComparison($ppmValue);
+
+        // If ERP value is empty, PPM is source of truth -> inherited
+        if ($erpValue === null || $erpValue === '') {
+            return 'inherited';
+        }
+
+        // If values match, they're synchronized
+        if ($erpValueNorm === $ppmValueNorm) {
+            return 'same';
+        }
+
+        // Values are different
+        return 'different';
+    }
+
+    /**
+     * Get field value from ERP external_data cache (ETAP_08.3)
+     *
+     * Maps PPM field names to ERP external_data structure
+     * Different ERPs may have different field structures
+     *
+     * @param string $field PPM field name
+     * @return mixed
+     */
+    protected function getErpExternalFieldValue(string $field): mixed
+    {
+        $externalData = $this->erpExternalData['external_data'] ?? [];
+
+        return match ($field) {
+            'sku' => $externalData['sku'] ?? null,
+            'name' => $externalData['text_fields']['name'] ?? $externalData['name'] ?? null,
+            'ean' => $externalData['ean'] ?? null,
+            'manufacturer' => $externalData['manufacturer'] ?? null,
+            'supplier_code' => $externalData['supplier_code'] ?? null,
+            'short_description' => $externalData['text_fields']['short_description'] ?? $externalData['short_description'] ?? null,
+            'long_description' => $externalData['text_fields']['description'] ?? $externalData['description'] ?? null,
+            'weight' => $externalData['weight'] ?? null,
+            'height' => $externalData['height'] ?? null,
+            'width' => $externalData['width'] ?? null,
+            'length' => $externalData['depth'] ?? $externalData['length'] ?? null,
+            'tax_rate' => $externalData['tax_rate'] ?? null,
+            'is_active' => $externalData['is_active'] ?? null,
+            default => null,
+        };
     }
 
     /**
@@ -5043,6 +5156,12 @@ class ProductForm extends Component
         // Taller inputs (py-2.5) with proper text padding (px-4) from edges
         $baseClasses = 'block w-full rounded-md shadow-sm focus:ring-orange-500 sm:text-sm transition-all duration-200 px-4 py-2.5';
 
+        // PRIORITY 0: Check if field has pending ERP sync (ETAP_08.4 FIX)
+        // Uses existing .field-status-different class from components.css
+        if ($this->activeErpConnectionId !== null && $this->isErpFieldPending($field)) {
+            return $baseClasses . ' field-status-different';
+        }
+
         // PRIORITY 1: Check if field has pending sync (highest priority visual indicator)
         if ($this->activeShopId !== null && $this->isPendingSyncForShop($this->activeShopId, $field)) {
             return $baseClasses . ' field-pending-sync';
@@ -5078,6 +5197,15 @@ class ProductForm extends Component
      */
     public function getFieldStatusIndicator(string $field): array
     {
+        // PRIORITY 0: Check if field has pending ERP sync (ETAP_08.4 FIX)
+        if ($this->activeErpConnectionId !== null && $this->isErpFieldPending($field)) {
+            return [
+                'show' => true,
+                'text' => 'Własne',
+                'class' => 'status-label-different'
+            ];
+        }
+
         // PRIORITY 1: Check if field has pending sync (highest priority)
         if ($this->activeShopId !== null && $this->isPendingSyncForShop($this->activeShopId, $field)) {
             return [
@@ -5191,6 +5319,8 @@ class ProductForm extends Component
     /**
      * Universal handler for all other form field changes
      * Automatically marks form as changed and saves to pending changes
+     *
+     * ETAP_08.4: Added ERP context tracking (Shop-Tab pattern)
      */
     public function updated($propertyName): void
     {
@@ -5220,16 +5350,29 @@ class ProductForm extends Component
             'activeJobStatus',
             'activeJobType',
             'jobResult',
-            'jobCreatedAt'
+            'jobCreatedAt',
+            // ERP tab internal properties
+            'activeErpTab',
+            'activeErpConnectionId',
+            'erpExternalData',
+            'erpDefaultData',
+            'syncingToErp',
+            'loadingErpData',
         ];
 
         if (!in_array($propertyName, $skipProperties)) {
             $this->markFormAsChanged();
 
+            // ETAP_08.4: Track ERP changes when in ERP context (Shop-Tab pattern)
+            if ($this->activeErpConnectionId !== null && $this->isEditMode && $this->product) {
+                $this->trackErpFieldChange($propertyName);
+            }
+
             Log::info('Form field updated', [
                 'property' => $propertyName,
                 'value' => $this->$propertyName ?? 'null',
                 'shop_id' => $this->activeShopId,
+                'erp_connection_id' => $this->activeErpConnectionId,
                 'has_pending_changes' => $this->hasUnsavedChanges,
             ]);
         }
@@ -7583,6 +7726,17 @@ class ProductForm extends Component
             ]);
         }
 
+        // ETAP_08.4: Handle ERP context (Shop-Tab pattern)
+        // When in ERP context, save to product_erp_data and dispatch sync job
+        if ($this->activeErpConnectionId !== null && $this->isEditMode && $this->product) {
+            $this->saveErpContextAndDispatchJob();
+
+            Log::info('[ETAP_08.4] ERP context save completed', [
+                'product_id' => $this->product->id,
+                'erp_connection_id' => $this->activeErpConnectionId,
+            ]);
+        }
+
         // FIX #5 2025-11-21: Save only current context (not all contexts)
         // FIX 2025-11-25: Skip job tracking - we're redirecting immediately, job runs in background
         $this->saveCurrentContextOnly(skipJobTracking: true);
@@ -7632,6 +7786,17 @@ class ProductForm extends Component
             // Check for active sync job
             if ($this->hasActiveSyncJob()) {
                 $this->dispatch('warning', message: 'Synchronizacja już w trakcie. Poczekaj na zakończenie.');
+                $this->isSaving = false;
+                return;
+            }
+
+            // ETAP_08.4 FIX: In ERP context, data is already saved by saveErpContextAndDispatchJob()
+            // Don't save to default product - that would overwrite PPM data with ERP-specific data!
+            if ($this->activeErpConnectionId !== null) {
+                Log::info('[ETAP_08.4 FIX] In ERP context - skipping default product save to prevent data leakage', [
+                    'product_id' => $this->product?->id,
+                    'erp_connection_id' => $this->activeErpConnectionId,
+                ]);
                 $this->isSaving = false;
                 return;
             }
