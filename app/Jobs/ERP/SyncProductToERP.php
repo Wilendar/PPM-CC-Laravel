@@ -55,6 +55,9 @@ class SyncProductToERP implements ShouldQueue, ShouldBeUnique
 
     /**
      * Create a new job instance.
+     *
+     * ETAP_08.5: Capture userId during dispatch (web context) because
+     * auth()->id() returns NULL in queue worker context.
      */
     public function __construct(
         public Product $product,
@@ -62,6 +65,9 @@ class SyncProductToERP implements ShouldQueue, ShouldBeUnique
         public ?SyncJob $syncJob = null
     ) {
         $this->onQueue($this->determineQueue());
+
+        // Capture user ID from web context (null in queue = SYSTEM)
+        $this->userId = auth()->id();
     }
 
     /**
@@ -78,16 +84,47 @@ class SyncProductToERP implements ShouldQueue, ShouldBeUnique
     }
 
     /**
+     * User ID captured during dispatch (web context).
+     * Queue context has no auth() so we capture it upfront.
+     */
+    public ?int $userId = null;
+
+    /**
      * Execute the job.
      */
     public function handle(ERPServiceManager $erpManager): void
     {
         $startTime = microtime(true);
 
-        // Update SyncJob if provided
-        if ($this->syncJob) {
-            $this->syncJob->start();
+        // ETAP_08.5: Create SyncJob record for tracking (like SyncProductToPrestaShop)
+        // This allows UI to track job progress
+        if (!$this->syncJob) {
+            $this->syncJob = SyncJob::create([
+                'job_id' => \Str::uuid(),
+                'job_type' => SyncJob::JOB_PRODUCT_SYNC,
+                'job_name' => "ERP Sync: {$this->product->sku} -> {$this->erpConnection->instance_name}",
+                'source_type' => SyncJob::TYPE_PPM,
+                'source_id' => $this->product->id,
+                'target_type' => $this->erpConnection->erp_type,
+                'target_id' => (string) $this->erpConnection->id,
+                'status' => SyncJob::STATUS_PENDING,
+                'user_id' => $this->userId,
+                // ETAP_08.5 FIX: Set progress metrics for single product sync
+                'total_items' => 1,
+                'processed_items' => 0,
+                'successful_items' => 0,
+                'failed_items' => 0,
+                'meta_data' => [
+                    'product_id' => $this->product->id,
+                    'product_sku' => $this->product->sku,
+                    'erp_connection_id' => $this->erpConnection->id,
+                    'erp_type' => $this->erpConnection->erp_type,
+                ],
+            ]);
         }
+
+        // Update SyncJob to running
+        $this->syncJob->start();
 
         try {
             // Get appropriate ERP service
@@ -111,23 +148,18 @@ class SyncProductToERP implements ShouldQueue, ShouldBeUnique
                 // ETAP_08.3: Update ProductErpData model
                 $this->updateProductErpData($result['external_id'] ?? null);
 
-                // Log success
-                IntegrationLog::info(
-                    'sync_product_job',
-                    "Product synced to {$this->erpConnection->erp_type}: {$this->product->sku}",
-                    [
-                        'product_id' => $this->product->id,
-                        'product_sku' => $this->product->sku,
-                        'connection_id' => $this->erpConnection->id,
-                        'external_id' => $result['external_id'] ?? null,
-                        'duration_ms' => $duration,
-                    ],
-                    IntegrationLog::INTEGRATION_BASELINKER,
-                    (string) $this->erpConnection->id
-                );
+                // ETAP_08.5 FIX: Removed redundant IntegrationLog here
+                // makeRequest() in BaselinkerService already logs api_call_* with full HTTP/BL details
+                // Having 2 logs per sync was confusing in admin/shops/sync UI
 
-                // Complete SyncJob
+                // Complete SyncJob with progress metrics
                 if ($this->syncJob) {
+                    // ETAP_08.5 FIX: Update progress metrics for single product sync
+                    $this->syncJob->update([
+                        'processed_items' => 1,
+                        'successful_items' => 1,
+                        'failed_items' => 0,
+                    ]);
                     $this->syncJob->complete([
                         'external_id' => $result['external_id'] ?? null,
                         'message' => $result['message'],
@@ -176,8 +208,14 @@ class SyncProductToERP implements ShouldQueue, ShouldBeUnique
             $exception
         );
 
-        // Fail SyncJob
+        // Fail SyncJob with progress metrics
         if ($this->syncJob) {
+            // ETAP_08.5 FIX: Update progress metrics for failed single product sync
+            $this->syncJob->update([
+                'processed_items' => 1,
+                'successful_items' => 0,
+                'failed_items' => 1,
+            ]);
             $this->syncJob->fail(
                 $message,
                 $exception?->getMessage(),

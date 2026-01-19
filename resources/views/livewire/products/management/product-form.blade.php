@@ -91,6 +91,25 @@
                         </div>
                     </div>
 
+                    {{-- ETAP_08.5: ERP Sync Blocking Overlay --}}
+                    {{-- Shows when ERP sync job is running - blocks form fields --}}
+                    @if($this->hasActiveErpSyncJob())
+                    <div class="shop-data-loading-overlay" style="background: rgba(30, 58, 138, 0.85);">
+                        <div class="shop-data-loading-content">
+                            <svg class="shop-data-loading-spinner" viewBox="0 0 24 24" fill="none">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            <span class="shop-data-loading-text text-blue-300">
+                                OCZEKUJE NA SYNCHRONIZACJE ERP
+                            </span>
+                            <span class="text-xs text-blue-400 mt-2">
+                                Pola formularza sa zablokowane do zakonczenia synchronizacji
+                            </span>
+                        </div>
+                    </div>
+                    @endif
+
                     {{-- Tab Navigation --}}
                     @include('livewire.products.management.partials.tab-navigation')
 

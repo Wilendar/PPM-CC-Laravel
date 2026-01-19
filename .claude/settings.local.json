@@ -16,6 +16,7 @@
       "Skill(context7-docs-lookup)",
       "Skill(project-plan-manager)",
       "Skill(prestashop-api-integration)",
+      "Skill(baselinker-api-integration)",
       "Skill(prestashop-database-structure)",
       "Skill(prestashop-xml-integration)",
       "Bash(php:*)",
@@ -137,7 +138,13 @@
       "Bash(__NEW_LINE_eaf6a4b5da8224e9__ pscp -i $HostidoKey -P 64321 \"D:\\\\Skrypty\\\\PPM-CC-Laravel\\\\app\\\\Services\\\\ERP\\\\DynamicsService.php\" \"host379076@host379076.hostido.net.pl:domains/ppm.mpptrade.pl/public_html/app/Services/ERP/DynamicsService.php\")",
       "Bash(cd:*)",
       "Bash(curl:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(Select-String -Pattern \"PullProductsFromPrestaShop|job|queue|failed|error\" -Context 2,2)",
+      "Bash(Select-Object -First 50)",
+      "Skill(subiekt-gt-integration)",
+      "Bash(Select-String -Pattern \"variant|Variant|SPKAS01|11180|error|Error\" -Context 0,2)",
+      "Bash($result = plink -ssh host379076@host379076.hostido.net.pl -P 64321 -i $HostidoKey -batch \"tail -n 100 domains/ppm.mpptrade.pl/public_html/storage/logs/laravel.log | grep -i -E ''variant|SPKAS01|11180|Error|error''\")",
+      "Bash($result)"
     ],
     "deny": [],
     "ask": []

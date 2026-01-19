@@ -1245,5 +1245,48 @@
     "medium": "Important skill, recommended for quality",
     "high": "Critical skill, essential for consistency",
     "critical": "Mandatory skill, project requirements depend on it"
+  },
+    "skills": {
+    "subiekt-gt-integration": {
+      "type": "integration",
+      "enforcement": "suggest",
+      "priority": "high",
+      "description": "Subiekt GT Integration: Baza danych SQL Server, Sfera API, REST wrapper dla ERP InsERT. Uzyj przy synchronizacji produktow, kontrahentow, zamowien.",
+      "promptTriggers": {
+        "keywords": [
+          "Subiekt GT",
+          "Subiekt",
+          "InsERT",
+          "Sfera GT",
+          "Sfera",
+          "integracja ERP",
+          "synchronizacja magazynu",
+          "import produktow",
+          "import kontrahentow",
+          "tw__Towar",
+          "kh__Kontrahent",
+          "dok__Dokument",
+          "INSERTGT",
+          "spIdentyfikator",
+          "stany magazynowe",
+          "faktury Subiekt"
+        ],
+        "intentPatterns": [
+          "(polacz|connect|integracja|integruj).*?subiekt",
+          "subiekt.*?(api|baza|database|sql|polaczenie)",
+          "(import|export|sync|synchronizacja|synchronizuj).*?(produkty|towary|kontrahenci|zamowienia|faktury)",
+          "(sfera|insert).*?(gt|api|com|ole)",
+          "(pobierz|wczytaj|zapisz).*?(towar|kontrahent|dokument|faktur)",
+          "struktura.*?(bazy|tabel).*?subiekt",
+          "(stan|stany).*?magazyn.*?subiekt"
+        ]
+      },
+      "skillLocation": ".claude/skills/subiekt-gt-integration/SKILL.md",
+      "resources": [
+        ".claude/skills/subiekt-gt-integration/SQL_EXAMPLES.md",
+        ".claude/skills/subiekt-gt-integration/resources/table-schema.md",
+        ".claude/skills/subiekt-gt-integration/resources/sfera-api.md"
+      ]
+    }
   }
 }

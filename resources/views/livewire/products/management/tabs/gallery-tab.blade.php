@@ -93,6 +93,36 @@
                         Anuluj zmiany
                     </button>
                 @endif
+
+                {{-- ETAP_08.6: ERP Pending Changes Button --}}
+                @if($hasPendingErpChanges ?? false)
+                    <button type="button"
+                            wire:click="applyPendingErpChanges"
+                            wire:loading.attr="disabled"
+                            class="media-btn media-btn-erp animate-pulse">
+                        <svg class="media-btn-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                  d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4"/>
+                        </svg>
+                        <span wire:loading.remove wire:target="applyPendingErpChanges">
+                            Zastosuj zmiany ERP ({{ count($pendingErpChanges) }})
+                        </span>
+                        <span wire:loading wire:target="applyPendingErpChanges">
+                            Synchronizowanie ERP...
+                        </span>
+                    </button>
+
+                    <button type="button"
+                            wire:click="discardPendingErpChanges"
+                            wire:loading.attr="disabled"
+                            class="media-btn media-btn-secondary">
+                        <svg class="media-btn-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                  d="M6 18L18 6M6 6l12 12"/>
+                        </svg>
+                        Anuluj ERP
+                    </button>
+                @endif
             </div>
         @endif
     </div>
@@ -394,6 +424,65 @@
                                     <span class="media-shop-checkbox-label">
                                         {{ Str::limit($shop->name, 10) }}
                                         @if($isPending)
+                                            <span class="pending-indicator">⏳</span>
+                                        @endif
+                                    </span>
+                                </label>
+                            @endforeach
+                        </div>
+                    @endif
+
+                    {{-- ETAP_08.6: ERP Assignment Checkboxes - UNDER PrestaShop --}}
+                    @if(!empty($erpConnections))
+                        <div class="media-erp-assignments">
+                            @foreach($erpConnections as $connection)
+                                @php
+                                    $connectionKey = 'connection_' . $connection['id'];
+                                    $erpKey = "{$item->id}:{$connection['id']}";
+                                    $erpMapping = $erpSyncStatus[$item->id][$connectionKey] ?? null;
+                                    $isErpSynced = $erpMapping && ($erpMapping['status'] ?? null) === 'synced';
+                                    $isErpPendingSync = isset($pendingErpChanges[$erpKey]) && $pendingErpChanges[$erpKey] === 'sync';
+                                    $isErpPendingUnsync = isset($pendingErpChanges[$erpKey]) && $pendingErpChanges[$erpKey] === 'unsync';
+                                    $isErpPending = $isErpPendingSync || $isErpPendingUnsync;
+
+                                    // Visual state (optimistic UI)
+                                    $displayErpChecked = ($isErpSynced && !$isErpPendingUnsync) || $isErpPendingSync;
+
+                                    // CSS classes
+                                    $erpClasses = ['media-erp-checkbox'];
+                                    if ($displayErpChecked) $erpClasses[] = 'is-synced';
+                                    if ($isErpPending) $erpClasses[] = 'is-pending';
+                                    $erpClassString = implode(' ', $erpClasses);
+
+                                    // Title
+                                    if ($isErpPendingSync) {
+                                        $erpTitle = 'Oczekuje na wyslanie do '.$connection['instance_name'];
+                                    } elseif ($isErpPendingUnsync) {
+                                        $erpTitle = 'Oczekuje na usuniecie z '.$connection['instance_name'];
+                                    } elseif ($isErpSynced) {
+                                        $erpTitle = 'Kliknij aby usunac z '.$connection['instance_name'];
+                                    } else {
+                                        $erpTitle = 'Kliknij aby wyslac do '.$connection['instance_name'];
+                                    }
+
+                                    // Icon based on ERP type
+                                    $erpIcon = match($connection['erp_type'] ?? 'baselinker') {
+                                        'baselinker' => 'M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4',
+                                        'subiekt_gt' => 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z',
+                                        default => 'M13 10V3L4 14h7v7l9-11h-7z',
+                                    };
+                                @endphp
+                                <label class="{{ $erpClassString }}" title="{{ $erpTitle }}">
+                                    <input type="checkbox"
+                                           wire:click="toggleErpAssignment({{ $item->id }}, {{ $connection['id'] }})"
+                                           {{ $displayErpChecked ? 'checked' : '' }}
+                                           class="media-erp-checkbox-input" />
+                                    <span class="media-erp-checkbox-label">
+                                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="{{ $erpIcon }}"/>
+                                        </svg>
+                                        {{ Str::limit($connection['instance_name'], 8) }}
+                                        @if($isErpPending)
                                             <span class="pending-indicator">⏳</span>
                                         @endif
                                     </span>

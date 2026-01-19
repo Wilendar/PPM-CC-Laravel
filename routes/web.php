@@ -152,6 +152,10 @@ Route::middleware(['auth'])->group(function () {
             'etap' => null
         ]);
     })->name('profile.notifications');
+
+    // Bug Reports - User's personal reports history
+    Route::get('/profile/bug-reports', \App\Http\Livewire\BugReports\UserBugReports::class)
+        ->name('profile.bug-reports');
 });
 
 // ==========================================
@@ -304,6 +308,14 @@ Route::prefix('admin')->name('admin.')->group(function () {
 
     // ERP Integration Management - działający komponent
     Route::get('/integrations', \App\Http\Livewire\Admin\ERP\ERPManager::class)->name('integrations');
+
+    // ==========================================
+    // BUG REPORTS / HELPDESK SYSTEM
+    // ==========================================
+    Route::prefix('bug-reports')->name('bug-reports.')->group(function () {
+        Route::get('/', \App\Http\Livewire\Admin\BugReports\BugReportList::class)->name('index');
+        Route::get('/{report}', \App\Http\Livewire\Admin\BugReports\BugReportDetail::class)->name('show');
+    });
 
     // ==========================================
     // ETAP_05: PRODUCTS MODULE - CORE ROUTES

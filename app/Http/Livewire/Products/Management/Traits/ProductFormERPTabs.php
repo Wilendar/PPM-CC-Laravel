@@ -69,6 +69,41 @@ trait ProductFormERPTabs
      */
     public bool $loadingErpData = false;
 
+    // === ETAP_08.5: ERP JOB TRACKING (like PrestaShop pattern) ===
+
+    /**
+     * Active ERP job status for UI tracking
+     * Values: 'pending'|'running'|'completed'|'failed'|null
+     */
+    public ?string $activeErpJobStatus = null;
+
+    /**
+     * Type of active ERP job
+     * Values: 'sync' (PPM → ERP) | 'pull' (ERP → PPM) | null
+     */
+    public ?string $activeErpJobType = null;
+
+    /**
+     * ERP connection ID for which job is running
+     */
+    public ?int $activeErpJobConnectionId = null;
+
+    /**
+     * ISO8601 timestamp when ERP job was created (for countdown animation)
+     */
+    public ?string $erpJobCreatedAt = null;
+
+    /**
+     * Result of ERP job after completion
+     * Values: 'success'|'error'|null
+     */
+    public ?string $erpJobResult = null;
+
+    /**
+     * Result message from ERP sync
+     */
+    public ?string $erpJobMessage = null;
+
     // ==========================================
     // TAB SELECTION METHODS (Shop-Tab Pattern)
     // ==========================================
@@ -472,12 +507,13 @@ trait ProductFormERPTabs
     }
 
     /**
-     * ETAP_08.4: Sync product to ERP (PUSH: PPM -> ERP) - ASYNC JOB DISPATCH
+     * ETAP_08.5: Sync product to ERP (PUSH: PPM -> ERP) - ASYNC JOB DISPATCH
      *
-     * Full Shop-Tab pattern:
-     * 1. Save current form data to product_erp_data columns
-     * 2. Mark as syncing
-     * 3. Dispatch SyncProductToERP Job (async)
+     * Full Shop-Tab pattern (like PrestaShop):
+     * 1. Check if already syncing (prevent duplicates!)
+     * 2. Save current form data to product_erp_data columns
+     * 3. Mark as syncing with job tracking
+     * 4. Dispatch SyncProductToERP Job (async)
      *
      * @param int $connectionId
      * @return void
@@ -490,32 +526,58 @@ trait ProductFormERPTabs
             return;
         }
 
+        // ETAP_08.5: PREVENT DUPLICATE DISPATCH!
+        // Check if we're already syncing this connection
+        if ($this->activeErpJobStatus === 'pending' || $this->activeErpJobStatus === 'running') {
+            if ($this->activeErpJobConnectionId === $connectionId) {
+                Log::info('syncToErp: Skipped - job already running', [
+                    'product_id' => $this->product->id,
+                    'connection_id' => $connectionId,
+                    'current_status' => $this->activeErpJobStatus,
+                ]);
+                $this->dispatch('warning', message: 'Synchronizacja juz w trakcie. Poczekaj na zakonczenie.');
+                return;
+            }
+        }
+
         $this->syncingToErp = true;
 
         try {
-            // ETAP_08.4 Step 1: Save current form data to product_erp_data columns
+            // ETAP_08.5 Step 1: Save current form data to product_erp_data columns
             $this->saveCurrentErpData($connectionId);
 
-            // ETAP_08.4 Step 2: Mark as syncing
+            // ETAP_08.5 Step 2: Mark ProductErpData as syncing
             $erpData = $this->product->getOrCreateErpData($connectionId);
             $erpData->markSyncing();
+
+            // ETAP_08.5 Step 3: Set job tracking for UI (like PrestaShop pattern)
+            $this->activeErpJobStatus = 'pending';
+            $this->activeErpJobType = 'sync';
+            $this->activeErpJobConnectionId = $connectionId;
+            $this->erpJobCreatedAt = now()->toIso8601String();
+            $this->erpJobResult = null;
+            $this->erpJobMessage = null;
 
             // Update UI status
             $this->erpExternalData['sync_status'] = ProductErpData::STATUS_SYNCING;
 
-            // ETAP_08.4 Step 3: Dispatch async Job
+            // ETAP_08.5 Step 4: Dispatch async Job
             SyncProductToERP::dispatch($this->product, $connection);
 
-            session()->flash('message', 'Synchronizacja uruchomiona: ' . $connection->instance_name);
-
-            Log::info('ERP sync job dispatched (SHOP-TAB PATTERN)', [
+            Log::info('ERP sync job dispatched with tracking (SHOP-TAB PATTERN)', [
                 'product_id' => $this->product->id,
                 'connection_id' => $connectionId,
                 'connection_name' => $connection->instance_name,
                 'pending_fields' => $erpData->pending_fields ?? [],
+                'job_status' => $this->activeErpJobStatus,
             ]);
 
         } catch (\Exception $e) {
+            // Reset job tracking on error
+            $this->activeErpJobStatus = 'failed';
+            $this->erpJobResult = 'error';
+            $this->erpJobMessage = $e->getMessage();
+
             $this->addError('erp_sync', 'Blad synchronizacji: ' . $e->getMessage());
             Log::error('ERP sync error', [
                 'product_id' => $this->product->id,
@@ -726,10 +788,12 @@ trait ProductFormERPTabs
     }
 
     /**
-     * ETAP_08.4: Save ERP context and dispatch sync job
+     * ETAP_08.5: Save ERP context and dispatch sync job
      *
      * Called from saveAndClose() when in ERP context.
      * This is the main "save" action for ERP Tab - saves data and dispatches job.
+     *
+     * IMPORTANT: Does NOT dispatch if job already pending/running (prevents duplicates!)
      *
      * @return void
      */
@@ -750,6 +814,18 @@ trait ProductFormERPTabs
             // Step 1: Save current form data to product_erp_data
             $this->saveCurrentErpData($this->activeErpConnectionId);
 
+            // ETAP_08.5: Check if job already dispatched (prevents duplicate!)
+            if ($this->activeErpJobStatus === 'pending' || $this->activeErpJobStatus === 'running') {
+                if ($this->activeErpJobConnectionId === $this->activeErpConnectionId) {
+                    Log::info('saveErpContextAndDispatchJob: Skipping dispatch - job already active', [
+                        'product_id' => $this->product->id,
+                        'connection_id' => $this->activeErpConnectionId,
+                        'job_status' => $this->activeErpJobStatus,
+                    ]);
+                    return;
+                }
+            }
+
             // Step 2: Check if there are pending changes
             $erpData = $this->product->getOrCreateErpData($this->activeErpConnectionId);
             $hasPendingChanges = !empty($erpData->pending_fields);
@@ -758,29 +834,40 @@ trait ProductFormERPTabs
                 // Step 3: Mark as syncing
                 $erpData->markSyncing();
 
+                // ETAP_08.5: Set job tracking (like PrestaShop pattern)
+                $this->activeErpJobStatus = 'pending';
+                $this->activeErpJobType = 'sync';
+                $this->activeErpJobConnectionId = $this->activeErpConnectionId;
+                $this->erpJobCreatedAt = now()->toIso8601String();
+                $this->erpJobResult = null;
+                $this->erpJobMessage = null;
+
                 // Update UI status
                 $this->erpExternalData['sync_status'] = ProductErpData::STATUS_SYNCING;
 
                 // Step 4: Dispatch async Job
                 SyncProductToERP::dispatch($this->product, $connection);
 
-                Log::info('saveErpContextAndDispatchJob: ERP sync job dispatched', [
+                Log::info('saveErpContextAndDispatchJob: ERP sync job dispatched with tracking', [
                     'product_id' => $this->product->id,
                     'connection_id' => $this->activeErpConnectionId,
                     'pending_fields' => $erpData->pending_fields,
+                    'job_status' => $this->activeErpJobStatus,
                 ]);
 
-                session()->flash('erp_message', 'Zmiany zapisane, synchronizacja ERP uruchomiona: ' . $connection->instance_name);
             } else {
                 Log::info('saveErpContextAndDispatchJob: No pending changes, skipping job dispatch', [
                     'product_id' => $this->product->id,
                     'connection_id' => $this->activeErpConnectionId,
                 ]);
-
-                session()->flash('erp_message', 'Dane ERP zapisane (brak zmian do synchronizacji)');
             }
 
         } catch (\Exception $e) {
+            // Reset job tracking on error
+            $this->activeErpJobStatus = 'failed';
+            $this->erpJobResult = 'error';
+            $this->erpJobMessage = $e->getMessage();
+
             $this->addError('erp_save', 'Blad zapisu ERP: ' . $e->getMessage());
             Log::error('saveErpContextAndDispatchJob failed', [
                 'product_id' => $this->product->id,
@@ -960,10 +1047,12 @@ trait ProductFormERPTabs
     /**
      * ETAP_08.4: Get field status indicator for ERP context
      *
+     * ETAP_08.5 FIX: Compares form value with PPM DEFAULT, not with Baselinker API cache!
+     *
      * Returns badge info for showing field comparison status:
-     * - Zgodne (green) - Value matches ERP external data
-     * - Własne (orange) - Value differs from ERP (pending change)
-     * - Dziedziczone (purple) - No ERP value, using PPM default
+     * - Zgodne (green) - Value matches PPM default (same as default tab)
+     * - Własne (orange) - Value differs from PPM default (custom for this ERP)
+     * - Dziedziczone (purple) - Form value is empty, uses PPM default
      *
      * @param string $fieldName
      * @return array ['show' => bool, 'class' => string, 'text' => string]
@@ -976,32 +1065,32 @@ trait ProductFormERPTabs
         }
 
         $pendingFields = $this->erpExternalData['pending_fields'] ?? [];
-        $externalData = $this->erpExternalData['external_data'] ?? [];
 
-        // Check if field is in pending changes
+        // Check if field is in pending changes (awaiting sync to ERP)
         $isPending = in_array($fieldName, $pendingFields);
 
         // Get current form value
         $currentValue = $this->$fieldName ?? null;
 
-        // Get ERP external value (from API cache)
-        $erpValue = $this->getExternalDataValueByName($fieldName, $externalData);
+        // ETAP_08.5 FIX: Compare with PPM DEFAULT, not with external_data!
+        $defaultValue = $this->erpDefaultData[$fieldName] ?? $this->defaultData[$fieldName] ?? null;
 
-        // Get PPM default value
-        $defaultValue = $this->erpDefaultData[$fieldName] ?? null;
+        // Normalize for comparison
+        $currentNorm = $this->normalizeValueForComparison($currentValue);
+        $defaultNorm = $this->normalizeValueForComparison($defaultValue);
 
         // Determine status
         if ($isPending) {
-            // Field has pending changes - show "Własne" (orange)
+            // Field has pending changes awaiting sync - show "Oczekuje" (yellow/orange)
             return [
                 'show' => true,
-                'class' => 'status-label-different',
-                'text' => 'Własne',
+                'class' => 'pending-sync-badge',
+                'text' => 'Oczekuje synchronizacji',
             ];
         }
 
-        if ($erpValue === null || $erpValue === '') {
-            // No value in ERP - show "Dziedziczone" (purple)
+        // If current form value is empty/null -> inherited from PPM default
+        if ($currentValue === null || $currentValue === '' || (is_array($currentValue) && empty($currentValue))) {
             return [
                 'show' => true,
                 'class' => 'status-label-inherited',
@@ -1009,12 +1098,9 @@ trait ProductFormERPTabs
             ];
         }
 
-        // Compare current with ERP value
-        $currentNorm = $this->normalizeValueForComparison($currentValue);
-        $erpNorm = $this->normalizeValueForComparison($erpValue);
-
-        if ($currentNorm === $erpNorm) {
-            // Values match - show "Zgodne" (green)
+        // Compare current form value with PPM default
+        if ($currentNorm === $defaultNorm) {
+            // Values match PPM default - show "Zgodne" (green)
             return [
                 'show' => true,
                 'class' => 'status-label-same',
@@ -1022,7 +1108,7 @@ trait ProductFormERPTabs
             ];
         }
 
-        // Values differ - show "Własne" (orange)
+        // Values differ from PPM default - show "Własne" (orange)
         return [
             'show' => true,
             'class' => 'status-label-different',
@@ -1119,5 +1205,112 @@ trait ProductFormERPTabs
     {
         $externalData = $this->erpExternalData['external_data'] ?? [];
         return $this->getExternalDataValueByName($fieldName, $externalData);
+    }
+
+    // ==========================================
+    // ETAP_08.5: ERP JOB STATUS POLLING
+    // ==========================================
+
+    /**
+     * ETAP_08.5: Check ERP sync job status (wire:poll)
+     *
+     * Called by wire:poll to check job completion status.
+     * Updates UI when job completes or fails.
+     *
+     * @return void
+     */
+    public function checkErpJobStatus(): void
+    {
+        // Skip if no active job or already completed
+        if (!$this->activeErpJobStatus || $this->activeErpJobStatus === 'completed' || $this->activeErpJobStatus === 'failed') {
+            return;
+        }
+
+        if (!$this->product || !$this->activeErpJobConnectionId) {
+            return;
+        }
+
+        try {
+            // Check ProductErpData sync_status (updated by job)
+            $erpData = $this->product->erpData()
+                ->where('erp_connection_id', $this->activeErpJobConnectionId)
+                ->first();
+
+            if (!$erpData) {
+                return;
+            }
+
+            // Check status changes
+            if ($erpData->sync_status === ProductErpData::STATUS_SYNCED) {
+                // Job completed successfully
+                $this->activeErpJobStatus = 'completed';
+                $this->erpJobResult = 'success';
+                $this->erpJobMessage = 'Synchronizacja zakonczona pomyslnie';
+
+                // Update UI data
+                $this->erpExternalData['sync_status'] = ProductErpData::STATUS_SYNCED;
+                $this->erpExternalData['pending_fields'] = [];
+                $this->erpExternalData['last_sync_at'] = $erpData->last_sync_at;
+
+                Log::info('checkErpJobStatus: Job completed successfully', [
+                    'product_id' => $this->product->id,
+                    'connection_id' => $this->activeErpJobConnectionId,
+                ]);
+
+            } elseif ($erpData->sync_status === ProductErpData::STATUS_ERROR) {
+                // Job failed
+                $this->activeErpJobStatus = 'failed';
+                $this->erpJobResult = 'error';
+                $this->erpJobMessage = $erpData->error_message ?? 'Blad synchronizacji';
+
+                // Update UI data
+                $this->erpExternalData['sync_status'] = ProductErpData::STATUS_ERROR;
+                $this->erpExternalData['error_message'] = $erpData->error_message;
+
+                Log::info('checkErpJobStatus: Job failed', [
+                    'product_id' => $this->product->id,
+                    'connection_id' => $this->activeErpJobConnectionId,
+                    'error' => $erpData->error_message,
+                ]);
+
+            } elseif ($erpData->sync_status === ProductErpData::STATUS_SYNCING) {
+                // Still running
+                $this->activeErpJobStatus = 'running';
+            }
+
+        } catch (\Exception $e) {
+            Log::error('checkErpJobStatus error', [
+                'error' => $e->getMessage(),
+                'product_id' => $this->product?->id,
+                'connection_id' => $this->activeErpJobConnectionId,
+            ]);
+        }
+    }
+
+    /**
+     * ETAP_08.5: Check if ERP sync is in progress
+     *
+     * Used by UI to show blocking overlay.
+     *
+     * @return bool
+     */
+    public function hasActiveErpSyncJob(): bool
+    {
+        return in_array($this->activeErpJobStatus, ['pending', 'running']);
+    }
+
+    /**
+     * ETAP_08.5: Reset ERP job tracking (used after viewing results)
+     *
+     * @return void
+     */
+    public function resetErpJobTracking(): void
+    {
+        $this->activeErpJobStatus = null;
+        $this->activeErpJobType = null;
+        $this->activeErpJobConnectionId = null;
+        $this->erpJobCreatedAt = null;
+        $this->erpJobResult = null;
+        $this->erpJobMessage = null;
     }
 }

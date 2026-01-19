@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Collection;
 use App\Models\ShopVariant;
+use App\Models\Concerns\HasIntegrationMappings;
 
 /**
  * Product Variant Model
@@ -29,7 +30,7 @@ use App\Models\ShopVariant;
  */
 class ProductVariant extends Model
 {
-    use HasFactory, SoftDeletes;
+    use HasFactory, SoftDeletes, HasIntegrationMappings;
 
     /**
      * Table name

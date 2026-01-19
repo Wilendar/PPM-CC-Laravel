@@ -327,8 +327,14 @@ class ConflictResolver
             // Sort order / position
             'sort_order' => (int) data_get($psData, 'position', 0),
 
-            // Sync timestamp
+            // Sync timestamps
             'last_pulled_at' => now(),
+
+            // OPTIMIZATION 2026-01-19: Cache PrestaShop date_upd for change detection
+            // This allows skipping unchanged products in future pulls
+            'prestashop_updated_at' => isset($psData['date_upd'])
+                ? \Carbon\Carbon::parse($psData['date_upd'])
+                : null,
         ];
     }
 

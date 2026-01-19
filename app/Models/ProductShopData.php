@@ -82,6 +82,7 @@ class ProductShopData extends Model
         'last_success_sync_at',
         'last_pulled_at',            // ETAP_13 (2025-11-06): PrestaShop → PPM pull timestamp
         'last_push_at',              // ETAP_13 (2025-11-17): PPM → PrestaShop push timestamp
+        'prestashop_updated_at',     // 2026-01-19: Cached PrestaShop date_upd for change detection
         'last_sync_hash',
         'checksum',
         'error_message',             // Migrated from sync_errors (JSON → TEXT)
@@ -125,6 +126,7 @@ class ProductShopData extends Model
         'last_success_sync_at' => 'datetime',
         'last_pulled_at' => 'datetime',          // ETAP_13 (2025-11-06)
         'last_push_at' => 'datetime',            // ETAP_13 (2025-11-17)
+        'prestashop_updated_at' => 'datetime',   // 2026-01-19: Change detection
         'conflict_detected_at' => 'datetime',
         'published_at' => 'datetime',
         'unpublished_at' => 'datetime',
@@ -160,6 +162,7 @@ class ProductShopData extends Model
         'last_success_sync_at',
         'last_pulled_at',          // ETAP_13 (2025-11-06)
         'last_push_at',            // ETAP_13 (2025-11-17)
+        'prestashop_updated_at',   // 2026-01-19: Change detection
         'conflict_detected_at',
         'published_at',
         'unpublished_at',
@@ -773,6 +776,51 @@ class ProductShopData extends Model
         }
 
         return $this->last_sync_at->diffForHumans();
+    }
+
+    // ==========================================
+    // DATE_UPD OPTIMIZATION HELPERS (2026-01-19)
+    // ==========================================
+
+    /**
+     * Check if product needs re-pull based on PrestaShop date_upd
+     *
+     * OPTIMIZATION: Skip full data fetch if product unchanged in PrestaShop
+     *
+     * Compares cached prestashop_updated_at with fresh date_upd from API.
+     * Returns true if:
+     * - Never pulled before (no prestashop_updated_at or last_pulled_at)
+     * - PrestaShop date_upd is newer than cached timestamp
+     *
+     * @param string|int $psDateUpd Fresh date_upd from PrestaShop (timestamp or datetime string)
+     * @return bool True if product needs full re-pull, false if can be skipped
+     */
+    public function needsRePull($psDateUpd): bool
+    {
+        // Never pulled - always needs pull
+        if (!$this->prestashop_updated_at || !$this->last_pulled_at) {
+            return true;
+        }
+
+        // Convert PS date_upd to timestamp for comparison
+        $psTimestamp = is_numeric($psDateUpd) ? (int)$psDateUpd : strtotime($psDateUpd);
+
+        // If PS timestamp is newer than our cached timestamp - needs re-pull
+        return $psTimestamp > $this->prestashop_updated_at->timestamp;
+    }
+
+    /**
+     * Get time since last PrestaShop update
+     *
+     * @return string Human-readable timestamp or "Unknown"
+     */
+    public function getTimeSincePrestaShopUpdate(): string
+    {
+        if (!$this->prestashop_updated_at) {
+            return 'Unknown';
+        }
+
+        return $this->prestashop_updated_at->diffForHumans();
     }
 
     // ==========================================

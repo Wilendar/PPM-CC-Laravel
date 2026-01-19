@@ -226,6 +226,153 @@
             </div>
         </div>
 
+        <!-- Queue Worker Status Panel -->
+        <div class="relative backdrop-blur-xl shadow-2xl rounded-xl border p-6 mb-8"
+             style="background: linear-gradient(135deg, rgba(31, 41, 55, 0.95), rgba(17, 24, 39, 0.95)); border: 1px solid rgba(124, 58, 237, 0.3);">
+
+            <div class="flex items-center justify-between mb-6">
+                <h3 class="text-lg font-semibold text-white flex items-center">
+                    <svg class="w-6 h-6 text-purple-400 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01"></path>
+                    </svg>
+                    Status Queue Worker
+
+                    <!-- Status Badge -->
+                    @php
+                        $statusColors = [
+                            'idle' => 'bg-green-500',
+                            'processing' => 'bg-blue-500',
+                            'stopped' => 'bg-red-500',
+                            'unknown' => 'bg-gray-500',
+                            'error' => 'bg-red-500',
+                        ];
+                        $statusLabels = [
+                            'idle' => 'Bezczynny',
+                            'processing' => 'Przetwarza',
+                            'stopped' => 'Zatrzymany',
+                            'unknown' => 'Nieznany',
+                            'error' => 'Błąd',
+                        ];
+                        $statusColor = $statusColors[$queueWorkerStatus['status']] ?? 'bg-gray-500';
+                        $statusLabel = $statusLabels[$queueWorkerStatus['status']] ?? 'Nieznany';
+                    @endphp
+                    <span class="ml-3 inline-flex items-center px-3 py-1 rounded-full text-xs font-medium {{ $statusColor }} text-white">
+                        <span class="w-2 h-2 rounded-full bg-white mr-2 {{ $queueWorkerStatus['status'] === 'processing' ? 'animate-pulse' : '' }}"></span>
+                        {{ $statusLabel }}
+                    </span>
+                </h3>
+
+                <!-- Run Queue Worker Button -->
+                <button wire:click="runQueueWorker(10)"
+                        wire:loading.attr="disabled"
+                        wire:loading.class="opacity-50 cursor-not-allowed"
+                        class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-bold rounded-lg text-white transition-all duration-300 transform hover:scale-105 shadow-lg"
+                        style="background: linear-gradient(45deg, rgba(124, 58, 237, 0.8), rgba(109, 40, 217, 0.8));">
+                    <svg wire:loading.remove wire:target="runQueueWorker" class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                    <svg wire:loading wire:target="runQueueWorker" class="w-5 h-5 mr-2 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                    </svg>
+                    <span wire:loading.remove wire:target="runQueueWorker">Uruchom Worker</span>
+                    <span wire:loading wire:target="runQueueWorker">Przetwarzam...</span>
+                    @if($queueWorkerStatus['total_pending'] > 0)
+                        <span class="ml-2 inline-flex items-center justify-center px-2 py-0.5 rounded-full text-xs font-bold bg-yellow-500 text-black">
+                            {{ $queueWorkerStatus['total_pending'] }}
+                        </span>
+                    @endif
+                </button>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <!-- Pending Jobs by Queue -->
+                <div class="p-4 rounded-lg" style="background: rgba(17, 24, 39, 0.6);">
+                    <p class="text-sm font-medium text-gray-400 mb-2">Jobs w kolejce</p>
+                    @if(count($queueWorkerStatus['jobs_by_queue'] ?? []) > 0)
+                        <div class="space-y-1">
+                            @foreach($queueWorkerStatus['jobs_by_queue'] as $queue => $count)
+                                <div class="flex justify-between items-center">
+                                    <span class="text-xs text-gray-300">{{ $queue }}</span>
+                                    <span class="text-sm font-bold {{ $count > 0 ? 'text-yellow-400' : 'text-gray-500' }}">{{ $count }}</span>
+                                </div>
+                            @endforeach
+                        </div>
+                    @else
+                        <p class="text-green-400 text-sm font-medium">Brak oczekujących</p>
+                    @endif
+                </div>
+
+                <!-- Oldest Job Waiting -->
+                <div class="p-4 rounded-lg" style="background: rgba(17, 24, 39, 0.6);">
+                    <p class="text-sm font-medium text-gray-400 mb-2">Najdłużej czekający</p>
+                    @if($queueWorkerStatus['oldest_job_age_seconds'])
+                        @php
+                            $age = $queueWorkerStatus['oldest_job_age_seconds'];
+                            $ageColor = $age > 300 ? 'text-red-400' : ($age > 60 ? 'text-yellow-400' : 'text-green-400');
+                            $ageText = $age > 3600 ? round($age / 3600, 1) . 'h' : ($age > 60 ? round($age / 60) . 'min' : $age . 's');
+                        @endphp
+                        <p class="text-2xl font-bold {{ $ageColor }}">{{ $ageText }}</p>
+                        <p class="text-xs text-gray-500">queue: {{ $queueWorkerStatus['oldest_job_queue'] }}</p>
+                    @else
+                        <p class="text-green-400 text-sm font-medium">-</p>
+                    @endif
+                </div>
+
+                <!-- Last Processed Job -->
+                <div class="p-4 rounded-lg" style="background: rgba(17, 24, 39, 0.6);">
+                    <p class="text-sm font-medium text-gray-400 mb-2">Ostatnio przetworzony</p>
+                    @if($queueWorkerStatus['last_processed_at'])
+                        <p class="text-sm text-white truncate" title="{{ $queueWorkerStatus['last_processed_job_name'] }}">
+                            {{ Str::limit($queueWorkerStatus['last_processed_job_name'] ?? 'Unknown', 25) }}
+                        </p>
+                        <p class="text-xs text-gray-500">{{ $queueWorkerStatus['last_processed_at']->diffForHumans() }}</p>
+                        @if($queueWorkerStatus['last_processed_status'] === 'completed')
+                            <span class="inline-flex items-center text-xs text-green-400">
+                                <svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path></svg>
+                                completed
+                            </span>
+                        @elseif($queueWorkerStatus['last_processed_status'] === 'failed')
+                            <span class="inline-flex items-center text-xs text-red-400">
+                                <svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"></path></svg>
+                                failed
+                            </span>
+                        @endif
+                    @else
+                        <p class="text-gray-500 text-sm">Brak danych</p>
+                    @endif
+                </div>
+
+                <!-- Failed Jobs -->
+                <div class="p-4 rounded-lg" style="background: rgba(17, 24, 39, 0.6);">
+                    <p class="text-sm font-medium text-gray-400 mb-2">Failed Jobs</p>
+                    <p class="text-2xl font-bold {{ $queueWorkerStatus['failed_jobs_count'] > 0 ? 'text-red-400' : 'text-green-400' }}">
+                        {{ $queueWorkerStatus['failed_jobs_count'] }}
+                    </p>
+                    @if($queueWorkerStatus['failed_jobs_count'] > 0)
+                        <p class="text-xs text-red-400">Wymaga uwagi!</p>
+                    @else
+                        <p class="text-xs text-green-400">Wszystko OK</p>
+                    @endif
+                </div>
+            </div>
+
+            <!-- Warning if worker seems stopped -->
+            @if($queueWorkerStatus['status'] === 'stopped')
+                <div class="mt-4 p-3 rounded-lg bg-red-500 bg-opacity-20 border border-red-500 border-opacity-30">
+                    <div class="flex items-center">
+                        <svg class="w-5 h-5 text-red-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                        </svg>
+                        <p class="text-sm text-red-300">
+                            <strong>Queue Worker prawdopodobnie zatrzymany!</strong>
+                            Jobs czekają ponad 5 minut bez przetwarzania. Kliknij "Uruchom Worker" aby przetworzyć oczekujące zadania.
+                        </p>
+                    </div>
+                </div>
+            @endif
+        </div>
+
         <!-- Sync Configuration Panel -->
         <div class="relative backdrop-blur-xl shadow-2xl rounded-xl border p-6 mb-8" 
              style="background: linear-gradient(135deg, rgba(31, 41, 55, 0.95), rgba(17, 24, 39, 0.95)); border: 1px solid rgba(224, 172, 126, 0.3);">
@@ -238,21 +385,40 @@
                 Konfiguracja Synchronizacji
             </h3>
             
-            <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
+            <div class="grid grid-cols-1 lg:grid-cols-5 gap-6">
                 <!-- Sync Types -->
                 <div>
                     <label class="block text-sm font-medium text-white mb-3">Typ synchronizacji</label>
                     <div class="space-y-2">
                         @foreach(['products' => 'Produkty', 'categories' => 'Kategorie', 'prices' => 'Ceny', 'stock' => 'Stany'] as $type => $label)
                             <label class="flex items-center">
-                                <input type="checkbox" 
-                                       wire:model.live="selectedSyncTypes" 
+                                <input type="checkbox"
+                                       wire:model.live="selectedSyncTypes"
                                        value="{{ $type }}"
                                        class="rounded border-gray-600 bg-gray-800 bg-opacity-60 text-[#e0ac7e] focus:ring-[#e0ac7e]">
                                 <span class="ml-2 text-sm text-white">{{ $label }}</span>
                             </label>
                         @endforeach
                     </div>
+                </div>
+
+                <!-- Sync Frequency (VISIBLE - user request 2026-01-19) -->
+                <div>
+                    <label for="autoSyncFrequency" class="block text-sm font-medium text-white mb-2">Częstotliwość sync</label>
+                    <select id="autoSyncFrequency"
+                            wire:model.live="autoSyncFrequency"
+                            class="w-full px-4 py-3 bg-gray-800 bg-opacity-60 border border-gray-600 text-white rounded-lg focus:ring-2 focus:ring-[#e0ac7e] focus:border-[#e0ac7e] transition-all duration-200">
+                        <option value="hourly">Co godzinę</option>
+                        <option value="daily">Codziennie</option>
+                        <option value="weekly">Tygodniowo</option>
+                    </select>
+                    <p class="text-gray-400 text-xs mt-1">
+                        @if($autoSyncEnabled)
+                            <span class="text-green-400">● Auto-sync ON</span>
+                        @else
+                            <span class="text-red-400">● Auto-sync OFF</span>
+                        @endif
+                    </p>
                 </div>
 
                 <!-- Batch Size -->
@@ -291,8 +457,24 @@
                 </div>
             </div>
 
-            <!-- Advanced Configuration Toggle Button -->
-            <div class="flex items-center justify-center mt-6 pt-4 border-t border-gray-600">
+            <!-- Configuration Action Buttons -->
+            <div class="flex items-center justify-center gap-4 mt-6 pt-4 border-t border-gray-600">
+                <!-- Save Configuration Button (user request 2026-01-19) -->
+                <button wire:click="saveSyncConfiguration"
+                        wire:loading.attr="disabled"
+                        class="px-6 py-3 text-white font-medium rounded-lg transition-all duration-200 flex items-center hover:scale-105"
+                        style="background: linear-gradient(45deg, #e0ac7e, #d1975a);">
+                    <svg wire:loading.remove wire:target="saveSyncConfiguration" class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                    </svg>
+                    <svg wire:loading wire:target="saveSyncConfiguration" class="w-5 h-5 mr-2 animate-spin" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                    </svg>
+                    Zapisz konfigurację
+                </button>
+
+                <!-- Advanced Configuration Toggle -->
                 <button wire:click="toggleSyncConfig"
                         class="px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white font-medium rounded-lg transition-colors duration-200 flex items-center">
                     <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -458,7 +640,7 @@
                             <input type="checkbox"
                                    wire:model.live="notificationsEnabled"
                                    class="rounded border-gray-600 bg-gray-800 bg-opacity-60 text-[#e0ac7e] focus:ring-[#e0ac7e]">
-                            <span class="ml-2 text-sm text-white">Włącz powiadomienia</span>
+                            <span class="ml-2 text-sm text-white">Wlacz powiadomienia</span>
                         </label>
 
                         @if($notificationsEnabled)
@@ -473,7 +655,7 @@
                                 <input type="checkbox"
                                        wire:model.live="notifyOnFailure"
                                        class="rounded border-gray-600 bg-gray-800 bg-opacity-60 text-[#e0ac7e] focus:ring-[#e0ac7e]">
-                                <span class="ml-2 text-sm text-white">Błędy</span>
+                                <span class="ml-2 text-sm text-white">Bledy</span>
                             </label>
                             <label class="flex items-center">
                                 <input type="checkbox"
@@ -484,7 +666,7 @@
                         </div>
 
                         <div>
-                            <label class="block text-sm font-medium text-gray-300 mb-2">Kanały</label>
+                            <label class="block text-sm font-medium text-gray-300 mb-2">Kanaly</label>
                             <div class="space-y-1">
                                 <label class="flex items-center">
                                     <input type="checkbox"
@@ -501,6 +683,82 @@
                                     <span class="ml-2 text-sm text-white">Slack</span>
                                 </label>
                             </div>
+                        </div>
+
+                        <!-- Email Recipients - 2.2.1.2.3 Extended -->
+                        @if(in_array('email', $notificationChannels))
+                        <div x-data="{
+                            emails: @entangle('emailRecipients'),
+                            newEmail: '',
+                            addEmail() {
+                                if (this.newEmail && this.newEmail.includes('@') && !this.emails.includes(this.newEmail)) {
+                                    this.emails.push(this.newEmail);
+                                    this.newEmail = '';
+                                }
+                            },
+                            removeEmail(index) {
+                                this.emails.splice(index, 1);
+                            }
+                        }">
+                            <label class="block text-sm font-medium text-gray-300 mb-2">Odbiorcy Email</label>
+                            <!-- Lista obecnych odbiorcow -->
+                            <div class="space-y-2 mb-2">
+                                <template x-for="(email, index) in emails" :key="index">
+                                    <div class="flex items-center gap-2">
+                                        <span class="text-sm text-white bg-gray-700 px-3 py-1 rounded" x-text="email"></span>
+                                        <button @click="removeEmail(index)" type="button" class="text-red-400 hover:text-red-300">
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                                            </svg>
+                                        </button>
+                                    </div>
+                                </template>
+                                <template x-if="emails.length === 0">
+                                    <p class="text-xs text-gray-500">Brak odbiorcow - dodaj ponizej</p>
+                                </template>
+                            </div>
+                            <!-- Input do dodawania -->
+                            <div class="space-y-2">
+                                <input type="email"
+                                       x-model="newEmail"
+                                       @keydown.enter.prevent="addEmail()"
+                                       placeholder="email@example.com"
+                                       class="w-full px-3 py-2 bg-gray-800 bg-opacity-60 border border-gray-600 text-white rounded-lg text-sm focus:ring-[#e0ac7e] focus:border-[#e0ac7e]">
+                                <button @click="addEmail()" type="button" class="btn-enterprise-secondary text-sm px-3 py-2 w-full">
+                                    Dodaj
+                                </button>
+                            </div>
+                        </div>
+                        @endif
+
+                        <!-- Microsoft Teams - 2.2.1.2.3 Extended -->
+                        <div class="pt-2 border-t border-gray-700">
+                            <label class="flex items-center">
+                                <input type="checkbox"
+                                       wire:model.live="teamsEnabled"
+                                       class="rounded border-gray-600 bg-gray-800 bg-opacity-60 text-[#e0ac7e] focus:ring-[#e0ac7e]">
+                                <span class="ml-2 text-sm text-white">Microsoft Teams</span>
+                            </label>
+
+                            @if($teamsEnabled)
+                            <div class="mt-3 space-y-2">
+                                <label class="block text-sm font-medium text-gray-300">Teams Webhook URL</label>
+                                <input type="url"
+                                       wire:model.live="teamsWebhookUrl"
+                                       placeholder="https://outlook.office.com/webhook/..."
+                                       class="w-full px-3 py-2 bg-gray-800 bg-opacity-60 border border-gray-600 text-white rounded-lg text-sm focus:ring-[#e0ac7e] focus:border-[#e0ac7e]">
+                                <p class="text-xs text-gray-400">Skopiuj URL z konfiguracji Incoming Webhook w Teams</p>
+                                <button wire:click="testTeamsWebhook"
+                                        type="button"
+                                        class="btn-enterprise-secondary text-xs px-3 py-1.5"
+                                        @if(empty($teamsWebhookUrl)) disabled @endif>
+                                    <svg class="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                                    </svg>
+                                    Test polaczenia
+                                </button>
+                            </div>
+                            @endif
                         </div>
                         @endif
                     </div>
@@ -1396,6 +1654,7 @@
         </div>
 
         <!-- Recent Sync Jobs (BUG #9 FIX #2: Added wire:poll.5s for auto-refresh) -->
+        <!-- ETAP_08.5: Removed separate "Ostatnie joby ERP" section - ERP jobs are now shown here with target_type=baselinker -->
         <div class="mt-8 relative backdrop-blur-xl shadow-lg rounded-lg border"
              style="background: linear-gradient(135deg, rgba(31, 41, 55, 0.8), rgba(17, 24, 39, 0.8)); border: 1px solid rgba(224, 172, 126, 0.2);"
              wire:poll.5s>
@@ -1873,7 +2132,15 @@
                                 <div class="flex-1">
                                     <div class="flex items-center gap-2">
                                         {{-- BUG #9 FIX #3: Job Type Badge --}}
-                                        @if($job->job_type === 'bulk_import')
+                                        {{-- ETAP_08.5: Added ERP/Baselinker badge --}}
+                                        @if($job->target_type === 'baselinker')
+                                            <span class="sync-job-type-badge inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-orange-900 bg-opacity-40 text-orange-300 border border-orange-700">
+                                                <svg class="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
+                                                </svg>
+                                                ERP →
+                                            </span>
+                                        @elseif($job->job_type === 'bulk_import' || $job->job_type === 'import_products')
                                             <span class="sync-job-type-badge inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-900 bg-opacity-40 text-blue-300 border border-blue-700">
                                                 <svg class="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10"/>
@@ -1970,7 +2237,7 @@
                                         </svg>
                                         Progress
                                     </h4>
-                                    <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
+                                    <div class="grid grid-cols-2 md:grid-cols-6 gap-3">
                                         <div class="bg-gray-800 bg-opacity-40 rounded p-2 border border-gray-700">
                                             <div class="text-xs text-gray-400">Total Items</div>
                                             <div class="text-sm font-medium text-white">{{ $job->total_items ?? 0 }}</div>
@@ -1982,6 +2249,11 @@
                                         <div class="bg-gray-800 bg-opacity-40 rounded p-2 border border-green-700">
                                             <div class="text-xs text-gray-400">Successful</div>
                                             <div class="text-sm font-medium text-green-300">{{ $job->successful_items ?? 0 }}</div>
+                                        </div>
+                                        {{-- Skipped tile (date_upd optimization 2026-01-19) --}}
+                                        <div class="bg-gray-800 bg-opacity-40 rounded p-2 border border-yellow-600">
+                                            <div class="text-xs text-gray-400">Skipped</div>
+                                            <div class="text-sm font-medium text-yellow-300">{{ $job->result_summary['skipped'] ?? 0 }}</div>
                                         </div>
                                         <div class="bg-gray-800 bg-opacity-40 rounded p-2 border border-red-700">
                                             <div class="text-xs text-gray-400">Failed</div>

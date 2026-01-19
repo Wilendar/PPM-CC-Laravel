@@ -9479,3 +9479,141 @@ hex-color-picker {
     justify-content: flex-end;
     gap: 0.75rem;
 }
+
+/* ========================================
+   ETAP_08.6: ERP PENDING SYNC STYLES
+   Styles for ERP sync pending states, overlays and badges
+   ======================================== */
+
+/* Pending Sync Badge (yellow badge for pending ERP fields) */
+.pending-sync-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.125rem 0.5rem;
+    background: rgba(251, 191, 36, 0.2);
+    border: 1px solid rgba(251, 191, 36, 0.3);
+    border-radius: 9999px;
+    color: #fbbf24;
+    font-size: 0.625rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+/* Pulsing animation for pending badge */
+.pending-sync-badge::before {
+    content: "";
+    width: 6px;
+    height: 6px;
+    background: #fbbf24;
+    border-radius: 50%;
+    margin-right: 0.375rem;
+    animation: erp-pending-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes erp-pending-pulse {
+    0%, 100% {
+        opacity: 1;
+        transform: scale(1);
+    }
+    50% {
+        opacity: 0.5;
+        transform: scale(0.8);
+    }
+}
+
+/* ERP Sync Overlay (blocking overlay during sync) */
+.erp-sync-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(30, 58, 138, 0.85);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 50;
+    border-radius: inherit;
+    animation: erp-overlay-fadein 0.3s ease-out;
+}
+
+@keyframes erp-overlay-fadein {
+    from {
+        opacity: 0;
+        backdrop-filter: blur(0px);
+    }
+    to {
+        opacity: 1;
+        backdrop-filter: blur(4px);
+    }
+}
+
+.erp-sync-overlay-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 1.5rem 2rem;
+    background: rgba(30, 41, 59, 0.95);
+    border: 1px solid rgba(59, 130, 246, 0.3);
+    border-radius: 0.75rem;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+    text-align: center;
+}
+
+/* ERP Field Pending Styles */
+.erp-field-pending {
+    border-color: #fbbf24 !important;
+    box-shadow: inset 0 0 0 2px rgba(251, 191, 36, 0.2) !important;
+}
+
+/* ERP Progress Bar (blue variant) */
+.erp-progress-bar {
+    background: linear-gradient(90deg, #3b82f6 0%, #60a5fa 50%, #3b82f6 100%) !important;
+    background-size: 200% 100%;
+    animation: erp-progress-shimmer 2s linear infinite;
+}
+
+@keyframes erp-progress-shimmer {
+    0% {
+        background-position: 200% 0;
+    }
+    100% {
+        background-position: -200% 0;
+    }
+}
+
+/* ERP Sync Status Container (blue theme) */
+.erp-sync-status.sync-status-running {
+    background: rgba(59, 130, 246, 0.1) !important;
+    border-color: rgba(59, 130, 246, 0.3) !important;
+}
+
+.erp-sync-status.sync-status-success {
+    background: rgba(34, 197, 94, 0.1) !important;
+    border-color: rgba(34, 197, 94, 0.3) !important;
+}
+
+.erp-sync-status.sync-status-error {
+    background: rgba(239, 68, 68, 0.1) !important;
+    border-color: rgba(239, 68, 68, 0.3) !important;
+}
+
+/* Status label variants for ERP fields */
+.status-label-same {
+    background: rgba(34, 197, 94, 0.2);
+    border: 1px solid rgba(34, 197, 94, 0.3);
+    color: #22c55e;
+}
+
+.status-label-different {
+    background: rgba(249, 115, 22, 0.2);
+    border: 1px solid rgba(249, 115, 22, 0.3);
+    color: #f97316;
+}
+
+.status-label-inherited {
+    background: rgba(168, 85, 247, 0.2);
+    border: 1px solid rgba(168, 85, 247, 0.3);
+    color: #a855f7;
+}

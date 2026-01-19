@@ -857,8 +857,17 @@
     </div>
 
     {{-- Inline Action Bar (duplicates key quick actions for current scope) --}}
+    {{-- ETAP_08.5: Footer Actions - rozpoznaje kontekst Shop/ERP --}}
     <div class="mt-6 mb-8">
-        @if($activeShopId === null)
+        @php
+            // Determine active context: ERP takes priority over Shop
+            $hasErpContext = isset($activeErpConnectionId) && $activeErpConnectionId !== null;
+            $hasShopContext = isset($activeShopId) && $activeShopId !== null;
+            $hasAnyContext = $hasErpContext || $hasShopContext;
+        @endphp
+
+        @if(!$hasAnyContext)
+            {{-- Default tab (Dane PPM) - only save/cancel buttons --}}
             <div class="flex flex-col lg:flex-row gap-4">
                 @include('livewire.products.management.partials.actions.save-and-close-button', [
                     'classes' => 'lg:flex-1'
@@ -868,6 +877,7 @@
                 ])
             </div>
         @else
+            {{-- Shop or ERP context active - show all buttons --}}
             <div class="space-y-4">
                 <div class="flex flex-col lg:flex-row gap-4">
                     @include('livewire.products.management.partials.actions.save-and-close-button', [
@@ -878,14 +888,28 @@
                     ])
                 </div>
                 <div class="flex flex-col lg:flex-row gap-4">
-                    @include('livewire.products.management.partials.actions.shop-sync-button', [
-                        'shopId' => $activeShopId,
-                        'classes' => 'w-full lg:flex-1'
-                    ])
-                    @include('livewire.products.management.partials.actions.shop-pull-button', [
-                        'shopId' => $activeShopId,
-                        'classes' => 'w-full lg:flex-1'
-                    ])
+                    {{-- ETAP_08.5: Universal sync/pull buttons (Shop or ERP based on context) --}}
+                    @if($hasErpContext)
+                        {{-- ERP Context: "Aktualizuj w ERP" / "Wczytaj z ERP" --}}
+                        @include('livewire.products.management.partials.actions.shop-sync-button', [
+                            'erpConnectionId' => $activeErpConnectionId,
+                            'classes' => 'w-full lg:flex-1'
+                        ])
+                        @include('livewire.products.management.partials.actions.shop-pull-button', [
+                            'erpConnectionId' => $activeErpConnectionId,
+                            'classes' => 'w-full lg:flex-1'
+                        ])
+                    @else
+                        {{-- Shop Context: "Aktualizuj aktualny sklep" / "Wczytaj z aktualnego sklepu" --}}
+                        @include('livewire.products.management.partials.actions.shop-sync-button', [
+                            'shopId' => $activeShopId,
+                            'classes' => 'w-full lg:flex-1'
+                        ])
+                        @include('livewire.products.management.partials.actions.shop-pull-button', [
+                            'shopId' => $activeShopId,
+                            'classes' => 'w-full lg:flex-1'
+                        ])
+                    @endif
                 </div>
             </div>
         @endif

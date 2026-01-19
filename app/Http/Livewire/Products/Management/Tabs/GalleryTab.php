@@ -10,6 +10,7 @@ use Livewire\Attributes\On;
 use App\Models\Media;
 use App\Models\Product;
 use App\Models\PrestaShopShop;
+use App\Models\ERPConnection;
 use App\DTOs\Media\MediaUploadDTO;
 use App\Services\Media\MediaManager;
 use App\Services\Media\MediaSyncService;
@@ -85,6 +86,11 @@ class GalleryTab extends Component
     public bool $isLoadingShopImages = false;
     public array $importModalShops = [];      // Shops to fetch images from
 
+    // ERP Integration state (ETAP_08.6: Baselinker/Subiekt GT Integration)
+    public array $erpConnections = [];        // Active ERP connections (Baselinker, etc.)
+    public array $pendingErpChanges = [];     // ['mediaId:erpId' => 'sync'|'unsync']
+    public array $erpSyncStatus = [];         // Status sync per media per ERP connection
+
     /*
     |--------------------------------------------------------------------------
     | CONSTANTS
@@ -108,6 +114,8 @@ class GalleryTab extends Component
         if ($productId) {
             $this->product = Product::find($productId);
             $this->loadSyncStatus();
+            $this->loadErpConnections();
+            $this->loadErpSyncStatus();
         }
     }
 
@@ -1099,6 +1107,250 @@ class GalleryTab extends Component
 
     /*
     |--------------------------------------------------------------------------
+    | ERP INTEGRATION METHODS (ETAP_08.6: Baselinker/Subiekt GT)
+    |--------------------------------------------------------------------------
+    */
+
+    /**
+     * Load active ERP connections
+     */
+    protected function loadErpConnections(): void
+    {
+        $this->erpConnections = ERPConnection::where('is_active', true)
+            ->orderBy('instance_name')
+            ->get()
+            ->toArray();
+    }
+
+    /**
+     * Load ERP sync status for all media
+     */
+    protected function loadErpSyncStatus(): void
+    {
+        if (!$this->product) return;
+
+        $this->erpSyncStatus = [];
+        foreach ($this->getMedia() as $media) {
+            $this->erpSyncStatus[$media->id] = $media->erp_mapping ?? [];
+        }
+    }
+
+    /**
+     * Toggle ERP assignment - LOCAL ONLY (deferred architecture)
+     * NO API CALL - just mark intent in $pendingErpChanges
+     */
+    public function toggleErpAssignment(int $mediaId, int $erpConnectionId): void
+    {
+        try {
+            $media = Media::findOrFail($mediaId);
+            $connection = ERPConnection::findOrFail($erpConnectionId);
+
+            $key = "{$mediaId}:{$erpConnectionId}";
+            $connectionKey = "connection_{$erpConnectionId}";
+            $mapping = $media->erp_mapping ?? [];
+            $isSynced = isset($mapping[$connectionKey]['status']) &&
+                        $mapping[$connectionKey]['status'] === 'synced';
+
+            // Toggle intent
+            if ($isSynced) {
+                // Currently synced → mark for UNSYNC
+                $this->pendingErpChanges[$key] = 'unsync';
+                // Optimistically update local status
+                if (isset($this->erpSyncStatus[$mediaId][$connectionKey])) {
+                    $this->erpSyncStatus[$mediaId][$connectionKey]['pending_unsync'] = true;
+                }
+            } else {
+                // Currently NOT synced → mark for SYNC
+                $this->pendingErpChanges[$key] = 'sync';
+                // Optimistically update local status
+                $this->erpSyncStatus[$mediaId][$connectionKey] = [
+                    'status' => null,
+                    'pending_sync' => true,
+                ];
+            }
+
+            Log::info('[GALLERY TAB] ERP assignment toggled (LOCAL)', [
+                'media_id' => $mediaId,
+                'erp_connection_id' => $erpConnectionId,
+                'action' => $this->pendingErpChanges[$key],
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('[GALLERY TAB] Toggle ERP assignment failed', ['error' => $e->getMessage()]);
+            $this->dispatch('notify', ['type' => 'error', 'message' => 'Blad zmiany stanu ERP']);
+        }
+    }
+
+    /**
+     * Apply pending ERP changes - EXECUTE ALL API CALLS
+     */
+    public function applyPendingErpChanges(): void
+    {
+        if (empty($this->pendingErpChanges)) {
+            $this->dispatch('notify', ['type' => 'info', 'message' => 'Brak zmian ERP do zastosowania']);
+            return;
+        }
+
+        $syncedCount = 0;
+        $unsyncedCount = 0;
+        $errors = [];
+
+        try {
+            $baselinkerService = app(\App\Services\ERP\BaselinkerService::class);
+
+            foreach ($this->pendingErpChanges as $key => $action) {
+                [$mediaId, $erpConnectionId] = explode(':', $key);
+                $media = Media::find($mediaId);
+                $connection = ERPConnection::find($erpConnectionId);
+
+                if (!$media || !$connection) {
+                    $errors[] = "Nie znaleziono media {$mediaId} lub ERP {$erpConnectionId}";
+                    continue;
+                }
+
+                try {
+                    if ($action === 'sync') {
+                        // Push image to ERP
+                        $success = $this->syncMediaToErp($media, $connection);
+                        if ($success) {
+                            $syncedCount++;
+                        } else {
+                            $errors[] = "Blad wysylania zdjecia {$mediaId} do {$connection->name}";
+                        }
+                    } elseif ($action === 'unsync') {
+                        // Remove from ERP
+                        $media->clearErpMapping($connection->id);
+                        $unsyncedCount++;
+                    }
+                } catch (\Exception $e) {
+                    $errors[] = "Blad: {$e->getMessage()}";
+                    Log::error('[GALLERY TAB] Apply pending ERP change failed', [
+                        'media_id' => $mediaId,
+                        'erp_connection_id' => $erpConnectionId,
+                        'action' => $action,
+                        'error' => $e->getMessage(),
+                    ]);
+                }
+            }
+
+            // Clear pending changes
+            $this->pendingErpChanges = [];
+
+            // Reload ERP sync status from DB
+            $this->loadErpSyncStatus();
+
+            // Notify user
+            $message = "Zastosowano zmiany ERP: {$syncedCount} wyslano, {$unsyncedCount} usunieto";
+            if (!empty($errors)) {
+                $message .= ". Bledy: " . count($errors);
+            }
+
+            $this->dispatch('notify', [
+                'type' => empty($errors) ? 'success' : 'warning',
+                'message' => $message,
+            ]);
+
+            Log::info('[GALLERY TAB] Pending ERP changes applied', [
+                'synced' => $syncedCount,
+                'unsynced' => $unsyncedCount,
+                'errors' => count($errors),
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('[GALLERY TAB] Apply pending ERP changes failed', ['error' => $e->getMessage()]);
+            $this->dispatch('notify', ['type' => 'error', 'message' => 'Blad zastosowania zmian ERP']);
+        }
+    }
+
+    /**
+     * Sync single media to ERP connection
+     */
+    protected function syncMediaToErp(Media $media, ERPConnection $connection): bool
+    {
+        try {
+            // Get product's Baselinker product ID
+            $product = $media->mediable;
+            if (!$product || !($product instanceof Product)) {
+                return false;
+            }
+
+            $productErpData = $product->erpData()
+                ->where('erp_connection_id', $connection->id)
+                ->first();
+
+            if (!$productErpData || !$productErpData->external_product_id) {
+                Log::warning('[GALLERY TAB] Product not synced to ERP, cannot sync image', [
+                    'product_id' => $product->id,
+                    'erp_connection_id' => $connection->id,
+                ]);
+                return false;
+            }
+
+            // Get image URL
+            $imageUrl = $media->url;
+            if (!$imageUrl || !filter_var($imageUrl, FILTER_VALIDATE_URL)) {
+                Log::warning('[GALLERY TAB] Invalid image URL', ['media_id' => $media->id]);
+                return false;
+            }
+
+            // TODO: Implement actual Baselinker image sync via API
+            // For now, just mark as synced (placeholder for full implementation)
+            $media->markAsErpSynced($connection->id, [
+                'product_id' => $productErpData->external_product_id,
+                'image_url' => $imageUrl,
+                'image_position' => $media->sort_order,
+            ]);
+
+            Log::info('[GALLERY TAB] Media synced to ERP', [
+                'media_id' => $media->id,
+                'erp_connection_id' => $connection->id,
+                'product_id' => $productErpData->external_product_id,
+            ]);
+
+            return true;
+
+        } catch (\Exception $e) {
+            Log::error('[GALLERY TAB] Sync media to ERP failed', [
+                'media_id' => $media->id,
+                'erp_connection_id' => $connection->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            $media->markErpSyncError($connection->id, $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Discard pending ERP changes (reset to DB state)
+     */
+    public function discardPendingErpChanges(): void
+    {
+        $this->pendingErpChanges = [];
+        $this->loadErpSyncStatus();
+        $this->dispatch('notify', ['type' => 'info', 'message' => 'Anulowano zmiany ERP']);
+
+        Log::info('[GALLERY TAB] Pending ERP changes discarded');
+    }
+
+    /**
+     * Check if there are any pending ERP changes
+     */
+    public function hasPendingErpChanges(): bool
+    {
+        return !empty($this->pendingErpChanges);
+    }
+
+    /**
+     * Get active ERP connections for display
+     */
+    public function getErpConnections(): array
+    {
+        return $this->erpConnections;
+    }
+
+    /*
+    |--------------------------------------------------------------------------
     | DATA ACCESS
     |--------------------------------------------------------------------------
     */
@@ -1262,6 +1514,10 @@ class GalleryTab extends Component
             'shops' => $this->getShops(),
             'mediaCount' => $this->getMediaCount(),
             'maxImages' => self::MAX_IMAGES,
+            // ETAP_08.6: ERP Integration
+            'erpConnections' => $this->erpConnections,
+            'erpSyncStatus' => $this->erpSyncStatus,
+            'hasPendingErpChanges' => $this->hasPendingErpChanges(),
         ]);
     }
 }

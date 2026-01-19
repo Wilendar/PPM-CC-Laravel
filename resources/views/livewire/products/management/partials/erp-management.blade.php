@@ -7,7 +7,7 @@
 @endphp
 
 @if($erpConnections->isNotEmpty())
-<div class="mt-3 bg-gray-800 rounded-lg p-3">
+<div class="mt-3 bg-gray-800 rounded-lg p-3 relative">
     <div class="flex items-center justify-between">
         <div class="flex items-center space-x-4">
             <h4 class="text-sm font-semibold text-white">
@@ -129,6 +129,20 @@
     {{-- ERP Sync Status Panel (when ERP tab is selected) --}}
     @if($activeErpConnectionId !== null && !empty($erpExternalData))
         @include('livewire.products.management.partials.erp-sync-status-panel')
+    @endif
+
+    {{-- ETAP_08.6: Blocking Overlay during ERP sync --}}
+    @if($this->hasActiveErpSyncJob())
+        <div class="erp-sync-overlay">
+            <div class="erp-sync-overlay-content">
+                <svg class="animate-spin h-8 w-8 text-blue-400 mb-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <span class="text-blue-300 font-medium text-sm">SYNCHRONIZACJA ERP W TOKU</span>
+                <span class="text-xs text-blue-400 mt-1">Pola sa zablokowane do zakonczenia synchronizacji</span>
+            </div>
+        </div>
     @endif
 </div>
 @endif

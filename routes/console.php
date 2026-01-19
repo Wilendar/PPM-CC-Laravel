@@ -63,11 +63,70 @@ if (config('sync.cleanup.auto_cleanup_enabled', false)) {
         ->runInBackground();
 }
 
+// ==========================================
+// DATABASE CLEANUP TASKS (CRITICAL!)
+// ==========================================
+// 2025-01-19: FIX - Te tabele rosly do gigabajtow bez regularnego czyszczenia!
+
+// Telescope entries cleanup - keep only 48 hours of data
+// CRITICAL: Bez tego telescope_entries rosnie do dziesiatek GB!
+Schedule::command('telescope:prune --hours=48')
+    ->daily()
+    ->at('03:00')
+    ->name('telescope-prune')
+    ->withoutOverlapping()
+    ->runInBackground();
+
+// Price history cleanup - keep 90 days of audit trail
+// CRITICAL: Bez tego price_history rosnie do dziesiatek GB!
+// JSON columns (old_values, new_values) moga miec setki KB per rekord
+Schedule::command('price-history:cleanup --days=90 --chunk=5000')
+    ->daily()
+    ->at('03:30')
+    ->name('price-history-cleanup')
+    ->withoutOverlapping()
+    ->runInBackground();
+
+// Log tables cleanup - sync_logs, integration_logs, failed_jobs, notifications
+// Uses retention policies from config/database-cleanup.php
+Schedule::command('logs:cleanup')
+    ->daily()
+    ->at('04:00')
+    ->name('logs-tables-cleanup')
+    ->withoutOverlapping()
+    ->runInBackground();
+
+// Database health check with email alerts
+// Monitors all table sizes, sends alerts when thresholds exceeded
+Schedule::command('db:health-check --alert')
+    ->daily()
+    ->at('06:00')
+    ->name('db-health-check')
+    ->withoutOverlapping()
+    ->runInBackground();
+
+// ==========================================
+// QUEUE WORKER (SHARED HOSTING)
+// ==========================================
+// 2026-01-19: Auto-process queue jobs every minute (shared hosting compatible)
+// On shared hosting we can't run `queue:work` as daemon, so we use scheduler
+
+Schedule::command('queue:work database --queue=erp_default,erp_high,default,sync --once --max-time=55')
+    ->everyMinute()
+    ->name('queue-worker-erp')
+    ->withoutOverlapping()
+    ->runInBackground();
+
+// ==========================================
+// PRESTASHOP SYNC TASKS
+// ==========================================
+
 // FIX #3 - BUG #7: Import products from PrestaShop (2025-11-12)
 // ETAP_07 FAZA 9.2: Dynamic scheduler frequency from SystemSettings (2025-11-13)
 // Pull current product data from PrestaShop → PPM with configurable schedule
 use App\Jobs\PullProductsFromPrestaShop;
 use App\Models\PrestaShopShop;
+use App\Models\SyncJob;
 use App\Models\SystemSetting;
 
 // Build dynamic cron expression from settings (with safe fallback)
@@ -119,6 +178,22 @@ Schedule::call(function () {
         $activeShops = $query->get();
 
         foreach ($activeShops as $shop) {
+            // JOB DEDUPLICATION: Skip if pending/running SyncJob already exists for this shop
+            // This is an additional layer of protection beyond ShouldBeUnique
+            $existingPending = SyncJob::where('source_id', $shop->id)
+                ->where('source_type', SyncJob::TYPE_PRESTASHOP)
+                ->where('job_type', 'import_products')
+                ->whereIn('status', [SyncJob::STATUS_PENDING, SyncJob::STATUS_RUNNING])
+                ->exists();
+
+            if ($existingPending) {
+                \Log::info('PullProductsFromPrestaShop skipped - pending/running job exists', [
+                    'shop_id' => $shop->id,
+                    'shop_name' => $shop->name,
+                ]);
+                continue;
+            }
+
             PullProductsFromPrestaShop::dispatch($shop);
         }
     } catch (\Exception $e) {

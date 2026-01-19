@@ -1051,5 +1051,21 @@
     <!-- Scripts Stack for Components -->
     @stack('component-scripts')
 
+    {{-- Bug Report Modal (Global) - works in dev mode without auth --}}
+    @livewire('bug-reports.bug-report-modal')
+
+    {{-- Floating Bug Report Button --}}
+    <button type="button"
+            x-data
+            @click="$dispatch('open-bug-report-modal')"
+            class="fixed bottom-6 right-6 layer-panel w-14 h-14 rounded-full shadow-lg flex items-center justify-center transition-all duration-200 hover:scale-110 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-900"
+            style="background: linear-gradient(135deg, #e0ac7e 0%, #d1975a 50%, #c08449 100%); z-index: 99999;"
+            title="Zglos problem lub pomysl"
+            aria-label="Zglos problem">
+        <svg class="w-7 h-7 text-gray-900" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+        </svg>
+    </button>
+
 </body>
 </html>

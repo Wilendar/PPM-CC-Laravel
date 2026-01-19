@@ -1,6 +1,15 @@
 {{-- Quick Actions Panel --}}
 <div class="enterprise-card p-6"
-     x-data="syncStatusTracker(@entangle('activeJobStatus'), @entangle('activeJobType'), @entangle('jobResult'), @entangle('jobCreatedAt'))">
+     x-data="quickActionsTracker(
+        @entangle('activeJobStatus'),
+        @entangle('activeJobType'),
+        @entangle('jobResult'),
+        @entangle('jobCreatedAt'),
+        @entangle('activeErpJobStatus'),
+        @entangle('activeErpJobType'),
+        @entangle('erpJobResult'),
+        @entangle('erpJobCreatedAt')
+     )">
 
     <h4 class="text-lg font-bold text-dark-primary mb-6 flex items-center">
         <i class="fas fa-bolt text-mpp-orange mr-2"></i>
@@ -60,6 +69,55 @@
         </div>
 
         {{-- ========================================== --}}
+        {{-- ETAP_08.6: ERP SYNC STATUS INDICATORS     --}}
+        {{-- ========================================== --}}
+
+        {{-- ERP RUNNING STATE: Animated progress bar --}}
+        <div class="sync-status-container sync-status-running erp-sync-status"
+             x-show="erpIsJobRunning"
+             x-cloak>
+            <div class="sync-status-header">
+                <i class="fas fa-sync fa-spin text-blue-400 mr-2"></i>
+                <span class="font-bold text-blue-400">Synchronizacja ERP</span>
+            </div>
+            <div class="sync-progress-bar-container">
+                <div class="sync-progress-bar erp-progress-bar" :style="`width: ${erpProgress}%`"></div>
+            </div>
+            <div class="sync-status-time text-sm text-dark-secondary mt-2">
+                <span x-text="erpStatusText"></span>
+                <span class="ml-2" x-show="erpRemainingSeconds > 0">
+                    (<span x-text="erpRemainingSeconds"></span>s)
+                </span>
+            </div>
+        </div>
+
+        {{-- ERP SUCCESS STATE --}}
+        <div class="sync-status-container sync-status-success erp-sync-status"
+             x-show="erpShowCompletionStatus && erpCompletionResult === 'success'"
+             x-cloak>
+            <div class="sync-status-header">
+                <i class="fas fa-check-circle text-green-500 mr-2 text-xl"></i>
+                <span class="font-bold text-green-500">ERP SUKCES</span>
+            </div>
+            <div class="text-sm text-dark-secondary mt-2">
+                Synchronizacja ERP zakonczona pomyslnie
+            </div>
+        </div>
+
+        {{-- ERP ERROR STATE --}}
+        <div class="sync-status-container sync-status-error erp-sync-status"
+             x-show="erpShowCompletionStatus && erpCompletionResult === 'error'"
+             x-cloak>
+            <div class="sync-status-header">
+                <i class="fas fa-exclamation-triangle text-red-500 mr-2 text-xl"></i>
+                <span class="font-bold text-red-500">ERP BLAD</span>
+            </div>
+            <div class="text-sm text-dark-secondary mt-2">
+                Wystapil blad podczas synchronizacji ERP
+            </div>
+        </div>
+
+        {{-- ========================================== --}}
         {{-- SAVE BUTTON - Always visible, changes mode --}}
         {{-- ========================================== --}}
         @include('livewire.products.management.partials.actions.save-and-close-button')
@@ -68,7 +126,7 @@
         {{-- NORMAL BUTTONS - Hidden during job        --}}
         {{-- FIX 2025-11-25: Use x-show instead of template x-if --}}
         {{-- ========================================== --}}
-        <div class="space-y-4" x-show="!isJobRunning && !showCompletionStatus" x-cloak>
+        <div class="space-y-4" x-show="!isJobRunning && !showCompletionStatus && !erpIsJobRunning && !erpShowCompletionStatus" x-cloak>
             {{-- ETAP_13.2: Aktualizuj sklepy (ALL shops export) --}}
             @if($isEditMode && !empty($exportedShops))
                 <button
@@ -99,14 +157,22 @@
     </div>
 </div>
 
-{{-- Alpine.js Component for Sync Status Tracking --}}
+{{-- Alpine.js Component for Combined Sync Status Tracking (PrestaShop + ERP) --}}
 <script>
 document.addEventListener('alpine:init', () => {
     // Guard against double registration (use window flag - survives Livewire morph)
-    if (window._syncStatusTrackerRegistered) return;
-    window._syncStatusTrackerRegistered = true;
+    if (window._quickActionsTrackerRegistered) return;
+    window._quickActionsTrackerRegistered = true;
 
-    Alpine.data('syncStatusTracker', (activeJobStatus, activeJobType, jobResult, jobCreatedAt) => ({
+    // ==========================================
+    // ETAP_08.6: COMBINED QUICK ACTIONS TRACKER
+    // Handles both PrestaShop and ERP sync status
+    // ==========================================
+    Alpine.data('quickActionsTracker', (
+        activeJobStatus, activeJobType, jobResult, jobCreatedAt,
+        activeErpJobStatus, activeErpJobType, erpJobResult, erpJobCreatedAt
+    ) => ({
+        // PrestaShop job tracking
         activeJobStatus: activeJobStatus,
         activeJobType: activeJobType,
         jobResult: jobResult,
@@ -116,54 +182,70 @@ document.addEventListener('alpine:init', () => {
         showCompletionStatus: false,
         completionResult: null,
         completionTimeout: null,
-        estimatedDuration: 60, // seconds (max JOB execution time)
+        estimatedDuration: 60,
+
+        // ERP job tracking (prefixed to avoid conflicts)
+        activeErpJobStatus: activeErpJobStatus,
+        activeErpJobType: activeErpJobType,
+        erpJobResult: erpJobResult,
+        erpJobCreatedAt: erpJobCreatedAt,
+        erpProgress: 0,
+        erpRemainingSeconds: 0,
+        erpShowCompletionStatus: false,
+        erpCompletionResult: null,
+        erpCompletionTimeout: null,
+        erpEstimatedDuration: 45,
 
         init() {
-            // Use window-level tracking to prevent duplicate completion across Livewire morphs
-            // Key: jobCreatedAt timestamp (unique per job)
-            const jobKey = this.jobCreatedAt || 'no-job';
+            // === PrestaShop job watcher ===
             window._syncCompletionShown = window._syncCompletionShown || {};
-
-            // Watch for job status changes (single watcher handles everything)
             this.$watch('activeJobStatus', (newStatus, oldStatus) => {
-                console.log('[SyncStatus] activeJobStatus changed:', oldStatus, '->', newStatus, 'jobKey:', jobKey);
-
                 if (newStatus === 'completed' || newStatus === 'failed') {
-                    // Job finished - show completion status ONCE per unique job
                     const currentJobKey = this.jobCreatedAt || 'no-job';
                     if (!window._syncCompletionShown[currentJobKey]) {
                         window._syncCompletionShown[currentJobKey] = true;
                         this.handleJobCompletion(newStatus);
-                        // Cleanup old keys (keep last 10)
-                        const keys = Object.keys(window._syncCompletionShown);
-                        if (keys.length > 10) {
-                            delete window._syncCompletionShown[keys[0]];
-                        }
                     }
                 } else if (newStatus === 'pending' || newStatus === 'processing') {
                     this.startProgressTracking();
                 } else {
-                    // null or other - reset state
                     this.resetState();
                 }
             });
 
-            // Initialize if job is already running on mount
+            // === ERP job watcher ===
+            window._erpSyncCompletionShown = window._erpSyncCompletionShown || {};
+            this.$watch('activeErpJobStatus', (newStatus, oldStatus) => {
+                if (newStatus === 'completed' || newStatus === 'failed') {
+                    const currentJobKey = this.erpJobCreatedAt || 'no-erp-job';
+                    if (!window._erpSyncCompletionShown[currentJobKey]) {
+                        window._erpSyncCompletionShown[currentJobKey] = true;
+                        this.handleErpJobCompletion(newStatus);
+                    }
+                } else if (newStatus === 'pending' || newStatus === 'running') {
+                    this.startErpProgressTracking();
+                } else {
+                    this.resetErpState();
+                }
+            });
+
+            // Initialize if jobs already running
             if (this.activeJobStatus === 'pending' || this.activeJobStatus === 'processing') {
                 this.startProgressTracking();
             }
+            if (this.activeErpJobStatus === 'pending' || this.activeErpJobStatus === 'running') {
+                this.startErpProgressTracking();
+            }
         },
 
+        // === PrestaShop getters and methods ===
         get isJobRunning() {
             return this.activeJobStatus === 'pending' || this.activeJobStatus === 'processing';
         },
 
         get statusText() {
-            if (this.activeJobType === 'sync') {
-                return 'Aktualizowanie sklepow...';
-            } else if (this.activeJobType === 'pull') {
-                return 'Pobieranie danych...';
-            }
+            if (this.activeJobType === 'sync') return 'Aktualizowanie sklepow...';
+            if (this.activeJobType === 'pull') return 'Pobieranie danych...';
             return 'Przetwarzanie...';
         },
 
@@ -172,50 +254,72 @@ document.addEventListener('alpine:init', () => {
             this.completionResult = null;
             this.progress = 0;
             this.remainingSeconds = 0;
-            if (this.completionTimeout) {
-                clearTimeout(this.completionTimeout);
-                this.completionTimeout = null;
-            }
+            if (this.completionTimeout) { clearTimeout(this.completionTimeout); this.completionTimeout = null; }
         },
 
         startProgressTracking() {
             this.showCompletionStatus = false;
             this.completionResult = null;
-
-            if (this.completionTimeout) {
-                clearTimeout(this.completionTimeout);
-                this.completionTimeout = null;
-            }
-
-            // Calculate progress based on elapsed time
+            if (this.completionTimeout) { clearTimeout(this.completionTimeout); this.completionTimeout = null; }
             const startTime = this.jobCreatedAt ? new Date(this.jobCreatedAt).getTime() : Date.now();
             const updateProgress = () => {
                 if (!this.isJobRunning) return;
-
                 const elapsed = (Date.now() - startTime) / 1000;
-                // Progress formula: approaches 95% asymptotically
                 this.progress = Math.min(95, (elapsed / this.estimatedDuration) * 100);
                 this.remainingSeconds = Math.max(0, Math.round(this.estimatedDuration - elapsed));
-
-                if (this.isJobRunning) {
-                    setTimeout(updateProgress, 500);
-                }
+                if (this.isJobRunning) setTimeout(updateProgress, 500);
             };
             updateProgress();
         },
 
         handleJobCompletion(status) {
-            console.log('[SyncStatus] handleJobCompletion:', status, 'jobResult:', this.jobResult);
-
             this.progress = 100;
             this.remainingSeconds = 0;
             this.showCompletionStatus = true;
             this.completionResult = (status === 'completed') ? (this.jobResult || 'success') : 'error';
+            this.completionTimeout = setTimeout(() => { this.resetState(); }, 5000);
+        },
 
-            // Clear after 5 seconds
-            this.completionTimeout = setTimeout(() => {
-                this.resetState();
-            }, 5000);
+        // === ERP getters and methods ===
+        get erpIsJobRunning() {
+            return this.activeErpJobStatus === 'pending' || this.activeErpJobStatus === 'running';
+        },
+
+        get erpStatusText() {
+            if (this.activeErpJobType === 'sync') return 'Synchronizowanie do ERP...';
+            if (this.activeErpJobType === 'pull') return 'Pobieranie danych z ERP...';
+            return 'Przetwarzanie ERP...';
+        },
+
+        resetErpState() {
+            this.erpShowCompletionStatus = false;
+            this.erpCompletionResult = null;
+            this.erpProgress = 0;
+            this.erpRemainingSeconds = 0;
+            if (this.erpCompletionTimeout) { clearTimeout(this.erpCompletionTimeout); this.erpCompletionTimeout = null; }
+        },
+
+        startErpProgressTracking() {
+            this.erpShowCompletionStatus = false;
+            this.erpCompletionResult = null;
+            if (this.erpCompletionTimeout) { clearTimeout(this.erpCompletionTimeout); this.erpCompletionTimeout = null; }
+            const startTime = this.erpJobCreatedAt ? new Date(this.erpJobCreatedAt).getTime() : Date.now();
+            const updateProgress = () => {
+                if (!this.erpIsJobRunning) return;
+                const elapsed = (Date.now() - startTime) / 1000;
+                this.erpProgress = Math.min(95, (elapsed / this.erpEstimatedDuration) * 100);
+                this.erpRemainingSeconds = Math.max(0, Math.round(this.erpEstimatedDuration - elapsed));
+                if (this.erpIsJobRunning) setTimeout(updateProgress, 500);
+            };
+            updateProgress();
+        },
+
+        handleErpJobCompletion(status) {
+            this.erpProgress = 100;
+            this.erpRemainingSeconds = 0;
+            this.erpShowCompletionStatus = true;
+            this.erpCompletionResult = (status === 'completed') ? (this.erpJobResult || 'success') : 'error';
+            this.erpCompletionTimeout = setTimeout(() => { this.resetErpState(); }, 5000);
         }
     }));
 });

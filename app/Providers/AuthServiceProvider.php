@@ -2,12 +2,23 @@
 
 namespace App\Providers;
 
+use App\Models\BugReport;
+use App\Policies\BugReportPolicy;
 use Illuminate\Foundation\Support\Providers\AuthServiceProvider as ServiceProvider;
 use Illuminate\Support\Facades\Gate;
 use App\Models\User;
 
 class AuthServiceProvider extends ServiceProvider
 {
+    /**
+     * The model to policy mappings for the application.
+     *
+     * @var array<class-string, class-string>
+     */
+    protected $policies = [
+        BugReport::class => BugReportPolicy::class,
+    ];
+
     /**
      * Register any authentication / authorization services.
      */

@@ -12,9 +12,11 @@ use App\Models\PrestaShopShop;
 use App\Models\Product;
 use App\Models\IntegrationLog;
 use App\Services\PrestaShop\PrestaShopService;
+use App\Services\SyncNotificationService;
 use Carbon\Carbon;
 use Exception;
 use Throwable;
+use Illuminate\Support\Facades\Log;
 
 /**
  * SyncProductsJob
@@ -252,15 +254,21 @@ class SyncProductsJob implements ShouldQueue
             if ($failedItems === 0) {
                 // All items succeeded - status: completed
                 $this->syncJob->complete($resultSummary);
+                // ENHANCEMENT 2.2.1.2.3: Send success notification
+                $this->sendNotification('success');
             } elseif ($successfulItems > 0) {
                 // Partial success - some succeeded, some failed - status: completed_with_errors
                 $this->syncJob->completeWithErrors($resultSummary);
+                // ENHANCEMENT 2.2.1.2.3: Send success notification (partial success is still success)
+                $this->sendNotification('success');
             } else {
                 // All items failed - status: failed
                 $this->syncJob->fail(
                     'All products failed to sync',
                     json_encode($errors, JSON_PRETTY_PRINT)
                 );
+                // ENHANCEMENT 2.2.1.2.3: Send failure notification
+                $this->sendNotification('failure');
                 return; // Exit early - job failed completely
             }
 
@@ -430,6 +438,9 @@ class SyncProductsJob implements ShouldQueue
             'error_details' => $exception->getMessage(),
             'stack_trace' => $exception->getTraceAsString(),
         ]);
+
+        // ENHANCEMENT 2.2.1.2.3: Send retry_exhausted notification
+        $this->sendNotification('retry_exhausted');
     }
 
     /**
@@ -513,6 +524,24 @@ class SyncProductsJob implements ShouldQueue
                 (string) $this->syncJob->target_id,
                 $e
             );
+        }
+    }
+
+    /**
+     * ENHANCEMENT 2.2.1.2.3: Send notification for sync job event.
+     *
+     * @param string $event Event type: 'success', 'failure', 'retry_exhausted'
+     */
+    protected function sendNotification(string $event): void
+    {
+        try {
+            app(SyncNotificationService::class)->sendSyncNotification($this->syncJob, $event);
+        } catch (\Exception $e) {
+            Log::warning('Failed to send sync notification', [
+                'sync_job_id' => $this->syncJob->id ?? null,
+                'event' => $event,
+                'error' => $e->getMessage(),
+            ]);
         }
     }
 

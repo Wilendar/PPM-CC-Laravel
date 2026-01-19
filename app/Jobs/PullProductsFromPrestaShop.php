@@ -10,7 +10,9 @@ use App\Services\PrestaShop\ConflictResolver;
 use App\Services\PrestaShop\PrestaShopClientFactory;
 use App\Services\PrestaShop\PrestaShopPriceImporter;
 use App\Services\PrestaShop\PrestaShopStockImporter;
+use App\Services\SyncNotificationService;
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
@@ -40,7 +42,7 @@ use Illuminate\Support\Facades\Log;
  *
  * @package App\Jobs
  */
-class PullProductsFromPrestaShop implements ShouldQueue
+class PullProductsFromPrestaShop implements ShouldQueue, ShouldBeUnique
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
@@ -72,6 +74,34 @@ class PullProductsFromPrestaShop implements ShouldQueue
      * ETAP_07 FAZA 9.2: Dynamic timeout from SystemSettings (2025-11-13)
      */
     public int $timeout;
+
+    /**
+     * Unique job lock duration in seconds
+     *
+     * JOB DEDUPLICATION: Lock per shop for 1 hour (scheduler frequency)
+     * This prevents duplicate jobs for the same shop when scheduler runs
+     * while previous job is still processing.
+     *
+     * Changed 2026-01-19: From 6h to 1h due to date_upd optimization
+     * (unchanged products are skipped, so hourly sync is now efficient)
+     *
+     * @var int
+     */
+    public int $uniqueFor = 3600; // 1 hour
+
+    /**
+     * Get unique job identifier
+     *
+     * JOB DEDUPLICATION: Unique per shop, not per job instance
+     * If job for shop_id=5 is already in queue/processing,
+     * new dispatch for same shop will be ignored.
+     *
+     * @return string
+     */
+    public function uniqueId(): string
+    {
+        return "pull_products_shop_{$this->shop->id}";
+    }
 
     /**
      * Create a new job instance.
@@ -193,6 +223,40 @@ class PullProductsFromPrestaShop implements ShouldQueue
             $conflicts = 0;
             $pricesImported = 0;
             $stockImported = 0;
+            $skipped = 0; // 2026-01-19: date_upd optimization - unchanged products skipped
+
+            // ============================================================
+            // OPTIMIZATION 2026-01-19: Pre-fetch date_upd for change detection
+            // ============================================================
+            // Instead of fetching full product data for ALL products,
+            // first fetch lightweight date_upd for all linked products.
+            // If product hasn't changed in PrestaShop since last pull, skip it.
+            // This significantly reduces API calls and database writes.
+
+            $prestashopIds = $productsToSync->map(function ($product) {
+                $shopData = $product->shopData()
+                    ->where('shop_id', $this->shop->id)
+                    ->first();
+                return $shopData?->prestashop_product_id;
+            })->filter()->unique()->values()->toArray();
+
+            $dateUpdMap = [];
+            if (!empty($prestashopIds)) {
+                try {
+                    $dateUpdMap = $client->getProductsDateUpd($prestashopIds);
+                    Log::debug('PullProductsFromPrestaShop date_upd pre-fetch completed', [
+                        'shop_id' => $this->shop->id,
+                        'requested' => count($prestashopIds),
+                        'returned' => count($dateUpdMap),
+                    ]);
+                } catch (\Exception $e) {
+                    // If date_upd fetch fails, fall back to syncing all products
+                    Log::warning('PullProductsFromPrestaShop date_upd fetch failed, will sync all', [
+                        'shop_id' => $this->shop->id,
+                        'error' => $e->getMessage(),
+                    ]);
+                }
+            }
 
             // ENHANCEMENT 2025-12-22: Extended tracking for validation purposes
             $fieldsUpdated = [
@@ -223,11 +287,31 @@ class PullProductsFromPrestaShop implements ShouldQueue
                     continue;
                 }
 
+                // ============================================================
+                // OPTIMIZATION 2026-01-19: Skip unchanged products
+                // ============================================================
+                // Check if product changed in PrestaShop since last pull
+                // If date_upd is same as cached prestashop_updated_at, skip full fetch
+                $psDateUpd = $dateUpdMap[$shopData->prestashop_product_id] ?? null;
+
+                if ($psDateUpd && !$shopData->needsRePull($psDateUpd)) {
+                    $skipped++;
+                    Log::debug('Product skipped - unchanged in PrestaShop', [
+                        'product_id' => $product->id,
+                        'sku' => $product->sku,
+                        'prestashop_product_id' => $shopData->prestashop_product_id,
+                        'cached_date_upd' => $shopData->prestashop_updated_at?->toDateTimeString(),
+                        'ps_date_upd' => $psDateUpd,
+                    ]);
+                    continue;
+                }
+
                 Log::debug('Fetching product from PrestaShop', [
                     'product_id' => $product->id,
                     'sku' => $product->sku,
                     'prestashop_product_id' => $shopData->prestashop_product_id,
                     'shop_id' => $this->shop->id,
+                    'reason' => $psDateUpd ? 'changed_since_last_pull' : 'no_date_upd_cache',
                 ]);
 
                 // Fetch from PrestaShop
@@ -465,8 +549,10 @@ class PullProductsFromPrestaShop implements ShouldQueue
             );
 
             // ENHANCEMENT 2025-12-22: Extended result_summary for validation
+            // OPTIMIZATION 2026-01-19: Added skipped counter for date_upd optimization
             $syncJob?->complete([
                 'synced' => $synced,
+                'skipped' => $skipped,  // 2026-01-19: Unchanged products (date_upd optimization)
                 'conflicts' => $conflicts,
                 'prices_imported' => $pricesImported,
                 'stock_imported' => $stockImported,
@@ -484,6 +570,7 @@ class PullProductsFromPrestaShop implements ShouldQueue
                 'sync_job_id' => $syncJob?->id,
                 'total_items' => $total,
                 'synced' => $synced,
+                'skipped' => $skipped,  // 2026-01-19: date_upd optimization
                 'conflicts' => $conflicts,
                 'prices_imported' => $pricesImported,
                 'stock_imported' => $stockImported,
@@ -493,6 +580,17 @@ class PullProductsFromPrestaShop implements ShouldQueue
                 'total_fields_updated' => array_sum($fieldsUpdated),
                 'fields_breakdown' => $fieldsUpdated,
             ]);
+
+            // ENHANCEMENT 2.2.1.2.3: Send success notification
+            if ($syncJob) {
+                try {
+                    app(SyncNotificationService::class)->sendSyncNotification($syncJob, 'success');
+                } catch (\Exception $notifyError) {
+                    Log::warning('Failed to send sync success notification', [
+                        'error' => $notifyError->getMessage(),
+                    ]);
+                }
+            }
 
         } catch (\Exception $e) {
             // Mark as failed (FIX #1 - BUG #7)
@@ -519,6 +617,7 @@ class PullProductsFromPrestaShop implements ShouldQueue
      * Job failed permanently (after all retries)
      *
      * FIX #1 - BUG #7: Update SyncJob status
+     * ENHANCEMENT 2.2.1.2.3: Send failure notification
      */
     public function failed(\Throwable $exception): void
     {
@@ -530,6 +629,16 @@ class PullProductsFromPrestaShop implements ShouldQueue
                 errorDetails: 'Job failed after ' . $this->attempts() . ' attempts',
                 stackTrace: $exception->getTraceAsString()
             );
+
+            // ENHANCEMENT 2.2.1.2.3: Send failure notification
+            try {
+                $event = $this->attempts() >= $this->tries ? 'retry_exhausted' : 'failure';
+                app(SyncNotificationService::class)->sendSyncNotification($syncJob, $event);
+            } catch (\Exception $notifyError) {
+                Log::warning('Failed to send sync failure notification', [
+                    'error' => $notifyError->getMessage(),
+                ]);
+            }
         }
 
         Log::error('PullProductsFromPrestaShop failed permanently', [

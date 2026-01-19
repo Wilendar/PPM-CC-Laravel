@@ -6,6 +6,108 @@ import 'vanilla-colorful/hex-color-picker.js';
 // Import resizable columns for import panel
 import './resizable-columns.js';
 
+// =====================================================
+// PPM DIAGNOSTICS - Bug Report System Support
+// Tracks user actions and console errors for bug reports
+// =====================================================
+window.ppmDiagnostics = {
+    actions: [],
+    consoleErrors: [],
+    maxActions: 5,
+    maxErrors: 10,
+
+    /**
+     * Track user action for bug report context
+     * @param {string} action - Description of action
+     */
+    trackAction(action) {
+        this.actions.push({
+            action,
+            timestamp: Date.now(),
+            url: location.href
+        });
+        if (this.actions.length > this.maxActions) {
+            this.actions.shift();
+        }
+    },
+
+    /**
+     * Get current diagnostics data for bug report
+     * @returns {Object} Diagnostics data
+     */
+    getData() {
+        return {
+            actions: [...this.actions],
+            consoleErrors: [...this.consoleErrors],
+            url: location.href,
+            browser: navigator.userAgent,
+            timestamp: Date.now()
+        };
+    },
+
+    /**
+     * Clear all tracked data
+     */
+    clear() {
+        this.actions = [];
+        this.consoleErrors = [];
+    },
+
+    /**
+     * Initialize diagnostics tracking
+     */
+    init() {
+        // Intercept console.error
+        const originalError = console.error;
+        console.error = (...args) => {
+            this.consoleErrors.push({
+                message: args.map(arg => {
+                    if (arg instanceof Error) return arg.message;
+                    if (typeof arg === 'object') {
+                        try { return JSON.stringify(arg); }
+                        catch { return String(arg); }
+                    }
+                    return String(arg);
+                }).join(' '),
+                timestamp: Date.now(),
+                url: location.href
+            });
+            if (this.consoleErrors.length > this.maxErrors) {
+                this.consoleErrors.shift();
+            }
+            originalError.apply(console, args);
+        };
+
+        // Track navigation clicks
+        document.addEventListener('click', (e) => {
+            const target = e.target.closest('button, a, [wire\\:click], [x-on\\:click]');
+            if (target) {
+                const text = target.textContent?.trim().slice(0, 50) || target.tagName;
+                const identifier = target.id ? `#${target.id}` :
+                    target.className ? `.${target.className.split(' ')[0]}` : '';
+                this.trackAction(`Click: ${text}${identifier ? ` (${identifier})` : ''}`);
+            }
+        });
+
+        // Track form submissions
+        document.addEventListener('submit', (e) => {
+            const form = e.target;
+            const formId = form.id || form.action || 'unknown';
+            this.trackAction(`Form submit: ${formId}`);
+        });
+
+        // Track Livewire navigation
+        document.addEventListener('livewire:navigate', () => {
+            this.trackAction(`Navigate: ${location.href}`);
+        });
+
+        console.log('[PPM Diagnostics] Initialized');
+    }
+};
+
+// Initialize diagnostics immediately
+window.ppmDiagnostics.init();
+
 /**
  * Register Alpine stores and data components.
  * PP.0.6 FIX: Handle case when livewire:init already fired before app.js loaded.
@@ -1864,6 +1966,114 @@ function registerAlpineComponents(Alpine) {
                 properties: this.selectedProperties
             };
             this.$wire?.updateControlValue('transition', value);
+        }
+    }));
+
+    // =====================================================
+    // ETAP_08.5: ERP SYNC STATUS TRACKER COMPONENT
+    // =====================================================
+    Alpine.data('erpSyncStatusTracker', (activeErpJobStatus, activeErpJobType, erpJobResult, erpJobCreatedAt) => ({
+        activeErpJobStatus: activeErpJobStatus,
+        activeErpJobType: activeErpJobType,
+        erpJobResult: erpJobResult,
+        erpJobCreatedAt: erpJobCreatedAt,
+        progress: 0,
+        remainingSeconds: 0,
+        showCompletionStatus: false,
+        completionResult: null,
+        completionTimeout: null,
+        estimatedDuration: 60, // seconds (max ERP JOB execution time)
+
+        init() {
+            const jobKey = this.erpJobCreatedAt || 'no-erp-job';
+            window._erpSyncCompletionShown = window._erpSyncCompletionShown || {};
+
+            this.$watch('activeErpJobStatus', (newStatus, oldStatus) => {
+                console.log('[ERPSyncStatus] activeErpJobStatus changed:', oldStatus, '->', newStatus);
+
+                if (newStatus === 'completed' || newStatus === 'failed') {
+                    const currentJobKey = this.erpJobCreatedAt || 'no-erp-job';
+                    if (!window._erpSyncCompletionShown[currentJobKey]) {
+                        window._erpSyncCompletionShown[currentJobKey] = true;
+                        this.handleJobCompletion(newStatus);
+                        const keys = Object.keys(window._erpSyncCompletionShown);
+                        if (keys.length > 10) {
+                            delete window._erpSyncCompletionShown[keys[0]];
+                        }
+                    }
+                } else if (newStatus === 'pending' || newStatus === 'running') {
+                    this.startProgressTracking();
+                } else {
+                    this.resetState();
+                }
+            });
+
+            // Initialize if job is already running on mount
+            if (this.activeErpJobStatus === 'pending' || this.activeErpJobStatus === 'running') {
+                this.startProgressTracking();
+            }
+        },
+
+        get isJobRunning() {
+            return this.activeErpJobStatus === 'pending' || this.activeErpJobStatus === 'running';
+        },
+
+        get statusText() {
+            if (this.activeErpJobType === 'sync') {
+                return 'Wysylanie do ERP...';
+            } else if (this.activeErpJobType === 'pull') {
+                return 'Pobieranie z ERP...';
+            }
+            return 'Przetwarzanie...';
+        },
+
+        resetState() {
+            this.showCompletionStatus = false;
+            this.completionResult = null;
+            this.progress = 0;
+            this.remainingSeconds = 0;
+            if (this.completionTimeout) {
+                clearTimeout(this.completionTimeout);
+                this.completionTimeout = null;
+            }
+        },
+
+        startProgressTracking() {
+            this.showCompletionStatus = false;
+            this.completionResult = null;
+
+            if (this.completionTimeout) {
+                clearTimeout(this.completionTimeout);
+                this.completionTimeout = null;
+            }
+
+            const startTime = this.erpJobCreatedAt ? new Date(this.erpJobCreatedAt).getTime() : Date.now();
+            const updateProgress = () => {
+                if (!this.isJobRunning) return;
+
+                const elapsed = (Date.now() - startTime) / 1000;
+                this.progress = Math.min(95, (elapsed / this.estimatedDuration) * 100);
+                this.remainingSeconds = Math.max(0, Math.round(this.estimatedDuration - elapsed));
+
+                if (this.isJobRunning) {
+                    setTimeout(updateProgress, 500);
+                }
+            };
+            updateProgress();
+        },
+
+        handleJobCompletion(status) {
+            console.log('[ERPSyncStatus] handleJobCompletion:', status, 'erpJobResult:', this.erpJobResult);
+
+            this.progress = 100;
+            this.remainingSeconds = 0;
+            this.showCompletionStatus = true;
+            this.completionResult = (status === 'completed') ? (this.erpJobResult || 'success') : 'error';
+
+            // Clear after 5 seconds
+            this.completionTimeout = setTimeout(() => {
+                this.resetState();
+            }, 5000);
         }
     }));
 

@@ -50,6 +50,80 @@ class PrestaShop8Client extends BasePrestaShopClient
     }
 
     /**
+     * Get only date_upd for multiple products (lightweight API call)
+     *
+     * OPTIMIZATION: Fetch only id + date_upd for change detection
+     * Used by PullProductsFromPrestaShop to skip unchanged products.
+     *
+     * PrestaShop API params:
+     * - display=[id,date_upd] - return only these fields
+     * - filter[id]=[1|2|3] - filter by multiple IDs using pipe separator
+     *
+     * @param array $productIds PrestaShop product IDs
+     * @return array [prestashop_id => date_upd, ...] Keyed by product ID
+     * @throws \App\Exceptions\PrestaShopAPIException
+     */
+    public function getProductsDateUpd(array $productIds): array
+    {
+        if (empty($productIds)) {
+            return [];
+        }
+
+        // PrestaShop API uses pipe (|) as OR separator for filter values
+        $idsFilter = implode('|', array_map('intval', $productIds));
+
+        $endpoint = "/products?display=[id,date_upd]&filter[id]=[{$idsFilter}]";
+
+        try {
+            $response = $this->makeRequest('GET', $endpoint);
+
+            $result = [];
+
+            // Handle empty response
+            if (!isset($response['products']) || empty($response['products'])) {
+                Log::debug('[PrestaShop8Client] getProductsDateUpd - no products returned', [
+                    'requested_ids' => count($productIds),
+                ]);
+                return [];
+            }
+
+            // Handle both single product (object) and multiple products (array)
+            $products = $response['products'];
+            if (!isset($products[0]) && isset($products['id'])) {
+                // Single product returned as object
+                $products = [$products];
+            }
+
+            foreach ($products as $product) {
+                $id = (int) ($product['id'] ?? 0);
+                $dateUpd = $product['date_upd'] ?? null;
+
+                if ($id > 0 && $dateUpd !== null) {
+                    $result[$id] = $dateUpd;
+                }
+            }
+
+            Log::debug('[PrestaShop8Client] getProductsDateUpd completed', [
+                'requested' => count($productIds),
+                'returned' => count($result),
+                'shop_id' => $this->shop->id,
+            ]);
+
+            return $result;
+
+        } catch (\Exception $e) {
+            Log::warning('[PrestaShop8Client] getProductsDateUpd failed', [
+                'error' => $e->getMessage(),
+                'shop_id' => $this->shop->id,
+                'product_ids_count' => count($productIds),
+            ]);
+
+            // Return empty array on failure - let the job fall back to full sync
+            return [];
+        }
+    }
+
+    /**
      * Create new product
      *
      * FIX (2025-11-14): Unwrap 'product' key if ProductTransformer returned wrapped structure

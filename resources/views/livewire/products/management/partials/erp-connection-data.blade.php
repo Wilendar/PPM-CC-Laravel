@@ -195,6 +195,7 @@
                 @endif
             </label>
             <input wire:model.live="sku"
+                   wire:change="trackErpFieldChange('sku')"
                    type="text"
                    id="erp_sku"
                    placeholder="np. ABC123456"
@@ -220,6 +221,7 @@
                 @endif
             </label>
             <input wire:model.live="name"
+                   wire:change="trackErpFieldChange('name')"
                    type="text"
                    id="erp_name"
                    placeholder="Wprowadz nazwe produktu"
@@ -245,6 +247,7 @@
                 @endif
             </label>
             <input wire:model.live="ean"
+                   wire:change="trackErpFieldChange('ean')"
                    type="text"
                    id="erp_ean"
                    placeholder="Kod kreskowy EAN"

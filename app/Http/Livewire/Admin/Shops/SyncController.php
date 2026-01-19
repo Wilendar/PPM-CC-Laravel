@@ -103,6 +103,13 @@ class SyncController extends Component
     public $notificationChannels = ['email'];
     public $notificationRecipients = [];
 
+    // Teams webhook configuration - 2.2.1.2.3 extended
+    public $teamsEnabled = false;
+    public $teamsWebhookUrl = '';
+
+    // Email recipients for UI binding (explicit array) - 2.2.1.2.3 extended
+    public $emailRecipients = [];
+
     // Performance optimization settings - 2.2.1.2.4
     public $performanceMode = 'balanced';
     public $maxConcurrentJobs = 3;
@@ -149,6 +156,14 @@ class SyncController extends Component
             // Notification settings - 2.2.1.2.3
             'notificationChannels' => 'array',
             'notificationRecipients' => 'array',
+
+            // Teams webhook - 2.2.1.2.3 extended
+            'teamsEnabled' => 'boolean',
+            'teamsWebhookUrl' => 'nullable|url|required_if:teamsEnabled,true',
+
+            // Email recipients - 2.2.1.2.3 extended
+            'emailRecipients' => 'array',
+            'emailRecipients.*' => 'email',
 
             // Performance optimization - 2.2.1.2.4
             'performanceMode' => 'required|in:economy,balanced,performance',
@@ -209,13 +224,16 @@ class SyncController extends Component
         $stats = $this->getSyncStats();
         $recentSyncJobs = $this->getRecentSyncJobs(); // BUG #9 FIX #7 - renamed for consistency
         $erpConnections = $this->getErpConnections(); // BUG #4 FIX - ETAP_08.4: Add ERP connections
+        $queueWorkerStatus = $this->getQueueWorkerStatus(); // Queue Worker Status panel
+        // ETAP_08.5: Removed $erpSyncLogs - ERP jobs are now in sync_jobs table with target_type=baselinker
 
         return view('livewire.admin.shops.sync-controller', [
             'shops' => $shops,
             'stats' => $stats,
             'recentJobs' => $recentSyncJobs,            // Keep old name for backward compatibility
-            'recentSyncJobs' => $recentSyncJobs,        // BUG #9 FIX #7 - new name with pagination
+            'recentSyncJobs' => $recentSyncJobs,        // BUG #9 FIX #7 - now includes ERP jobs (target_type=baselinker)
             'erpConnections' => $erpConnections,        // BUG #4 FIX - ERP connections list
+            'queueWorkerStatus' => $queueWorkerStatus,  // Queue Worker Status
 
             // BUG #9 FIX #7 - Filter options (2025-11-12)
             'filterUsers' => $this->getUsersForFilter(),
@@ -1511,6 +1529,11 @@ class SyncController extends Component
             'sync.notifications.channels' => 'notificationChannels',
             'sync.notifications.recipients' => 'notificationRecipients',
 
+            // Teams & Email extended - 2.2.1.2.3
+            'sync.notifications.teams_enabled' => 'teamsEnabled',
+            'sync.notifications.teams_webhook_url' => 'teamsWebhookUrl',
+            'sync.notifications.email_recipients' => 'emailRecipients',
+
             // Performance - 2.2.1.2.4
             'sync.performance.mode' => 'performanceMode',
             'sync.performance.max_concurrent' => 'maxConcurrentJobs',
@@ -1593,6 +1616,11 @@ class SyncController extends Component
                 'sync.notifications.on_retry_exhausted' => $this->notifyOnRetryExhausted,
                 'sync.notifications.channels' => $this->notificationChannels,
                 'sync.notifications.recipients' => $this->notificationRecipients,
+
+                // Teams & Email extended - 2.2.1.2.3
+                'sync.notifications.teams_enabled' => $this->teamsEnabled,
+                'sync.notifications.teams_webhook_url' => $this->teamsWebhookUrl,
+                'sync.notifications.email_recipients' => $this->emailRecipients,
 
                 // Performance - 2.2.1.2.4
                 'sync.performance.mode' => $this->performanceMode,
@@ -1693,6 +1721,9 @@ class SyncController extends Component
             'sync.notifications.on_retry_exhausted' => 'Notify when retries exhausted',
             'sync.notifications.channels' => 'Notification channels (email, slack)',
             'sync.notifications.recipients' => 'Notification recipients',
+            'sync.notifications.teams_enabled' => 'Enable Microsoft Teams notifications',
+            'sync.notifications.teams_webhook_url' => 'Microsoft Teams webhook URL',
+            'sync.notifications.email_recipients' => 'Email notification recipients list',
             'sync.performance.mode' => 'Performance optimization mode',
             'sync.performance.max_concurrent' => 'Maximum concurrent sync jobs',
             'sync.performance.delay_ms' => 'Delay between jobs in milliseconds',
@@ -1745,6 +1776,11 @@ class SyncController extends Component
             $this->notifyOnRetryExhausted = true;
             $this->notificationChannels = ['email'];
             $this->notificationRecipients = [];
+
+            // Teams & Email extended defaults - 2.2.1.2.3
+            $this->teamsEnabled = false;
+            $this->teamsWebhookUrl = '';
+            $this->emailRecipients = [];
 
             // Performance defaults - 2.2.1.2.4
             $this->performanceMode = 'balanced';
@@ -1990,14 +2026,25 @@ class SyncController extends Component
     protected function validateNotificationConfig()
     {
         if ($this->notificationsEnabled && empty($this->notificationChannels)) {
-            return ['valid' => false, 'message' => 'Wybierz co najmniej jeden kanał powiadomień'];
+            return ['valid' => false, 'message' => 'Wybierz co najmniej jeden kanal powiadomien'];
         }
 
-        if ($this->notificationsEnabled && empty($this->notificationRecipients)) {
-            return ['valid' => false, 'message' => 'Dodaj co najmniej jednego odbiorcy powiadomień'];
+        // Validate Teams webhook
+        if ($this->teamsEnabled && empty($this->teamsWebhookUrl)) {
+            return ['valid' => false, 'message' => 'Teams wlaczony ale brak webhook URL'];
         }
 
-        return ['valid' => true, 'message' => 'Konfiguracja powiadomień jest poprawna'];
+        // Validate email recipients when email channel is enabled
+        if (in_array('email', $this->notificationChannels) && empty($this->emailRecipients)) {
+            return ['valid' => false, 'message' => 'Email wlaczony ale brak odbiorcow'];
+        }
+
+        // Legacy check for notificationRecipients (fallback)
+        if ($this->notificationsEnabled && empty($this->notificationRecipients) && empty($this->emailRecipients)) {
+            return ['valid' => false, 'message' => 'Dodaj co najmniej jednego odbiorce powiadomien'];
+        }
+
+        return ['valid' => true, 'message' => 'Konfiguracja powiadomien jest poprawna'];
     }
 
     /**
@@ -2022,6 +2069,42 @@ class SyncController extends Component
         }
 
         return ['valid' => true, 'message' => 'Konfiguracja backupów jest poprawna'];
+    }
+
+    /**
+     * Test Microsoft Teams webhook connection - 2.2.1.2.3
+     *
+     * Sends a test message to the configured Teams channel webhook.
+     */
+    public function testTeamsWebhook(): void
+    {
+        try {
+            if (empty($this->teamsWebhookUrl)) {
+                $this->dispatch('notify', ['type' => 'error', 'message' => 'Brak URL webhook Teams']);
+                return;
+            }
+
+            // Validate URL format
+            if (!filter_var($this->teamsWebhookUrl, FILTER_VALIDATE_URL)) {
+                $this->dispatch('notify', ['type' => 'error', 'message' => 'Nieprawidlowy format URL webhook']);
+                return;
+            }
+
+            $teamsChannel = app(\App\Services\Channels\TeamsChannel::class);
+            $result = $teamsChannel->sendTestMessage($this->teamsWebhookUrl);
+
+            if ($result['success']) {
+                $this->dispatch('notify', ['type' => 'success', 'message' => 'Polaczenie Teams OK! Sprawdz kanal Teams.']);
+            } else {
+                $this->dispatch('notify', ['type' => 'error', 'message' => $result['error'] ?? 'Nie udalo sie wyslac wiadomosci']);
+            }
+        } catch (\Exception $e) {
+            Log::error('testTeamsWebhook failed', [
+                'error' => $e->getMessage(),
+                'webhook_url' => substr($this->teamsWebhookUrl, 0, 50) . '...',
+            ]);
+            $this->dispatch('notify', ['type' => 'error', 'message' => 'Blad: ' . $e->getMessage()]);
+        }
     }
 
     /**
@@ -2080,10 +2163,209 @@ class SyncController extends Component
     }
 
     /**
+     * Get recent ERP sync logs from integration_logs table
+     *
+     * ETAP_08.5: Fixed filter to include api_call_* operations.
+     *
+     * Returns the latest ERP synchronization activities including:
+     * - Baselinker sync jobs
+     * - API calls to ERP systems (api_call_addInventoryProduct, etc.)
+     * - Success/failure status with full request/response data
+     *
+     * @param int $limit Maximum number of logs to return
+     * @return \Illuminate\Support\Collection
+     */
+    protected function getErpSyncLogs(int $limit = 10)
+    {
+        try {
+            return DB::table('integration_logs')
+                ->where('integration_type', 'baselinker')
+                ->where(function ($q) {
+                    // ETAP_08.5 FIX: Include both sync_product_job AND api_call_* operations
+                    $q->where('operation', 'sync_product_job')
+                      ->orWhere('operation', 'LIKE', 'api_call_%');
+                })
+                ->orderBy('logged_at', 'desc')
+                ->limit($limit)
+                ->get()
+                ->map(function ($log) {
+                    // Parse request_data and response_data JSON
+                    $requestData = json_decode($log->request_data ?? '{}', true) ?: [];
+                    $responseData = json_decode($log->response_data ?? '{}', true) ?: [];
+
+                    // Extract SKU from parameters (ETAP_08.5: Support nested structure)
+                    $productSku = $requestData['parameters']['sku']
+                        ?? $requestData['sku']
+                        ?? null;
+
+                    // Extract API method name
+                    $apiMethod = $requestData['method'] ?? null;
+
+                    // Extract Baselinker response status
+                    $blStatus = $responseData['status'] ?? null;
+                    $blError = $responseData['error_message'] ?? null;
+                    $blProductId = $responseData['product_id'] ?? null;
+
+                    return (object) [
+                        'id' => $log->id,
+                        'integration_type' => $log->integration_type,
+                        'operation' => $log->operation,
+                        'description' => $log->description ?? $responseData['description'] ?? 'Sync to ERP',
+                        'product_id' => $requestData['product_id'] ?? null,
+                        'product_sku' => $productSku,
+                        'connection_name' => $requestData['connection_name'] ?? 'Baselinker',
+                        'status' => $this->determineErpLogStatus($log),
+                        'http_status' => $log->http_status,
+                        'error_message' => $log->error_message,
+                        'logged_at' => $log->logged_at ? \Carbon\Carbon::parse($log->logged_at) : null,
+                        'duration_ms' => $log->duration_ms ?? null,
+                        // ETAP_08.5: New fields for expandable details
+                        'api_method' => $apiMethod,
+                        'bl_status' => $blStatus,
+                        'bl_error' => $blError,
+                        'bl_product_id' => $blProductId,
+                        'request_data' => $requestData,
+                        'response_data' => $responseData,
+                    ];
+                });
+        } catch (\Exception $e) {
+            Log::error('Failed to get ERP sync logs', [
+                'error' => $e->getMessage(),
+            ]);
+            return collect();
+        }
+    }
+
+    /**
+     * Determine status of ERP log entry
+     */
+    protected function determineErpLogStatus($log): string
+    {
+        if (!empty($log->error_message)) {
+            return 'failed';
+        }
+        if ($log->http_status && $log->http_status >= 400) {
+            return 'failed';
+        }
+        if ($log->log_level === 'error') {
+            return 'failed';
+        }
+        return 'completed';
+    }
+
+    /**
+     * Get Queue Worker Status for dashboard display
+     *
+     * Returns comprehensive status about the queue system:
+     * - Total pending jobs
+     * - Jobs by queue
+     * - Last processed job info
+     * - Worker status estimation
+     *
+     * @return array
+     */
+    public function getQueueWorkerStatus(): array
+    {
+        try {
+            // Get jobs by queue
+            $jobsByQueue = DB::table('jobs')
+                ->select('queue', DB::raw('COUNT(*) as count'))
+                ->groupBy('queue')
+                ->pluck('count', 'queue')
+                ->toArray();
+
+            $totalPending = array_sum($jobsByQueue);
+
+            // Get oldest job (longest waiting)
+            $oldestJob = DB::table('jobs')
+                ->orderBy('created_at', 'asc')
+                ->first();
+
+            $oldestJobAge = null;
+            $oldestJobQueue = null;
+            if ($oldestJob) {
+                $oldestJobAge = now()->timestamp - $oldestJob->created_at;
+                $oldestJobQueue = $oldestJob->queue;
+            }
+
+            // Get last processed job from sync_jobs
+            $lastProcessedJob = SyncJob::whereIn('status', [
+                    SyncJob::STATUS_COMPLETED,
+                    SyncJob::STATUS_FAILED,
+                    SyncJob::STATUS_COMPLETED_WITH_ERRORS
+                ])
+                ->orderBy('completed_at', 'desc')
+                ->first();
+
+            // Get failed jobs count
+            $failedJobsCount = DB::table('failed_jobs')->count();
+
+            // Estimate worker status
+            // If oldest job is >5 minutes old and no recent completions, worker is likely stopped
+            $workerStatus = 'unknown';
+            $workerStatusColor = 'gray';
+
+            if ($totalPending === 0 && $failedJobsCount === 0) {
+                $workerStatus = 'idle';
+                $workerStatusColor = 'green';
+            } elseif ($oldestJobAge !== null && $oldestJobAge > 300) { // 5 minutes
+                // Check if any job was processed recently
+                $recentCompletion = $lastProcessedJob &&
+                    $lastProcessedJob->completed_at &&
+                    $lastProcessedJob->completed_at->diffInMinutes(now()) < 5;
+
+                if ($recentCompletion) {
+                    $workerStatus = 'processing';
+                    $workerStatusColor = 'blue';
+                } else {
+                    $workerStatus = 'stopped';
+                    $workerStatusColor = 'red';
+                }
+            } elseif ($totalPending > 0) {
+                $workerStatus = 'processing';
+                $workerStatusColor = 'blue';
+            }
+
+            return [
+                'status' => $workerStatus,
+                'status_color' => $workerStatusColor,
+                'total_pending' => $totalPending,
+                'jobs_by_queue' => $jobsByQueue,
+                'oldest_job_age_seconds' => $oldestJobAge,
+                'oldest_job_queue' => $oldestJobQueue,
+                'failed_jobs_count' => $failedJobsCount,
+                'last_processed_at' => $lastProcessedJob?->completed_at,
+                'last_processed_job_name' => $lastProcessedJob?->job_name,
+                'last_processed_status' => $lastProcessedJob?->status,
+            ];
+        } catch (\Exception $e) {
+            Log::error('Failed to get queue worker status', [
+                'error' => $e->getMessage(),
+            ]);
+
+            return [
+                'status' => 'error',
+                'status_color' => 'red',
+                'total_pending' => 0,
+                'jobs_by_queue' => [],
+                'oldest_job_age_seconds' => null,
+                'oldest_job_queue' => null,
+                'failed_jobs_count' => 0,
+                'last_processed_at' => null,
+                'last_processed_job_name' => null,
+                'last_processed_status' => null,
+                'error' => $e->getMessage(),
+            ];
+        }
+    }
+
+    /**
      * BUG #4 FIX - ETAP_08.4: Run queue worker for ERP jobs
      *
      * Processes pending jobs in the queue without needing a background worker.
      * Useful for shared hosting without supervisor/systemd.
+     *
+     * Queue names: erp_default, prestashop, default (NOT prestashop_sync!)
      *
      * @param int $maxJobs Maximum jobs to process (default 10)
      * @return void
@@ -2091,19 +2373,32 @@ class SyncController extends Component
     public function runQueueWorker(int $maxJobs = 10): void
     {
         try {
+            // Get pending jobs count before with details
+            $pendingBefore = DB::table('jobs')->count();
+            $jobsByQueueBefore = DB::table('jobs')
+                ->select('queue', DB::raw('COUNT(*) as count'))
+                ->groupBy('queue')
+                ->pluck('count', 'queue')
+                ->toArray();
+
             Log::info('Manual queue worker triggered', [
                 'user_id' => auth()->id(),
                 'max_jobs' => $maxJobs,
+                'pending_before' => $pendingBefore,
+                'jobs_by_queue' => $jobsByQueueBefore,
             ]);
 
-            // Get pending jobs count before
-            $pendingBefore = DB::table('jobs')->count();
+            // Show "processing" notification immediately
+            $this->dispatch('info', [
+                'message' => "Uruchamiam queue worker dla {$pendingBefore} zadan..."
+            ]);
 
             // Run queue:work with limited jobs
+            // IMPORTANT: Queue names are: erp_default, prestashop, default (NOT prestashop_sync!)
             $output = new \Symfony\Component\Console\Output\BufferedOutput();
-            \Artisan::call('queue:work', [
+            $exitCode = \Artisan::call('queue:work', [
                 'connection' => 'database',
-                '--queue' => 'erp_default,prestashop_sync,default',
+                '--queue' => 'erp_default,prestashop,default',
                 '--max-jobs' => $maxJobs,
                 '--timeout' => 120,
                 '--stop-when-empty' => true,
@@ -2112,19 +2407,32 @@ class SyncController extends Component
             // Get pending jobs count after
             $pendingAfter = DB::table('jobs')->count();
             $processedCount = $pendingBefore - $pendingAfter;
+            $outputText = $output->fetch();
 
             Log::info('Manual queue worker completed', [
                 'user_id' => auth()->id(),
                 'pending_before' => $pendingBefore,
                 'pending_after' => $pendingAfter,
                 'processed' => $processedCount,
-                'output' => $output->fetch(),
+                'exit_code' => $exitCode,
+                'output' => $outputText,
             ]);
 
-            $this->dispatch('notify', [
-                'type' => 'success',
-                'message' => "Queue worker przetworzyl {$processedCount} z {$pendingBefore} zadan. Pozostalo: {$pendingAfter}"
-            ]);
+            // Determine notification type based on results
+            if ($processedCount > 0) {
+                $this->dispatch('success', [
+                    'message' => "Queue worker przetworzyl {$processedCount} zadan. Pozostalo w kolejce: {$pendingAfter}"
+                ]);
+            } elseif ($pendingBefore === 0) {
+                $this->dispatch('info', [
+                    'message' => 'Brak zadan do przetworzenia - kolejka jest pusta.'
+                ]);
+            } else {
+                // Jobs exist but none processed - might be an issue
+                $this->dispatch('warning', [
+                    'message' => "Queue worker nie przetworzyl zadnych zadan. Oczekujacych: {$pendingAfter}. Sprawdz logi."
+                ]);
+            }
 
             // Refresh page data
             $this->loadActiveSyncJobs();
@@ -2132,12 +2440,12 @@ class SyncController extends Component
         } catch (\Exception $e) {
             Log::error('Manual queue worker failed', [
                 'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
                 'user_id' => auth()->id(),
             ]);
 
-            $this->dispatch('notify', [
-                'type' => 'error',
-                'message' => 'Blad podczas uruchamiania queue workera: ' . $e->getMessage()
+            $this->dispatch('error', [
+                'message' => 'Blad queue workera: ' . Str::limit($e->getMessage(), 100)
             ]);
         }
     }

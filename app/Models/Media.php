@@ -132,6 +132,7 @@ class Media extends Model
         'sort_order',
         'is_primary',
         'prestashop_mapping',
+        'erp_mapping',
         'sync_status',
         'orphan_history',
         'is_active',
@@ -145,6 +146,7 @@ class Media extends Model
     protected $hidden = [
         'deleted_at',
         'prestashop_mapping', // Może zawierać wrażliwe dane mapowania
+        'erp_mapping',        // Dane mapowania ERP (Baselinker, Subiekt GT, etc.)
     ];
 
     /**
@@ -163,6 +165,7 @@ class Media extends Model
             'is_primary' => 'boolean',
             'is_active' => 'boolean',
             'prestashop_mapping' => 'array',
+            'erp_mapping' => 'array',
             'orphan_history' => 'array',
             'created_at' => 'datetime',
             'updated_at' => 'datetime',
@@ -682,10 +685,140 @@ class Media extends Model
         $mappings["store_{$storeId}"] = array_merge($mappings["store_{$storeId}"] ?? [], $data, [
             'updated_at' => now()->toISOString(),
         ]);
-        
+
         $this->prestashop_mapping = $mappings;
-        
+
         return $this->save();
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | ERP MAPPING METHODS - ETAP_08.6 Baselinker/Subiekt GT Integration
+    |--------------------------------------------------------------------------
+    */
+
+    /**
+     * Get ERP mapping for specific connection
+     *
+     * @param int $connectionId ERP Connection ID
+     * @return array|null
+     */
+    public function getErpMapping(int $connectionId): ?array
+    {
+        $mappings = $this->erp_mapping ?? [];
+
+        return $mappings["connection_{$connectionId}"] ?? null;
+    }
+
+    /**
+     * Set ERP mapping for specific connection
+     *
+     * Structure:
+     * {
+     *   "connection_1": {
+     *     "product_id": "358946840",
+     *     "image_position": 0,
+     *     "synced_at": "2026-01-19T14:30:00Z"
+     *   }
+     * }
+     *
+     * @param int $connectionId ERP Connection ID
+     * @param array $data Mapping data
+     * @return bool
+     */
+    public function setErpMapping(int $connectionId, array $data): bool
+    {
+        $mappings = $this->erp_mapping ?? [];
+        $mappings["connection_{$connectionId}"] = array_merge(
+            $mappings["connection_{$connectionId}"] ?? [],
+            $data,
+            ['updated_at' => now()->toISOString()]
+        );
+
+        $this->erp_mapping = $mappings;
+
+        return $this->save();
+    }
+
+    /**
+     * Clear ERP mapping for specific connection
+     *
+     * @param int $connectionId ERP Connection ID
+     * @return bool
+     */
+    public function clearErpMapping(int $connectionId): bool
+    {
+        $mappings = $this->erp_mapping ?? [];
+
+        unset($mappings["connection_{$connectionId}"]);
+
+        $this->erp_mapping = !empty($mappings) ? $mappings : null;
+
+        return $this->save();
+    }
+
+    /**
+     * Mark media as synced to ERP system
+     *
+     * @param int $connectionId ERP Connection ID
+     * @param array $data Additional sync data (product_id, image_position, etc.)
+     * @return bool
+     */
+    public function markAsErpSynced(int $connectionId, array $data = []): bool
+    {
+        return $this->setErpMapping($connectionId, array_merge($data, [
+            'synced_at' => now()->toISOString(),
+            'status' => 'synced',
+        ]));
+    }
+
+    /**
+     * Mark ERP sync error for specific connection
+     *
+     * @param int $connectionId ERP Connection ID
+     * @param string $error Error message
+     * @return bool
+     */
+    public function markErpSyncError(int $connectionId, string $error): bool
+    {
+        return $this->setErpMapping($connectionId, [
+            'error_at' => now()->toISOString(),
+            'error_message' => $error,
+            'status' => 'error',
+        ]);
+    }
+
+    /**
+     * Check if media is synced to specific ERP connection
+     *
+     * @param int $connectionId ERP Connection ID
+     * @return bool
+     */
+    public function isSyncedToErp(int $connectionId): bool
+    {
+        $mapping = $this->getErpMapping($connectionId);
+
+        return $mapping && ($mapping['status'] ?? null) === 'synced';
+    }
+
+    /**
+     * Get all ERP connections this media is synced to
+     *
+     * @return array Array of connection IDs
+     */
+    public function getSyncedErpConnections(): array
+    {
+        $mappings = $this->erp_mapping ?? [];
+        $syncedConnections = [];
+
+        foreach ($mappings as $key => $mapping) {
+            if (str_starts_with($key, 'connection_') && ($mapping['status'] ?? null) === 'synced') {
+                $connectionId = (int) str_replace('connection_', '', $key);
+                $syncedConnections[] = $connectionId;
+            }
+        }
+
+        return $syncedConnections;
     }
 
     /*

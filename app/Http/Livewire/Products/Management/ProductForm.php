@@ -4738,32 +4738,40 @@ class ProductForm extends Component
     /**
      * Get field status for ERP context (ETAP_08.3)
      *
-     * Compares current PPM form value with ERP external_data
+     * ETAP_08.5 FIX: Compares current ERP TAB form value with PPM default value!
+     * (NOT with external_data from Baselinker API cache)
+     *
+     * Logic (same as Shop TAB pattern):
+     * - 'inherited': ERP form value is empty/null (uses PPM default)
+     * - 'same': ERP form value equals PPM default
+     * - 'different': ERP form value differs from PPM default
      *
      * @param string $field
      * @return string 'default'|'inherited'|'same'|'different'
      */
     protected function getErpFieldStatusInternal(string $field): string
     {
-        // Get ERP value from external_data cache
-        $erpValue = $this->getErpExternalFieldValue($field);
-        $ppmValue = $this->defaultData[$field] ?? $this->getCurrentFieldValue($field);
+        // Current value from form (may be edited by user in ERP TAB)
+        $currentValue = $this->getCurrentFieldValue($field);
+
+        // PPM default value (stored when entering ERP TAB)
+        $defaultValue = $this->erpDefaultData[$field] ?? $this->defaultData[$field] ?? null;
 
         // Normalize for comparison
-        $erpValueNorm = $this->normalizeValueForComparison($erpValue);
-        $ppmValueNorm = $this->normalizeValueForComparison($ppmValue);
+        $currentNorm = $this->normalizeValueForComparison($currentValue);
+        $defaultNorm = $this->normalizeValueForComparison($defaultValue);
 
-        // If ERP value is empty, PPM is source of truth -> inherited
-        if ($erpValue === null || $erpValue === '') {
+        // If current ERP form value is empty/null -> inherited from PPM default
+        if ($currentValue === null || $currentValue === '' || (is_array($currentValue) && empty($currentValue))) {
             return 'inherited';
         }
 
-        // If values match, they're synchronized
-        if ($erpValueNorm === $ppmValueNorm) {
+        // If values match -> same as PPM default
+        if ($currentNorm === $defaultNorm) {
             return 'same';
         }
 
-        // Values are different
+        // Values differ -> user has custom value for this ERP
         return 'different';
     }
 

@@ -250,6 +250,9 @@ class BaselinkerService implements ERPSyncServiceInterface
 
     /**
      * Sync single product to Baselinker.
+     *
+     * ETAP_08.5: Enhanced logging for CREATE vs UPDATE decision.
+     * ETAP_08.6: Added variant sync for is_variant_master products.
      */
     protected function syncSingleProduct(ERPConnection $connection, Product $product, string $inventoryId): array
     {
@@ -260,15 +263,82 @@ class BaselinkerService implements ERPSyncServiceInterface
                 ->where('integration_identifier', $connection->instance_name)
                 ->first();
 
+            $result = null;
+            $baselinkerProductId = null;
+
             if ($mapping && $mapping->external_id) {
-                // Update existing product
-                return $this->updateBaselinkerProduct($connection, $product, $inventoryId, $mapping->external_id);
+                // ETAP_08.5: Log UPDATE decision with mapping details
+                Log::info('Baselinker syncSingleProduct: UPDATE existing product', [
+                    'product_id' => $product->id,
+                    'product_sku' => $product->sku,
+                    'product_name' => $product->name,
+                    'external_id' => $mapping->external_id,
+                    'mapping_id' => $mapping->id,
+                    'inventory_id' => $inventoryId,
+                    'connection_name' => $connection->instance_name,
+                    'last_sync_at' => $mapping->last_sync_at?->toDateTimeString(),
+                ]);
+
+                $result = $this->updateBaselinkerProduct($connection, $product, $inventoryId, $mapping->external_id);
+                $baselinkerProductId = $mapping->external_id;
             } else {
-                // Create new product
-                return $this->createBaselinkerProduct($connection, $product, $inventoryId);
+                // ETAP_08.5: Log CREATE decision
+                Log::info('Baselinker syncSingleProduct: CREATE new product (no mapping found)', [
+                    'product_id' => $product->id,
+                    'product_sku' => $product->sku,
+                    'product_name' => $product->name,
+                    'inventory_id' => $inventoryId,
+                    'connection_name' => $connection->instance_name,
+                    'mapping_exists' => $mapping !== null,
+                    'mapping_external_id' => $mapping?->external_id,
+                ]);
+
+                $result = $this->createBaselinkerProduct($connection, $product, $inventoryId);
+                $baselinkerProductId = $result['baselinker_id'] ?? null;
             }
 
+            // ETAP_08.6: Sync variants if product is variant master
+            if ($result['success'] && $baselinkerProductId && $product->is_variant_master) {
+                // Ensure variants are loaded
+                if (!$product->relationLoaded('variants')) {
+                    $product->load('variants');
+                }
+
+                if ($product->variants->isNotEmpty()) {
+                    Log::info('syncSingleProduct: Syncing variants', [
+                        'product_id' => $product->id,
+                        'product_sku' => $product->sku,
+                        'variants_count' => $product->variants->count(),
+                        'parent_baselinker_id' => $baselinkerProductId,
+                    ]);
+
+                    $variantResults = $this->syncProductVariants(
+                        $connection,
+                        $product,
+                        $inventoryId,
+                        $baselinkerProductId
+                    );
+
+                    // Add variant results to response
+                    $result['variants'] = $variantResults;
+                }
+            }
+
+            // ETAP_08.6: Mark product media as synced to ERP (for Gallery checkboxes)
+            if ($result['success'] && $baselinkerProductId) {
+                $mediaSynced = $this->markProductMediaAsSyncedToErp($connection, $product, $baselinkerProductId);
+                $result['media_synced'] = $mediaSynced;
+            }
+
+            return $result;
+
         } catch (\Exception $e) {
+            Log::error('Baselinker syncSingleProduct: Exception', [
+                'product_id' => $product->id,
+                'product_sku' => $product->sku,
+                'error' => $e->getMessage(),
+            ]);
+
             return [
                 'success' => false,
                 'skipped' => false,
@@ -279,31 +349,62 @@ class BaselinkerService implements ERPSyncServiceInterface
 
     /**
      * Create new product in Baselinker.
+     *
+     * ETAP_08.5 FIX: Uses buildBaselinkerProductData() to get ERP-specific data
+     * from ProductErpData table (where user edits are stored in ERP TAB).
      */
     protected function createBaselinkerProduct(ERPConnection $connection, Product $product, string $inventoryId): array
     {
+        // ETAP_08.5 FIX: Get ERP-specific data (with fallback to Product defaults)
         $productData = $this->buildBaselinkerProductData($connection, $product);
-        
+
+        Log::info('Baselinker createBaselinkerProduct: Using ERP data', [
+            'product_id' => $product->id,
+            'product_sku' => $product->sku,
+            'product_name_from_model' => $product->name,
+            'name_being_sent' => $productData['name'],
+            'connection_id' => $connection->id,
+        ]);
+
         try {
+            // ETAP_08.5 FIX: text_fields as PHP array - makeRequest() calls json_encode($parameters)
+            // so passing array here results in proper nested JSON: {"text_fields":{"name":"..."}}
+            // NOT double-encoded: {"text_fields":"{\"name\":\"...\"}"}
+            $textFields = [
+                'name' => $productData['name'],
+                'description' => $productData['description'],
+                'description_extra1' => $productData['description_extra1'],
+            ];
+
+            // ETAP_08.5 FIX: For CREATE, product_id MUST be empty!
+            // Baselinker API: product_id = empty → CREATE new product (BL assigns ID)
+            //                 product_id = existing ID → UPDATE existing product
+            // Passing SKU as product_id caused ERROR_PRODUCT_ID because BL
+            // tried to find product with that ID (which doesn't exist yet!)
+            $requestParams = [
+                'inventory_id' => $inventoryId,
+                // NO product_id for CREATE - let Baselinker assign it!
+                'parent_id' => 0,
+                'is_bundle' => false,
+                'text_fields' => $textFields,  // PHP array - proper format!
+                'sku' => $productData['sku'],
+                'ean' => $productData['ean'],
+                'tax_rate' => $productData['tax_rate'],
+                'weight' => $productData['weight'],
+                'height' => $productData['height'],
+                'width' => $productData['width'],
+                'length' => $productData['length'],
+            ];
+
+            // ETAP_08.5: Add images if available (stdClass requires get_object_vars check)
+            if (isset($productData['images']) && count(get_object_vars($productData['images'])) > 0) {
+                $requestParams['images'] = $productData['images'];
+            }
+
             $response = $this->makeRequest(
                 $connection->connection_config,
                 'addInventoryProduct',
-                [
-                    'inventory_id' => $inventoryId,
-                    'product_id' => $product->sku, // Use SKU as product_id
-                    'parent_id' => 0,
-                    'is_bundle' => false,
-                    'name' => $product->name,
-                    'description' => $product->description ?: '',
-                    'description_extra1' => $product->short_description ?: '',
-                    'sku' => $product->sku,
-                    'ean' => $product->ean ?: '',
-                    'tax_rate' => $product->tax_rate ?: 23,
-                    'weight' => $product->weight ?: 0,
-                    'height' => $product->height ?: 0,
-                    'width' => $product->width ?: 0,
-                    'length' => $product->length ?: 0,
-                ]
+                $requestParams
             );
 
             if ($response['status'] === 'SUCCESS') {
@@ -349,29 +450,57 @@ class BaselinkerService implements ERPSyncServiceInterface
 
     /**
      * Update existing product in Baselinker.
+     *
+     * ETAP_08.5 FIX: Uses buildBaselinkerProductData() to get ERP-specific data
+     * from ProductErpData table (where user edits are stored in ERP TAB).
      */
     protected function updateBaselinkerProduct(ERPConnection $connection, Product $product, string $inventoryId, string $baselinkerProductId): array
     {
+        // ETAP_08.5 FIX: Get ERP-specific data (with fallback to Product defaults)
+        $productData = $this->buildBaselinkerProductData($connection, $product);
+
+        Log::info('Baselinker updateBaselinkerProduct: Using ERP data', [
+            'product_id' => $product->id,
+            'product_sku' => $product->sku,
+            'product_name_from_model' => $product->name,
+            'name_being_sent' => $productData['name'],
+            'baselinker_product_id' => $baselinkerProductId,
+            'connection_id' => $connection->id,
+        ]);
+
         try {
-            // ETAP_08: Use addInventoryProduct for updates (updateInventoryProductsData doesn't exist!)
-            // Baselinker API uses addInventoryProduct with product_id for both CREATE and UPDATE
+            // ETAP_08.5 FIX: text_fields as PHP array - makeRequest() calls json_encode($parameters)
+            // so passing array here results in proper nested JSON: {"text_fields":{"name":"..."}}
+            // NOT double-encoded: {"text_fields":"{\"name\":\"...\"}"}
+            $textFields = [
+                'name' => $productData['name'],
+                'description' => $productData['description'],
+                'description_extra1' => $productData['description_extra1'],
+            ];
+
+            // ETAP_08.5: Build request params - same pattern as createBaselinkerProduct
+            $requestParams = [
+                'inventory_id' => $inventoryId,
+                'product_id' => $baselinkerProductId,  // For UPDATE - use existing BL product ID
+                'sku' => $productData['sku'],
+                'ean' => $productData['ean'],
+                'text_fields' => $textFields,  // PHP array - proper format!
+                'tax_rate' => $productData['tax_rate'],
+                'weight' => $productData['weight'],
+                'height' => $productData['height'],
+                'width' => $productData['width'],
+                'length' => $productData['length'],
+            ];
+
+            // ETAP_08.5: Add images if available (stdClass requires get_object_vars check)
+            if (isset($productData['images']) && count(get_object_vars($productData['images'])) > 0) {
+                $requestParams['images'] = $productData['images'];
+            }
+
             $response = $this->makeRequest(
                 $connection->connection_config,
                 'addInventoryProduct',
-                [
-                    'inventory_id' => $inventoryId,
-                    'product_id' => $baselinkerProductId,
-                    'sku' => $product->sku,
-                    'ean' => $product->ean ?: '',
-                    'name' => $product->name,
-                    'description' => $product->description ?: '',
-                    'description_extra1' => $product->short_description ?: '',
-                    'tax_rate' => $product->tax_rate ?: 23,
-                    'weight' => $product->weight ?: 0,
-                    'height' => $product->height ?: 0,
-                    'width' => $product->width ?: 0,
-                    'length' => $product->length ?: 0,
-                ]
+                $requestParams
             );
 
             if ($response['status'] === 'SUCCESS') {
@@ -401,6 +530,41 @@ class BaselinkerService implements ERPSyncServiceInterface
                     'message' => 'Product updated successfully'
                 ];
             } else {
+                // ETAP_08.5: Handle ERROR_PRODUCT_ID - product was deleted in Baselinker
+                // Auto-recreate: delete stale mapping and create new product
+                $errorCode = $response['error_code'] ?? '';
+
+                if ($errorCode === 'ERROR_PRODUCT_ID') {
+                    Log::warning('Baselinker updateBaselinkerProduct: Product not found in BL - auto-recreating', [
+                        'product_id' => $product->id,
+                        'product_sku' => $product->sku,
+                        'stale_external_id' => $baselinkerProductId,
+                        'error_message' => $response['error_message'] ?? 'Unknown',
+                    ]);
+
+                    // Delete stale mapping
+                    $staleMapping = $product->integrationMappings()
+                        ->where('integration_type', 'baselinker')
+                        ->where('integration_identifier', $connection->instance_name)
+                        ->first();
+
+                    if ($staleMapping) {
+                        $staleMapping->delete();
+                        Log::info('Baselinker: Deleted stale mapping', [
+                            'mapping_id' => $staleMapping->id,
+                            'external_id' => $staleMapping->external_id,
+                        ]);
+                    }
+
+                    // Recreate product in Baselinker
+                    Log::info('Baselinker: Recreating product after stale mapping cleanup', [
+                        'product_id' => $product->id,
+                        'product_sku' => $product->sku,
+                    ]);
+
+                    return $this->createBaselinkerProduct($connection, $product, $inventoryId);
+                }
+
                 return [
                     'success' => false,
                     'skipped' => false,
@@ -512,6 +676,443 @@ class BaselinkerService implements ERPSyncServiceInterface
         }
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | ETAP_08.6: VARIANT SYNC METHODS (PUSH)
+    |--------------------------------------------------------------------------
+    */
+
+    /**
+     * Sync product variants to Baselinker.
+     *
+     * ETAP_08.6: Creates/updates variants as child products linked to main product.
+     * Baselinker API uses parent_id to link variants to their parent product.
+     *
+     * @param ERPConnection $connection
+     * @param Product $product Parent product (must be variant master)
+     * @param string $inventoryId
+     * @param string $parentBaselinkerProductId Main product's Baselinker ID
+     * @return array Results summary
+     */
+    protected function syncProductVariants(
+        ERPConnection $connection,
+        Product $product,
+        string $inventoryId,
+        string $parentBaselinkerProductId
+    ): array {
+        $results = [
+            'total' => 0,
+            'created' => 0,
+            'updated' => 0,
+            'failed' => 0,
+            'errors' => [],
+        ];
+
+        if (!$product->is_variant_master || $product->variants->isEmpty()) {
+            return $results;
+        }
+
+        $results['total'] = $product->variants->count();
+
+        foreach ($product->variants as $variant) {
+            try {
+                // Check if variant has existing Baselinker mapping
+                $variantMapping = $variant->getIntegrationMapping('baselinker', $connection->instance_name);
+
+                if ($variantMapping && $variantMapping->external_id) {
+                    // UPDATE existing variant
+                    $updateResult = $this->updateVariantInBaselinker(
+                        $connection,
+                        $product,
+                        $variant,
+                        $inventoryId,
+                        $variantMapping->external_id
+                    );
+
+                    if ($updateResult['success']) {
+                        $results['updated']++;
+                    } else {
+                        $results['failed']++;
+                        $results['errors'][] = "Variant {$variant->sku}: " . $updateResult['message'];
+                    }
+                } else {
+                    // CREATE new variant
+                    $createResult = $this->createVariantInBaselinker(
+                        $connection,
+                        $product,
+                        $variant,
+                        $inventoryId,
+                        $parentBaselinkerProductId
+                    );
+
+                    if ($createResult['success']) {
+                        $results['created']++;
+                    } else {
+                        $results['failed']++;
+                        $results['errors'][] = "Variant {$variant->sku}: " . $createResult['message'];
+                    }
+                }
+
+            } catch (\Exception $e) {
+                $results['failed']++;
+                $results['errors'][] = "Variant {$variant->sku}: Exception - " . $e->getMessage();
+
+                Log::error('syncProductVariants: Exception for variant', [
+                    'variant_id' => $variant->id,
+                    'variant_sku' => $variant->sku,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        Log::info('syncProductVariants: Completed', [
+            'product_id' => $product->id,
+            'product_sku' => $product->sku,
+            'results' => $results,
+        ]);
+
+        return $results;
+    }
+
+    /**
+     * Create variant in Baselinker as child of parent product.
+     *
+     * ETAP_08.6: Uses parent_id to link variant to main product.
+     * Variant inherits inventory from parent but has own SKU/EAN/stock.
+     *
+     * @param ERPConnection $connection
+     * @param Product $mainProduct Parent product
+     * @param ProductVariant $variant Variant to create
+     * @param string $inventoryId
+     * @param string $parentBaselinkerProductId Parent's Baselinker product ID
+     * @return array
+     */
+    protected function createVariantInBaselinker(
+        ERPConnection $connection,
+        Product $mainProduct,
+        ProductVariant $variant,
+        string $inventoryId,
+        string $parentBaselinkerProductId
+    ): array {
+        Log::info('createVariantInBaselinker: Creating variant', [
+            'variant_id' => $variant->id,
+            'variant_sku' => $variant->sku,
+            'parent_product_id' => $mainProduct->id,
+            'parent_baselinker_id' => $parentBaselinkerProductId,
+        ]);
+
+        try {
+            $variantData = $this->buildVariantProductData($mainProduct, $variant);
+
+            $textFields = [
+                'name' => $variantData['name'],
+                'description' => $variantData['description'],
+            ];
+
+            $requestParams = [
+                'inventory_id' => $inventoryId,
+                // NO product_id for CREATE - Baselinker assigns ID
+                'parent_id' => $parentBaselinkerProductId, // KEY: Link to parent!
+                'is_bundle' => false,
+                'text_fields' => $textFields, // PHP array
+                'sku' => $variantData['sku'],
+                'ean' => $variantData['ean'],
+                'tax_rate' => $variantData['tax_rate'],
+                'weight' => $variantData['weight'],
+            ];
+
+            $response = $this->makeRequest(
+                $connection->connection_config,
+                'addInventoryProduct',
+                $requestParams
+            );
+
+            if ($response['status'] === 'SUCCESS') {
+                $baselinkerVariantId = $response['product_id'];
+
+                // Save IntegrationMapping for variant
+                $variant->findOrCreateIntegrationMapping(
+                    'baselinker',
+                    $connection->instance_name,
+                    [
+                        'external_id' => $baselinkerVariantId,
+                        'external_reference' => $variant->sku,
+                        'external_data' => $response,
+                        'sync_status' => 'synced',
+                        'last_sync_at' => Carbon::now(),
+                    ]
+                );
+
+                // Sync variant stock
+                $this->syncVariantStock($connection, $variant, $inventoryId, $baselinkerVariantId);
+
+                // Sync variant prices
+                $this->syncVariantPrices($connection, $variant, $inventoryId, $baselinkerVariantId);
+
+                Log::info('createVariantInBaselinker: Created successfully', [
+                    'variant_id' => $variant->id,
+                    'variant_sku' => $variant->sku,
+                    'baselinker_variant_id' => $baselinkerVariantId,
+                ]);
+
+                return [
+                    'success' => true,
+                    'message' => 'Variant created successfully',
+                    'baselinker_id' => $baselinkerVariantId,
+                ];
+            } else {
+                return [
+                    'success' => false,
+                    'message' => 'API error: ' . ($response['error_message'] ?? 'Unknown'),
+                ];
+            }
+
+        } catch (\Exception $e) {
+            return [
+                'success' => false,
+                'message' => 'Exception: ' . $e->getMessage(),
+            ];
+        }
+    }
+
+    /**
+     * Update existing variant in Baselinker.
+     *
+     * @param ERPConnection $connection
+     * @param Product $mainProduct Parent product
+     * @param ProductVariant $variant Variant to update
+     * @param string $inventoryId
+     * @param string $baselinkerVariantId Existing Baselinker variant ID
+     * @return array
+     */
+    protected function updateVariantInBaselinker(
+        ERPConnection $connection,
+        Product $mainProduct,
+        ProductVariant $variant,
+        string $inventoryId,
+        string $baselinkerVariantId
+    ): array {
+        Log::info('updateVariantInBaselinker: Updating variant', [
+            'variant_id' => $variant->id,
+            'variant_sku' => $variant->sku,
+            'baselinker_variant_id' => $baselinkerVariantId,
+        ]);
+
+        try {
+            $variantData = $this->buildVariantProductData($mainProduct, $variant);
+
+            $textFields = [
+                'name' => $variantData['name'],
+                'description' => $variantData['description'],
+            ];
+
+            $requestParams = [
+                'inventory_id' => $inventoryId,
+                'product_id' => $baselinkerVariantId, // UPDATE existing
+                'text_fields' => $textFields, // PHP array
+                'sku' => $variantData['sku'],
+                'ean' => $variantData['ean'],
+                'tax_rate' => $variantData['tax_rate'],
+                'weight' => $variantData['weight'],
+            ];
+
+            $response = $this->makeRequest(
+                $connection->connection_config,
+                'addInventoryProduct',
+                $requestParams
+            );
+
+            if ($response['status'] === 'SUCCESS') {
+                // Update mapping
+                $mapping = $variant->getIntegrationMapping('baselinker', $connection->instance_name);
+                if ($mapping) {
+                    $mapping->update([
+                        'external_data' => $response,
+                        'sync_status' => 'synced',
+                        'last_sync_at' => Carbon::now(),
+                        'error_message' => null,
+                        'error_count' => 0,
+                    ]);
+                }
+
+                // Sync variant stock and prices
+                $this->syncVariantStock($connection, $variant, $inventoryId, $baselinkerVariantId);
+                $this->syncVariantPrices($connection, $variant, $inventoryId, $baselinkerVariantId);
+
+                return [
+                    'success' => true,
+                    'message' => 'Variant updated successfully',
+                ];
+            } else {
+                // Handle deleted variant in Baselinker (ERROR_PRODUCT_ID)
+                if (($response['error_code'] ?? '') === 'ERROR_PRODUCT_ID') {
+                    Log::warning('updateVariantInBaselinker: Variant not found, recreating', [
+                        'variant_sku' => $variant->sku,
+                        'stale_id' => $baselinkerVariantId,
+                    ]);
+
+                    // Delete stale mapping
+                    $staleMapping = $variant->getIntegrationMapping('baselinker', $connection->instance_name);
+                    if ($staleMapping) {
+                        $staleMapping->delete();
+                    }
+
+                    // Get parent Baselinker ID
+                    $parentMapping = $mainProduct->integrationMappings()
+                        ->where('integration_type', 'baselinker')
+                        ->where('integration_identifier', $connection->instance_name)
+                        ->first();
+
+                    if ($parentMapping && $parentMapping->external_id) {
+                        return $this->createVariantInBaselinker(
+                            $connection,
+                            $mainProduct,
+                            $variant,
+                            $inventoryId,
+                            $parentMapping->external_id
+                        );
+                    }
+                }
+
+                return [
+                    'success' => false,
+                    'message' => 'API error: ' . ($response['error_message'] ?? 'Unknown'),
+                ];
+            }
+
+        } catch (\Exception $e) {
+            return [
+                'success' => false,
+                'message' => 'Exception: ' . $e->getMessage(),
+            ];
+        }
+    }
+
+    /**
+     * Build variant product data for Baselinker API.
+     *
+     * @param Product $mainProduct Parent product
+     * @param ProductVariant $variant
+     * @return array
+     */
+    protected function buildVariantProductData(Product $mainProduct, ProductVariant $variant): array
+    {
+        // Get variant attributes for name suffix
+        $attributeSuffix = '';
+        if ($variant->attributes && $variant->attributes->isNotEmpty()) {
+            $attrs = $variant->attributes->pluck('value')->toArray();
+            $attributeSuffix = ' - ' . implode(', ', $attrs);
+        }
+
+        return [
+            'name' => $variant->name ?: ($mainProduct->name . $attributeSuffix),
+            'description' => $mainProduct->description ?: '',
+            'sku' => $variant->sku,
+            'ean' => '', // Variants may have own EAN in future
+            'tax_rate' => $mainProduct->tax_rate ?: 23,
+            'weight' => $mainProduct->weight ?: 0,
+        ];
+    }
+
+    /**
+     * Sync variant stock to Baselinker.
+     *
+     * @param ERPConnection $connection
+     * @param ProductVariant $variant
+     * @param string $inventoryId
+     * @param string $baselinkerVariantId
+     */
+    protected function syncVariantStock(
+        ERPConnection $connection,
+        ProductVariant $variant,
+        string $inventoryId,
+        string $baselinkerVariantId
+    ): void {
+        try {
+            $warehouseMapping = $connection->connection_config['warehouse_mappings'] ?? [];
+            $stockData = [];
+
+            foreach ($variant->stock as $stock) {
+                $baselinkerWarehouseId = $warehouseMapping[$stock->warehouse_id] ?? null;
+
+                if ($baselinkerWarehouseId) {
+                    $stockData[] = [
+                        'product_id' => $baselinkerVariantId,
+                        'variant_id' => 0, // Variant IS the product in BL
+                        'warehouse_id' => $baselinkerWarehouseId,
+                        'stock' => $stock->quantity,
+                    ];
+                }
+            }
+
+            if (!empty($stockData)) {
+                $this->makeRequest(
+                    $connection->connection_config,
+                    'updateInventoryProductsStock',
+                    [
+                        'inventory_id' => $inventoryId,
+                        'products' => $stockData,
+                    ]
+                );
+            }
+
+        } catch (\Exception $e) {
+            Log::warning('syncVariantStock: Failed', [
+                'variant_sku' => $variant->sku,
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    /**
+     * Sync variant prices to Baselinker.
+     *
+     * @param ERPConnection $connection
+     * @param ProductVariant $variant
+     * @param string $inventoryId
+     * @param string $baselinkerVariantId
+     */
+    protected function syncVariantPrices(
+        ERPConnection $connection,
+        ProductVariant $variant,
+        string $inventoryId,
+        string $baselinkerVariantId
+    ): void {
+        try {
+            $priceMapping = $this->getPriceGroupMapping();
+            $priceData = [];
+
+            foreach ($variant->prices as $price) {
+                $baselinkerPriceType = $priceMapping[$price->price_group_id] ?? null;
+
+                if ($baselinkerPriceType) {
+                    $priceData[] = [
+                        'product_id' => $baselinkerVariantId,
+                        'price_type' => $baselinkerPriceType,
+                        'price' => $price->price_gross ?? $price->price ?? 0,
+                    ];
+                }
+            }
+
+            if (!empty($priceData)) {
+                $this->makeRequest(
+                    $connection->connection_config,
+                    'updateInventoryProductsPrices',
+                    [
+                        'inventory_id' => $inventoryId,
+                        'products' => $priceData,
+                    ]
+                );
+            }
+
+        } catch (\Exception $e) {
+            Log::warning('syncVariantPrices: Failed', [
+                'variant_sku' => $variant->sku,
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
     /**
      * Get orders from Baselinker.
      */
@@ -569,9 +1170,22 @@ class BaselinkerService implements ERPSyncServiceInterface
 
     /**
      * Make HTTP request to Baselinker API.
+     *
+     * ETAP_08.5: Full request/response logging for debugging.
      */
     protected function makeRequest(array $config, string $method, array $parameters): array
     {
+        $startTime = microtime(true);
+
+        // DEBUG: Check images format before json_encode
+        if (isset($parameters['images'])) {
+            Log::debug('makeRequest: images debug', [
+                'images_type' => gettype($parameters['images']),
+                'images_class' => is_object($parameters['images']) ? get_class($parameters['images']) : 'N/A',
+                'images_json_sample' => substr(json_encode($parameters['images']), 0, 200),
+            ]);
+        }
+
         try {
             $response = Http::timeout($this->timeout)
                 ->asForm()
@@ -581,60 +1195,179 @@ class BaselinkerService implements ERPSyncServiceInterface
                     'parameters' => json_encode($parameters)
                 ]);
 
-            if ($response->successful()) {
-                $data = $response->json();
-                
-                IntegrationLog::debug(
-                    'api_call',
-                    "Baselinker API call: {$method}",
-                    [
-                        'method' => $method,
-                        'parameters' => $parameters,
-                        'response_status' => $data['status'] ?? 'UNKNOWN',
-                        'response_time' => $response->transferStats?->getTransferTime(),
-                    ],
-                    IntegrationLog::INTEGRATION_BASELINKER
-                );
+            $duration = round((microtime(true) - $startTime) * 1000, 2);
+            $httpStatus = $response->status();
+            $data = $response->json() ?? [];
 
+            // ETAP_08.5: Full logging with request_data and response_data
+            $isSuccess = $response->successful() && ($data['status'] ?? '') === 'SUCCESS';
+            $logLevel = $isSuccess ? 'info' : 'warning';
+
+            // Create detailed log entry
+            // NOTE: IntegrationLog model has 'array' cast for request_data/response_data
+            // so we pass arrays directly - Laravel handles json_encode automatically
+            IntegrationLog::create([
+                'integration_type' => IntegrationLog::INTEGRATION_BASELINKER,
+                'log_type' => IntegrationLog::TYPE_API_CALL,
+                'operation' => 'api_call_' . $method,  // e.g. api_call_addInventoryProduct
+                'log_level' => $logLevel,
+                'description' => "Baselinker API: {$method}",
+                'request_data' => [
+                    'method' => $method,
+                    'parameters' => $this->sanitizeParameters($parameters),
+                    'endpoint' => $this->baseUrl,
+                ],
+                'response_data' => [
+                    'status' => $data['status'] ?? 'UNKNOWN',
+                    'product_id' => $data['product_id'] ?? null,
+                    'error_code' => $data['error_code'] ?? null,
+                    'error_message' => $data['error_message'] ?? null,
+                    'warnings' => $data['warnings'] ?? null,
+                    'products_count' => isset($data['products']) ? count($data['products']) : null,
+                    'inventories_count' => isset($data['inventories']) ? count($data['inventories']) : null,
+                ],
+                'http_status' => $httpStatus,
+                'duration_ms' => $duration,
+                'logged_at' => now(),
+            ]);
+
+            if ($response->successful()) {
                 return $data;
             } else {
-                throw new \Exception('HTTP Error ' . $response->status() . ': ' . $response->reason());
+                throw new \Exception('HTTP Error ' . $httpStatus . ': ' . $response->reason());
             }
 
         } catch (\Exception $e) {
-            IntegrationLog::error(
-                'api_call',
-                "Baselinker API call failed: {$method}",
-                [
+            $duration = round((microtime(true) - $startTime) * 1000, 2);
+
+            // ETAP_08.5: Full error logging
+            // NOTE: IntegrationLog model has 'array' cast - pass arrays directly
+            IntegrationLog::create([
+                'integration_type' => IntegrationLog::INTEGRATION_BASELINKER,
+                'log_type' => IntegrationLog::TYPE_API_CALL,
+                'operation' => 'api_call_' . $method,
+                'log_level' => 'error',
+                'description' => "Baselinker API FAILED: {$method}",
+                'request_data' => [
                     'method' => $method,
-                    'parameters' => $parameters,
-                    'error_message' => $e->getMessage(),
+                    'parameters' => $this->sanitizeParameters($parameters),
+                    'endpoint' => $this->baseUrl,
                 ],
-                IntegrationLog::INTEGRATION_BASELINKER,
-                null,
-                $e
-            );
+                'response_data' => null,
+                'http_status' => isset($response) ? $response->status() : null,
+                'duration_ms' => $duration,
+                'error_message' => $e->getMessage(),
+                'stack_trace' => $e->getTraceAsString(),
+                'logged_at' => now(),
+            ]);
 
             throw $e;
         }
     }
 
     /**
+     * Sanitize parameters for logging (remove sensitive data).
+     *
+     * ETAP_08.5: Never log API tokens!
+     */
+    protected function sanitizeParameters(array $params): array
+    {
+        // Never log API token
+        unset($params['token']);
+
+        // Truncate very large arrays (e.g., product lists)
+        foreach ($params as $key => $value) {
+            if (is_array($value) && count($value) > 10) {
+                $params[$key] = [
+                    '_truncated' => true,
+                    '_count' => count($value),
+                    '_sample' => array_slice($value, 0, 3),
+                ];
+            }
+        }
+
+        return $params;
+    }
+
+    /**
      * Build Baselinker product data structure.
+     *
+     * ETAP_08.5 FIX: Uses ProductErpData if exists (for ERP TAB edits),
+     * with fallback to main Product data.
+     *
+     * Priority: ProductErpData columns > Product model defaults
      */
     protected function buildBaselinkerProductData(ERPConnection $connection, Product $product): array
     {
+        // ETAP_08.5: Check for ERP-specific data from ProductErpData
+        $erpData = $product->erpData()
+            ->where('erp_connection_id', $connection->id)
+            ->first();
+
+        // Log data source for debugging
+        Log::debug('buildBaselinkerProductData: Data source', [
+            'product_id' => $product->id,
+            'product_sku' => $product->sku,
+            'connection_id' => $connection->id,
+            'has_erp_data' => $erpData !== null,
+            'erp_data_name' => $erpData?->name,
+            'product_name' => $product->name,
+            'using_erp_name' => $erpData?->name !== null,
+        ]);
+
+        // ETAP_08.5: Get product images from Media gallery
+        // CRITICAL: Baselinker API images format:
+        // 1. Object with numeric string keys (0-15): {"0": "...", "1": "..."}
+        // 2. Values MUST have prefix "url:" for URL format: "url:https://example.com/img.jpg"
+        // 3. Or "data:" prefix for base64 encoded images
+        // Documentation: https://api.baselinker.com/index.php?method=addInventoryProduct
+        $imagesObject = new \stdClass();
+        $mediaCollection = $product->media()->active()->forGallery()->get();
+        $imageIndex = 0;
+
+        // LIMIT: Baselinker accepts max 16 images (positions 0-15)
+        $maxImages = 16;
+
+        foreach ($mediaCollection as $media) {
+            // Stop if we've reached the limit
+            if ($imageIndex >= $maxImages) {
+                Log::info('Baselinker: Image limit reached', [
+                    'product_sku' => $product->sku,
+                    'max_images' => $maxImages,
+                    'total_media' => $mediaCollection->count(),
+                ]);
+                break;
+            }
+
+            // Get full URL for Baselinker (must be publicly accessible)
+            $imageUrl = $media->url;
+            if ($imageUrl && !empty($imageUrl) && !str_contains($imageUrl, 'placeholder')) {
+                // CRITICAL: Baselinker requires "url:" prefix for URL format images!
+                $imagesObject->{(string)$imageIndex} = 'url:' . $imageUrl;
+                $imageIndex++;
+            }
+        }
+
+        Log::debug('buildBaselinkerProductData: Images collected', [
+            'product_id' => $product->id,
+            'product_sku' => $product->sku,
+            'images_count' => $imageIndex,
+            'images_type' => gettype($imagesObject),
+        ]);
+
+        // Use ERP data if exists, fallback to Product
         return [
-            'name' => $product->name,
-            'description' => $product->description ?: '',
-            'description_extra1' => $product->short_description ?: '',
-            'sku' => $product->sku,
-            'ean' => $product->ean ?: '',
-            'tax_rate' => $product->tax_rate ?: 23,
-            'weight' => $product->weight ?: 0,
-            'height' => $product->height ?: 0,
-            'width' => $product->width ?: 0,
-            'length' => $product->length ?: 0,
+            'name' => $erpData?->name ?? $product->name,
+            'description' => $erpData?->long_description ?? $product->description ?: '',
+            'description_extra1' => $erpData?->short_description ?? $product->short_description ?: '',
+            'sku' => $erpData?->sku ?? $product->sku,
+            'ean' => $erpData?->ean ?? $product->ean ?: '',
+            'tax_rate' => $erpData?->tax_rate ?? $product->tax_rate ?: 23,
+            'weight' => $erpData?->weight ?? $product->weight ?: 0,
+            'height' => $erpData?->height ?? $product->height ?: 0,
+            'width' => $erpData?->width ?? $product->width ?: 0,
+            'length' => $erpData?->length ?? $product->length ?: 0,
+            'images' => $imagesObject,  // ETAP_08.5: stdClass for proper JSON object encoding
         ];
     }
 
@@ -850,8 +1583,8 @@ class BaselinkerService implements ERPSyncServiceInterface
                 }
             }
 
-            // Import images from Baselinker
-            $imagesImported = $this->importImagesFromBaselinker($product, $blProduct['images'] ?? [], $connection);
+            // Import images from Baselinker (ETAP_08.6: Pass ERP product ID for erp_mapping)
+            $imagesImported = $this->importImagesFromBaselinker($product, $blProduct['images'] ?? [], $connection, $erpProductId);
             if ($imagesImported > 0) {
                 Log::info('syncProductFromERP: Imported images', [
                     'product_id' => $product->id,
@@ -935,13 +1668,15 @@ class BaselinkerService implements ERPSyncServiceInterface
      *
      * Downloads images from Baselinker URLs and saves them to PPM storage/media.
      * Skips import if product already has images (to avoid duplicates on re-sync).
+     * ETAP_08.6: Sets erp_mapping on Media records for Gallery sync status.
      *
      * @param Product $product The PPM product to attach images to
      * @param array $imageUrls Array of image URLs from Baselinker
      * @param ERPConnection $connection The ERP connection for logging
+     * @param string|null $baselinkerProductId Baselinker product ID for erp_mapping
      * @return int Number of successfully imported images
      */
-    protected function importImagesFromBaselinker(Product $product, array $imageUrls, ERPConnection $connection): int
+    protected function importImagesFromBaselinker(Product $product, array $imageUrls, ERPConnection $connection, ?string $baselinkerProductId = null): int
     {
         if (empty($imageUrls)) {
             return 0;
@@ -1020,6 +1755,19 @@ class BaselinkerService implements ERPSyncServiceInterface
                 $media->is_active = true;
                 $media->sync_status = 'synced';
                 $media->save();
+
+                // ETAP_08.6: Set erp_mapping for Gallery sync status
+                if ($baselinkerProductId) {
+                    $media->setErpMapping($connection->id, [
+                        'product_id' => $baselinkerProductId,
+                        'image_position' => $index,
+                        'synced_at' => now()->toIso8601String(),
+                        'connection_name' => $connection->instance_name,
+                        'erp_type' => $connection->erp_type,
+                        'source' => 'imported_from_baselinker',
+                        'status' => 'synced',  // CRITICAL: Required for Gallery checkbox display
+                    ]);
+                }
 
                 $imported++;
 
@@ -1876,5 +2624,63 @@ class BaselinkerService implements ERPSyncServiceInterface
 
             return ['products' => [], 'error' => $e->getMessage()];
         }
+    }
+
+    /**
+     * ETAP_08.6: Mark product media as synced to ERP.
+     *
+     * Updates Media.erp_mapping for all product images after successful sync.
+     * This allows GalleryTab to show correct sync status (blue checkboxes).
+     *
+     * @param ERPConnection $connection The ERP connection
+     * @param Product $product The product whose media was synced
+     * @param string $baselinkerProductId The Baselinker product ID
+     * @return int Number of media records updated
+     */
+    protected function markProductMediaAsSyncedToErp(
+        ERPConnection $connection,
+        Product $product,
+        string $baselinkerProductId
+    ): int {
+        $mediaCollection = $product->media()->active()->forGallery()->get();
+
+        if ($mediaCollection->isEmpty()) {
+            return 0;
+        }
+
+        $updated = 0;
+        $imageIndex = 0;
+
+        foreach ($mediaCollection as $media) {
+            // Max 16 images (same limit as in buildBaselinkerProductData)
+            if ($imageIndex >= 16) {
+                break;
+            }
+
+            // Update erp_mapping on Media record
+            $media->setErpMapping($connection->id, [
+                'product_id' => $baselinkerProductId,
+                'image_position' => $imageIndex,
+                'synced_at' => now()->toIso8601String(),
+                'connection_name' => $connection->instance_name,
+                'erp_type' => $connection->erp_type,
+                'status' => 'synced',  // CRITICAL: Required for Gallery checkbox display
+            ]);
+
+            $updated++;
+            $imageIndex++;
+        }
+
+        Log::info('markProductMediaAsSyncedToErp: Updated media erp_mapping', [
+            'product_id' => $product->id,
+            'product_sku' => $product->sku,
+            'connection_id' => $connection->id,
+            'connection_name' => $connection->instance_name,
+            'baselinker_product_id' => $baselinkerProductId,
+            'media_updated' => $updated,
+            'total_media' => $mediaCollection->count(),
+        ]);
+
+        return $updated;
     }
 }
