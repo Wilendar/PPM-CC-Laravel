@@ -120,12 +120,32 @@ tw_Stan         - Stany magazynowe
   st_Stan       - Ilosc na stanie (DECIMAL)
   st_MagId      - ID magazynu (FK)
 
-tw_Cena         - Ceny produktow
+tw_Cena         - Ceny produktow (11 poziomow cenowych!)
   tc_TowId      - ID produktu (FK)
-  tc_CenaNetto  - Cena netto (DECIMAL)
-  tc_CenaBrutto - Cena brutto (DECIMAL)
-  tc_RodzCenyId - ID rodzaju ceny (FK)
+  tc_CenaNetto0..10 - Ceny netto poziom 0-10 (DECIMAL)
+  tc_CenaBrutto0..10 - Ceny brutto poziom 0-10 (DECIMAL)
+
+tw_Parametr     - NAZWY POZIOMOW CENOWYCH (KRYTYCZNE!)
+  twp_Id        - ID (zawsze 1, jeden wiersz)
+  twp_NazwaCeny1..10 - Nazwy poziomow cen
 ```
+
+#### MAPOWANIE POZIOMOW CENOWYCH (tw_Parametr)
+
+| Kolumna tw_Parametr | ID | Kolumna tw_Cena | Przyklad nazwy |
+|--------------------|----|-----------------|----------------|
+| twp_NazwaCeny1 | 0 | tc_CenaNetto0 | Detaliczna |
+| twp_NazwaCeny2 | 1 | tc_CenaNetto1 | MRF-MPP |
+| twp_NazwaCeny3 | 2 | tc_CenaNetto2 | Szkółka-Komis-Drop |
+| twp_NazwaCeny4 | 3 | tc_CenaNetto3 | z magazynu |
+| twp_NazwaCeny5 | 4 | tc_CenaNetto4 | Warsztat |
+| twp_NazwaCeny6 | 5 | tc_CenaNetto5 | Standard |
+| twp_NazwaCeny7 | 6 | tc_CenaNetto6 | Premium |
+| twp_NazwaCeny8 | 7 | tc_CenaNetto7 | HuHa |
+| twp_NazwaCeny9 | 8 | tc_CenaNetto8 | Warsztat Premium |
+| twp_NazwaCeny10 | 9 | tc_CenaNetto9 | Pracownik |
+
+**UWAGA:** `twp_NazwaCeny[N]` odpowiada `tc_CenaNetto[N-1]` (offset by 1!)
 
 #### KONTRAHENCI
 ```
@@ -290,7 +310,113 @@ echo "Utworzono: " . $faktura->NumerPelny;
 
 ---
 
-## 5. REST API Wrapper (Lukegpl)
+## 5. REST API Wrapper - MPP TRADE (sapi.mpptrade.pl)
+
+### Konfiguracja dla PPM-CC-Laravel
+
+| Parametr | Wartosc |
+|----------|---------|
+| Base URL | `https://sapi.mpptrade.pl` |
+| Auth Header | `X-API-Key` |
+| SSL Verify | `false` (self-signed certificate!) |
+| Timeout | 30s |
+| Retry | 3 attempts |
+
+### Dostepne Endpointy
+
+| Endpoint | Metoda | Opis |
+|----------|--------|------|
+| `/api/health` | GET | Connection test + DB stats |
+| `/api/stats` | GET | Database statistics |
+| `/api/products` | GET | Lista produktow (paginated) |
+| `/api/products/{id}` | GET | Produkt po ID |
+| `/api/products/sku/{sku}` | GET | Produkt po SKU |
+| `/api/stock` | GET | Stany magazynowe |
+| `/api/stock/{productId}` | GET | Stan produktu |
+| `/api/stock/sku/{sku}` | GET | Stan po SKU |
+| `/api/prices/{productId}` | GET | Ceny produktu |
+| `/api/prices/sku/{sku}` | GET | Ceny po SKU |
+| `/api/warehouses` | GET | Lista magazynow |
+| `/api/price-levels` | GET | Nazwy poziomow cenowych (z tw_Parametr!) |
+| `/api/vat-rates` | GET | Stawki VAT |
+| `/api/manufacturers` | GET | Producenci |
+| `/api/product-groups` | GET | Grupy produktow |
+| `/api/units` | GET | Jednostki miary |
+
+### Query Parameters (/api/products)
+
+| Parametr | Typ | Default | Opis |
+|----------|-----|---------|------|
+| `page` | int | 1 | Numer strony |
+| `pageSize` | int | 100 | Produktow na strone (max 500) |
+| `priceLevel` | int | 0 | Poziom ceny (0-9 = tc_CenaNetto0..9) |
+| `warehouseId` | int | 1 | ID magazynu dla stanu |
+| `sku` | string | - | Filtr po SKU (LIKE) |
+| `name` | string | - | Filtr po nazwie (LIKE) |
+
+### Response Format
+
+```json
+{
+    "success": true,
+    "timestamp": "2026-01-20T17:28:32.666Z",
+    "data": [...],
+    "pagination": {
+        "page": 1,
+        "page_size": 100,
+        "total": 12717,
+        "total_pages": 128,
+        "has_next": true,
+        "has_prev": false
+    }
+}
+```
+
+### Laravel Client (SubiektRestApiClient)
+
+```php
+use App\Services\ERP\SubiektGT\SubiektRestApiClient;
+
+$client = new SubiektRestApiClient([
+    'base_url' => 'https://sapi.mpptrade.pl',
+    'api_key' => $config['rest_api_key'],
+    'timeout' => 30,
+    'verify_ssl' => false,  // CRITICAL: self-signed cert!
+]);
+
+// Pobranie produktow
+$products = $client->getProducts(['page' => 1, 'pageSize' => 100]);
+
+// Poziomy cenowe z prawdziwymi nazwami (z tw_Parametr)
+$priceLevels = $client->getPriceLevels();
+// [
+//   {id: 0, name: "Detaliczna"},
+//   {id: 1, name: "MRF-MPP"},
+//   {id: 2, name: "Szkółka-Komis-Drop"},
+//   {id: 3, name: "z magazynu"},
+//   {id: 4, name: "Warsztat"},
+//   {id: 5, name: "Standard"},
+//   {id: 6, name: "Premium"},
+//   {id: 7, name: "HuHa"},
+//   {id: 8, name: "Warsztat Premium"},
+//   {id: 9, name: "Pracownik"}
+// ]
+```
+
+### Kod zrodlowy REST API (.NET 8)
+
+Lokalizacja: `_TOOLS/SubiektGT_REST_API_DotNet/`
+
+Build & Deploy:
+```powershell
+cd "_TOOLS/SubiektGT_REST_API_DotNet"
+dotnet publish -c Release -o ./publish
+# Upload publish/ folder to sapi.mpptrade.pl (IIS Windows Server)
+```
+
+---
+
+## 6. REST API Open Source (Lukegpl)
 
 ### Zrodlo
 https://github.com/Lukegpl/api-subiekt-gt
@@ -322,7 +448,7 @@ $product = $response->json();
 
 ---
 
-## 6. Laravel Service Class - Wzorzec
+## 7. Laravel Service Class - Wzorzec
 
 ```php
 <?php
@@ -442,6 +568,14 @@ Ten skill automatycznie zbiera:
 - User satisfaction target: 4.5/5
 
 ### Historia Ulepszen
+#### v1.1.0 (2026-01-20)
+- [FEATURE] Dodano dokumentacje REST API MPP TRADE (sapi.mpptrade.pl)
+- [FEATURE] Odkryto tabele tw_Parametr z nazwami poziomow cenowych
+- [FEATURE] Mapowanie twp_NazwaCeny[N] -> tc_CenaNetto[N-1]
+- [FIX] REST API /api/price-levels zwraca prawdziwe nazwy z bazy
+- [DOCS] Dodano wszystkie endpointy REST API
+- [DOCS] Zaktualizowano strukture bazy o tw_Parametr
+
 #### v1.0.0 (2026-01-19)
 - [INIT] Poczatkowa wersja skilla
 - [FEATURE] Dokumentacja trzech metod integracji (SQL/Sfera/REST)

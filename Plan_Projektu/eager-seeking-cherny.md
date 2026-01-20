@@ -5,7 +5,27 @@ Implementacja pełnej integracji z ERP Subiekt GT (InsERT) w PPM-CC-Laravel prze
 
 ## Status Architektury
 
-### Już istnieje (gotowe do użycia):
+### ✅ UKOŃCZONE (2026-01-20):
+
+**REST API Wrapper (sapi.mpptrade.pl):**
+- ✅ REST API .NET 8 działające na `https://sapi.mpptrade.pl`
+- ✅ Endpointy: `/api/health`, `/api/products`, `/api/stock`, `/api/warehouses`, `/api/price-levels`
+- ✅ Odkrycie tabeli `tw_Parametr` z nazwami poziomów cenowych
+- ✅ `/api/price-levels` zwraca prawdziwe nazwy (Detaliczna, MRF-MPP, HuHa, etc.)
+- ✅ `SubiektRestApiClient.php` - klient HTTP dla REST API
+- ✅ Dokumentacja w `.claude/rules/erp/subiekt-*.md`
+- ✅ Skill `subiekt-gt-integration` zaktualizowany do v1.1.0
+
+**Pliki REST API:**
+- `_TOOLS/SubiektGT_REST_API_DotNet/` - kod źródłowy
+- `app/Services/ERP/SubiektGT/SubiektRestApiClient.php` - klient Laravel
+
+**Database Schema Discovery:**
+- ✅ `tw_Parametr` - tabela z nazwami poziomów cenowych
+- ✅ Mapowanie: `twp_NazwaCeny[N]` → `tc_CenaNetto[N-1]` (offset by 1!)
+- ✅ Narzędzie `_TOOLS/explore_simple/search_price_names_pyodbc.py`
+
+### Już istnieje (z poprzednich prac):
 - `ERPSyncServiceInterface` - interfejs do implementacji
 - `SubiektGTService` - **PLACEHOLDER** (zwraca not_implemented)
 - `ERPServiceManager` - factory obsługuje `subiekt_gt`
@@ -40,7 +60,16 @@ Implementacja pełnej integracji z ERP Subiekt GT (InsERT) w PPM-CC-Laravel prze
 
 ```php
 'connection_config' => [
-    // SQL Server
+    // Mode: sql_direct (read-only) | sfera_dll | rest_api
+    'connection_mode' => 'rest_api',  // REKOMENDOWANE dla PPM
+
+    // ✅ REST API (sapi.mpptrade.pl) - ZALECANE
+    'rest_api_url' => 'https://sapi.mpptrade.pl',
+    'rest_api_key' => 'YOUR_API_KEY',
+    'rest_api_verify_ssl' => false,  // CRITICAL: self-signed cert!
+    'rest_api_timeout' => 30,
+
+    // SQL Server (alternatywnie)
     'db_host' => '(local)\INSERTGT',
     'db_port' => 1433,
     'db_database' => 'NazwaFirmy',
@@ -48,15 +77,11 @@ Implementacja pełnej integracji z ERP Subiekt GT (InsERT) w PPM-CC-Laravel prze
     'db_password' => '',
     'db_trust_certificate' => true,
 
-    // Mode: sql_direct (read-only) | sfera_dll | rest_api
-    'connection_mode' => 'sql_direct',
-    'rest_api_url' => null,  // dla REST wrapper
-
     // Mappings
     'default_warehouse_id' => 1,
-    'default_price_type_id' => 1,
+    'default_price_type_id' => 0,  // 0-9 = tc_CenaNetto0..9
     'warehouse_mappings' => [],    // PPM ID => Subiekt mag_Id
-    'price_group_mappings' => [],  // PPM ID => Subiekt rc_Id
+    'price_group_mappings' => [],  // PPM ID => Subiekt price level (0-9)
 
     // Flags
     'create_missing_products' => false,  // false dla sql_direct
@@ -206,10 +231,10 @@ app/Jobs/ERP/SyncProductToERP.php              # 307 linii - wzorzec job
 ```sql
 -- Produkty z cenami i stanami
 SELECT t.tw_Id, t.tw_Symbol, t.tw_Nazwa, t.tw_DataMod,
-       c.tc_CenaNetto, c.tc_CenaBrutto,
+       c.tc_CenaNetto0, c.tc_CenaBrutto0,
        ISNULL(s.st_Stan, 0) as stan
 FROM tw__Towar t
-LEFT JOIN tw_Cena c ON t.tw_Id = c.tc_TowId AND c.tc_RodzCenyId = 1
+LEFT JOIN tw_Cena c ON t.tw_Id = c.tc_TowId
 LEFT JOIN tw_Stan s ON t.tw_Id = s.st_TowId AND s.st_MagId = 1
 WHERE t.tw_Aktywny = 1
 
@@ -221,8 +246,21 @@ WHERE tw_DataMod > @last_sync_timestamp AND tw_Aktywny = 1
 -- Magazyny
 SELECT mag_Id, mag_Symbol, mag_Nazwa FROM sl_Magazyn WHERE mag_Aktywny = 1
 
--- Grupy cenowe
-SELECT rc_Id, rc_Symbol, rc_Nazwa FROM sl_RodzajCeny WHERE rc_Aktywny = 1
+-- ✅ NAZWY POZIOMÓW CENOWYCH (ODKRYTE 2026-01-20)
+-- Tabela tw_Parametr zawiera nazwy wszystkich 10 poziomów cenowych!
+-- UWAGA: twp_NazwaCeny[N] odpowiada tc_CenaNetto[N-1] (offset by 1!)
+SELECT TOP 1
+    twp_NazwaCeny1 AS PriceLevel0,   -- tc_CenaNetto0 = "Detaliczna"
+    twp_NazwaCeny2 AS PriceLevel1,   -- tc_CenaNetto1 = "MRF-MPP"
+    twp_NazwaCeny3 AS PriceLevel2,   -- tc_CenaNetto2 = "Szkółka-Komis-Drop"
+    twp_NazwaCeny4 AS PriceLevel3,   -- tc_CenaNetto3 = "z magazynu"
+    twp_NazwaCeny5 AS PriceLevel4,   -- tc_CenaNetto4 = "Warsztat"
+    twp_NazwaCeny6 AS PriceLevel5,   -- tc_CenaNetto5 = "Standard"
+    twp_NazwaCeny7 AS PriceLevel6,   -- tc_CenaNetto6 = "Premium"
+    twp_NazwaCeny8 AS PriceLevel7,   -- tc_CenaNetto7 = "HuHa"
+    twp_NazwaCeny9 AS PriceLevel8,   -- tc_CenaNetto8 = "Warsztat Premium"
+    twp_NazwaCeny10 AS PriceLevel9   -- tc_CenaNetto9 = "Pracownik"
+FROM tw_Parametr
 ```
 
 ---

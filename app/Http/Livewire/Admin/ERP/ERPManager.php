@@ -78,15 +78,12 @@ class ERPManager extends Component
     ];
 
     public $subiektConfig = [
-        // SQL Server connection
-        'db_host' => '(local)\\INSERTGT',
-        'db_port' => 1433,
-        'db_database' => '',
-        'db_username' => 'sa',
-        'db_password' => '',
-        'db_trust_certificate' => true,
-        // Connection mode
-        'connection_mode' => 'sql_direct', // sql_direct | rest_api | sfera_api
+        // REST API Configuration (ONLY mode supported)
+        'connection_mode' => 'rest_api',
+        'rest_api_url' => 'https://sapi.mpptrade.pl',
+        'rest_api_key' => 'YHZ4AtJiNBrEFhez7AvPTGJK3XKCrX4NCyGLwrQpecqCyvP3XxxCGYRvjdmtGkRb',
+        'rest_api_timeout' => 30,
+        'rest_api_verify_ssl' => false, // Temporarily disabled - sapi.mpptrade.pl certificate issue
         // Mappings (populated after test)
         'default_warehouse_id' => 1,
         'default_price_type_id' => 1,
@@ -138,11 +135,9 @@ class ERPManager extends Component
                 $rules['baselinkerConfig.inventory_id'] = 'required|integer';
                 break;
             case 'subiekt_gt':
-                $rules['subiektConfig.db_host'] = 'required|min:1';
-                $rules['subiektConfig.db_port'] = 'required|integer|min:1|max:65535';
-                $rules['subiektConfig.db_database'] = 'required|min:1';
-                $rules['subiektConfig.db_username'] = 'required|min:1';
-                $rules['subiektConfig.connection_mode'] = 'required|in:sql_direct,rest_api,sfera_api';
+                $rules['subiektConfig.rest_api_url'] = 'required|url';
+                $rules['subiektConfig.rest_api_key'] = 'required|min:32';
+                $rules['subiektConfig.rest_api_timeout'] = 'required|integer|min:5|max:120';
                 break;
             case 'dynamics':
                 $rules['dynamicsConfig.tenant_id'] = 'required|uuid';
@@ -312,13 +307,10 @@ class ERPManager extends Component
         ];
 
         $this->subiektConfig = [
-            'db_host' => '(local)\\INSERTGT',
-            'db_port' => 1433,
-            'db_database' => '',
-            'db_username' => 'sa',
-            'db_password' => '',
-            'db_trust_certificate' => true,
-            'connection_mode' => 'sql_direct',
+            'connection_mode' => 'rest_api',
+            'rest_api_url' => 'https://sapi.mpptrade.pl',
+            'rest_api_key' => '',
+            'rest_api_timeout' => 30,
             'default_warehouse_id' => 1,
             'default_price_type_id' => 1,
             'warehouse_mappings' => [],
@@ -424,11 +416,9 @@ class ERPManager extends Component
                 break;
             case 'subiekt_gt':
                 $this->validate([
-                    'subiektConfig.db_host' => 'required|min:1',
-                    'subiektConfig.db_port' => 'required|integer|min:1|max:65535',
-                    'subiektConfig.db_database' => 'required|min:1',
-                    'subiektConfig.db_username' => 'required|min:1',
-                    'subiektConfig.connection_mode' => 'required|in:sql_direct,rest_api,sfera_api',
+                    'subiektConfig.rest_api_url' => 'required|url',
+                    'subiektConfig.rest_api_key' => 'required|min:32',
+                    'subiektConfig.rest_api_timeout' => 'required|integer|min:5|max:120',
                 ]);
                 break;
             case 'dynamics':
@@ -546,7 +536,10 @@ class ERPManager extends Component
             case 'baselinker':
                 return $this->baselinkerConfig;
             case 'subiekt_gt':
-                return $this->subiektConfig;
+                // Force SSL verification off (sapi.mpptrade.pl certificate issue)
+                return array_merge($this->subiektConfig, [
+                    'rest_api_verify_ssl' => false,
+                ]);
             case 'dynamics':
                 return $this->dynamicsConfig;
             default:

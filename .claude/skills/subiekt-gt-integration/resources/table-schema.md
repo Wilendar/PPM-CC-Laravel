@@ -50,19 +50,54 @@
 | st_StanMax | DECIMAL(18,4) | Stan maksymalny |
 | st_DataMod | DATETIME | Data modyfikacji |
 
-### tw_Cena (Ceny produktow)
+### tw_Cena (Ceny produktow - 11 poziomow!)
 
 | Kolumna | Typ | Opis |
 |---------|-----|------|
 | tc_Id | INT | Klucz glowny |
 | tc_TowId | INT | FK do tw__Towar |
-| tc_RodzCenyId | INT | FK do sl_RodzajCeny |
-| tc_CenaNetto | DECIMAL(18,4) | Cena netto |
-| tc_CenaBrutto | DECIMAL(18,4) | Cena brutto |
-| tc_Waluta | VARCHAR(3) | Kod waluty (PLN) |
-| tc_DataOd | DATETIME | Cena obowiazuje od |
-| tc_DataDo | DATETIME | Cena obowiazuje do |
+| tc_CenaNetto0 | DECIMAL(18,4) | Cena netto poziom 0 |
+| tc_CenaNetto1 | DECIMAL(18,4) | Cena netto poziom 1 |
+| tc_CenaNetto2..9 | DECIMAL(18,4) | Ceny netto poziomy 2-9 |
+| tc_CenaBrutto0 | DECIMAL(18,4) | Cena brutto poziom 0 |
+| tc_CenaBrutto1..9 | DECIMAL(18,4) | Ceny brutto poziomy 1-9 |
 | tc_DataMod | DATETIME | Data modyfikacji |
+
+### tw_Parametr (NAZWY POZIOMOW CENOWYCH - KRYTYCZNE!)
+
+**UWAGA:** Ta tabela zawiera nazwy wszystkich 10 poziomow cenowych!
+
+| Kolumna | Typ | Opis |
+|---------|-----|------|
+| twp_Id | INT | Klucz glowny (zawsze = 1) |
+| twp_NazwaCeny1 | VARCHAR(50) | Nazwa poziomu 0 (tc_CenaNetto0) |
+| twp_NazwaCeny2 | VARCHAR(50) | Nazwa poziomu 1 (tc_CenaNetto1) |
+| twp_NazwaCeny3 | VARCHAR(50) | Nazwa poziomu 2 (tc_CenaNetto2) |
+| twp_NazwaCeny4 | VARCHAR(50) | Nazwa poziomu 3 (tc_CenaNetto3) |
+| twp_NazwaCeny5 | VARCHAR(50) | Nazwa poziomu 4 (tc_CenaNetto4) |
+| twp_NazwaCeny6 | VARCHAR(50) | Nazwa poziomu 5 (tc_CenaNetto5) |
+| twp_NazwaCeny7 | VARCHAR(50) | Nazwa poziomu 6 (tc_CenaNetto6) |
+| twp_NazwaCeny8 | VARCHAR(50) | Nazwa poziomu 7 (tc_CenaNetto7) |
+| twp_NazwaCeny9 | VARCHAR(50) | Nazwa poziomu 8 (tc_CenaNetto8) |
+| twp_NazwaCeny10 | VARCHAR(50) | Nazwa poziomu 9 (tc_CenaNetto9) |
+
+**KRYTYCZNE MAPOWANIE:**
+- `twp_NazwaCeny[N]` odpowiada `tc_CenaNetto[N-1]` (offset by 1!)
+- Przyklad: twp_NazwaCeny1 = "Detaliczna" -> tc_CenaNetto0
+
+**Przykladowe wartosci (MPP TRADE):**
+| twp_NazwaCeny | ID | Wartosc |
+|---------------|-----|---------|
+| twp_NazwaCeny1 | 0 | Detaliczna |
+| twp_NazwaCeny2 | 1 | MRF-MPP |
+| twp_NazwaCeny3 | 2 | Szkółka-Komis-Drop |
+| twp_NazwaCeny4 | 3 | z magazynu |
+| twp_NazwaCeny5 | 4 | Warsztat |
+| twp_NazwaCeny6 | 5 | Standard |
+| twp_NazwaCeny7 | 6 | Premium |
+| twp_NazwaCeny8 | 7 | HuHa |
+| twp_NazwaCeny9 | 8 | Warsztat Premium |
+| twp_NazwaCeny10 | 9 | Pracownik |
 
 ### tw_EAN (Dodatkowe kody EAN)
 

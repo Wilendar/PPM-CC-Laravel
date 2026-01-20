@@ -60,6 +60,73 @@ Route::get('/up', function () {
     return response()->json(['status' => 'ok', 'timestamp' => now()]);
 })->name('health');
 
+// Subiekt GT REST API Integration Test
+Route::get('/test-subiekt-api', function () {
+    try {
+        $config = [
+            'rest_api_url' => 'https://sapi.mpptrade.pl',
+            'rest_api_key' => 'YHZ4AtJiNBrEFhez7AvPTGJK3XKCrX4NCyGLwrQpecqCyvP3XxxCGYRvjdmtGkRb',
+            'rest_api_timeout' => 30,
+            'rest_api_connect_timeout' => 10,
+            'rest_api_verify_ssl' => false,
+            'connection_mode' => 'rest_api',
+        ];
+
+        $client = new \App\Services\ERP\SubiektGT\SubiektRestApiClient([
+            'base_url' => $config['rest_api_url'],
+            'api_key' => $config['rest_api_key'],
+            'timeout' => $config['rest_api_timeout'],
+            'connect_timeout' => $config['rest_api_connect_timeout'],
+            'verify_ssl' => $config['rest_api_verify_ssl'],
+        ]);
+
+        $results = ['tests' => []];
+
+        // Test 1: Health check
+        try {
+            $health = $client->healthCheck();
+            $results['tests']['health'] = [
+                'success' => true,
+                'data' => $health,
+            ];
+        } catch (\Exception $e) {
+            $results['tests']['health'] = [
+                'success' => false,
+                'error' => $e->getMessage(),
+            ];
+        }
+
+        // Test 2: Get products
+        try {
+            $products = $client->getProducts(['page' => 1, 'pageSize' => 3]);
+            $results['tests']['products'] = [
+                'success' => $products['success'] ?? false,
+                'count' => count($products['data'] ?? []),
+                'total' => $products['pagination']['total_items'] ?? 0,
+                'sample' => array_slice($products['data'] ?? [], 0, 1),
+            ];
+        } catch (\Exception $e) {
+            $results['tests']['products'] = [
+                'success' => false,
+                'error' => $e->getMessage(),
+            ];
+        }
+
+        return response()->json([
+            'status' => 'completed',
+            'api_url' => $config['rest_api_url'],
+            'results' => $results,
+        ]);
+
+    } catch (\Exception $e) {
+        return response()->json([
+            'status' => 'error',
+            'error' => $e->getMessage(),
+            'trace' => $e->getTraceAsString(),
+        ], 500);
+    }
+})->name('test.subiekt-api');
+
 // ==========================================
 // AUTHENTICATION ROUTES
 // ==========================================

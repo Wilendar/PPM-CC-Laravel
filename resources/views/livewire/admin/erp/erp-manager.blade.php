@@ -398,7 +398,7 @@
                                 <select wire:model.live="connectionForm.erp_type"
                                         class="w-full px-3 py-2 text-sm bg-gray-700 border border-gray-600 rounded text-white focus:outline-none focus:border-orange-400">
                                     <option value="baselinker">BaseLinker</option>
-                                    <option value="subiekt_gt">Subiekt GT (SQL Server)</option>
+                                    <option value="subiekt_gt">Subiekt GT (REST API)</option>
                                     <option value="dynamics">Microsoft Dynamics (Not implemented)</option>
                                 </select>
                                 @error('connectionForm.erp_type') <span class="text-red-400 text-xs">{{ $message }}</span> @enderror
@@ -462,107 +462,58 @@
                         @elseif($connectionForm['erp_type'] === 'subiekt_gt')
                             <div class="space-y-4">
                                 <div class="p-3 bg-purple-900/30 border border-purple-700/50 rounded-md">
-                                    <h4 class="text-sm font-medium text-purple-300 mb-1">Subiekt GT - SQL Server Configuration</h4>
-                                    <p class="text-xs text-purple-200/70">Connect directly to Subiekt GT database via SQL Server. Default instance: (local)\INSERTGT</p>
-                                </div>
-
-                                {{-- Connection Mode --}}
-                                <div>
-                                    <label class="block text-xs font-medium text-gray-300 mb-1">Connection Mode *</label>
-                                    <select wire:model.live="subiektConfig.connection_mode"
-                                            class="w-full px-3 py-2 text-sm bg-gray-700 border border-gray-600 rounded text-white focus:outline-none focus:border-orange-400">
-                                        <option value="sql_direct">SQL Direct (Read-Only)</option>
-                                        <option value="rest_api">REST API Wrapper</option>
-                                        <option value="sfera_api">Sfera API (COM/OLE)</option>
-                                    </select>
-                                    @error('subiektConfig.connection_mode') <span class="text-red-400 text-xs">{{ $message }}</span> @enderror
-                                    <p class="text-xs text-gray-500 mt-1">
-                                        @if($subiektConfig['connection_mode'] === 'sql_direct')
-                                            Direct SQL queries - read-only operations (safest for sync)
-                                        @elseif($subiektConfig['connection_mode'] === 'rest_api')
-                                            REST API wrapper on Windows server (requires local API service)
-                                        @else
-                                            Sfera API via COM/OLE (Windows only, full read/write)
-                                        @endif
+                                    <h4 class="text-sm font-medium text-purple-300 mb-1">Subiekt GT - REST API</h4>
+                                    <p class="text-xs text-purple-200/70">
+                                        Polaczenie przez REST API Wrapper na serwerze Windows (sapi.mpptrade.pl).
+                                        API obsluguje produkty, stany magazynowe, ceny i kontrahentow.
                                     </p>
                                 </div>
 
-                                <div class="grid grid-cols-2 gap-4">
-                                    {{-- SQL Server Host --}}
-                                    <div>
-                                        <label class="block text-xs font-medium text-gray-300 mb-1">SQL Server Host *</label>
-                                        <input wire:model.blur="subiektConfig.db_host"
-                                               type="text"
-                                               class="w-full px-3 py-2 text-sm bg-gray-700 border border-gray-600 rounded text-white placeholder-gray-400 focus:outline-none focus:border-orange-400"
-                                               placeholder="(local)\INSERTGT">
-                                        @error('subiektConfig.db_host') <span class="text-red-400 text-xs">{{ $message }}</span> @enderror
-                                    </div>
-
-                                    {{-- Port --}}
-                                    <div>
-                                        <label class="block text-xs font-medium text-gray-300 mb-1">Port</label>
-                                        <input wire:model.blur="subiektConfig.db_port"
-                                               type="number"
-                                               class="w-full px-3 py-2 text-sm bg-gray-700 border border-gray-600 rounded text-white placeholder-gray-400 focus:outline-none focus:border-orange-400"
-                                               placeholder="1433">
-                                        @error('subiektConfig.db_port') <span class="text-red-400 text-xs">{{ $message }}</span> @enderror
-                                    </div>
+                                {{-- REST API URL --}}
+                                <div>
+                                    <label class="block text-xs font-medium text-gray-300 mb-1">REST API URL *</label>
+                                    <input wire:model.blur="subiektConfig.rest_api_url"
+                                           type="url"
+                                           class="w-full px-3 py-2 text-sm bg-gray-700 border border-gray-600 rounded text-white placeholder-gray-400 focus:outline-none focus:border-orange-400"
+                                           placeholder="https://sapi.mpptrade.pl">
+                                    @error('subiektConfig.rest_api_url') <span class="text-red-400 text-xs">{{ $message }}</span> @enderror
+                                    <p class="text-xs text-gray-500 mt-1">URL do REST API Subiekt GT na serwerze Windows</p>
                                 </div>
 
-                                {{-- Database Name --}}
+                                {{-- API Key --}}
                                 <div>
-                                    <label class="block text-xs font-medium text-gray-300 mb-1">Database Name *</label>
-                                    <input wire:model.blur="subiektConfig.db_database"
+                                    <label class="block text-xs font-medium text-gray-300 mb-1">API Key *</label>
+                                    <input wire:model="subiektConfig.rest_api_key"
                                            type="text"
                                            class="w-full px-3 py-2 text-sm bg-gray-700 border border-gray-600 rounded text-white placeholder-gray-400 focus:outline-none focus:border-orange-400"
-                                           placeholder="NazwaFirmy">
-                                    @error('subiektConfig.db_database') <span class="text-red-400 text-xs">{{ $message }}</span> @enderror
-                                    <p class="text-xs text-gray-500 mt-1">Database name from Subiekt GT configuration (usually company name)</p>
+                                           placeholder="Twoj klucz API">
+                                    @error('subiektConfig.rest_api_key') <span class="text-red-400 text-xs">{{ $message }}</span> @enderror
+                                    <p class="text-xs text-gray-500 mt-1">Klucz API do autoryzacji (header X-API-Key)</p>
                                 </div>
 
-                                <div class="grid grid-cols-2 gap-4">
-                                    {{-- Username --}}
-                                    <div>
-                                        <label class="block text-xs font-medium text-gray-300 mb-1">SQL Username *</label>
-                                        <input wire:model.blur="subiektConfig.db_username"
-                                               type="text"
-                                               class="w-full px-3 py-2 text-sm bg-gray-700 border border-gray-600 rounded text-white placeholder-gray-400 focus:outline-none focus:border-orange-400"
-                                               placeholder="sa">
-                                        @error('subiektConfig.db_username') <span class="text-red-400 text-xs">{{ $message }}</span> @enderror
-                                    </div>
-
-                                    {{-- Password --}}
-                                    <div>
-                                        <label class="block text-xs font-medium text-gray-300 mb-1">SQL Password</label>
-                                        <input wire:model.blur="subiektConfig.db_password"
-                                               type="password"
-                                               class="w-full px-3 py-2 text-sm bg-gray-700 border border-gray-600 rounded text-white placeholder-gray-400 focus:outline-none focus:border-orange-400"
-                                               placeholder="(leave empty if no password)">
-                                        @error('subiektConfig.db_password') <span class="text-red-400 text-xs">{{ $message }}</span> @enderror
-                                    </div>
-                                </div>
-
-                                {{-- Trust Certificate --}}
+                                {{-- Timeout --}}
                                 <div>
-                                    <label class="flex items-center gap-2 text-sm text-gray-300">
-                                        <input type="checkbox"
-                                               wire:model="subiektConfig.db_trust_certificate"
-                                               class="rounded border-gray-600 bg-gray-700 text-orange-500 focus:ring-orange-500">
-                                        Trust Server Certificate (recommended for local connections)
-                                    </label>
+                                    <label class="block text-xs font-medium text-gray-300 mb-1">Timeout (sekundy)</label>
+                                    <input wire:model.blur="subiektConfig.rest_api_timeout"
+                                           type="number"
+                                           min="5"
+                                           max="120"
+                                           class="w-full px-3 py-2 text-sm bg-gray-700 border border-gray-600 rounded text-white placeholder-gray-400 focus:outline-none focus:border-orange-400"
+                                           placeholder="30">
+                                    @error('subiektConfig.rest_api_timeout') <span class="text-red-400 text-xs">{{ $message }}</span> @enderror
+                                    <p class="text-xs text-gray-500 mt-1">Maksymalny czas oczekiwania na odpowiedz (5-120s)</p>
                                 </div>
 
-                                {{-- Warning for shared hosting --}}
-                                <div class="p-3 bg-yellow-900/30 border border-yellow-700/50 rounded-md">
+                                {{-- Success info --}}
+                                <div class="p-3 bg-green-900/30 border border-green-700/50 rounded-md">
                                     <div class="flex items-start gap-2">
-                                        <svg class="w-4 h-4 text-yellow-400 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                                        <svg class="w-4 h-4 text-green-400 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
                                         </svg>
                                         <div>
-                                            <p class="text-xs text-yellow-300 font-medium">Hosting Limitation</p>
-                                            <p class="text-xs text-yellow-200/70 mt-0.5">
-                                                PPM runs on Linux (Hostido). SQL Server connection requires:
-                                                VPN/SSH tunnel to Windows server, or REST API wrapper on Windows side.
+                                            <p class="text-xs text-green-300 font-medium">REST API Ready</p>
+                                            <p class="text-xs text-green-200/70 mt-0.5">
+                                                API dziala na HTTPS przez IIS. Dostepne endpointy: /api/health, /api/products, /api/warehouses, /api/price-levels
                                             </p>
                                         </div>
                                     </div>
@@ -605,8 +556,10 @@
                                         <div class="mt-3 pt-3 border-t border-green-700/50">
                                             <p class="text-xs text-green-300 mb-1">Supported Features:</p>
                                             <div class="flex flex-wrap gap-1">
-                                                @foreach($authTestResult['supported_features'] as $feature)
-                                                    <span class="px-2 py-0.5 bg-green-800/50 text-green-300 text-xs rounded">{{ $feature }}</span>
+                                                @foreach($authTestResult['supported_features'] as $featureName => $enabled)
+                                                    @if($enabled === true)
+                                                        <span class="px-2 py-0.5 bg-green-800/50 text-green-300 text-xs rounded">{{ ucfirst(str_replace('_', ' ', $featureName)) }}</span>
+                                                    @endif
                                                 @endforeach
                                             </div>
                                         </div>

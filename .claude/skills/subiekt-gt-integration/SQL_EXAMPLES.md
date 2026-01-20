@@ -189,7 +189,7 @@ WHERE c.tc_TowId = @towar_id
 ORDER BY rc.rc_Kolejnosc
 ```
 
-### Lista rodzajow cen
+### Lista rodzajow cen (stara metoda)
 
 ```sql
 SELECT
@@ -200,6 +200,37 @@ SELECT
 FROM sl_RodzajCeny
 WHERE rc_Aktywny = 1
 ORDER BY rc_Kolejnosc
+```
+
+### NAZWY POZIOMOW CENOWYCH z tw_Parametr (REKOMENDOWANE!)
+
+```sql
+-- Ta tabela zawiera prawdziwe nazwy poziomow cenowych
+-- KRYTYCZNE: twp_NazwaCeny[N] odpowiada tc_CenaNetto[N-1]!
+SELECT TOP 1
+    twp_NazwaCeny1 AS PriceLevel0,   -- tc_CenaNetto0
+    twp_NazwaCeny2 AS PriceLevel1,   -- tc_CenaNetto1
+    twp_NazwaCeny3 AS PriceLevel2,   -- tc_CenaNetto2
+    twp_NazwaCeny4 AS PriceLevel3,   -- tc_CenaNetto3
+    twp_NazwaCeny5 AS PriceLevel4,   -- tc_CenaNetto4
+    twp_NazwaCeny6 AS PriceLevel5,   -- tc_CenaNetto5
+    twp_NazwaCeny7 AS PriceLevel6,   -- tc_CenaNetto6
+    twp_NazwaCeny8 AS PriceLevel7,   -- tc_CenaNetto7
+    twp_NazwaCeny9 AS PriceLevel8,   -- tc_CenaNetto8
+    twp_NazwaCeny10 AS PriceLevel9   -- tc_CenaNetto9
+FROM tw_Parametr
+
+-- Przyklad wynikow (MPP TRADE):
+-- PriceLevel0 = "Detaliczna"
+-- PriceLevel1 = "MRF-MPP"
+-- PriceLevel2 = "Szkółka-Komis-Drop"
+-- PriceLevel3 = "z magazynu"
+-- PriceLevel4 = "Warsztat"
+-- PriceLevel5 = "Standard"
+-- PriceLevel6 = "Premium"
+-- PriceLevel7 = "HuHa"
+-- PriceLevel8 = "Warsztat Premium"
+-- PriceLevel9 = "Pracownik"
 ```
 
 ### Produkty z cenami i marza

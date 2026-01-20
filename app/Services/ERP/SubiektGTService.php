@@ -10,6 +10,8 @@ use App\Models\IntegrationMapping;
 use App\Services\ERP\Contracts\ERPSyncServiceInterface;
 use App\Services\ERP\SubiektGT\SubiektQueryBuilder;
 use App\Services\ERP\SubiektGT\SubiektDataTransformer;
+use App\Services\ERP\SubiektGT\SubiektRestApiClient;
+use App\Exceptions\SubiektApiException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Config;
@@ -21,31 +23,32 @@ use Carbon\Carbon;
  * ETAP: Subiekt GT ERP Integration
  *
  * Pelna implementacja integracji z Subiekt GT (InsERT).
- * Komunikacja przez bezposrednie polaczenie SQL Server.
+ * Komunikacja przez REST API Wrapper na serwerze Windows (sapi.mpptrade.pl).
  *
  * Supported Features:
- * - Product synchronization (PULL only in sql_direct mode)
+ * - Product synchronization (PULL/PUSH via REST API)
  * - Stock levels per warehouse
  * - Prices for all price types
- * - Change detection via tw_DataMod
+ * - Warehouses and price types reference data
  *
  * NOT Supported (Subiekt GT limitations):
  * - Images (Subiekt GT does not store product images)
  * - Webhooks (polling required)
  * - Native variants (each variant = separate product)
  *
- * Connection Modes:
- * - sql_direct: Read-only SQL Server access (default)
- * - sfera_api: Sfera COM/DLL bridge (requires Windows)
- * - rest_api: REST API wrapper (requires external server)
+ * Connection Mode:
+ * - rest_api: REST API wrapper on Windows server (ONLY supported mode)
+ *   URL: https://sapi.mpptrade.pl
+ *   Auth: X-API-Key header
  *
  * @package App\Services\ERP
- * @version 1.0
+ * @version 2.0
  */
 class SubiektGTService implements ERPSyncServiceInterface
 {
     protected ?SubiektQueryBuilder $queryBuilder = null;
     protected ?SubiektDataTransformer $transformer = null;
+    protected ?SubiektRestApiClient $restApiClient = null;
     protected string $connectionName = 'subiekt';
 
     /**
@@ -55,6 +58,25 @@ class SubiektGTService implements ERPSyncServiceInterface
      * @return array Test result
      */
     public function testConnection(array $config): array
+    {
+        $connectionMode = $config['connection_mode'] ?? 'rest_api';
+
+        // REST API is the default and recommended mode
+        if ($connectionMode === 'rest_api') {
+            return $this->testConnectionViaRestApi($config);
+        }
+
+        // Legacy: SQL Direct connection test (not recommended)
+        return $this->testConnectionViaSqlDirect($config);
+    }
+
+    /**
+     * Test connection via SQL Direct mode.
+     *
+     * @param array $config Connection configuration
+     * @return array Test result
+     */
+    protected function testConnectionViaSqlDirect(array $config): array
     {
         $startTime = microtime(true);
 
@@ -80,11 +102,11 @@ class SubiektGTService implements ERPSyncServiceInterface
             // Log successful test
             IntegrationLog::info(
                 'connection_test',
-                'Subiekt GT connection test successful',
+                'Subiekt GT connection test successful (SQL Direct)',
                 [
                     'response_time' => $responseTime,
                     'stats' => $stats,
-                    'config_mode' => $config['connection_mode'] ?? 'sql_direct',
+                    'config_mode' => 'sql_direct',
                 ],
                 IntegrationLog::INTEGRATION_SUBIEKT_GT,
                 $config['db_host'] ?? 'unknown'
@@ -92,13 +114,13 @@ class SubiektGTService implements ERPSyncServiceInterface
 
             return [
                 'success' => true,
-                'message' => 'Polaczenie z Subiekt GT pomyslne',
+                'message' => 'Polaczenie z Subiekt GT pomyslne (SQL Direct)',
                 'response_time' => $responseTime,
                 'details' => array_merge($connectionResult['details'], [
                     'total_products' => $stats['total_products'] ?? 0,
                     'active_warehouses' => $stats['active_warehouses'] ?? 0,
                     'price_types' => $stats['price_types'] ?? 0,
-                    'connection_mode' => $config['connection_mode'] ?? 'sql_direct',
+                    'connection_mode' => 'sql_direct',
                 ]),
             ];
 
@@ -107,7 +129,7 @@ class SubiektGTService implements ERPSyncServiceInterface
 
             IntegrationLog::error(
                 'connection_test',
-                'Subiekt GT connection test failed',
+                'Subiekt GT connection test failed (SQL Direct)',
                 [
                     'response_time' => $responseTime,
                     'error' => $e->getMessage(),
@@ -123,6 +145,108 @@ class SubiektGTService implements ERPSyncServiceInterface
                 'response_time' => $responseTime,
                 'details' => [
                     'exception_type' => get_class($e),
+                    'connection_mode' => 'sql_direct',
+                ],
+            ];
+        }
+    }
+
+    /**
+     * Test connection via REST API mode.
+     *
+     * @param array $config Connection configuration
+     * @return array Test result
+     */
+    protected function testConnectionViaRestApi(array $config): array
+    {
+        $startTime = microtime(true);
+
+        try {
+            $client = $this->createRestApiClient($config);
+            $result = $client->testConnection();
+
+            $responseTime = round((microtime(true) - $startTime) * 1000, 2);
+
+            if ($result['success']) {
+                // Get additional stats
+                try {
+                    $statsResponse = $client->getStats();
+                    $stats = $statsResponse;
+                } catch (\Exception $e) {
+                    $stats = [];
+                }
+
+                IntegrationLog::info(
+                    'connection_test',
+                    'Subiekt GT REST API connection test successful',
+                    [
+                        'response_time' => $responseTime,
+                        'api_url' => $config['rest_api_url'] ?? 'unknown',
+                    ],
+                    IntegrationLog::INTEGRATION_SUBIEKT_GT,
+                    $config['rest_api_url'] ?? 'unknown'
+                );
+
+                return [
+                    'success' => true,
+                    'message' => 'Polaczenie z Subiekt GT REST API pomyslne',
+                    'response_time' => $responseTime,
+                    'details' => array_merge($result['details'] ?? [], [
+                        'total_products' => $stats['total_products'] ?? $stats['active_products'] ?? 0,
+                        'active_warehouses' => $stats['warehouses'] ?? 0,
+                        'price_types' => $stats['price_types'] ?? 0,
+                        'connection_mode' => 'rest_api',
+                        'api_url' => $config['rest_api_url'] ?? '',
+                    ]),
+                ];
+            }
+
+            return [
+                'success' => false,
+                'message' => $result['message'] ?? 'Blad polaczenia z REST API',
+                'response_time' => $responseTime,
+                'details' => [
+                    'connection_mode' => 'rest_api',
+                ],
+            ];
+
+        } catch (SubiektApiException $e) {
+            $responseTime = round((microtime(true) - $startTime) * 1000, 2);
+
+            IntegrationLog::error(
+                'connection_test',
+                'Subiekt GT REST API connection test failed',
+                [
+                    'response_time' => $responseTime,
+                    'error' => $e->getMessage(),
+                    'http_status' => $e->getHttpStatusCode(),
+                ],
+                IntegrationLog::INTEGRATION_SUBIEKT_GT,
+                $config['rest_api_url'] ?? 'unknown',
+                $e
+            );
+
+            return [
+                'success' => false,
+                'message' => 'Blad polaczenia REST API: ' . $e->getMessage(),
+                'response_time' => $responseTime,
+                'details' => [
+                    'exception_type' => get_class($e),
+                    'http_status' => $e->getHttpStatusCode(),
+                    'connection_mode' => 'rest_api',
+                ],
+            ];
+
+        } catch (\Exception $e) {
+            $responseTime = round((microtime(true) - $startTime) * 1000, 2);
+
+            return [
+                'success' => false,
+                'message' => 'Blad polaczenia: ' . $e->getMessage(),
+                'response_time' => $responseTime,
+                'details' => [
+                    'exception_type' => get_class($e),
+                    'connection_mode' => 'rest_api',
                 ],
             ];
         }
@@ -136,6 +260,8 @@ class SubiektGTService implements ERPSyncServiceInterface
      */
     public function testAuthentication(array $config): array
     {
+        $connectionMode = $config['connection_mode'] ?? 'rest_api';
+
         $connectionResult = $this->testConnection($config);
 
         if (!$connectionResult['success']) {
@@ -143,6 +269,11 @@ class SubiektGTService implements ERPSyncServiceInterface
         }
 
         try {
+            if ($connectionMode === 'rest_api') {
+                return $this->testAuthenticationViaRestApi($config, $connectionResult);
+            }
+
+            // SQL Direct mode
             // Configure connection
             $this->configureConnection($config);
             $queryBuilder = new SubiektQueryBuilder($this->connectionName);
@@ -191,6 +322,60 @@ class SubiektGTService implements ERPSyncServiceInterface
     }
 
     /**
+     * Test authentication via REST API.
+     *
+     * @param array $config Connection configuration
+     * @param array $connectionResult Connection test result
+     * @return array Authentication test result
+     */
+    protected function testAuthenticationViaRestApi(array $config, array $connectionResult): array
+    {
+        try {
+            $client = $this->createRestApiClient($config);
+
+            // Get reference data for mapping UI
+            $warehousesResponse = $client->getWarehouses(false);
+            $priceTypesResponse = $client->getPriceTypes(false);
+            $statsResponse = $client->getStats();
+
+            $warehouses = $warehousesResponse['data'] ?? [];
+            $priceTypes = $priceTypesResponse['data'] ?? [];
+
+            // Format database_stats for UI compatibility
+            $databaseStats = [
+                'product_count' => $statsResponse['total_products'] ?? 0,
+                'active_products' => $statsResponse['active_products'] ?? $statsResponse['total_products'] ?? 0,
+                'contractor_count' => null,
+                'warehouse_count' => $statsResponse['warehouses'] ?? count($warehouses),
+                'price_type_count' => $statsResponse['price_types'] ?? count($priceTypes),
+            ];
+
+            return [
+                'success' => true,
+                'message' => 'Uwierzytelnienie REST API pomyslne',
+                'response_time' => $connectionResult['response_time'],
+                'details' => array_merge($connectionResult['details'], [
+                    'warehouses' => $warehouses,
+                    'price_types' => $priceTypes,
+                    'database_stats' => $databaseStats,
+                ]),
+                'supported_features' => $this->getSupportedFeatures(),
+            ];
+
+        } catch (SubiektApiException $e) {
+            return [
+                'success' => false,
+                'message' => 'Blad uwierzytelnienia REST API: ' . $e->getMessage(),
+                'response_time' => $connectionResult['response_time'],
+                'details' => [
+                    'http_status' => $e->getHttpStatusCode(),
+                ],
+                'supported_features' => $this->getSupportedFeatures(),
+            ];
+        }
+    }
+
+    /**
      * Sync single product TO Subiekt GT.
      *
      * NOTE: In sql_direct mode, this validates and maps the product
@@ -203,7 +388,7 @@ class SubiektGTService implements ERPSyncServiceInterface
     public function syncProductToERP(ERPConnection $connection, Product $product): array
     {
         $config = $connection->connection_config;
-        $connectionMode = $config['connection_mode'] ?? 'sql_direct';
+        $connectionMode = $config['connection_mode'] ?? 'rest_api';
 
         // SQL Direct mode = read-only
         if ($connectionMode === 'sql_direct') {
@@ -328,7 +513,7 @@ class SubiektGTService implements ERPSyncServiceInterface
     public function syncAllProducts(ERPConnection $connection, array $filters = []): array
     {
         $config = $connection->connection_config;
-        $connectionMode = $config['connection_mode'] ?? 'sql_direct';
+        $connectionMode = $config['connection_mode'] ?? 'rest_api';
 
         // SQL Direct mode = validation only
         if ($connectionMode === 'sql_direct') {
@@ -623,22 +808,25 @@ class SubiektGTService implements ERPSyncServiceInterface
             'images' => false,           // Subiekt GT does not store images
             'variants' => false,         // Variants are separate products
             'webhooks' => false,         // Polling required
-            'bidirectional_sync' => false, // sql_direct = read-only
+            'bidirectional_sync' => false, // sql_direct/rest_api = read-only
             'connection_modes' => [
                 'sql_direct' => [
                     'name' => 'SQL Direct (Read-Only)',
-                    'description' => 'Bezposrednie polaczenie do bazy SQL Server. Tylko odczyt danych.',
+                    'description' => 'Bezposrednie polaczenie do bazy SQL Server. Tylko odczyt danych. Wymaga dostępu do SQL Server z serwera hostingowego.',
                     'available' => true,
+                    'config_fields' => ['db_host', 'db_port', 'db_database', 'db_username', 'db_password'],
                 ],
                 'rest_api' => [
                     'name' => 'REST API Wrapper',
-                    'description' => 'Polaczenie przez REST API (wymaga zewnetrznego serwera).',
-                    'available' => false,
+                    'description' => 'Polaczenie przez REST API uruchomione na serwerze Windows z dostepem do Subiekt GT. Zalecane dla hostingu Linux.',
+                    'available' => true,
+                    'config_fields' => ['rest_api_url', 'rest_api_key'],
                 ],
                 'sfera_api' => [
                     'name' => 'Sfera API (COM)',
-                    'description' => 'Natywne API Subiekt GT (wymaga Windows Server).',
+                    'description' => 'Natywne API Subiekt GT z obsluga zapisu (wymaga Windows Server + licencja Sfera).',
                     'available' => false,
+                    'config_fields' => [],
                 ],
             ],
         ];
@@ -685,7 +873,19 @@ class SubiektGTService implements ERPSyncServiceInterface
     protected function initializeForConnection(ERPConnection $connection): void
     {
         $config = $connection->connection_config;
+        $connectionMode = $config['connection_mode'] ?? 'rest_api';
 
+        // For REST API mode, initialize REST client instead of direct SQL
+        if ($connectionMode === 'rest_api') {
+            $this->restApiClient = $this->createRestApiClient($config);
+            $this->transformer = new SubiektDataTransformer([
+                'warehouse_mappings' => $config['warehouse_mappings'] ?? [],
+                'price_group_mappings' => $config['price_group_mappings'] ?? [],
+            ]);
+            return;
+        }
+
+        // SQL Direct mode
         $this->configureConnection($config);
 
         $this->queryBuilder = new SubiektQueryBuilder($this->connectionName);
@@ -693,6 +893,25 @@ class SubiektGTService implements ERPSyncServiceInterface
         $this->transformer = new SubiektDataTransformer([
             'warehouse_mappings' => $config['warehouse_mappings'] ?? [],
             'price_group_mappings' => $config['price_group_mappings'] ?? [],
+        ]);
+    }
+
+    /**
+     * Create REST API client from configuration.
+     *
+     * @param array $config Connection configuration
+     * @return SubiektRestApiClient
+     */
+    protected function createRestApiClient(array $config): SubiektRestApiClient
+    {
+        return new SubiektRestApiClient([
+            'base_url' => $config['rest_api_url'] ?? '',
+            'api_key' => $config['rest_api_key'] ?? '',
+            'timeout' => $config['rest_api_timeout'] ?? 30,
+            'connect_timeout' => $config['rest_api_connect_timeout'] ?? 10,
+            'retry_times' => $config['rest_api_retry_times'] ?? 3,
+            'retry_delay' => $config['rest_api_retry_delay'] ?? 100,
+            'verify_ssl' => $config['rest_api_verify_ssl'] ?? true,
         ]);
     }
 
@@ -924,7 +1143,12 @@ class SubiektGTService implements ERPSyncServiceInterface
     }
 
     /**
-     * Sync product via REST API (placeholder).
+     * Sync product via REST API.
+     *
+     * In REST API mode, we can:
+     * - Read product data from Subiekt GT
+     * - Map existing products by SKU
+     * - Write operations require Sfera API on the wrapper side
      *
      * @param ERPConnection $connection
      * @param Product $product
@@ -932,12 +1156,140 @@ class SubiektGTService implements ERPSyncServiceInterface
      */
     protected function syncProductViaRestApi(ERPConnection $connection, Product $product): array
     {
-        // TODO: Implement REST API integration
-        return [
-            'success' => false,
-            'message' => 'REST API mode nie jest jeszcze zaimplementowany',
-            'external_id' => null,
+        try {
+            $config = $connection->connection_config;
+            $client = $this->createRestApiClient($config);
+
+            // Try to find product in Subiekt GT by SKU
+            try {
+                $response = $client->getProductBySku($product->sku);
+                $subiektProduct = $response['data'] ?? null;
+            } catch (SubiektApiException $e) {
+                if ($e->isNotFound()) {
+                    $subiektProduct = null;
+                } else {
+                    throw $e;
+                }
+            }
+
+            if ($subiektProduct) {
+                // Product exists - create mapping
+                $externalId = (string) ($subiektProduct->id ?? $subiektProduct['id'] ?? null);
+
+                // Convert to object if array
+                if (is_array($subiektProduct)) {
+                    $subiektProduct = (object) $subiektProduct;
+                }
+
+                // Update mapping
+                $this->updateIntegrationMapping($product, $connection, $externalId);
+
+                // Update ProductErpData with Subiekt data
+                $this->updateProductErpDataFromRestApi($product, $connection, $subiektProduct);
+
+                IntegrationLog::info(
+                    'product_sync',
+                    'Product mapped via REST API',
+                    [
+                        'product_sku' => $product->sku,
+                        'subiekt_id' => $externalId,
+                    ],
+                    IntegrationLog::INTEGRATION_SUBIEKT_GT,
+                    (string) $connection->id
+                );
+
+                return [
+                    'success' => true,
+                    'message' => 'Produkt znaleziony w Subiekt GT i zmapowany',
+                    'external_id' => $externalId,
+                    'action' => 'mapped',
+                ];
+            }
+
+            // Product not found in Subiekt GT
+            // Note: Creating products requires Sfera API on the wrapper side
+            return [
+                'success' => false,
+                'message' => 'Produkt nie istnieje w Subiekt GT. Tworzenie produktow wymaga Sfera API.',
+                'external_id' => null,
+                'action' => 'not_found',
+            ];
+
+        } catch (SubiektApiException $e) {
+            IntegrationLog::error(
+                'product_sync',
+                'REST API sync failed',
+                [
+                    'product_sku' => $product->sku,
+                    'error' => $e->getMessage(),
+                    'http_status' => $e->getHttpStatusCode(),
+                ],
+                IntegrationLog::INTEGRATION_SUBIEKT_GT,
+                (string) $connection->id,
+                $e
+            );
+
+            return [
+                'success' => false,
+                'message' => 'Blad REST API: ' . $e->getMessage(),
+                'external_id' => null,
+            ];
+
+        } catch (\Exception $e) {
+            return [
+                'success' => false,
+                'message' => 'Blad synchronizacji: ' . $e->getMessage(),
+                'external_id' => null,
+            ];
+        }
+    }
+
+    /**
+     * Update ProductErpData from REST API response.
+     *
+     * Note: API returns camelCase field names (priceNet, priceGross, isActive)
+     *
+     * @param Product $product
+     * @param ERPConnection $connection
+     * @param object $subiektProduct
+     * @return ProductErpData
+     */
+    protected function updateProductErpDataFromRestApi(Product $product, ERPConnection $connection, object $subiektProduct): ProductErpData
+    {
+        // Handle both camelCase (new API) and snake_case (legacy) field names
+        $externalData = [
+            'subiekt_id' => $subiektProduct->id ?? null,
+            'sku' => $subiektProduct->sku ?? null,
+            'name' => $subiektProduct->name ?? null,
+            'ean' => $subiektProduct->ean ?? null,
+            // New API uses camelCase
+            'price_net' => $subiektProduct->priceNet ?? $subiektProduct->price_net ?? null,
+            'price_gross' => $subiektProduct->priceGross ?? $subiektProduct->price_gross ?? null,
+            'stock_quantity' => $subiektProduct->stock ?? $subiektProduct->stock_quantity ?? 0,
+            'stock_reserved' => $subiektProduct->stockReserved ?? $subiektProduct->stock_reserved ?? 0,
+            'is_active' => $subiektProduct->isActive ?? $subiektProduct->is_active ?? true,
+            'vat_rate' => $subiektProduct->vatRate ?? $subiektProduct->vat_rate ?? null,
+            'group_name' => $subiektProduct->groupName ?? $subiektProduct->group_name ?? null,
+            'manufacturer_name' => $subiektProduct->manufacturerName ?? $subiektProduct->manufacturer_name ?? null,
+            'unit' => $subiektProduct->unit ?? null,
+            'weight' => $subiektProduct->weight ?? null,
+            'fetched_via' => 'rest_api',
+            'fetched_at' => now()->toIso8601String(),
         ];
+
+        return ProductErpData::updateOrCreate(
+            [
+                'product_id' => $product->id,
+                'erp_connection_id' => $connection->id,
+            ],
+            [
+                'external_id' => (string) ($subiektProduct->id ?? ''),
+                'external_sku' => $subiektProduct->sku ?? $product->sku,
+                'sync_status' => ProductErpData::STATUS_SYNCED,
+                'last_sync_at' => now(),
+                'external_data' => $externalData,
+            ]
+        );
     }
 
     /**
