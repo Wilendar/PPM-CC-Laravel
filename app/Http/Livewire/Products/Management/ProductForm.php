@@ -5184,6 +5184,15 @@ class ProductForm extends Component
             return $baseClasses . ' field-status-different';
         }
 
+        // ETAP_08.8 FIX: For unlinked/not_found ERP products, ALL fields get inherited styling
+        // There's no ERP data to compare with, so everything inherits from local PPM data
+        if ($this->activeErpConnectionId !== null) {
+            $syncStatus = $this->erpExternalData['sync_status'] ?? null;
+            if (in_array($syncStatus, ['not_linked', 'not_found'])) {
+                return $baseClasses . ' field-status-inherited';
+            }
+        }
+
         // PRIORITY 2: Check if field has pending sync (highest priority visual indicator)
         if ($this->activeShopId !== null && $this->isPendingSyncForShop($this->activeShopId, $field)) {
             return $baseClasses . ' field-pending-sync';
