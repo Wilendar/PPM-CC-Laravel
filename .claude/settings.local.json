@@ -144,7 +144,14 @@
       "Skill(subiekt-gt-integration)",
       "Bash(Select-String -Pattern \"variant|Variant|SPKAS01|11180|error|Error\" -Context 0,2)",
       "Bash($result = plink -ssh host379076@host379076.hostido.net.pl -P 64321 -i $HostidoKey -batch \"tail -n 100 domains/ppm.mpptrade.pl/public_html/storage/logs/laravel.log | grep -i -E ''variant|SPKAS01|11180|Error|error''\")",
-      "Bash($result)"
+      "Bash($result)",
+      "Bash(where:*)",
+      "Bash(\"C:\\\\Program Files\\\\PuTTY\\\\pscp.exe\" -i \"D:\\\\SSH\\\\Hostido\\\\HostidoSSHNoPass.ppk\" -P 64321 \"D:\\\\Skrypty\\\\PPM-CC-Laravel\\\\app\\\\Http\\\\Livewire\\\\Products\\\\Management\\\\Traits\\\\ProductFormERPTabs.php\" host379076@host379076.hostido.net.pl:domains/ppm.mpptrade.pl/public_html/app/Http/Livewire/Products/Management/Traits/ProductFormERPTabs.php)",
+      "Bash(\"C:\\\\Program Files\\\\PuTTY\\\\pscp.exe\" -i \"D:\\\\SSH\\\\Hostido\\\\HostidoSSHNoPass.ppk\" -P 64321 \"D:\\\\Skrypty\\\\PPM-CC-Laravel\\\\app\\\\Services\\\\ERP\\\\BaselinkerService.php\" host379076@host379076.hostido.net.pl:domains/ppm.mpptrade.pl/public_html/app/Services/ERP/BaselinkerService.php)",
+      "Bash(\"C:\\\\Program Files\\\\PuTTY\\\\pscp.exe\":*)",
+      "Bash(\"C:\\\\Program Files\\\\PuTTY\\\\pscp.exe\" -i \"D:\\\\SSH\\\\Hostido\\\\HostidoSSHNoPass.ppk\" -P 64321 \"D:\\\\Skrypty\\\\PPM-CC-Laravel\\\\resources\\\\views\\\\livewire\\\\products\\\\management\\\\partials\\\\erp-sync-status-panel.blade.php\" host379076@host379076.hostido.net.pl:domains/ppm.mpptrade.pl/public_html/resources/views/livewire/products/management/partials/erp-sync-status-panel.blade.php)",
+      "Bash(\"C:\\\\Program Files\\\\PuTTY\\\\plink.exe\" -ssh host379076@host379076.hostido.net.pl -P 64321 -i \"D:\\\\SSH\\\\Hostido\\\\HostidoSSHNoPass.ppk\" -batch \"cd domains/ppm.mpptrade.pl/public_html && php artisan view:clear && php artisan cache:clear && php artisan config:clear\")",
+      "Bash(\"C:\\\\Program Files\\\\PuTTY\\\\plink.exe\" -ssh host379076@host379076.hostido.net.pl -P 64321 -i \"D:\\\\SSH\\\\Hostido\\\\HostidoSSHNoPass.ppk\" -batch \"cd domains/ppm.mpptrade.pl/public_html && php artisan cache:clear && php artisan config:clear\")"
     ],
     "deny": [],
     "ask": []

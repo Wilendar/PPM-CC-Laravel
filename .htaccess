@@ -1,5 +1,5 @@
 # Force PHP 8.3 for Laravel 12.x compatibility
-AddHandler application/x-httpd-php83 .php
+# AddHandler application/x-httpd-php83 .php
 
 <IfModule mod_negotiation.c>
     Options -MultiViews -Indexes
@@ -25,6 +25,10 @@ AddHandler application/x-httpd-php83 .php
     RewriteCond %{REQUEST_URI} ^/css/
     RewriteCond %{REQUEST_FILENAME} -f
     RewriteRule ^ - [L]
+
+    # Allow direct access to storage folder (symlinked to storage/app/public)
+    RewriteCond %{REQUEST_URI} ^/storage/
+    RewriteRule ^storage/(.*)$ public/storage/$1 [L]
 
     # Send Requests To Front Controller...
     RewriteCond %{REQUEST_FILENAME} !-d

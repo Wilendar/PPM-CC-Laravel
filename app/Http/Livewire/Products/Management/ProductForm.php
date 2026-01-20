@@ -361,6 +361,9 @@ class ProductForm extends Component
                 // FIX 2025-11-25: Detect active sync job on mount (for re-entry during sync)
                 // If user re-enters product while sync is running, restore job tracking state
                 $this->detectActiveJobOnMount();
+
+                // ETAP_08.7: Detect active ERP sync job on mount (analogous to PrestaShop)
+                $this->detectActiveErpJobOnMount();
             } else {
                 $this->isEditMode = false;
                 $this->setDefaults();
@@ -5164,13 +5167,24 @@ class ProductForm extends Component
         // Taller inputs (py-2.5) with proper text padding (px-4) from edges
         $baseClasses = 'block w-full rounded-md shadow-sm focus:ring-orange-500 sm:text-sm transition-all duration-200 px-4 py-2.5';
 
-        // PRIORITY 0: Check if field has pending ERP sync (ETAP_08.4 FIX)
+        // PRIORITY -1: ERP SYNC JOB RUNNING - ALL fields get pending-sync styling!
+        // (matches badge behavior from getFieldStatusIndicator - yellow/orange border during sync)
+        if ($this->hasActiveErpSyncJob()) {
+            return $baseClasses . ' field-pending-sync';
+        }
+
+        // PRIORITY 0: PrestaShop SYNC JOB RUNNING - ALL fields get pending-sync styling!
+        if ($this->activeShopId !== null && $this->hasActiveSyncJob()) {
+            return $baseClasses . ' field-pending-sync';
+        }
+
+        // PRIORITY 1: Check if field has pending ERP sync (ETAP_08.4 FIX)
         // Uses existing .field-status-different class from components.css
         if ($this->activeErpConnectionId !== null && $this->isErpFieldPending($field)) {
             return $baseClasses . ' field-status-different';
         }
 
-        // PRIORITY 1: Check if field has pending sync (highest priority visual indicator)
+        // PRIORITY 2: Check if field has pending sync (highest priority visual indicator)
         if ($this->activeShopId !== null && $this->isPendingSyncForShop($this->activeShopId, $field)) {
             return $baseClasses . ' field-pending-sync';
         }
@@ -5202,19 +5216,40 @@ class ProductForm extends Component
 
     /**
      * Get status indicator for field (visual badge) + pending sync
+     *
+     * ETAP_08.7: Added ERP job running state (shows "Oczekuje" on ALL fields during sync)
      */
     public function getFieldStatusIndicator(string $field): array
     {
-        // PRIORITY 0: Check if field has pending ERP sync (ETAP_08.4 FIX)
+        // PRIORITY -1: ERP SYNC JOB RUNNING - ALL fields show "Oczekuje" badge!
+        // (Screenshot pattern: during active job, ALL inputs have pending badge)
+        if ($this->hasActiveErpSyncJob()) {
+            return [
+                'show' => true,
+                'text' => 'Oczekuje na synchronizację ERP',
+                'class' => 'pending-sync-badge'
+            ];
+        }
+
+        // PRIORITY 0: PrestaShop SYNC JOB RUNNING - ALL fields show "Oczekuje" badge!
+        if ($this->activeShopId !== null && $this->hasActiveSyncJob()) {
+            return [
+                'show' => true,
+                'text' => 'Oczekuje na synchronizację',
+                'class' => 'pending-sync-badge'
+            ];
+        }
+
+        // PRIORITY 1: Check if field has pending ERP changes (before job dispatch)
         if ($this->activeErpConnectionId !== null && $this->isErpFieldPending($field)) {
             return [
                 'show' => true,
-                'text' => 'Własne',
+                'text' => 'Własne (ERP)',
                 'class' => 'status-label-different'
             ];
         }
 
-        // PRIORITY 1: Check if field has pending sync (highest priority)
+        // PRIORITY 2: Check if field has pending shop sync (before job dispatch)
         if ($this->activeShopId !== null && $this->isPendingSyncForShop($this->activeShopId, $field)) {
             return [
                 'show' => true,

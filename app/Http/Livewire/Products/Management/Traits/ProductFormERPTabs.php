@@ -169,6 +169,9 @@ trait ProductFormERPTabs
      * KEY METHOD: Loads ERP-specific overrides to THE SAME form fields
      * Priority: product_erp_data columns > external_data (API cache) > PPM defaults
      *
+     * ETAP_08.8 FIX: NIE tworzy automatycznie rekordu ProductErpData!
+     * Jeśli produkt nie jest powiązany z ERP, pokazuje UI do sprawdzenia/linkowania.
+     *
      * @param int $connectionId
      * @return void
      */
@@ -180,8 +183,37 @@ trait ProductFormERPTabs
             return;
         }
 
-        // Get or create ProductErpData record
-        $erpData = $this->product->getOrCreateErpData($connectionId);
+        // ETAP_08.8 FIX: NIE używaj getOrCreateErpData() - sprawdź czy istnieje
+        $erpData = $this->product->erpData()
+            ->where('erp_connection_id', $connectionId)
+            ->first();
+
+        // Store default PPM values for comparison (used by getFieldStatus)
+        $this->erpDefaultData = $this->defaultData;
+
+        // ETAP_08.8: Jeśli brak rekordu = produkt NIE jest powiązany z tym ERP
+        if (!$erpData) {
+            $this->erpExternalData = [
+                'connection' => $connection,
+                'erp_data_id' => null,
+                'external_id' => null,
+                'sync_status' => 'not_linked',  // Nowy status: nie powiązany
+                'pending_fields' => [],
+                'external_data' => [],
+                'last_sync_at' => null,
+                'last_pull_at' => null,
+                'last_push_at' => null,
+                'error_message' => null,
+            ];
+
+            Log::info('ERP tab selected - product NOT linked to this ERP', [
+                'product_id' => $this->product->id,
+                'connection_id' => $connectionId,
+                'connection_name' => $connection->instance_name,
+            ]);
+
+            return; // NIE nadpisuj pól formularza, zostaw PPM defaults
+        }
 
         // ETAP_08.4: Check if we should pull fresh data from ERP
         if ($this->shouldPullFromErp($erpData)) {
@@ -202,9 +234,6 @@ trait ProductFormERPTabs
             'last_push_at' => $erpData->last_push_at,
             'error_message' => $erpData->error_message,
         ];
-
-        // Store default PPM values for comparison (used by getFieldStatus)
-        $this->erpDefaultData = $this->defaultData;
 
         // ETAP_08.4: CRITICAL - OVERRIDE form fields with ERP data (SHOP-TAB PATTERN!)
         // Priority: product_erp_data columns > external_data (API cache) > PPM defaults
@@ -526,6 +555,16 @@ trait ProductFormERPTabs
             return;
         }
 
+        // ETAP_08.8 FIX: Sprawdź czy produkt jest powiązany z ERP przed sync
+        if (!$this->isProductLinkedToErp($connectionId)) {
+            $this->addError('erp_sync', 'Produkt nie jest powiazany z tym ERP. Najpierw kliknij "Dodac do ERP?"');
+            Log::warning('syncToErp: Product not linked to ERP', [
+                'product_id' => $this->product->id,
+                'connection_id' => $connectionId,
+            ]);
+            return;
+        }
+
         // ETAP_08.5: PREVENT DUPLICATE DISPATCH!
         // Check if we're already syncing this connection
         if ($this->activeErpJobStatus === 'pending' || $this->activeErpJobStatus === 'running') {
@@ -547,7 +586,15 @@ trait ProductFormERPTabs
             $this->saveCurrentErpData($connectionId);
 
             // ETAP_08.5 Step 2: Mark ProductErpData as syncing
-            $erpData = $this->product->getOrCreateErpData($connectionId);
+            // ETAP_08.8 FIX: Używamy zwykłego query - wiemy że rekord istnieje
+            $erpData = $this->product->erpData()
+                ->where('erp_connection_id', $connectionId)
+                ->first();
+
+            if (!$erpData) {
+                throw new \Exception('ERP data record not found');
+            }
+
             $erpData->markSyncing();
 
             // ETAP_08.5 Step 3: Set job tracking for UI (like PrestaShop pattern)
@@ -563,6 +610,9 @@ trait ProductFormERPTabs
 
             // ETAP_08.5 Step 4: Dispatch async Job
             SyncProductToERP::dispatch($this->product, $connection);
+
+            // ETAP_08.6: Notify Alpine to start ERP polling (analogia do PrestaShop job-started)
+            $this->dispatch('erp-job-started');
 
             Log::info('ERP sync job dispatched with tracking (SHOP-TAB PATTERN)', [
                 'product_id' => $this->product->id,
@@ -646,7 +696,18 @@ trait ProductFormERPTabs
             return;
         }
 
-        $erpData = $this->product->getOrCreateErpData($connectionId);
+        // ETAP_08.8 FIX: NIE twórz rekordu jeśli produkt nie jest powiązany z ERP!
+        $erpData = $this->product->erpData()
+            ->where('erp_connection_id', $connectionId)
+            ->first();
+
+        if (!$erpData) {
+            Log::info('saveCurrentErpData: Product not linked to ERP - skipping save', [
+                'product_id' => $this->product->id,
+                'connection_id' => $connectionId,
+            ]);
+            return;
+        }
 
         // Save current form fields to product_erp_data columns
         $erpData->update([
@@ -804,6 +865,17 @@ trait ProductFormERPTabs
             return;
         }
 
+        // ETAP_08.8 FIX: NIE dispatchuj joba jeśli produkt nie jest powiązany z ERP!
+        // Użytkownik musi najpierw kliknąć "Dodać do ERP?" żeby utworzyć powiązanie
+        if (!$this->isProductLinkedToErp($this->activeErpConnectionId)) {
+            Log::info('saveErpContextAndDispatchJob: Product NOT linked to ERP - skipping job dispatch', [
+                'product_id' => $this->product->id,
+                'connection_id' => $this->activeErpConnectionId,
+                'erp_link_status' => $this->getErpLinkStatus($this->activeErpConnectionId),
+            ]);
+            return;
+        }
+
         $connection = ERPConnection::find($this->activeErpConnectionId);
         if (!$connection) {
             $this->addError('erp_save', 'ERP connection not found');
@@ -827,7 +899,10 @@ trait ProductFormERPTabs
             }
 
             // Step 2: Check if there are pending changes
-            $erpData = $this->product->getOrCreateErpData($this->activeErpConnectionId);
+            // ETAP_08.8 FIX: Używamy zwykłego query zamiast getOrCreateErpData()
+            $erpData = $this->product->erpData()
+                ->where('erp_connection_id', $this->activeErpConnectionId)
+                ->first();
             $hasPendingChanges = !empty($erpData->pending_fields);
 
             if ($hasPendingChanges) {
@@ -847,6 +922,9 @@ trait ProductFormERPTabs
 
                 // Step 4: Dispatch async Job
                 SyncProductToERP::dispatch($this->product, $connection);
+
+                // ETAP_08.6: Notify Alpine to start ERP polling
+                $this->dispatch('erp-job-started');
 
                 Log::info('saveErpContextAndDispatchJob: ERP sync job dispatched with tracking', [
                     'product_id' => $this->product->id,
@@ -960,16 +1038,37 @@ trait ProductFormERPTabs
             ->where('erp_connection_id', $connectionId)
             ->first();
 
+        // ETAP_08.8: Check erpExternalData for UI reactivity (not_found status)
+        if ($this->activeErpConnectionId === $connectionId) {
+            $uiStatus = $this->erpExternalData['sync_status'] ?? null;
+            if ($uiStatus === 'not_found') {
+                return [
+                    'status' => 'not_found',
+                    'icon' => '⊘',
+                    'text' => 'Nie znaleziono',
+                    'class' => 'bg-orange-600 text-white',
+                    'external_id' => null,
+                    'last_sync' => null,
+                ];
+            }
+        }
+
         if (!$erpData) {
             return [
-                'status' => 'not_synced',
+                'status' => 'not_linked',
                 'icon' => '○',
-                'text' => 'Nie zsynchronizowano',
+                'text' => 'Nie polaczony',
                 'class' => 'bg-gray-600 text-gray-300',
                 'external_id' => null,
                 'last_sync' => null,
             ];
         }
+
+        // ETAP_08.6 FIX: Pobierz pending_fields dla wyswietlenia listy (jak w PrestaShop TAB)
+        $pendingFields = $erpData->pending_fields ?? [];
+        $pendingText = !empty($pendingFields)
+            ? 'Oczekuje: ' . implode(', ', $pendingFields)
+            : 'Oczekuje';
 
         $statusMap = [
             ProductErpData::STATUS_SYNCED => [
@@ -979,7 +1078,7 @@ trait ProductFormERPTabs
             ],
             ProductErpData::STATUS_PENDING => [
                 'icon' => '⏳',
-                'text' => 'Oczekuje',
+                'text' => $pendingText,  // ETAP_08.6: Dynamiczny tekst z lista pol
                 'class' => 'bg-yellow-600 text-white',
             ],
             ProductErpData::STATUS_SYNCING => [
@@ -1312,5 +1411,278 @@ trait ProductFormERPTabs
         $this->erpJobCreatedAt = null;
         $this->erpJobResult = null;
         $this->erpJobMessage = null;
+    }
+
+    // ==========================================
+    // ETAP_08.7: ERP JOB DETECTION ON MOUNT (PERSISTENCY)
+    // ==========================================
+
+    /**
+     * ETAP_08.7: Detect active ERP sync job on mount
+     *
+     * Restores job tracking state from product_erp_data.sync_status = 'syncing'
+     * This ensures blocking overlay persists even after page refresh.
+     *
+     * MIRRORS: detectActiveJobOnMount() from PrestaShop pattern
+     *
+     * @return void
+     */
+    public function detectActiveErpJobOnMount(): void
+    {
+        if (!$this->product || !$this->product->exists) {
+            return;
+        }
+
+        try {
+            // Find any ERP connection with syncing status for this product
+            $syncingErpData = $this->product->erpData()
+                ->where('sync_status', ProductErpData::STATUS_SYNCING)
+                ->orderBy('updated_at', 'desc')
+                ->first();
+
+            if ($syncingErpData) {
+                // Active ERP sync job found - restore job tracking state
+                $this->activeErpJobStatus = 'running';
+                $this->activeErpJobType = 'sync';
+                $this->activeErpJobConnectionId = $syncingErpData->erp_connection_id;
+                $this->erpJobCreatedAt = $syncingErpData->updated_at->toIso8601String();
+
+                // Restore UI state
+                $this->erpExternalData['sync_status'] = ProductErpData::STATUS_SYNCING;
+
+                Log::info('[MOUNT] Detected active ERP sync job - restoring tracking state', [
+                    'product_id' => $this->product->id,
+                    'connection_id' => $syncingErpData->erp_connection_id,
+                    'sync_status' => $syncingErpData->sync_status,
+                ]);
+            }
+        } catch (\Exception $e) {
+            Log::error('[MOUNT] Failed to detect active ERP job', [
+                'product_id' => $this->product->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    // ==========================================
+    // ETAP_08.8: ERP PRODUCT LINKING (Check/Link/Create)
+    // ==========================================
+
+    /**
+     * ETAP_08.8: Check if product exists in ERP by SKU/EAN
+     *
+     * Called when user clicks "Sprawdź czy jest w ERP".
+     * Searches ERP for product by SKU or EAN.
+     *
+     * @param int $connectionId
+     * @return void
+     */
+    public function checkProductInErp(int $connectionId): void
+    {
+        $connection = ERPConnection::find($connectionId);
+        if (!$connection || !$this->product) {
+            $this->addError('erp_check', 'Brak polaczenia ERP lub produktu');
+            return;
+        }
+
+        $this->loadingErpData = true;
+
+        try {
+            // Use BaselinkerService to search for product by SKU
+            $service = app(BaselinkerService::class);
+            $result = $service->findProductBySku($connection, $this->product->sku);
+
+            if ($result['success'] && !empty($result['external_id'])) {
+                // Product FOUND in ERP - link it automatically
+                $this->linkProductToErp($connectionId, $result['external_id'], $result['data'] ?? []);
+
+                session()->flash('message', 'Produkt znaleziony w ERP i polaczony: ' . $connection->instance_name);
+
+                Log::info('checkProductInErp: Product found and linked', [
+                    'product_id' => $this->product->id,
+                    'connection_id' => $connectionId,
+                    'external_id' => $result['external_id'],
+                ]);
+            } else {
+                // Product NOT FOUND in ERP - show "Dodać do ERP?" button
+                $this->erpExternalData['sync_status'] = 'not_found';
+
+                session()->flash('warning', 'Produkt nie zostal znaleziony w ERP. Mozesz go dodac.');
+
+                Log::info('checkProductInErp: Product not found in ERP', [
+                    'product_id' => $this->product->id,
+                    'connection_id' => $connectionId,
+                    'sku' => $this->product->sku,
+                ]);
+            }
+
+        } catch (\Exception $e) {
+            $this->addError('erp_check', 'Blad sprawdzania ERP: ' . $e->getMessage());
+            Log::error('checkProductInErp error', [
+                'product_id' => $this->product->id,
+                'connection_id' => $connectionId,
+                'error' => $e->getMessage(),
+            ]);
+        } finally {
+            $this->loadingErpData = false;
+        }
+    }
+
+    /**
+     * ETAP_08.8: Link product to existing ERP product
+     *
+     * Creates ProductErpData record with external_id and pulls data from ERP.
+     *
+     * @param int $connectionId
+     * @param string $externalId
+     * @param array $externalData
+     * @return void
+     */
+    protected function linkProductToErp(int $connectionId, string $externalId, array $externalData = []): void
+    {
+        if (!$this->product) {
+            return;
+        }
+
+        // Create ProductErpData record with external_id
+        $erpData = $this->product->erpData()->create([
+            'erp_connection_id' => $connectionId,
+            'external_id' => $externalId,
+            'sync_status' => ProductErpData::STATUS_SYNCED,
+            'external_data' => $externalData,
+            'last_pull_at' => now(),
+        ]);
+
+        // Update UI state
+        $this->erpExternalData = [
+            'connection' => ERPConnection::find($connectionId),
+            'erp_data_id' => $erpData->id,
+            'external_id' => $externalId,
+            'sync_status' => ProductErpData::STATUS_SYNCED,
+            'pending_fields' => [],
+            'external_data' => $externalData,
+            'last_sync_at' => null,
+            'last_pull_at' => now(),
+            'last_push_at' => null,
+            'error_message' => null,
+        ];
+
+        // Load ERP data to form fields
+        if (!empty($externalData)) {
+            $this->overrideFormFieldsWithErpData($erpData);
+        }
+
+        Log::info('linkProductToErp: Product linked to ERP', [
+            'product_id' => $this->product->id,
+            'connection_id' => $connectionId,
+            'external_id' => $externalId,
+        ]);
+    }
+
+    /**
+     * ETAP_08.8: Add product to ERP (create new in ERP)
+     *
+     * Called when user clicks "Dodać do ERP?".
+     * Creates new product in ERP system via sync job.
+     *
+     * @param int $connectionId
+     * @return void
+     */
+    public function addProductToErp(int $connectionId): void
+    {
+        $connection = ERPConnection::find($connectionId);
+        if (!$connection || !$this->product) {
+            $this->addError('erp_add', 'Brak polaczenia ERP lub produktu');
+            return;
+        }
+
+        try {
+            // Create ProductErpData record WITHOUT external_id (will be created by sync)
+            $erpData = $this->product->erpData()->create([
+                'erp_connection_id' => $connectionId,
+                'external_id' => null,  // Will be filled after sync creates product
+                'sync_status' => ProductErpData::STATUS_PENDING,
+                'pending_fields' => ['sku', 'name', 'ean', 'manufacturer', 'weight'],  // Mark all as pending
+            ]);
+
+            // Update UI state
+            $this->erpExternalData = [
+                'connection' => $connection,
+                'erp_data_id' => $erpData->id,
+                'external_id' => null,
+                'sync_status' => ProductErpData::STATUS_PENDING,
+                'pending_fields' => $erpData->pending_fields,
+                'external_data' => [],
+                'last_sync_at' => null,
+                'last_pull_at' => null,
+                'last_push_at' => null,
+                'error_message' => null,
+            ];
+
+            session()->flash('message', 'Produkt przygotowany do dodania do ERP. Kliknij Synchronizuj aby wyslac.');
+
+            Log::info('addProductToErp: Product prepared for ERP creation', [
+                'product_id' => $this->product->id,
+                'connection_id' => $connectionId,
+            ]);
+
+        } catch (\Exception $e) {
+            $this->addError('erp_add', 'Blad przygotowania do ERP: ' . $e->getMessage());
+            Log::error('addProductToErp error', [
+                'product_id' => $this->product->id,
+                'connection_id' => $connectionId,
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    /**
+     * ETAP_08.8: Check if product is linked to specific ERP connection
+     *
+     * @param int $connectionId
+     * @return bool
+     */
+    public function isProductLinkedToErp(int $connectionId): bool
+    {
+        if (!$this->product) {
+            return false;
+        }
+
+        return $this->product->erpData()
+            ->where('erp_connection_id', $connectionId)
+            ->exists();
+    }
+
+    /**
+     * ETAP_08.8: Get ERP link status for UI display
+     *
+     * Returns: 'linked' | 'not_linked' | 'not_found' | 'pending'
+     *
+     * @param int $connectionId
+     * @return string
+     */
+    public function getErpLinkStatus(int $connectionId): string
+    {
+        // Check current erpExternalData state first (for UI reactivity)
+        if ($this->activeErpConnectionId === $connectionId) {
+            $status = $this->erpExternalData['sync_status'] ?? 'not_linked';
+            if ($status === 'not_linked' || $status === 'not_found') {
+                return $status;
+            }
+        }
+
+        if (!$this->product) {
+            return 'not_linked';
+        }
+
+        $erpData = $this->product->erpData()
+            ->where('erp_connection_id', $connectionId)
+            ->first();
+
+        if (!$erpData) {
+            return 'not_linked';
+        }
+
+        return 'linked';
     }
 }

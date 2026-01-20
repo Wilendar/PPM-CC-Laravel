@@ -74,16 +74,18 @@
    PENDING SYNC VISUAL INDICATORS
    ======================================== */
 
-/* Field with pending sync - orange border + subtle background */
+/* Field with pending sync - orange/yellow border + visible background */
+/* ETAP_08.7: Increased intensity for better visibility on dark theme */
 .field-pending-sync {
-    border-color: var(--color-warning, #f59e0b) !important;
-    background-color: rgba(251, 191, 36, 0.08) !important;
-    box-shadow: 0 0 0 1px rgba(251, 191, 36, 0.15) !important;
+    border-color: #f59e0b !important;
+    border-width: 2px !important;
+    background-color: rgba(251, 191, 36, 0.15) !important;
+    box-shadow: 0 0 0 2px rgba(251, 191, 36, 0.25), inset 0 0 0 1px rgba(251, 191, 36, 0.1) !important;
 }
 
 .field-pending-sync:focus {
-    border-color: var(--color-warning, #f59e0b) !important;
-    box-shadow: 0 0 0 3px rgba(251, 191, 36, 0.2) !important;
+    border-color: #f59e0b !important;
+    box-shadow: 0 0 0 3px rgba(251, 191, 36, 0.35) !important;
 }
 
 /* Pending sync badge */

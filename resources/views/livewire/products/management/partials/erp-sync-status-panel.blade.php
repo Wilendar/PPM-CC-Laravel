@@ -1,10 +1,8 @@
 {{-- ETAP_08.5: ERP Sync Status Panel (Compact Shop-Tab Pattern) --}}
 {{-- Panel statusu synchronizacji - domyslnie zwiniety, jak Shop TAB --}}
 
-{{-- wire:poll dla sprawdzania statusu joba (tylko gdy aktywny job) --}}
-@if($this->hasActiveErpSyncJob())
-<div wire:poll.2s="checkErpJobStatus" class="hidden"></div>
-@endif
+{{-- UWAGA: wire:poll zostal przeniesiony do erp-management.blade.php (FIX ETAP_08.6) --}}
+{{-- Nie duplikuj wire:poll tutaj - powoduje to podwojne odpytywanie i problemy z DOM --}}
 
 @php
     $connection = $erpExternalData['connection'] ?? null;
@@ -110,6 +108,20 @@
                         </svg>
                     </span>
                 @break
+                @case('not_linked')
+                    <span class="text-2xl text-gray-500">
+                        <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/>
+                        </svg>
+                    </span>
+                @break
+                @case('not_found')
+                    <span class="text-2xl text-orange-500">
+                        <svg class="w-8 h-8" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
+                        </svg>
+                    </span>
+                @break
                 @default
                     <span class="text-2xl text-gray-400">
                         <svg class="w-8 h-8" fill="currentColor" viewBox="0 0 20 20">
@@ -120,21 +132,30 @@
 
             <div>
                 {{-- Status Title --}}
-                <h4 class="font-semibold @switch($syncStatus) @case('synced') text-green-400 @break @case('error') text-red-400 @break @case('syncing') text-blue-400 @break @case('pending') text-yellow-400 @break @default text-gray-400 @endswitch">
-                    Status synchronizacji:
+                <h4 class="font-semibold @switch($syncStatus) @case('synced') text-green-400 @break @case('error') text-red-400 @break @case('syncing') text-blue-400 @break @case('pending') text-yellow-400 @break @case('not_found') text-orange-400 @break @default text-gray-400 @endswitch">
                     @switch($syncStatus)
-                        @case('synced') Zsynchronizowany @break
-                        @case('syncing') Synchronizacja... @break
-                        @case('error') Blad @break
-                        @case('pending') Oczekuje ({{ $pendingCount }}) @break
-                        @default Nie zsynchronizowano @break
+                        @case('synced') Status synchronizacji: Zsynchronizowany @break
+                        @case('syncing') Status synchronizacji: Synchronizacja... @break
+                        @case('error') Status synchronizacji: Blad @break
+                        @case('pending') Status synchronizacji: Oczekuje ({{ $pendingCount }}) @break
+                        @case('not_linked') Produkt nie polaczony z ERP @break
+                        @case('not_found') Produkt nie znaleziony w ERP @break
+                        @default Status synchronizacji: Nie zsynchronizowano @break
                     @endswitch
                 </h4>
 
-                {{-- External ID --}}
+                {{-- External ID or Status Description --}}
                 @if($externalId)
                     <p class="text-sm text-gray-400">
                         {{ ucfirst($connection->erp_type) }} ID: <strong class="font-mono">#{{ $externalId }}</strong>
+                    </p>
+                @elseif($syncStatus === 'not_linked')
+                    <p class="text-sm text-gray-500">
+                        Kliknij "Sprawdz czy jest w ERP" aby wyszukac produkt po SKU
+                    </p>
+                @elseif($syncStatus === 'not_found')
+                    <p class="text-sm text-orange-400">
+                        Produkt o SKU "{{ $this->product->sku ?? 'N/A' }}" nie istnieje w ERP. Mozesz go dodac.
                     </p>
                 @else
                     <p class="text-sm text-gray-500">
@@ -233,38 +254,76 @@
                 </p>
             </div>
 
-            {{-- Action Buttons --}}
-            <div class="shop-actions-compact mt-4 flex gap-2">
-                <button type="button"
-                        wire:click="syncToErp({{ $connection->id }})"
-                        wire:loading.attr="disabled"
-                        @if($isSyncing) disabled @endif
-                        class="btn-enterprise-primary text-sm inline-flex items-center {{ $isSyncing ? 'opacity-50 cursor-not-allowed' : '' }}">
-                    <svg class="w-4 h-4 mr-1.5" wire:loading.class="animate-spin" wire:target="syncToErp({{ $connection->id }})" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                    </svg>
-                    <span wire:loading.remove wire:target="syncToErp({{ $connection->id }})">
-                        @if($hasPending)
-                            Wyslij zmiany ({{ $pendingCount }})
-                        @else
-                            Synchronizuj do ERP
-                        @endif
-                    </span>
-                    <span wire:loading wire:target="syncToErp({{ $connection->id }})">Wysylanie...</span>
-                </button>
+            {{-- Action Buttons - ETAP_08.8: Only show when linked --}}
+            @if(!in_array($syncStatus, ['not_linked', 'not_found']))
+                <div class="shop-actions-compact mt-4 flex gap-2">
+                    <button type="button"
+                            wire:click="syncToErp({{ $connection->id }})"
+                            wire:loading.attr="disabled"
+                            @if($isSyncing) disabled @endif
+                            class="btn-enterprise-primary text-sm inline-flex items-center {{ $isSyncing ? 'opacity-50 cursor-not-allowed' : '' }}">
+                        <svg class="w-4 h-4 mr-1.5" wire:loading.class="animate-spin" wire:target="syncToErp({{ $connection->id }})" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                        </svg>
+                        <span wire:loading.remove wire:target="syncToErp({{ $connection->id }})">
+                            @if($hasPending)
+                                Wyslij zmiany ({{ $pendingCount }})
+                            @else
+                                Synchronizuj do ERP
+                            @endif
+                        </span>
+                        <span wire:loading wire:target="syncToErp({{ $connection->id }})">Wysylanie...</span>
+                    </button>
 
-                <button type="button"
-                        wire:click="pullProductDataFromErp({{ $connection->id }})"
-                        wire:loading.attr="disabled"
-                        @if($isSyncing) disabled @endif
-                        class="btn-enterprise-secondary text-sm inline-flex items-center {{ $isSyncing ? 'opacity-50 cursor-not-allowed' : '' }}">
-                    <svg class="w-4 h-4 mr-1.5" wire:loading.class="animate-spin" wire:target="pullProductDataFromErp({{ $connection->id }})" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                    </svg>
-                    <span wire:loading.remove wire:target="pullProductDataFromErp({{ $connection->id }})">Wczytaj z ERP</span>
-                    <span wire:loading wire:target="pullProductDataFromErp({{ $connection->id }})">Pobieranie...</span>
-                </button>
-            </div>
+                    <button type="button"
+                            wire:click="pullProductDataFromErp({{ $connection->id }})"
+                            wire:loading.attr="disabled"
+                            @if($isSyncing) disabled @endif
+                            class="btn-enterprise-secondary text-sm inline-flex items-center {{ $isSyncing ? 'opacity-50 cursor-not-allowed' : '' }}">
+                        <svg class="w-4 h-4 mr-1.5" wire:loading.class="animate-spin" wire:target="pullProductDataFromErp({{ $connection->id }})" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                        </svg>
+                        <span wire:loading.remove wire:target="pullProductDataFromErp({{ $connection->id }})">Wczytaj z ERP</span>
+                        <span wire:loading wire:target="pullProductDataFromErp({{ $connection->id }})">Pobieranie...</span>
+                    </button>
+                </div>
+            @else
+                {{-- ETAP_08.8: Buttons for not linked/not found state --}}
+                <div class="shop-actions-compact mt-4 flex gap-2">
+                    @if($syncStatus === 'not_linked')
+                        <button type="button"
+                                wire:click="checkProductInErp({{ $connection->id }})"
+                                wire:loading.attr="disabled"
+                                class="btn-enterprise-primary text-sm inline-flex items-center">
+                            <svg class="w-4 h-4 mr-1.5" wire:loading.class="animate-spin" wire:target="checkProductInErp({{ $connection->id }})" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                            </svg>
+                            <span wire:loading.remove wire:target="checkProductInErp({{ $connection->id }})">Sprawdz czy jest w ERP</span>
+                            <span wire:loading wire:target="checkProductInErp({{ $connection->id }})">Szukam...</span>
+                        </button>
+                    @elseif($syncStatus === 'not_found')
+                        <button type="button"
+                                wire:click="addProductToErp({{ $connection->id }})"
+                                wire:loading.attr="disabled"
+                                class="btn-enterprise-primary text-sm inline-flex items-center">
+                            <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                            </svg>
+                            <span>Dodac do ERP?</span>
+                        </button>
+                        <button type="button"
+                                wire:click="checkProductInErp({{ $connection->id }})"
+                                wire:loading.attr="disabled"
+                                class="btn-enterprise-secondary text-sm inline-flex items-center">
+                            <svg class="w-4 h-4 mr-1.5" wire:loading.class="animate-spin" wire:target="checkProductInErp({{ $connection->id }})" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                            </svg>
+                            <span wire:loading.remove wire:target="checkProductInErp({{ $connection->id }})">Sprawdz ponownie</span>
+                            <span wire:loading wire:target="checkProductInErp({{ $connection->id }})">Szukam...</span>
+                        </button>
+                    @endif
+                </div>
+            @endif
 
             {{-- Raw External Data Preview (dev only) --}}
             @if(!empty($externalData) && config('app.debug'))

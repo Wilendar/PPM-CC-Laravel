@@ -231,114 +231,192 @@ protected function syncProductStock(...): array
 
 ---
 
-## ZADANIE 3: Pending Sync UI dla ERP TAB
+## ZADANIE 3: Pending Sync UI dla ERP TAB (SHOP-TAB PATTERN)
 
-### Problem
-Na screenshocie widać że PrestaShop TAB ma:
-- Żółte badge "OCZEKUJE NA SYNCHRONIZACJĘ" przy polach
-- Progressbar "Trwa aktualizacja" w sidebarze
-- Zamrożone pola podczas sync
+### Problem - AKTUALIZACJA 2026-01-20
 
-ERP TAB **NIE MA** tej funkcjonalności mimo że kod częściowo istnieje!
+**WYMAGANIE:** Po uruchomieniu JOB synchronizacji ERP musi się dziać TO SAMO co w PrestaShop TAB:
 
-### Analiza Obecnego Stanu
-**Co już istnieje:**
-- `ProductFormERPTabs.php` ma properties: `$activeErpJobStatus`, `$activeErpJobType`
-- `ProductErpData` ma kolumny: `sync_status`, `pending_fields`
-- `erp-sync-status-panel.blade.php` istnieje
+1. **Panel "Szybkie akcje"** (sidebar):
+   - Zmiana na "Trwa aktualizacja" (niebieski header z ikoną spinnera)
+   - Progress bar z gradientem i odliczaniem czasu "(Xs)"
+   - Przycisk "Wróć do Listy Produktów"
 
-**Co NIE DZIAŁA:**
-- Pola NIE pokazują badge "OCZEKUJE NA SYNCHRONIZACJĘ"
-- `trackErpFieldChange()` NIE jest wywoływany przy edycji
-- Overlay blokujący NIE pojawia się
-- `getErpFieldStatusIndicator()` NIE jest używany w Blade
+2. **Connection badge** (sekcja "Integracje ERP"):
+   - Status zmienia się z "Zsynchronizowany" na "Oczekuje: [lista pól]"
+   - Pokazuje DOKŁADNĄ LISTĘ oczekujących pól (jak PrestaShop: "waga, stawka VAT, główny wariant...")
+
+3. **Pola formularza**:
+   - Żółty badge "OCZEKUJE NA SYNCHRONIZACJĘ" przy każdym polu pending
+   - Pola NIE są zablokowane, ale są oznaczone wizualnie
+
+4. **Po zakończeniu job**:
+   - Panel wraca do normalnego stanu
+   - Badge zmienia się na "Zsynchronizowany"
+   - Badge przy polach znikają
+
+### Analiza Obecnego Stanu - SZCZEGÓŁOWA
+
+**✅ Co JUŻ DZIAŁA (KOD ISTNIEJE):**
+
+1. `quick-actions.blade.php`:
+   - ✅ Alpine `quickActionsTracker` z pełną obsługą ERP
+   - ✅ `@entangle('activeErpJobStatus')`, `@entangle('erpJobCreatedAt')` itd.
+   - ✅ Progress bar z countdown dla ERP
+   - ✅ Success/Error states
+
+2. `erp-management.blade.php`:
+   - ✅ Blocking overlay: `.erp-sync-overlay` (linie 134-146)
+   - ✅ Connection badges z status display
+
+3. `erp-connection-data.blade.php`:
+   - ✅ `wire:change="trackErpFieldChange('sku')"` na polach
+   - ✅ `getErpFieldStatusIndicator()` wywoływane dla badge
+   - ✅ `getErpFieldClasses()` dla stylowania inputów
+
+4. `ProductFormERPTabs.php`:
+   - ✅ Pełna logika job tracking (linie 72-106)
+   - ✅ `checkErpJobStatus()` dla wire:poll
+   - ✅ `hasActiveErpSyncJob()` dla UI
+   - ✅ `getErpFieldStatusIndicator()` z tekstem "Oczekuje synchronizacji"
+
+5. `erp-sync-status-panel.blade.php`:
+   - ✅ Alpine `erpSyncStatusTracker` z progress bar
+   - ✅ Success/Error states
+
+**❌ BŁĘDY DO NAPRAWIENIA:**
+
+### BUG 1: wire:poll NIE inicjalizuje się (KRYTYCZNY!)
+**Plik:** `erp-sync-status-panel.blade.php` (linie 5-7)
+
+**OBECNY KOD (BŁĘDNY):**
+```blade
+@if($this->hasActiveErpSyncJob())
+<div wire:poll.2s="checkErpJobStatus" class="hidden"></div>
+@endif
+```
+
+**PROBLEM:** `@if` jest NA ZEWNĄTRZ div z wire:poll!
+- Gdy strona ładuje się BEZ aktywnego joba → wire:poll element NIE istnieje w DOM
+- Gdy użytkownik kliknie "Sync do ERP" → job się uruchamia
+- ALE wire:poll nadal NIE istnieje → Livewire NIGDY nie wywoła `checkErpJobStatus()`!
+
+**ZASADA Z HKS:** `wire:poll element MUSI istniec w DOM ZAWSZE - @if WEWNATRZ wrappera`
+
+**FIX:**
+```blade
+{{-- wire:poll ZAWSZE w DOM, @if WEWNATRZ --}}
+<div wire:poll.2s="checkErpJobStatus">
+    @if($this->hasActiveErpSyncJob())
+        {{-- polling active --}}
+    @endif
+</div>
+```
+
+### BUG 2: Connection badge NIE pokazuje listy pól
+**Plik:** `erp-management.blade.php` (linie 89-92)
+
+**OBECNY KOD:**
+```blade
+<span class="inline-flex items-center ml-2 px-2 py-0.5 rounded text-xs font-medium {{ $syncDisplay['class'] }}">
+    {{ $syncDisplay['icon'] }} {{ $syncDisplay['text'] }}
+</span>
+```
+
+**PROBLEM:** `$syncDisplay['text']` to tylko "Oczekuje" - brak listy pól!
+**PrestaShop pokazuje:** "Oczekuje: waga, stawka VAT, główny wariant, wyróżniony, kategorie"
+
+**FIX:** Rozszerzyć `getErpSyncStatusDisplay()` w `ProductFormERPTabs.php`:
+```php
+// Dla STATUS_PENDING dodać:
+$pendingText = 'Oczekuje';
+if (!empty($erpData->pending_fields)) {
+    $fieldLabels = array_map(fn($f) => __("products.fields.{$f}") ?: ucfirst(str_replace('_', ' ', $f)), $erpData->pending_fields);
+    $pendingText = 'Oczekuje: ' . implode(', ', $fieldLabels);
+}
+```
+
+### BUG 3: Klasa CSS `pending-sync-badge` może nie istnieć
+**Plik:** `ProductFormERPTabs.php` (linia 1087)
+
+**OBECNY KOD:**
+```php
+return [
+    'show' => true,
+    'class' => 'pending-sync-badge',
+    'text' => 'Oczekuje synchronizacji',
+];
+```
+
+**POTRZEBNA WERYFIKACJA:** Czy `.pending-sync-badge` jest zdefiniowana w CSS?
+Jeśli nie, pola pending nie będą miały żółtego tła.
+
+### BUG 4: wire:poll tylko w erp-sync-status-panel (warunkowo includowany)
+**Plik:** `erp-management.blade.php` (linie 130-132)
+
+```blade
+@if($activeErpConnectionId !== null && !empty($erpExternalData))
+    @include('livewire.products.management.partials.erp-sync-status-panel')
+@endif
+```
+
+**PROBLEM:** Gdy użytkownik jest w widoku "Dane PPM" (default) ale uruchomił sync ERP,
+`erp-sync-status-panel` NIE jest includowane → wire:poll nie działa!
+
+**FIX:** Przenieść wire:poll POZA warunek, np. do `erp-management.blade.php` bezpośrednio.
 
 ### Plan Implementacji
 
-#### 3.1 Podłączyć trackErpFieldChange() do input fields
-**Plik:** `resources/views/livewire/products/management/partials/erp-data-form.blade.php`
-
-```blade
-{{-- Każdy input musi mieć wire:change --}}
-<input type="text"
-       wire:model.live="sku"
-       wire:change="trackErpFieldChange('sku')"
-       class="form-input-enterprise {{ $this->getErpFieldClasses('sku') }}"
-/>
-
-{{-- Badge przy labelu --}}
-<label>
-    SKU produktu
-    @php $indicator = $this->getErpFieldStatusIndicator('sku'); @endphp
-    @if($indicator['show'])
-        <span class="{{ $indicator['class'] }}">{{ $indicator['text'] }}</span>
-    @endif
-</label>
-```
-
-#### 3.2 Dodać blocking overlay w ERP section
+#### 3.1 FIX wire:poll (KRYTYCZNY!)
 **Plik:** `resources/views/livewire/products/management/partials/erp-management.blade.php`
 
+Dodać wire:poll BEZPOŚREDNIO w głównym wrapperze (nie w includowanym pliku):
 ```blade
-{{-- Blocking overlay when ERP sync active --}}
-@if($this->hasActiveErpSyncJob())
-<div class="erp-sync-overlay">
-    <div class="erp-sync-overlay-content">
-        <svg class="animate-spin h-8 w-8 text-blue-400">...</svg>
-        <span class="text-blue-300 font-medium">OCZEKUJE NA SYNCHRONIZACJĘ ERP</span>
-        <span class="text-xs text-blue-400">Pola są zablokowane do zakończenia synchronizacji</span>
-    </div>
+{{-- ZAWSZE wire:poll gdy są aktywne ERP connections --}}
+@if($erpConnections->isNotEmpty())
+<div class="mt-3 bg-gray-800 rounded-lg p-3 relative"
+     wire:poll.2s="checkErpJobStatus">
+    ...
 </div>
 @endif
 ```
 
-#### 3.3 Rozszerzyć sidebar "Szybkie akcje"
-**Plik:** `resources/views/livewire/products/management/partials/quick-actions-sidebar.blade.php`
+#### 3.2 Rozszerzyć getErpSyncStatusDisplay() o listę pól
+**Plik:** `app/Http/Livewire/Products/Management/Traits/ProductFormERPTabs.php`
 
-```blade
-{{-- ERP Sync Status (analogia do PrestaShop) --}}
-@if($this->hasActiveErpSyncJob())
-<div class="quick-action-card bg-blue-900/30 border-blue-700">
-    <div class="flex items-center gap-2">
-        <svg class="animate-spin h-5 w-5 text-blue-400">...</svg>
-        <span class="text-blue-400 font-medium">Trwa synchronizacja ERP</span>
-    </div>
-    <div class="mt-2">
-        <span x-text="'Synchronizowanie... (' + remainingSeconds + 's)'"></span>
-    </div>
-    {{-- Progress bar --}}
-    <div class="h-1 bg-blue-900 rounded-full mt-2">
-        <div class="h-full bg-blue-500 rounded-full transition-all"
-             :style="'width: ' + progress + '%'"></div>
-    </div>
-</div>
-@endif
+Dodać do metody `getErpSyncStatusDisplay()`:
+```php
+ProductErpData::STATUS_PENDING => [
+    'icon' => '⏳',
+    'text' => $this->buildPendingFieldsText($erpData),  // Nowa metoda!
+    'class' => 'bg-yellow-600 text-white',
+],
 ```
 
-#### 3.4 CSS dla ERP pending states
+Nowa metoda:
+```php
+protected function buildPendingFieldsText(ProductErpData $erpData): string
+{
+    $pendingFields = $erpData->pending_fields ?? [];
+    if (empty($pendingFields)) {
+        return 'Oczekuje';
+    }
+
+    $fieldLabels = array_map(function($field) {
+        return __("products.fields.{$field}") ?: ucfirst(str_replace('_', ' ', $field));
+    }, $pendingFields);
+
+    return 'Oczekuje: ' . implode(', ', array_slice($fieldLabels, 0, 5)) .
+           (count($fieldLabels) > 5 ? '...' : '');
+}
+```
+
+#### 3.3 Dodać/zweryfikować CSS dla pending badge
 **Plik:** `resources/css/admin/components.css`
 
 ```css
-/* ERP Sync Overlay */
-.erp-sync-overlay {
-    position: absolute;
-    inset: 0;
-    background: rgba(30, 58, 138, 0.85);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 50;
-    border-radius: inherit;
-}
-
-/* Pending field indicator */
-.erp-field-pending {
-    border-color: #fbbf24 !important;
-    box-shadow: inset 0 0 0 2px rgba(251, 191, 36, 0.2);
-}
-
-/* Pending badge */
-.erp-pending-badge {
+/* ERP Pending Sync Badge (jak w PrestaShop) */
+.pending-sync-badge {
     display: inline-flex;
     align-items: center;
     padding: 0.125rem 0.5rem;
@@ -349,28 +427,37 @@ ERP TAB **NIE MA** tej funkcjonalności mimo że kod częściowo istnieje!
     font-size: 0.625rem;
     font-weight: 600;
     text-transform: uppercase;
-    margin-left: 0.5rem;
+    letter-spacing: 0.05em;
 }
 ```
 
-#### 3.5 Upewnić się że wire:poll działa
+#### 3.4 Usunąć duplikat wire:poll z erp-sync-status-panel
 **Plik:** `resources/views/livewire/products/management/partials/erp-sync-status-panel.blade.php`
 
+Usunąć linie 5-7 (wire:poll jest teraz w parent):
 ```blade
-{{-- wire:poll ONLY when job is active --}}
-@if($this->hasActiveErpSyncJob())
-<div wire:poll.2s="checkErpJobStatus" class="hidden"></div>
-@endif
+{{-- USUNIĘTE - wire:poll jest teraz w erp-management.blade.php --}}
 ```
 
 ### Pliki do Modyfikacji
 | Plik | Akcja |
 |------|-------|
-| `resources/views/livewire/products/management/partials/erp-data-form.blade.php` | Dodać wire:change + badges |
-| `resources/views/livewire/products/management/partials/erp-management.blade.php` | Dodać overlay |
-| `resources/views/livewire/products/management/partials/quick-actions-sidebar.blade.php` | Dodać ERP progress |
-| `resources/css/admin/components.css` | CSS dla pending states |
-| `app/Http/Livewire/Products/Management/Traits/ProductFormERPTabs.php` | Verify methods work |
+| `erp-management.blade.php` | Dodać wire:poll do głównego wrappera |
+| `ProductFormERPTabs.php` | Rozszerzyć getErpSyncStatusDisplay() o listę pól |
+| `components.css` | Dodać/zweryfikować .pending-sync-badge |
+| `erp-sync-status-panel.blade.php` | Usunąć duplikat wire:poll |
+
+### Weryfikacja - MANDATORY Chrome DevTools
+
+Po implementacji KAŻDEGO fixa:
+1. Otwórz produkt w edycji
+2. Wybierz ERP connection (np. BASE TEST)
+3. Kliknij "Synchronizuj do ERP"
+4. **SPRAWDŹ:**
+   - [ ] Progress bar pojawia się w "Szybkie akcje"
+   - [ ] Connection badge zmienia się na "Oczekuje: [lista pól]"
+   - [ ] Pola mają żółty badge "OCZEKUJE NA SYNCHRONIZACJĘ"
+   - [ ] Po zakończeniu job → wszystko wraca do "Zsynchronizowany"
 
 ---
 

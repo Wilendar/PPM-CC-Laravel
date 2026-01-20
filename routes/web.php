@@ -314,6 +314,7 @@ Route::prefix('admin')->name('admin.')->group(function () {
     // ==========================================
     Route::prefix('bug-reports')->name('bug-reports.')->group(function () {
         Route::get('/', \App\Http\Livewire\Admin\BugReports\BugReportList::class)->name('index');
+        Route::get('/solutions', \App\Http\Livewire\Admin\BugReports\SolutionsLibrary::class)->name('solutions');
         Route::get('/{report}', \App\Http\Livewire\Admin\BugReports\BugReportDetail::class)->name('show');
     });
 

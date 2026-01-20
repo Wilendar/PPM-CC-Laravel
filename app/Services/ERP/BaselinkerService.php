@@ -2683,4 +2683,101 @@ class BaselinkerService implements ERPSyncServiceInterface
 
         return $updated;
     }
+
+    /**
+     * ETAP_08.8: Find product in Baselinker by SKU
+     *
+     * Searches all inventories for a product with matching SKU.
+     * Used when linking existing PPM product with Baselinker.
+     *
+     * @param ERPConnection $connection
+     * @param string $sku Product SKU to search for
+     * @return array ['success' => bool, 'external_id' => string|null, 'data' => array]
+     */
+    public function findProductBySku(ERPConnection $connection, string $sku): array
+    {
+        $config = $connection->connection_config;
+        $sku = trim($sku);
+
+        if (empty($sku)) {
+            return ['success' => false, 'external_id' => null, 'data' => [], 'message' => 'SKU is empty'];
+        }
+
+        try {
+            // Get all inventories
+            $inventoriesResponse = $this->makeRequest($config, 'getInventories', []);
+
+            if ($inventoriesResponse['status'] !== 'SUCCESS') {
+                return [
+                    'success' => false,
+                    'external_id' => null,
+                    'data' => [],
+                    'message' => 'Failed to get inventories: ' . ($inventoriesResponse['error_message'] ?? 'Unknown'),
+                ];
+            }
+
+            $inventories = $inventoriesResponse['inventories'] ?? [];
+
+            // Search each inventory for product with matching SKU
+            foreach ($inventories as $inventoryId => $inventoryData) {
+                $response = $this->makeRequest(
+                    $config,
+                    'getInventoryProductsList',
+                    [
+                        'inventory_id' => $inventoryId,
+                        'filter_sku' => $sku,
+                        'filter_limit' => 5,
+                    ]
+                );
+
+                if ($response['status'] === 'SUCCESS' && !empty($response['products'])) {
+                    // Check for exact SKU match
+                    foreach ($response['products'] as $productId => $productData) {
+                        $productSku = $productData['sku'] ?? '';
+                        if (strtolower(trim($productSku)) === strtolower($sku)) {
+                            Log::info('BaselinkerService::findProductBySku: Product found', [
+                                'sku' => $sku,
+                                'external_id' => $productId,
+                                'inventory_id' => $inventoryId,
+                                'connection_id' => $connection->id,
+                            ]);
+
+                            return [
+                                'success' => true,
+                                'external_id' => (string) $productId,
+                                'data' => $productData,
+                                'inventory_id' => $inventoryId,
+                            ];
+                        }
+                    }
+                }
+
+                // Rate limiting between inventory searches
+                usleep(100000); // 0.1 second
+            }
+
+            // Product not found in any inventory
+            Log::info('BaselinkerService::findProductBySku: Product not found', [
+                'sku' => $sku,
+                'connection_id' => $connection->id,
+                'inventories_searched' => count($inventories),
+            ]);
+
+            return ['success' => false, 'external_id' => null, 'data' => [], 'message' => 'Product not found'];
+
+        } catch (\Exception $e) {
+            Log::error('BaselinkerService::findProductBySku exception', [
+                'sku' => $sku,
+                'connection_id' => $connection->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return [
+                'success' => false,
+                'external_id' => null,
+                'data' => [],
+                'message' => 'Error: ' . $e->getMessage(),
+            ];
+        }
+    }
 }

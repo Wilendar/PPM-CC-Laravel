@@ -214,48 +214,27 @@ class BugReport extends Model
     // ========================================
 
     /**
-     * Get status badge HTML class
+     * Get status badge HTML class (PPM Dark Theme)
      */
     public function getStatusBadgeAttribute(): string
     {
-        return match ($this->status) {
-            self::STATUS_NEW => 'bg-blue-100 text-blue-800',
-            self::STATUS_IN_PROGRESS => 'bg-yellow-100 text-yellow-800',
-            self::STATUS_WAITING => 'bg-purple-100 text-purple-800',
-            self::STATUS_RESOLVED => 'bg-green-100 text-green-800',
-            self::STATUS_CLOSED => 'bg-gray-100 text-gray-800',
-            self::STATUS_REJECTED => 'bg-red-100 text-red-800',
-            default => 'bg-gray-100 text-gray-800',
-        };
+        return 'badge-bugreport badge-status-' . $this->status;
     }
 
     /**
-     * Get type badge HTML class
+     * Get type badge HTML class (PPM Dark Theme)
      */
     public function getTypeBadgeAttribute(): string
     {
-        return match ($this->type) {
-            self::TYPE_BUG => 'bg-red-100 text-red-800',
-            self::TYPE_FEATURE_REQUEST => 'bg-green-100 text-green-800',
-            self::TYPE_IMPROVEMENT => 'bg-blue-100 text-blue-800',
-            self::TYPE_QUESTION => 'bg-purple-100 text-purple-800',
-            self::TYPE_SUPPORT => 'bg-orange-100 text-orange-800',
-            default => 'bg-gray-100 text-gray-800',
-        };
+        return 'badge-bugreport badge-type-' . $this->type;
     }
 
     /**
-     * Get severity badge HTML class
+     * Get severity badge HTML class (PPM Dark Theme)
      */
     public function getSeverityBadgeAttribute(): string
     {
-        return match ($this->severity) {
-            self::SEVERITY_LOW => 'bg-gray-100 text-gray-800',
-            self::SEVERITY_MEDIUM => 'bg-yellow-100 text-yellow-800',
-            self::SEVERITY_HIGH => 'bg-orange-100 text-orange-800',
-            self::SEVERITY_CRITICAL => 'bg-red-100 text-red-800',
-            default => 'bg-gray-100 text-gray-800',
-        };
+        return 'badge-bugreport badge-severity-' . $this->severity;
     }
 
     /**
@@ -332,6 +311,17 @@ class BugReport extends Model
     public function isResolved(): bool
     {
         return $this->status === self::STATUS_RESOLVED;
+    }
+
+    /**
+     * Check if report is closed (closed or rejected)
+     */
+    public function isClosed(): bool
+    {
+        return in_array($this->status, [
+            self::STATUS_CLOSED,
+            self::STATUS_REJECTED,
+        ]);
     }
 
     /**

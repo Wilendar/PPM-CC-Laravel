@@ -4,8 +4,25 @@
 {{-- ETAP_13.6: Job Monitoring with CONDITIONAL Polling (PERFORMANCE FIX 2025-11-27) --}}
 {{-- FIX 2025-11-27: Use $wire.activeJobStatus for reactive checking instead of static Blade value --}}
 {{-- Previous bug: isJobActive() used static '{{ $activeJobStatus }}' which didn't update after Livewire changes --}}
+{{-- ETAP_08.6: Added ERP job polling (analogia do PrestaShop) --}}
 <div
     x-data="{
+        // ETAP_08.7: Reactive getters for job status (used by frozen class and banner)
+        get erpIsJobRunning() {
+            const status = $wire.activeErpJobStatus;
+            return status === 'pending' || status === 'running';
+        },
+        get isJobRunning() {
+            const status = $wire.activeJobStatus;
+            return status === 'pending' || status === 'processing';
+        },
+        get erpStatusText() {
+            if ($wire.activeErpJobType === 'sync') return 'Synchronizowanie do ERP...';
+            if ($wire.activeErpJobType === 'pull') return 'Pobieranie danych z ERP...';
+            return 'Przetwarzanie ERP...';
+        },
+
+        // PrestaShop polling
         pollingInterval: null,
         pollCount: 0,
         maxPolls: 120,
@@ -44,12 +61,54 @@
                 clearInterval(this.pollingInterval);
                 this.pollingInterval = null;
             }
+        },
+
+        // ETAP_08.6: ERP polling (analogia do PrestaShop)
+        erpPollingInterval: null,
+        erpPollCount: 0,
+        erpMaxPolls: 120,
+        async isErpJobActive() {
+            const status = await $wire.get('activeErpJobStatus');
+            console.log('[ERP POLL DEBUG] Checking ERP job status:', status, 'pollCount:', this.erpPollCount);
+            return status && status !== 'completed' && status !== 'failed' && status !== '';
+        },
+        async startErpPolling() {
+            if (this.erpPollingInterval) {
+                console.log('[ERP POLL DEBUG] ERP Polling already active');
+                return;
+            }
+            console.log('[ERP POLL DEBUG] Starting ERP polling...');
+            this.erpPollCount = 0;
+            this.erpPollingInterval = setInterval(async () => {
+                this.erpPollCount++;
+                if (this.erpPollCount > this.erpMaxPolls) {
+                    console.log('[ERP POLL DEBUG] Max polls reached, stopping ERP');
+                    this.stopErpPolling();
+                    return;
+                }
+                const active = await this.isErpJobActive();
+                if (active) {
+                    console.log('[ERP POLL DEBUG] ERP Job still active, calling checkErpJobStatus');
+                    $wire.checkErpJobStatus();
+                } else {
+                    console.log('[ERP POLL DEBUG] ERP Job no longer active, stopping polling');
+                    this.stopErpPolling();
+                }
+            }, 2000);
+        },
+        stopErpPolling() {
+            if (this.erpPollingInterval) {
+                console.log('[ERP POLL DEBUG] Stopping ERP polling');
+                clearInterval(this.erpPollingInterval);
+                this.erpPollingInterval = null;
+            }
         }
     }"
-    x-init="$nextTick(async () => { if (await isJobActive()) startPolling(); })"
+    x-init="$nextTick(async () => { if (await isJobActive()) startPolling(); if (await isErpJobActive()) startErpPolling(); })"
     @job-started.window="startPolling()"
     @job-completed.window="stopPolling()"
     @job-failed.window="stopPolling()"
+    @erp-job-started.window="startErpPolling()"
 >
 <div
     class="category-form-container"
@@ -91,24 +150,27 @@
                         </div>
                     </div>
 
-                    {{-- ETAP_08.5: ERP Sync Blocking Overlay --}}
-                    {{-- Shows when ERP sync job is running - blocks form fields --}}
-                    @if($this->hasActiveErpSyncJob())
-                    <div class="shop-data-loading-overlay" style="background: rgba(30, 58, 138, 0.85);">
-                        <div class="shop-data-loading-content">
-                            <svg class="shop-data-loading-spinner" viewBox="0 0 24 24" fill="none">
-                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                            </svg>
-                            <span class="shop-data-loading-text text-blue-300">
-                                OCZEKUJE NA SYNCHRONIZACJE ERP
-                            </span>
-                            <span class="text-xs text-blue-400 mt-2">
-                                Pola formularza sa zablokowane do zakonczenia synchronizacji
-                            </span>
+                    {{-- ETAP_08.7: ERP Sync Info Banner (NOT blocking overlay!) --}}
+                    {{-- Shows informational banner when ERP sync job is running --}}
+                    {{-- Fields are frozen via CSS class + badges, not overlay --}}
+                    <div x-show="erpIsJobRunning"
+                         x-cloak
+                         x-transition:enter="transition ease-out duration-300"
+                         x-transition:enter-start="opacity-0 transform -translate-y-2"
+                         x-transition:enter-end="opacity-100 transform translate-y-0"
+                         class="erp-sync-banner mb-4">
+                        <div class="flex items-center justify-between px-4 py-3 bg-blue-900/50 border border-blue-500/30 rounded-lg">
+                            <div class="flex items-center">
+                                <svg class="animate-spin h-5 w-5 text-blue-400 mr-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                                <span class="text-blue-300 font-medium">Synchronizacja ERP w toku</span>
+                                <span class="text-blue-400 text-sm ml-2">Pola formularza sa zablokowane</span>
+                            </div>
+                            <div class="text-blue-400 text-sm" x-text="erpStatusText"></div>
                         </div>
                     </div>
-                    @endif
 
                     {{-- Tab Navigation --}}
                     @include('livewire.products.management.partials.tab-navigation')
@@ -127,7 +189,11 @@
 
                     {{-- TAB CONTENT AREA - CONDITIONAL RENDERING (Only 1 tab in DOM at a time) --}}
                     {{-- FIX 2025-12-08: Wrap in div with activeTab in wire:key to force full replacement instead of morphing --}}
-                    <div wire:key="tab-content-{{ $activeTab }}-{{ $product?->id ?? 'new' }}">
+                    {{-- ETAP_08.7: Add frozen class when ERP or PrestaShop sync job is running --}}
+                    <div wire:key="tab-content-{{ $activeTab }}-{{ $product?->id ?? 'new' }}"
+                         :class="{
+                             'category-tree-frozen': erpIsJobRunning || ($wire.activeJobStatus === 'pending' || $wire.activeJobStatus === 'processing')
+                         }">
                         @if($activeTab === 'basic')
                             @include('livewire.products.management.tabs.basic-tab')
                         @elseif($activeTab === 'description')

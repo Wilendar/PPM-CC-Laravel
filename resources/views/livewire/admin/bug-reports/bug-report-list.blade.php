@@ -14,6 +14,14 @@
                     <p class="text-gray-400">Zarzadzanie zgloszeniami uzytkownikow</p>
                 </div>
             </div>
+            {{-- Link to Solutions Library --}}
+            <a href="{{ route('admin.bug-reports.solutions') }}"
+               class="btn-enterprise-secondary flex items-center gap-2">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
+                </svg>
+                Biblioteka rozwiazan
+            </a>
         </div>
 
         {{-- Statistics Cards --}}
@@ -172,7 +180,10 @@
                                 Zgloszenie
                             </th>
                             <th class="px-4 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">
-                                Typ / Priorytet
+                                Typ
+                            </th>
+                            <th class="px-4 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                                Priorytet
                             </th>
                             <th class="px-4 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">
                                 Status
@@ -212,20 +223,20 @@
                                     </div>
                                 </td>
                                 <td class="px-4 py-3">
-                                    <div class="flex flex-col gap-1">
-                                        <span class="inline-flex items-center px-2 py-0.5 text-xs rounded-full {{ $report->type_badge }}">
-                                            <i class="{{ $report->type_icon }} mr-1"></i>
-                                            {{ $report->type_label }}
-                                        </span>
-                                        <span class="inline-flex items-center px-2 py-0.5 text-xs rounded-full {{ $report->severity_badge }}">
-                                            <i class="{{ $report->severity_icon }} mr-1"></i>
-                                            {{ $report->severity_label }}
-                                        </span>
-                                    </div>
+                                    <span class="{{ $report->type_badge }}">
+                                        <i class="{{ $report->type_icon }}"></i>
+                                        {{ $report->type_label }}
+                                    </span>
+                                </td>
+                                <td class="px-4 py-3">
+                                    <span class="{{ $report->severity_badge }}">
+                                        <i class="{{ $report->severity_icon }}"></i>
+                                        {{ $report->severity_label }}
+                                    </span>
                                 </td>
                                 <td class="px-4 py-3" wire:click.stop>
                                     <select wire:change="quickStatusChange({{ $report->id }}, $event.target.value)"
-                                            class="form-input-enterprise text-xs py-1 px-2 {{ $report->status_badge }}">
+                                            class="bugreport-status-select {{ $report->status_badge }}">
                                         @foreach($statuses as $value => $label)
                                             <option value="{{ $value }}" {{ $report->status === $value ? 'selected' : '' }}>
                                                 {{ $label }}
@@ -256,7 +267,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="7" class="px-4 py-12 text-center">
+                                <td colspan="8" class="px-4 py-12 text-center">
                                     <svg class="w-12 h-12 mx-auto text-gray-600 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
                                     </svg>

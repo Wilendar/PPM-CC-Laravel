@@ -5636,9 +5636,9 @@ hex-color-picker {
    Active/Inactive ERP connection tabs
    ======================================== */
 
-/* Active ERP Tab - Blue Theme */
+/* Active ERP Tab - Dark Theme with Blue Accent (matching Shop Tab pattern) */
 .erp-tab-active {
-    background: linear-gradient(135deg, rgba(30, 58, 138, 0.95), rgba(37, 99, 235, 0.95));
+    background: linear-gradient(135deg, rgba(31, 41, 55, 0.95), rgba(55, 65, 81, 0.95));
     color: #f3f4f6;
     font-weight: 600;
     border: 1px solid #3b82f6;
@@ -5649,12 +5649,19 @@ hex-color-picker {
 }
 
 .erp-tab-active:hover {
-    background: linear-gradient(135deg, rgba(37, 99, 235, 0.95), rgba(59, 130, 246, 0.95));
+    background: linear-gradient(135deg, rgba(55, 65, 81, 0.95), rgba(75, 85, 99, 0.95));
     border-color: #60a5fa;
     box-shadow:
         0 0 0 1px rgba(96, 165, 250, 0.4),
         0 4px 12px rgba(59, 130, 246, 0.3),
         inset 0 1px 0 rgba(96, 165, 250, 0.15);
+}
+
+/* External ID in ERP Tab - better visibility */
+.erp-tab-active .erp-external-id,
+.erp-tab-inactive .erp-external-id {
+    color: #9ca3af;
+    opacity: 0.9;
 }
 
 /* Inactive ERP Tab */
@@ -9616,4 +9623,227 @@ hex-color-picker {
     background: rgba(168, 85, 247, 0.2);
     border: 1px solid rgba(168, 85, 247, 0.3);
     color: #a855f7;
+}
+
+/* ============================================
+   Bug Report Badges (PPM Dark Theme)
+   ============================================ */
+
+/* Base badge style */
+.badge-bugreport {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.25rem 0.625rem;
+    font-size: 0.75rem;
+    font-weight: 500;
+    border-radius: 9999px;
+    border: 1px solid transparent;
+    transition: all 0.2s ease;
+}
+
+/* Status badges - stonowane kolory dla dark theme */
+.badge-status-new {
+    background: rgba(59, 130, 246, 0.15);
+    border-color: rgba(59, 130, 246, 0.3);
+    color: #93c5fd;
+}
+
+.badge-status-in_progress {
+    background: rgba(234, 179, 8, 0.15);
+    border-color: rgba(234, 179, 8, 0.3);
+    color: #fcd34d;
+}
+
+.badge-status-waiting {
+    background: rgba(139, 92, 246, 0.15);
+    border-color: rgba(139, 92, 246, 0.3);
+    color: #c4b5fd;
+}
+
+.badge-status-resolved {
+    background: rgba(34, 197, 94, 0.15);
+    border-color: rgba(34, 197, 94, 0.3);
+    color: #86efac;
+}
+
+.badge-status-closed {
+    background: rgba(107, 114, 128, 0.15);
+    border-color: rgba(107, 114, 128, 0.3);
+    color: #9ca3af;
+}
+
+.badge-status-rejected {
+    background: rgba(239, 68, 68, 0.15);
+    border-color: rgba(239, 68, 68, 0.3);
+    color: #fca5a5;
+}
+
+/* Type badges - stonowane kolory */
+.badge-type-bug {
+    background: rgba(220, 38, 38, 0.12);
+    border-color: rgba(220, 38, 38, 0.25);
+    color: #f87171;
+}
+
+.badge-type-feature_request {
+    background: rgba(34, 197, 94, 0.12);
+    border-color: rgba(34, 197, 94, 0.25);
+    color: #86efac;
+}
+
+.badge-type-improvement {
+    background: rgba(59, 130, 246, 0.12);
+    border-color: rgba(59, 130, 246, 0.25);
+    color: #93c5fd;
+}
+
+.badge-type-question {
+    background: rgba(139, 92, 246, 0.12);
+    border-color: rgba(139, 92, 246, 0.25);
+    color: #c4b5fd;
+}
+
+.badge-type-support {
+    background: rgba(224, 172, 126, 0.12);
+    border-color: rgba(224, 172, 126, 0.25);
+    color: var(--mpp-primary, #e0ac7e);
+}
+
+/* Severity badges - stonowane kolory */
+.badge-severity-low {
+    background: rgba(107, 114, 128, 0.12);
+    border-color: rgba(107, 114, 128, 0.25);
+    color: #9ca3af;
+}
+
+.badge-severity-medium {
+    background: rgba(234, 179, 8, 0.12);
+    border-color: rgba(234, 179, 8, 0.25);
+    color: #fcd34d;
+}
+
+.badge-severity-high {
+    background: rgba(249, 115, 22, 0.12);
+    border-color: rgba(249, 115, 22, 0.25);
+    color: #fdba74;
+}
+
+.badge-severity-critical {
+    background: rgba(220, 38, 38, 0.12);
+    border-color: rgba(220, 38, 38, 0.25);
+    color: #f87171;
+}
+
+/* Status select styling for bug reports table */
+.bugreport-status-select {
+    background: transparent;
+    border: 1px solid rgba(107, 114, 128, 0.3);
+    border-radius: 9999px;
+    padding: 0.25rem 0.75rem;
+    font-size: 0.75rem;
+    color: inherit;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.bugreport-status-select:hover {
+    border-color: rgba(224, 172, 126, 0.5);
+}
+
+.bugreport-status-select:focus {
+    outline: none;
+    border-color: var(--mpp-primary, #e0ac7e);
+    box-shadow: 0 0 0 2px rgba(224, 172, 126, 0.15);
+}
+
+/* ============================================
+   Markdown Editor Toolbar (Bug Reports)
+   ============================================ */
+
+.md-toolbar-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    padding: 0;
+    border: none;
+    border-radius: 0.375rem;
+    background: transparent;
+    color: #9ca3af;
+    font-size: 0.875rem;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.md-toolbar-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: var(--mpp-primary, #e0ac7e);
+}
+
+.md-toolbar-btn:active {
+    background: rgba(255, 255, 255, 0.15);
+    transform: scale(0.95);
+}
+
+.md-toolbar-btn:focus {
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(224, 172, 126, 0.3);
+}
+
+.md-toolbar-btn i {
+    width: 1rem;
+    height: 1rem;
+}
+
+/* ============================================
+   Icon Chip (PPM Styling Playbook)
+   ============================================ */
+
+.icon-chip {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 3rem;
+    height: 3rem;
+    border-radius: 0.75rem;
+    background: rgba(224, 172, 126, 0.18);
+    color: var(--mpp-primary, #e0ac7e);
+    flex-shrink: 0;
+}
+
+.icon-chip i,
+.icon-chip svg {
+    width: 1.25rem;
+    height: 1.25rem;
+}
+
+/* Small variant for statistics cards */
+.icon-chip-sm {
+    width: 2.5rem;
+    height: 2.5rem;
+    border-radius: 0.5rem;
+}
+
+.icon-chip-sm i,
+.icon-chip-sm svg {
+    width: 1rem;
+    height: 1rem;
+}
+
+/* Color variants */
+.icon-chip--secondary {
+    background: rgba(107, 114, 128, 0.18);
+    color: #9ca3af;
+}
+
+.icon-chip--success {
+    background: rgba(34, 197, 94, 0.18);
+    color: #86efac;
+}
+
+.icon-chip--danger {
+    background: rgba(239, 68, 68, 0.18);
+    color: #fca5a5;
 }

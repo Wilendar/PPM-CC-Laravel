@@ -2077,6 +2077,120 @@ function registerAlpineComponents(Alpine) {
         }
     }));
 
+    // =====================================================
+    // MARKDOWN EDITOR TOOLBAR COMPONENT (Bug Reports)
+    // =====================================================
+    Alpine.data('markdownEditor', () => ({
+        init() {
+            // Focus textarea on mount
+            this.$nextTick(() => {
+                this.$refs.textarea?.focus();
+            });
+        },
+
+        // Insert formatting around selected text (bold, italic, code)
+        insertFormat(before, after) {
+            const textarea = this.$refs.textarea;
+            if (!textarea) return;
+
+            const start = textarea.selectionStart;
+            const end = textarea.selectionEnd;
+            const text = textarea.value;
+            const selectedText = text.substring(start, end);
+
+            const newText = text.substring(0, start) + before + selectedText + after + text.substring(end);
+            textarea.value = newText;
+
+            // Position cursor
+            if (selectedText) {
+                textarea.selectionStart = start;
+                textarea.selectionEnd = end + before.length + after.length;
+            } else {
+                textarea.selectionStart = textarea.selectionEnd = start + before.length;
+            }
+
+            textarea.focus();
+            textarea.dispatchEvent(new Event('input', { bubbles: true }));
+        },
+
+        // Insert prefix at line start (headers, lists, quotes)
+        insertPrefix(prefix) {
+            const textarea = this.$refs.textarea;
+            if (!textarea) return;
+
+            const start = textarea.selectionStart;
+            const text = textarea.value;
+
+            // Find line start
+            let lineStart = text.lastIndexOf('\n', start - 1) + 1;
+            const newText = text.substring(0, lineStart) + prefix + text.substring(lineStart);
+
+            textarea.value = newText;
+            textarea.selectionStart = textarea.selectionEnd = start + prefix.length;
+            textarea.focus();
+            textarea.dispatchEvent(new Event('input', { bubbles: true }));
+        },
+
+        // Insert code block
+        insertCodeBlock() {
+            const textarea = this.$refs.textarea;
+            if (!textarea) return;
+
+            const start = textarea.selectionStart;
+            const end = textarea.selectionEnd;
+            const text = textarea.value;
+            const selectedText = text.substring(start, end);
+
+            const codeBlock = '\n```\n' + (selectedText || 'kod') + '\n```\n';
+            const newText = text.substring(0, start) + codeBlock + text.substring(end);
+
+            textarea.value = newText;
+            textarea.selectionStart = start + 5;
+            textarea.selectionEnd = start + 5 + (selectedText || 'kod').length;
+            textarea.focus();
+            textarea.dispatchEvent(new Event('input', { bubbles: true }));
+        },
+
+        // Insert link
+        insertLink() {
+            const textarea = this.$refs.textarea;
+            if (!textarea) return;
+
+            const start = textarea.selectionStart;
+            const end = textarea.selectionEnd;
+            const text = textarea.value;
+            const selectedText = text.substring(start, end);
+
+            const linkText = selectedText || 'tekst linku';
+            const link = '[' + linkText + '](url)';
+            const newText = text.substring(0, start) + link + text.substring(end);
+
+            textarea.value = newText;
+            // Select 'url' part
+            textarea.selectionStart = start + linkText.length + 3;
+            textarea.selectionEnd = start + linkText.length + 6;
+            textarea.focus();
+            textarea.dispatchEvent(new Event('input', { bubbles: true }));
+        },
+
+        // Insert horizontal rule
+        insertHr() {
+            const textarea = this.$refs.textarea;
+            if (!textarea) return;
+
+            const start = textarea.selectionStart;
+            const text = textarea.value;
+
+            const hr = '\n\n---\n\n';
+            const newText = text.substring(0, start) + hr + text.substring(start);
+
+            textarea.value = newText;
+            textarea.selectionStart = textarea.selectionEnd = start + hr.length;
+            textarea.focus();
+            textarea.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+    }));
+
     console.log('[PPM app.js] Alpine components registered successfully:', {
         loading: Alpine.store('loading'),
         notifications: Alpine.store('notifications'),

@@ -151,12 +151,34 @@
                 {{-- Resolution --}}
                 @if($report->resolution)
                     <div class="p-4 rounded-lg {{ $report->status === 'resolved' ? 'bg-green-500/10 border border-green-500/30' : 'bg-red-500/10 border border-red-500/30' }}">
-                        <h3 class="text-sm font-medium {{ $report->status === 'resolved' ? 'text-green-400' : 'text-red-400' }} mb-2">
-                            {{ $report->status === 'resolved' ? 'Rozwiazanie' : 'Powod odrzucenia' }}
-                        </h3>
-                        <p class="text-gray-300 whitespace-pre-wrap">{{ $report->resolution }}</p>
+                        <div class="flex items-start justify-between mb-3">
+                            <h3 class="text-sm font-medium {{ $report->status === 'resolved' ? 'text-green-400' : 'text-red-400' }}">
+                                <svg class="w-4 h-4 inline-block mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    @if($report->status === 'resolved')
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                    @else
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                    @endif
+                                </svg>
+                                {{ $report->status === 'resolved' ? 'Rozwiazanie' : 'Powod odrzucenia' }}
+                            </h3>
+                            <button wire:click="exportToMarkdown"
+                                    class="btn-enterprise-secondary btn-enterprise-sm flex items-center gap-1"
+                                    title="Pobierz jako plik .md dla bazy wiedzy Claude Code">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+                                </svg>
+                                <span>.md</span>
+                            </button>
+                        </div>
+                        <div class="bg-gray-900/50 rounded-lg p-3 mb-3">
+                            <p class="text-gray-300 whitespace-pre-wrap">{{ $report->resolution }}</p>
+                        </div>
                         @if($report->resolved_at)
-                            <p class="text-xs text-gray-500 mt-2">
+                            <p class="text-xs text-gray-500">
+                                <svg class="w-3 h-3 inline-block mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                </svg>
                                 {{ $report->resolved_at->format('d.m.Y H:i') }}
                             </p>
                         @endif
@@ -273,14 +295,14 @@
                 {{-- Quick Actions --}}
                 <div class="border-t border-gray-700/50 pt-4 mt-4 space-y-2">
                     @if(!$report->isClosed() && !$report->isResolved())
-                        <button wire:click="$set('showResolutionForm', true)"
+                        <button wire:click="openResolveForm"
                                 class="btn-enterprise-primary w-full">
                             <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
                             </svg>
                             Oznacz jako rozwiazane
                         </button>
-                        <button wire:click="$set('showResolutionForm', true)"
+                        <button wire:click="openRejectForm"
                                 class="btn-enterprise-danger w-full">
                             <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
@@ -311,28 +333,112 @@
 
             {{-- Resolution Form Modal --}}
             @if($showResolutionForm)
-                <div class="enterprise-card p-6 border-2 border-yellow-500/30">
-                    <h3 class="text-lg font-semibold text-white mb-4">Rozwiazanie / Odrzucenie</h3>
+                <div class="enterprise-card p-6 border-2 {{ $resolutionMode === 'resolve' ? 'border-green-500/30' : 'border-red-500/30' }}"
+                     x-data="markdownEditor()">
+                    <div class="flex items-center gap-2 mb-4">
+                        @if($resolutionMode === 'resolve')
+                            <div class="w-8 h-8 rounded-full bg-green-500/20 flex items-center justify-center">
+                                <svg class="w-5 h-5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                                </svg>
+                            </div>
+                            <h3 class="text-lg font-semibold text-green-400">Oznacz jako rozwiazane</h3>
+                        @else
+                            <div class="w-8 h-8 rounded-full bg-red-500/20 flex items-center justify-center">
+                                <svg class="w-5 h-5 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                                </svg>
+                            </div>
+                            <h3 class="text-lg font-semibold text-red-400">Odrzuc zgloszenie</h3>
+                        @endif
+                    </div>
                     <div class="space-y-4">
                         <div>
                             <label class="block text-sm font-medium text-gray-300 mb-2">
-                                Opis rozwiazania / powod odrzucenia
+                                {{ $resolutionMode === 'resolve' ? 'Opis rozwiazania' : 'Powod odrzucenia' }}
+                                <span class="text-xs text-gray-500 ml-2">(Markdown)</span>
                             </label>
+
+                            {{-- Markdown Toolbar --}}
+                            <div class="flex flex-wrap items-center gap-1 mb-2 p-2 bg-gray-800/50 rounded-t-lg border border-b-0 border-gray-700/50">
+                                <button type="button" @click="insertFormat('**', '**')"
+                                        class="md-toolbar-btn" title="Pogrubienie (Ctrl+B)">
+                                    <i class="fas fa-bold"></i>
+                                </button>
+                                <button type="button" @click="insertFormat('*', '*')"
+                                        class="md-toolbar-btn" title="Kursywa (Ctrl+I)">
+                                    <i class="fas fa-italic"></i>
+                                </button>
+                                <button type="button" @click="insertFormat('`', '`')"
+                                        class="md-toolbar-btn" title="Kod inline">
+                                    <i class="fas fa-code"></i>
+                                </button>
+                                <div class="w-px h-5 bg-gray-600 mx-1"></div>
+                                <button type="button" @click="insertPrefix('## ')"
+                                        class="md-toolbar-btn" title="Naglowek">
+                                    <i class="fas fa-heading"></i>
+                                </button>
+                                <button type="button" @click="insertPrefix('- ')"
+                                        class="md-toolbar-btn" title="Lista">
+                                    <i class="fas fa-list-ul"></i>
+                                </button>
+                                <button type="button" @click="insertPrefix('1. ')"
+                                        class="md-toolbar-btn" title="Lista numerowana">
+                                    <i class="fas fa-list-ol"></i>
+                                </button>
+                                <div class="w-px h-5 bg-gray-600 mx-1"></div>
+                                <button type="button" @click="insertCodeBlock()"
+                                        class="md-toolbar-btn" title="Blok kodu">
+                                    <i class="fas fa-file-code"></i>
+                                </button>
+                                <button type="button" @click="insertLink()"
+                                        class="md-toolbar-btn" title="Link">
+                                    <i class="fas fa-link"></i>
+                                </button>
+                                <div class="w-px h-5 bg-gray-600 mx-1"></div>
+                                <button type="button" @click="insertPrefix('> ')"
+                                        class="md-toolbar-btn" title="Cytat">
+                                    <i class="fas fa-quote-left"></i>
+                                </button>
+                                <button type="button" @click="insertHr()"
+                                        class="md-toolbar-btn" title="Linia pozioma">
+                                    <i class="fas fa-minus"></i>
+                                </button>
+                            </div>
+
                             <textarea wire:model="resolution"
-                                      rows="4"
-                                      class="form-input-enterprise w-full"
-                                      placeholder="Opisz jak rozwiazano problem lub dlaczego zgloszenie zostalo odrzucone..."></textarea>
+                                      x-ref="textarea"
+                                      rows="8"
+                                      class="form-input-enterprise w-full rounded-t-none font-mono text-sm"
+                                      placeholder="{{ $resolutionMode === 'resolve' ? 'Opisz jak rozwiazano problem...' : 'Podaj powod odrzucenia zgloszenia...' }}"
+                                      @keydown.ctrl.b.prevent="insertFormat('**', '**')"
+                                      @keydown.ctrl.i.prevent="insertFormat('*', '*')"></textarea>
+
+                            <div class="text-xs text-gray-500 mt-1 flex items-center gap-2">
+                                <i class="fab fa-markdown"></i>
+                                Formatowanie Markdown - uzyj toolbara lub skrotow klawiszowych
+                            </div>
+
                             @error('resolution')
                                 <p class="text-xs text-red-400 mt-1">{{ $message }}</p>
                             @enderror
                         </div>
                         <div class="flex gap-2">
-                            <button wire:click="markResolved" class="btn-enterprise-primary flex-1">
-                                Rozwiazane
-                            </button>
-                            <button wire:click="markRejected" class="btn-enterprise-danger flex-1">
-                                Odrzuc
-                            </button>
+                            @if($resolutionMode === 'resolve')
+                                <button wire:click="markResolved" class="btn-enterprise-primary w-full">
+                                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                                    </svg>
+                                    Zatwierdz rozwiazanie
+                                </button>
+                            @else
+                                <button wire:click="markRejected" class="btn-enterprise-danger w-full">
+                                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                                    </svg>
+                                    Zatwierdz odrzucenie
+                                </button>
+                            @endif
                         </div>
                         <button wire:click="$set('showResolutionForm', false)"
                                 class="btn-enterprise-secondary w-full">
