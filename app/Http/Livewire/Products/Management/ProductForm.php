@@ -5249,6 +5249,19 @@ class ProductForm extends Component
             ];
         }
 
+        // ETAP_08.8 FIX: For unlinked/not_found ERP products, ALL fields show "Dziedziczone"
+        // There's no ERP data to compare with, so everything inherits from local PPM data
+        if ($this->activeErpConnectionId !== null) {
+            $syncStatus = $this->erpExternalData['sync_status'] ?? null;
+            if (in_array($syncStatus, ['not_linked', 'not_found'])) {
+                return [
+                    'show' => true,
+                    'text' => 'Dziedziczone',
+                    'class' => 'status-label-inherited'
+                ];
+            }
+        }
+
         // PRIORITY 2: Check if field has pending shop sync (before job dispatch)
         if ($this->activeShopId !== null && $this->isPendingSyncForShop($this->activeShopId, $field)) {
             return [

@@ -163,20 +163,61 @@ class SolutionsLibrary extends Component
 
     /**
      * Generate index markdown for ZIP archive
+     * Includes AI-friendly summary for Claude Code CLI
      */
     protected function generateIndexMarkdown($reports): string
     {
-        $md = "# PPM Solutions Library - Index\n\n";
-        $md .= "Wygenerowano: " . now()->format('Y-m-d H:i:s') . "\n\n";
-        $md .= "Liczba rozwiazan: " . $reports->count() . "\n\n";
+        $typeLabels = BugReport::getTypes();
+        $severityLabels = BugReport::getSeverities();
+
+        // Count by type
+        $byType = $reports->groupBy('type')->map->count();
+        $bySeverity = $reports->groupBy('severity')->map->count();
+
+        // Collect all unique keywords
+        $allKeywords = [];
+        foreach ($reports as $report) {
+            $allKeywords = array_merge($allKeywords, $this->extractKeywords($report));
+        }
+        $uniqueKeywords = array_unique($allKeywords);
+
+        // AI-FRIENDLY HEADER
+        $md = "---\n";
+        $md .= "# AI AGENT CONTEXT - PPM Solutions Library Index\n";
+        $md .= "# Ten plik jest indeksem wszystkich rozwiazan w bibliotece PPM\n";
+        $md .= "total_solutions: " . $reports->count() . "\n";
+        $md .= "exported_at: " . now()->format('Y-m-d H:i:s') . "\n";
+        $md .= "project: PPM-CC-Laravel\n";
+        $md .= "keywords: [" . implode(', ', array_slice($uniqueKeywords, 0, 20)) . "]\n";
+        $md .= "---\n\n";
+
+        // AI QUICK SUMMARY
+        $md .= "## AI Summary\n\n";
+        $md .= "> **BIBLIOTEKA:** Zbiór {$reports->count()} rozwiązanych problemów z projektu PPM-CC-Laravel\n>\n";
+        $md .= "> **TYPY:** " . $byType->map(fn($count, $type) => ($typeLabels[$type] ?? $type) . " ({$count})")->implode(', ') . "\n>\n";
+        $md .= "> **PRIORYTETY:** " . $bySeverity->map(fn($count, $sev) => ($severityLabels[$sev] ?? $sev) . " ({$count})")->implode(', ') . "\n\n";
+
+        // AI INSTRUCTION BLOCK
+        $md .= "<!-- AI_INSTRUCTION\n";
+        $md .= "Jak korzystac z tej biblioteki rozwiazan:\n";
+        $md .= "1. Przeszukaj INDEX.md po slowach kluczowych zwiazanych z Twoim problemem\n";
+        $md .= "2. Otworz odpowiedni plik SOLUTION_*.md\n";
+        $md .= "3. Przeczytaj sekcje 'AI Summary' dla szybkiego kontekstu\n";
+        $md .= "4. Zastosuj rozwiazanie z sekcji 'Rozwiazanie'\n";
+        $md .= "5. Uzyj sekcji 'Tagi' do znalezienia powiazanych rozwiazan\n";
+        $md .= "AI_INSTRUCTION -->\n\n";
+
+        $md .= "---\n\n";
+
+        // MAIN CONTENT
+        $md .= "# PPM Solutions Library - Index\n\n";
+        $md .= "**Wygenerowano:** " . now()->format('Y-m-d H:i:s') . "\n\n";
+        $md .= "**Liczba rozwiazan:** " . $reports->count() . "\n\n";
         $md .= "---\n\n";
 
         $md .= "## Lista rozwiazan\n\n";
         $md .= "| ID | Tytul | Typ | Priorytet | Rozwiazano |\n";
         $md .= "|---|---|---|---|---|\n";
-
-        $typeLabels = BugReport::getTypes();
-        $severityLabels = BugReport::getSeverities();
 
         foreach ($reports as $report) {
             $filename = sprintf('SOLUTION_%s_%s.md', $report->id, Str::slug($report->title, '_'));
@@ -192,6 +233,12 @@ class SolutionsLibrary extends Component
         }
 
         $md .= "\n---\n\n";
+
+        // Keywords section for AI search
+        $md .= "## Slowa kluczowe (dla AI)\n\n";
+        $md .= implode(', ', $uniqueKeywords) . "\n\n";
+
+        $md .= "---\n\n";
         $md .= "_Eksport z systemu Bug Report PPM_\n";
 
         return $md;
@@ -205,6 +252,7 @@ class SolutionsLibrary extends Component
 
     /**
      * Generate enhanced Markdown with full metadata
+     * Includes AI-friendly summary for Claude Code CLI
      */
     protected function generateEnhancedMarkdown(BugReport $report): string
     {
@@ -212,7 +260,49 @@ class SolutionsLibrary extends Component
         $severityLabels = BugReport::getSeverities();
         $statusLabels = BugReport::getStatuses();
 
-        $md = "# {$report->title}\n\n";
+        // Extract keywords for AI context
+        $keywords = $this->extractKeywords($report);
+        // Clean summaries - remove markdown/HTML and newlines for single-line AI summary
+        $problemSummary = Str::limit(
+            preg_replace('/\s+/', ' ', strip_tags($report->description)),
+            200
+        );
+        $solutionSummary = $report->resolution
+            ? Str::limit(preg_replace('/\s+/', ' ', strip_tags($report->resolution)), 200)
+            : 'Brak rozwiazania';
+
+        // AI-FRIENDLY HEADER (YAML-like frontmatter for Claude Code CLI)
+        $md = "---\n";
+        $md .= "# AI AGENT CONTEXT - PPM Bug Report Solution\n";
+        $md .= "# Ten blok jest przeznaczony dla agentow AI (Claude Code CLI)\n";
+        $md .= "id: {$report->id}\n";
+        $md .= "type: {$report->type}\n";
+        $md .= "severity: {$report->severity}\n";
+        $md .= "status: {$report->status}\n";
+        $md .= "resolved_at: " . ($report->resolved_at?->format('Y-m-d') ?? 'null') . "\n";
+        $md .= "keywords: [" . implode(', ', $keywords) . "]\n";
+        $md .= "context_url: " . ($report->context_url ?? 'null') . "\n";
+        $md .= "---\n\n";
+
+        // AI QUICK SUMMARY
+        $md .= "## AI Summary\n\n";
+        $md .= "> **PROBLEM:** {$problemSummary}\n>\n";
+        $md .= "> **ROZWIAZANIE:** {$solutionSummary}\n>\n";
+        $md .= "> **TECHNOLOGIE:** " . implode(', ', $keywords) . "\n\n";
+
+        // AI INSTRUCTION BLOCK
+        $md .= "<!-- AI_INSTRUCTION\n";
+        $md .= "Jesli napotykasz podobny problem w projekcie PPM-CC-Laravel:\n";
+        $md .= "1. Sprawdz czy symptomy sa zgodne z opisem ponizej\n";
+        $md .= "2. Zastosuj rozwiazanie z sekcji 'Rozwiazanie'\n";
+        $md .= "3. Zweryfikuj poprawke zgodnie z krokami odtworzenia\n";
+        $md .= "4. Jesli problem sie powtarza, sprawdz sekcje 'Dane techniczne'\n";
+        $md .= "AI_INSTRUCTION -->\n\n";
+
+        $md .= "---\n\n";
+
+        // MAIN CONTENT
+        $md .= "# {$report->title}\n\n";
 
         // Metadata section
         $md .= "## Metadane zgloszenia\n\n";
@@ -370,6 +460,74 @@ class SolutionsLibrary extends Component
     | PRIVATE METHODS
     |--------------------------------------------------------------------------
     */
+
+    /**
+     * Extract technology keywords from bug report for AI context
+     */
+    private function extractKeywords(BugReport $report): array
+    {
+        $allKeywords = [
+            'Laravel', 'Livewire', 'PrestaShop', 'API', 'CSS', 'JavaScript',
+            'Database', 'Cache', 'Redis', 'Queue', 'Blade', 'Alpine.js',
+            'Eloquent', 'Migration', 'Route', 'Middleware', 'Controller',
+            'Component', 'Model', 'View', 'Vite', 'Tailwind', 'PHP',
+            'MySQL', 'SQL', 'JSON', 'HTTP', 'AJAX', 'Fetch', 'Axios',
+            'Auth', 'Session', 'Cookie', 'Storage', 'Upload', 'File',
+            'Validation', 'Form', 'Input', 'Modal', 'Dropdown', 'Table',
+            'Pagination', 'Search', 'Filter', 'Sort', 'Export', 'Import',
+            'Sync', 'Webhook', 'Cron', 'Job', 'Event', 'Listener',
+            'BaseLinker', 'ERP', 'Subiekt', 'FTP', 'SSH', 'Deploy',
+        ];
+
+        // URL path patterns -> keywords mapping
+        $urlPatterns = [
+            '/admin/' => 'Admin',
+            '/products' => 'Product',
+            '/categories' => 'Category',
+            '/shops' => 'Shop',
+            '/orders' => 'Order',
+            '/users' => 'User',
+            '/settings' => 'Settings',
+            '/import' => 'Import',
+            '/export' => 'Export',
+            '/sync' => 'Sync',
+            '/bug-reports' => 'BugReport',
+            '/dashboard' => 'Dashboard',
+            '/media' => 'Media',
+            '/edit' => 'Edit',
+            '/create' => 'Create',
+        ];
+
+        $content = strtolower(
+            $report->title . ' ' .
+            $report->description . ' ' .
+            ($report->resolution ?? '') . ' ' .
+            ($report->context_url ?? '')
+        );
+
+        $found = [];
+
+        // Match technology keywords
+        foreach ($allKeywords as $keyword) {
+            if (str_contains($content, strtolower($keyword))) {
+                $found[] = $keyword;
+            }
+        }
+
+        // Match URL patterns
+        $contextUrl = $report->context_url ?? '';
+        foreach ($urlPatterns as $pattern => $keyword) {
+            if (str_contains(strtolower($contextUrl), $pattern)) {
+                $found[] = $keyword;
+            }
+        }
+
+        // Always add type and PPM
+        $found[] = ucfirst(str_replace('_', ' ', $report->type));
+        $found[] = 'PPM';
+
+        return array_unique($found);
+    }
 
     /**
      * Build filtered query for resolved reports only

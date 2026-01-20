@@ -1163,6 +1163,17 @@ trait ProductFormERPTabs
             return ['show' => false, 'class' => '', 'text' => ''];
         }
 
+        // ETAP_08.8 FIX: For unlinked/not_found products, ALL fields are "Dziedziczone" from PPM
+        // There's no ERP data to compare with, so everything inherits from local PPM data
+        $syncStatus = $this->erpExternalData['sync_status'] ?? null;
+        if (in_array($syncStatus, ['not_linked', 'not_found'])) {
+            return [
+                'show' => true,
+                'class' => 'status-label-inherited',
+                'text' => 'Dziedziczone',
+            ];
+        }
+
         $pendingFields = $this->erpExternalData['pending_fields'] ?? [];
 
         // Check if field is in pending changes (awaiting sync to ERP)
