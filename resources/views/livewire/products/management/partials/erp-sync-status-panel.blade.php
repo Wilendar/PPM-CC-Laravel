@@ -207,6 +207,23 @@
         </div>
     @endif
 
+    {{-- ETAP_08.8: Subiekt GT Limitations Note --}}
+    @if($connection->erp_type === 'subiekt_gt')
+        <div class="mt-3 p-3 bg-purple-900/20 border border-purple-700/50 rounded">
+            <div class="flex items-start space-x-2">
+                <svg class="w-5 h-5 text-purple-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+                <div>
+                    <p class="text-sm text-purple-300 font-medium">Ograniczenia Subiekt GT</p>
+                    <p class="text-xs text-purple-400/80 mt-1">
+                        System Subiekt GT nie przechowuje zdjec produktow. Synchronizacja obejmuje tylko dane tekstowe (nazwa, opis, ceny, stany).
+                    </p>
+                </div>
+            </div>
+        </div>
+    @endif
+
     {{-- ========================================== --}}
     {{-- COLLAPSIBLE: Szczegoly synchronizacji --}}
     {{-- ========================================== --}}

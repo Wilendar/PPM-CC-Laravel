@@ -78,12 +78,22 @@ class ERPManager extends Component
     ];
 
     public $subiektConfig = [
-        'dll_path' => '',
-        'database_name' => '',
-        'server' => 'localhost',
-        'username' => '',
-        'password' => '',
-        'data_mappings' => [],
+        // SQL Server connection
+        'db_host' => '(local)\\INSERTGT',
+        'db_port' => 1433,
+        'db_database' => '',
+        'db_username' => 'sa',
+        'db_password' => '',
+        'db_trust_certificate' => true,
+        // Connection mode
+        'connection_mode' => 'sql_direct', // sql_direct | rest_api | sfera_api
+        // Mappings (populated after test)
+        'default_warehouse_id' => 1,
+        'default_price_type_id' => 1,
+        'warehouse_mappings' => [],
+        'price_group_mappings' => [],
+        // Options
+        'create_missing_products' => false,
     ];
 
     public $dynamicsConfig = [
@@ -128,11 +138,11 @@ class ERPManager extends Component
                 $rules['baselinkerConfig.inventory_id'] = 'required|integer';
                 break;
             case 'subiekt_gt':
-                $rules['subiektConfig.dll_path'] = 'required';
-                $rules['subiektConfig.database_name'] = 'required';
-                $rules['subiektConfig.server'] = 'required';
-                $rules['subiektConfig.username'] = 'required';
-                $rules['subiektConfig.password'] = 'required';
+                $rules['subiektConfig.db_host'] = 'required|min:1';
+                $rules['subiektConfig.db_port'] = 'required|integer|min:1|max:65535';
+                $rules['subiektConfig.db_database'] = 'required|min:1';
+                $rules['subiektConfig.db_username'] = 'required|min:1';
+                $rules['subiektConfig.connection_mode'] = 'required|in:sql_direct,rest_api,sfera_api';
                 break;
             case 'dynamics':
                 $rules['dynamicsConfig.tenant_id'] = 'required|uuid';
@@ -302,12 +312,18 @@ class ERPManager extends Component
         ];
 
         $this->subiektConfig = [
-            'dll_path' => '',
-            'database_name' => '',
-            'server' => 'localhost',
-            'username' => '',
-            'password' => '',
-            'data_mappings' => [],
+            'db_host' => '(local)\\INSERTGT',
+            'db_port' => 1433,
+            'db_database' => '',
+            'db_username' => 'sa',
+            'db_password' => '',
+            'db_trust_certificate' => true,
+            'connection_mode' => 'sql_direct',
+            'default_warehouse_id' => 1,
+            'default_price_type_id' => 1,
+            'warehouse_mappings' => [],
+            'price_group_mappings' => [],
+            'create_missing_products' => false,
         ];
 
         $this->dynamicsConfig = [
@@ -408,11 +424,11 @@ class ERPManager extends Component
                 break;
             case 'subiekt_gt':
                 $this->validate([
-                    'subiektConfig.dll_path' => 'required',
-                    'subiektConfig.database_name' => 'required',
-                    'subiektConfig.server' => 'required',
-                    'subiektConfig.username' => 'required',
-                    'subiektConfig.password' => 'required',
+                    'subiektConfig.db_host' => 'required|min:1',
+                    'subiektConfig.db_port' => 'required|integer|min:1|max:65535',
+                    'subiektConfig.db_database' => 'required|min:1',
+                    'subiektConfig.db_username' => 'required|min:1',
+                    'subiektConfig.connection_mode' => 'required|in:sql_direct,rest_api,sfera_api',
                 ]);
                 break;
             case 'dynamics':

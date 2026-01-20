@@ -204,8 +204,92 @@ Schedule::call(function () {
   ->cron($buildSyncCronExpression())
   ->withoutOverlapping(); // Note: Closures cannot use runInBackground()
 
-// Schedule będzie skonfigurowany w kolejnych fazach
-// na razie placeholder dla przyszłych zadań
+// ==========================================
+// SUBIEKT GT ERP SYNC TASKS
+// ==========================================
+// ETAP: Subiekt GT Integration - Scheduled pull operations
+
+use App\Jobs\ERP\PullProductsFromSubiektGT;
+use App\Jobs\ERP\DetectSubiektGTChanges;
+use App\Models\ERPConnection;
+
+// Subiekt GT Change Detection (lightweight check every 15 minutes)
+// Dispatches incremental pull if changes detected
+Schedule::call(function () {
+    try {
+        // Get all active Subiekt GT connections with auto-sync enabled
+        $subiektConnections = ERPConnection::where('erp_type', ERPConnection::ERP_SUBIEKT_GT)
+            ->where('is_active', true)
+            ->where('auto_sync_products', true)
+            ->get();
+
+        foreach ($subiektConnections as $connection) {
+            DetectSubiektGTChanges::dispatch($connection->id);
+        }
+    } catch (\Exception $e) {
+        // Fail silently if erp_connections table doesn't exist yet
+        \Log::warning('Subiekt GT change detection scheduler failed: ' . $e->getMessage());
+    }
+})->name('subiekt-gt:change-detection')
+  ->everyFifteenMinutes()
+  ->withoutOverlapping();
+
+// Subiekt GT Full Sync (every 6 hours)
+// Full product pull for active Subiekt GT connections
+Schedule::call(function () {
+    try {
+        $subiektConnections = ERPConnection::where('erp_type', ERPConnection::ERP_SUBIEKT_GT)
+            ->where('is_active', true)
+            ->where('auto_sync_products', true)
+            ->get();
+
+        foreach ($subiektConnections as $connection) {
+            // Skip if already has pending/running sync job
+            $existingJob = SyncJob::where('target_type', 'subiekt_gt')
+                ->where('target_id', $connection->id)
+                ->where('job_type', 'pull_products')
+                ->whereIn('status', ['pending', 'processing'])
+                ->exists();
+
+            if ($existingJob) {
+                \Log::info('Subiekt GT full sync skipped - job already pending', [
+                    'connection_id' => $connection->id,
+                ]);
+                continue;
+            }
+
+            // Create SyncJob for tracking
+            $syncJob = SyncJob::create([
+                'target_type' => 'subiekt_gt',
+                'target_id' => $connection->id,
+                'job_type' => 'pull_products',
+                'status' => 'pending',
+                'status_message' => 'Scheduled full sync',
+                'metadata' => [
+                    'mode' => 'full',
+                    'triggered_by' => 'scheduler',
+                ],
+            ]);
+
+            PullProductsFromSubiektGT::dispatch(
+                $connection->id,
+                'full',
+                null,
+                5000,
+                100,
+                $syncJob->id
+            );
+        }
+    } catch (\Exception $e) {
+        \Log::warning('Subiekt GT full sync scheduler failed: ' . $e->getMessage());
+    }
+})->name('subiekt-gt:full-sync')
+  ->everySixHours()
+  ->withoutOverlapping();
+
+// ==========================================
+// FUTURE TASKS (PLACEHOLDER)
+// ==========================================
 
 /*
 Schedule::command('ppm:sync-prestashop --all')

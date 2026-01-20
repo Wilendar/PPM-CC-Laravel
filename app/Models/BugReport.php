@@ -18,6 +18,7 @@ class BugReport extends Model
         'type',
         'severity',
         'status',
+        'status_updated_at',
         'context_url',
         'browser_info',
         'os_info',
@@ -34,6 +35,7 @@ class BugReport extends Model
     protected $casts = [
         'console_errors' => 'array',
         'user_actions' => 'array',
+        'status_updated_at' => 'datetime',
         'resolved_at' => 'datetime',
         'closed_at' => 'datetime',
     ];
@@ -99,8 +101,8 @@ class BugReport extends Model
     {
         return [
             self::STATUS_NEW => 'Nowe',
-            self::STATUS_IN_PROGRESS => 'W trakcie',
-            self::STATUS_WAITING => 'Oczekuje',
+            self::STATUS_IN_PROGRESS => 'Rozpatrywane',
+            self::STATUS_WAITING => 'Odlozone',
             self::STATUS_RESOLVED => 'Rozwiazane',
             self::STATUS_CLOSED => 'Zamkniete',
             self::STATUS_REJECTED => 'Odrzucone',
@@ -329,7 +331,10 @@ class BugReport extends Model
      */
     public function markInProgress(?int $assigneeId = null): void
     {
-        $data = ['status' => self::STATUS_IN_PROGRESS];
+        $data = [
+            'status' => self::STATUS_IN_PROGRESS,
+            'status_updated_at' => now(),
+        ];
 
         if ($assigneeId) {
             $data['assigned_to'] = $assigneeId;
@@ -345,6 +350,7 @@ class BugReport extends Model
     {
         $this->update([
             'status' => self::STATUS_RESOLVED,
+            'status_updated_at' => now(),
             'resolution' => $resolution,
             'resolved_at' => now(),
         ]);
@@ -357,6 +363,7 @@ class BugReport extends Model
     {
         $this->update([
             'status' => self::STATUS_CLOSED,
+            'status_updated_at' => now(),
             'closed_at' => now(),
         ]);
     }
@@ -368,6 +375,7 @@ class BugReport extends Model
     {
         $this->update([
             'status' => self::STATUS_REJECTED,
+            'status_updated_at' => now(),
             'resolution' => $reason,
             'closed_at' => now(),
         ]);

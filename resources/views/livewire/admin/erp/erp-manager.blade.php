@@ -398,7 +398,7 @@
                                 <select wire:model.live="connectionForm.erp_type"
                                         class="w-full px-3 py-2 text-sm bg-gray-700 border border-gray-600 rounded text-white focus:outline-none focus:border-orange-400">
                                     <option value="baselinker">BaseLinker</option>
-                                    <option value="subiekt_gt">Subiekt GT (Not implemented)</option>
+                                    <option value="subiekt_gt">Subiekt GT (SQL Server)</option>
                                     <option value="dynamics">Microsoft Dynamics (Not implemented)</option>
                                 </select>
                                 @error('connectionForm.erp_type') <span class="text-red-400 text-xs">{{ $message }}</span> @enderror
@@ -460,9 +460,113 @@
                                 </div>
                             </div>
                         @elseif($connectionForm['erp_type'] === 'subiekt_gt')
-                            <div class="p-4 bg-yellow-900/30 border border-yellow-700/50 rounded-md">
-                                <h4 class="text-sm font-medium text-yellow-300 mb-2">Subiekt GT - Not Implemented</h4>
-                                <p class="text-xs text-yellow-200/70">Subiekt GT integration requires Windows Server with DLL bridge. This will be implemented in a future update.</p>
+                            <div class="space-y-4">
+                                <div class="p-3 bg-purple-900/30 border border-purple-700/50 rounded-md">
+                                    <h4 class="text-sm font-medium text-purple-300 mb-1">Subiekt GT - SQL Server Configuration</h4>
+                                    <p class="text-xs text-purple-200/70">Connect directly to Subiekt GT database via SQL Server. Default instance: (local)\INSERTGT</p>
+                                </div>
+
+                                {{-- Connection Mode --}}
+                                <div>
+                                    <label class="block text-xs font-medium text-gray-300 mb-1">Connection Mode *</label>
+                                    <select wire:model.live="subiektConfig.connection_mode"
+                                            class="w-full px-3 py-2 text-sm bg-gray-700 border border-gray-600 rounded text-white focus:outline-none focus:border-orange-400">
+                                        <option value="sql_direct">SQL Direct (Read-Only)</option>
+                                        <option value="rest_api">REST API Wrapper</option>
+                                        <option value="sfera_api">Sfera API (COM/OLE)</option>
+                                    </select>
+                                    @error('subiektConfig.connection_mode') <span class="text-red-400 text-xs">{{ $message }}</span> @enderror
+                                    <p class="text-xs text-gray-500 mt-1">
+                                        @if($subiektConfig['connection_mode'] === 'sql_direct')
+                                            Direct SQL queries - read-only operations (safest for sync)
+                                        @elseif($subiektConfig['connection_mode'] === 'rest_api')
+                                            REST API wrapper on Windows server (requires local API service)
+                                        @else
+                                            Sfera API via COM/OLE (Windows only, full read/write)
+                                        @endif
+                                    </p>
+                                </div>
+
+                                <div class="grid grid-cols-2 gap-4">
+                                    {{-- SQL Server Host --}}
+                                    <div>
+                                        <label class="block text-xs font-medium text-gray-300 mb-1">SQL Server Host *</label>
+                                        <input wire:model.blur="subiektConfig.db_host"
+                                               type="text"
+                                               class="w-full px-3 py-2 text-sm bg-gray-700 border border-gray-600 rounded text-white placeholder-gray-400 focus:outline-none focus:border-orange-400"
+                                               placeholder="(local)\INSERTGT">
+                                        @error('subiektConfig.db_host') <span class="text-red-400 text-xs">{{ $message }}</span> @enderror
+                                    </div>
+
+                                    {{-- Port --}}
+                                    <div>
+                                        <label class="block text-xs font-medium text-gray-300 mb-1">Port</label>
+                                        <input wire:model.blur="subiektConfig.db_port"
+                                               type="number"
+                                               class="w-full px-3 py-2 text-sm bg-gray-700 border border-gray-600 rounded text-white placeholder-gray-400 focus:outline-none focus:border-orange-400"
+                                               placeholder="1433">
+                                        @error('subiektConfig.db_port') <span class="text-red-400 text-xs">{{ $message }}</span> @enderror
+                                    </div>
+                                </div>
+
+                                {{-- Database Name --}}
+                                <div>
+                                    <label class="block text-xs font-medium text-gray-300 mb-1">Database Name *</label>
+                                    <input wire:model.blur="subiektConfig.db_database"
+                                           type="text"
+                                           class="w-full px-3 py-2 text-sm bg-gray-700 border border-gray-600 rounded text-white placeholder-gray-400 focus:outline-none focus:border-orange-400"
+                                           placeholder="NazwaFirmy">
+                                    @error('subiektConfig.db_database') <span class="text-red-400 text-xs">{{ $message }}</span> @enderror
+                                    <p class="text-xs text-gray-500 mt-1">Database name from Subiekt GT configuration (usually company name)</p>
+                                </div>
+
+                                <div class="grid grid-cols-2 gap-4">
+                                    {{-- Username --}}
+                                    <div>
+                                        <label class="block text-xs font-medium text-gray-300 mb-1">SQL Username *</label>
+                                        <input wire:model.blur="subiektConfig.db_username"
+                                               type="text"
+                                               class="w-full px-3 py-2 text-sm bg-gray-700 border border-gray-600 rounded text-white placeholder-gray-400 focus:outline-none focus:border-orange-400"
+                                               placeholder="sa">
+                                        @error('subiektConfig.db_username') <span class="text-red-400 text-xs">{{ $message }}</span> @enderror
+                                    </div>
+
+                                    {{-- Password --}}
+                                    <div>
+                                        <label class="block text-xs font-medium text-gray-300 mb-1">SQL Password</label>
+                                        <input wire:model.blur="subiektConfig.db_password"
+                                               type="password"
+                                               class="w-full px-3 py-2 text-sm bg-gray-700 border border-gray-600 rounded text-white placeholder-gray-400 focus:outline-none focus:border-orange-400"
+                                               placeholder="(leave empty if no password)">
+                                        @error('subiektConfig.db_password') <span class="text-red-400 text-xs">{{ $message }}</span> @enderror
+                                    </div>
+                                </div>
+
+                                {{-- Trust Certificate --}}
+                                <div>
+                                    <label class="flex items-center gap-2 text-sm text-gray-300">
+                                        <input type="checkbox"
+                                               wire:model="subiektConfig.db_trust_certificate"
+                                               class="rounded border-gray-600 bg-gray-700 text-orange-500 focus:ring-orange-500">
+                                        Trust Server Certificate (recommended for local connections)
+                                    </label>
+                                </div>
+
+                                {{-- Warning for shared hosting --}}
+                                <div class="p-3 bg-yellow-900/30 border border-yellow-700/50 rounded-md">
+                                    <div class="flex items-start gap-2">
+                                        <svg class="w-4 h-4 text-yellow-400 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                                        </svg>
+                                        <div>
+                                            <p class="text-xs text-yellow-300 font-medium">Hosting Limitation</p>
+                                            <p class="text-xs text-yellow-200/70 mt-0.5">
+                                                PPM runs on Linux (Hostido). SQL Server connection requires:
+                                                VPN/SSH tunnel to Windows server, or REST API wrapper on Windows side.
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         @elseif($connectionForm['erp_type'] === 'dynamics')
                             <div class="p-4 bg-yellow-900/30 border border-yellow-700/50 rounded-md">
@@ -513,6 +617,76 @@
                                             <p class="text-xs text-green-300 mb-1">Available Inventories: {{ count($authTestResult['details']['inventories']) }}</p>
                                         </div>
                                     @endif
+
+                                    {{-- Subiekt GT specific results --}}
+                                    @if($authTestResult['success'] && $connectionForm['erp_type'] === 'subiekt_gt')
+                                        <div class="mt-3 pt-3 border-t border-green-700/50 space-y-3">
+                                            {{-- Database Stats --}}
+                                            @if(!empty($authTestResult['details']['database_stats']))
+                                                <div>
+                                                    <p class="text-xs text-green-300 mb-1">Database Statistics:</p>
+                                                    <div class="grid grid-cols-2 gap-2 text-xs">
+                                                        <div class="bg-green-800/30 px-2 py-1 rounded">
+                                                            <span class="text-gray-400">Products:</span>
+                                                            <span class="text-white font-medium ml-1">{{ number_format($authTestResult['details']['database_stats']['product_count'] ?? 0) }}</span>
+                                                        </div>
+                                                        <div class="bg-green-800/30 px-2 py-1 rounded">
+                                                            <span class="text-gray-400">Active:</span>
+                                                            <span class="text-white font-medium ml-1">{{ number_format($authTestResult['details']['database_stats']['active_products'] ?? 0) }}</span>
+                                                        </div>
+                                                        @if(!empty($authTestResult['details']['database_stats']['contractor_count']))
+                                                        <div class="bg-green-800/30 px-2 py-1 rounded">
+                                                            <span class="text-gray-400">Contractors:</span>
+                                                            <span class="text-white font-medium ml-1">{{ number_format($authTestResult['details']['database_stats']['contractor_count']) }}</span>
+                                                        </div>
+                                                        @endif
+                                                    </div>
+                                                </div>
+                                            @endif
+
+                                            {{-- Warehouses --}}
+                                            @if(!empty($authTestResult['details']['warehouses']))
+                                                <div>
+                                                    <p class="text-xs text-green-300 mb-1">Available Warehouses ({{ count($authTestResult['details']['warehouses']) }}):</p>
+                                                    <div class="flex flex-wrap gap-1">
+                                                        @foreach($authTestResult['details']['warehouses'] as $warehouse)
+                                                            <span class="px-2 py-0.5 bg-purple-800/50 text-purple-300 text-xs rounded">
+                                                                {{ $warehouse['mag_Nazwa'] ?? $warehouse['name'] ?? 'ID: ' . ($warehouse['mag_Id'] ?? $warehouse['id'] ?? '?') }}
+                                                            </span>
+                                                        @endforeach
+                                                    </div>
+                                                </div>
+                                            @endif
+
+                                            {{-- Price Types --}}
+                                            @if(!empty($authTestResult['details']['price_types']))
+                                                <div>
+                                                    <p class="text-xs text-green-300 mb-1">Price Types ({{ count($authTestResult['details']['price_types']) }}):</p>
+                                                    <div class="flex flex-wrap gap-1">
+                                                        @foreach($authTestResult['details']['price_types'] as $priceType)
+                                                            <span class="px-2 py-0.5 bg-blue-800/50 text-blue-300 text-xs rounded">
+                                                                {{ $priceType['rc_Nazwa'] ?? $priceType['name'] ?? 'ID: ' . ($priceType['rc_Id'] ?? $priceType['id'] ?? '?') }}
+                                                            </span>
+                                                        @endforeach
+                                                    </div>
+                                                </div>
+                                            @endif
+
+                                            {{-- Connection Mode Info --}}
+                                            <div class="p-2 bg-purple-900/30 rounded">
+                                                <p class="text-xs text-purple-300">
+                                                    <span class="font-medium">Mode:</span>
+                                                    @if($subiektConfig['connection_mode'] === 'sql_direct')
+                                                        SQL Direct (Read-Only) - Full pull support, no push operations
+                                                    @elseif($subiektConfig['connection_mode'] === 'rest_api')
+                                                        REST API - Full read/write via Windows wrapper
+                                                    @else
+                                                        Sfera API - Full read/write via COM/OLE
+                                                    @endif
+                                                </p>
+                                            </div>
+                                        </div>
+                                    @endif
                                 </div>
                             @elseif($testingConnection)
                                 <div class="flex items-center justify-center py-8">
@@ -538,14 +712,82 @@
                                 <p class="text-xs text-gray-400">Configure what should be synchronized automatically.</p>
                             </div>
 
+                            {{-- Subiekt GT: Warehouse & Price Type Mapping --}}
+                            @if($connectionForm['erp_type'] === 'subiekt_gt' && $authTestResult && $authTestResult['success'])
+                                <div class="p-3 bg-purple-900/30 border border-purple-700/50 rounded-md space-y-3">
+                                    <h4 class="text-sm font-medium text-purple-300">Subiekt GT Mappings</h4>
+
+                                    <div class="grid grid-cols-2 gap-4">
+                                        {{-- Default Warehouse --}}
+                                        <div>
+                                            <label class="block text-xs font-medium text-gray-300 mb-1">Default Warehouse</label>
+                                            <select wire:model="subiektConfig.default_warehouse_id"
+                                                    class="w-full px-3 py-2 text-sm bg-gray-700 border border-gray-600 rounded text-white focus:outline-none focus:border-orange-400">
+                                                @if(!empty($authTestResult['details']['warehouses']))
+                                                    @foreach($authTestResult['details']['warehouses'] as $warehouse)
+                                                        <option value="{{ $warehouse['mag_Id'] ?? $warehouse['id'] ?? 1 }}">
+                                                            {{ $warehouse['mag_Nazwa'] ?? $warehouse['name'] ?? 'Warehouse ' . ($warehouse['mag_Id'] ?? '?') }}
+                                                        </option>
+                                                    @endforeach
+                                                @else
+                                                    <option value="1">Default (ID: 1)</option>
+                                                @endif
+                                            </select>
+                                            <p class="text-xs text-gray-500 mt-1">Stock levels will be synced from this warehouse</p>
+                                        </div>
+
+                                        {{-- Default Price Type --}}
+                                        <div>
+                                            <label class="block text-xs font-medium text-gray-300 mb-1">Default Price Type</label>
+                                            <select wire:model="subiektConfig.default_price_type_id"
+                                                    class="w-full px-3 py-2 text-sm bg-gray-700 border border-gray-600 rounded text-white focus:outline-none focus:border-orange-400">
+                                                @if(!empty($authTestResult['details']['price_types']))
+                                                    @foreach($authTestResult['details']['price_types'] as $priceType)
+                                                        <option value="{{ $priceType['rc_Id'] ?? $priceType['id'] ?? 1 }}">
+                                                            {{ $priceType['rc_Nazwa'] ?? $priceType['name'] ?? 'Price Type ' . ($priceType['rc_Id'] ?? '?') }}
+                                                        </option>
+                                                    @endforeach
+                                                @else
+                                                    <option value="1">Default (ID: 1)</option>
+                                                @endif
+                                            </select>
+                                            <p class="text-xs text-gray-500 mt-1">Prices will be synced from this price list</p>
+                                        </div>
+                                    </div>
+
+                                    {{-- Create Missing Products Option --}}
+                                    <div>
+                                        <label class="flex items-center gap-2 text-sm text-gray-300">
+                                            <input type="checkbox"
+                                                   wire:model="subiektConfig.create_missing_products"
+                                                   class="rounded border-gray-600 bg-gray-700 text-orange-500 focus:ring-orange-500">
+                                            Create missing products in PPM during sync
+                                        </label>
+                                        <p class="text-xs text-gray-500 ml-6">If enabled, new products from Subiekt GT will be automatically created in PPM</p>
+                                    </div>
+
+                                    {{-- Sync Mode Note for SQL Direct --}}
+                                    @if($subiektConfig['connection_mode'] === 'sql_direct')
+                                        <div class="p-2 bg-yellow-900/30 border border-yellow-700/50 rounded text-xs text-yellow-300">
+                                            <strong>Note:</strong> SQL Direct mode is read-only. Product push to Subiekt GT requires REST API or Sfera API mode.
+                                        </div>
+                                    @endif
+                                </div>
+                            @endif
+
                             <div>
                                 <label class="block text-xs font-medium text-gray-300 mb-1">Sync Mode</label>
                                 <select wire:model="connectionForm.sync_mode"
                                         class="w-full px-3 py-2 text-sm bg-gray-700 border border-gray-600 rounded text-white focus:outline-none focus:border-orange-400">
-                                    <option value="bidirectional">Bidirectional (Push & Pull)</option>
-                                    <option value="push_only">Push Only (PPM → ERP)</option>
-                                    <option value="pull_only">Pull Only (ERP → PPM)</option>
-                                    <option value="disabled">Disabled</option>
+                                    @if($connectionForm['erp_type'] === 'subiekt_gt' && ($subiektConfig['connection_mode'] ?? 'sql_direct') === 'sql_direct')
+                                        <option value="pull_only">Pull Only (Subiekt GT → PPM) - SQL Direct Mode</option>
+                                        <option value="disabled">Disabled</option>
+                                    @else
+                                        <option value="bidirectional">Bidirectional (Push & Pull)</option>
+                                        <option value="push_only">Push Only (PPM → ERP)</option>
+                                        <option value="pull_only">Pull Only (ERP → PPM)</option>
+                                        <option value="disabled">Disabled</option>
+                                    @endif
                                 </select>
                             </div>
 
@@ -562,9 +804,16 @@
                                     <input type="checkbox" wire:model="connectionForm.auto_sync_prices" class="rounded border-gray-600 bg-gray-700 text-orange-500 focus:ring-orange-500">
                                     Auto-sync Prices
                                 </label>
-                                <label class="flex items-center gap-2 text-sm text-gray-300">
-                                    <input type="checkbox" wire:model="connectionForm.auto_sync_orders" class="rounded border-gray-600 bg-gray-700 text-orange-500 focus:ring-orange-500">
+                                <label class="flex items-center gap-2 text-sm text-gray-300"
+                                       @if($connectionForm['erp_type'] === 'subiekt_gt') title="Orders sync not supported for Subiekt GT" @endif>
+                                    <input type="checkbox"
+                                           wire:model="connectionForm.auto_sync_orders"
+                                           class="rounded border-gray-600 bg-gray-700 text-orange-500 focus:ring-orange-500"
+                                           @if($connectionForm['erp_type'] === 'subiekt_gt') disabled @endif>
                                     Auto-sync Orders
+                                    @if($connectionForm['erp_type'] === 'subiekt_gt')
+                                        <span class="text-xs text-gray-500">(N/A)</span>
+                                    @endif
                                 </label>
                             </div>
 

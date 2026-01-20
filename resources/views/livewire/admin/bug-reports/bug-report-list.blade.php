@@ -39,17 +39,17 @@
             <div class="enterprise-card p-4 text-center cursor-pointer hover:border-yellow-500/50"
                  wire:click="$set('statusFilter', 'in_progress')">
                 <p class="text-2xl font-bold text-yellow-400">{{ $this->stats['in_progress'] }}</p>
-                <p class="text-xs text-gray-400">W trakcie</p>
+                <p class="text-xs text-gray-400">Rozpatrywane</p>
             </div>
             <div class="enterprise-card p-4 text-center cursor-pointer hover:border-purple-500/50"
                  wire:click="$set('statusFilter', 'waiting')">
                 <p class="text-2xl font-bold text-purple-400">{{ $this->stats['waiting'] }}</p>
-                <p class="text-xs text-gray-400">Oczekuje</p>
+                <p class="text-xs text-gray-400">Odłożone</p>
             </div>
             <div class="enterprise-card p-4 text-center cursor-pointer hover:border-green-500/50"
                  wire:click="$set('statusFilter', 'resolved')">
                 <p class="text-2xl font-bold text-green-400">{{ $this->stats['resolved'] }}</p>
-                <p class="text-xs text-gray-400">Rozwiazane</p>
+                <p class="text-xs text-gray-400">Rozwiązane</p>
             </div>
             <div class="enterprise-card p-4 text-center cursor-pointer hover:border-orange-500/50"
                  wire:click="$set('assignedToFilter', 0)">
@@ -203,7 +203,7 @@
                         @forelse($reports as $report)
                             <tr wire:key="report-{{ $report->id }}"
                                 class="hover:bg-gray-800/30 transition-colors cursor-pointer {{ $previewReportId === $report->id ? 'bg-gray-800/50' : '' }}"
-                                wire:click="preview({{ $report->id }})">
+                                wire:click="viewReport({{ $report->id }})">
                                 <td class="px-4 py-3" wire:click.stop>
                                     <input type="checkbox"
                                            wire:model.live="selectedReports"

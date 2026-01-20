@@ -329,6 +329,41 @@
                         </button>
                     @endif
                 </div>
+
+                {{-- AI Agent Export Section --}}
+                <div class="border-t border-gray-700/50 pt-4 mt-4">
+                    <h4 class="text-sm font-medium text-gray-400 mb-3 flex items-center gap-2">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
+                        </svg>
+                        Eksport dla AI
+                    </h4>
+                    @if(!$report->isResolved() && !$report->isClosed())
+                        <button wire:click="exportForAIAgent"
+                                class="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 bg-gradient-to-r from-purple-600/20 to-blue-600/20 border border-purple-500/30 text-purple-300 hover:from-purple-600/30 hover:to-blue-600/30 hover:border-purple-500/50"
+                                title="Pobierz zadanie dla Claude Code CLI z instrukcjami naprawy">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+                            </svg>
+                            AI Task (.md)
+                        </button>
+                        <p class="text-xs text-gray-500 mt-2 text-center">
+                            Eksportuj jako zadanie do naprawy dla Claude Code CLI
+                        </p>
+                    @else
+                        <button wire:click="exportToMarkdown"
+                                class="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 bg-gradient-to-r from-green-600/20 to-emerald-600/20 border border-green-500/30 text-green-300 hover:from-green-600/30 hover:to-emerald-600/30 hover:border-green-500/50"
+                                title="Pobierz rozwiazanie dla bazy wiedzy Claude Code">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+                            </svg>
+                            Solution (.md)
+                        </button>
+                        <p class="text-xs text-gray-500 mt-2 text-center">
+                            Eksportuj rozwiazanie do bazy wiedzy
+                        </p>
+                    @endif
+                </div>
             </div>
 
             {{-- Resolution Form Modal --}}
@@ -460,6 +495,12 @@
                         <dt class="text-gray-400">Utworzono:</dt>
                         <dd class="text-white">{{ $report->created_at->format('d.m.Y H:i') }}</dd>
                     </div>
+                    @if($report->status_updated_at)
+                        <div class="flex justify-between">
+                            <dt class="text-gray-400">Aktualizacja:</dt>
+                            <dd class="text-white">{{ $report->status_updated_at->format('d.m.Y H:i') }}</dd>
+                        </div>
+                    @endif
                     @if($report->resolved_at)
                         <div class="flex justify-between">
                             <dt class="text-gray-400">Rozwiazano:</dt>

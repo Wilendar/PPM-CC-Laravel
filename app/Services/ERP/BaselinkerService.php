@@ -821,6 +821,15 @@ class BaselinkerService implements ERPSyncServiceInterface
                 'weight' => $variantData['weight'],
             ];
 
+            // ETAP_08.8 FIX: Add variant images if available
+            if (isset($variantData['images']) && count(get_object_vars($variantData['images'])) > 0) {
+                $requestParams['images'] = $variantData['images'];
+                Log::info('createVariantInBaselinker: Adding images', [
+                    'variant_sku' => $variant->sku,
+                    'images_count' => count(get_object_vars($variantData['images'])),
+                ]);
+            }
+
             $response = $this->makeRequest(
                 $connection->connection_config,
                 'addInventoryProduct',
@@ -916,6 +925,15 @@ class BaselinkerService implements ERPSyncServiceInterface
                 'weight' => $variantData['weight'],
             ];
 
+            // ETAP_08.8 FIX: Add variant images if available
+            if (isset($variantData['images']) && count(get_object_vars($variantData['images'])) > 0) {
+                $requestParams['images'] = $variantData['images'];
+                Log::info('updateVariantInBaselinker: Updating images', [
+                    'variant_sku' => $variant->sku,
+                    'images_count' => count(get_object_vars($variantData['images'])),
+                ]);
+            }
+
             $response = $this->makeRequest(
                 $connection->connection_config,
                 'addInventoryProduct',
@@ -1004,6 +1022,37 @@ class BaselinkerService implements ERPSyncServiceInterface
             $attributeSuffix = ' - ' . implode(', ', $attrs);
         }
 
+        // ETAP_08.8 FIX: Build images for variant
+        // Uses same format as main product: stdClass with "url:" prefixed URLs
+        $imagesObject = new \stdClass();
+        $imageIndex = 0;
+        $maxImages = 16; // Baselinker limit
+
+        // Load variant images if not already loaded
+        if (!$variant->relationLoaded('images')) {
+            $variant->load('images');
+        }
+
+        foreach ($variant->images as $variantImage) {
+            if ($imageIndex >= $maxImages) {
+                break;
+            }
+
+            // Get full URL from VariantImage accessor
+            $imageUrl = $variantImage->url;
+            if ($imageUrl && !empty($imageUrl) && !str_contains($imageUrl, 'placeholder')) {
+                // CRITICAL: Baselinker requires "url:" prefix for URL format images!
+                $imagesObject->{(string)$imageIndex} = 'url:' . $imageUrl;
+                $imageIndex++;
+            }
+        }
+
+        Log::debug('buildVariantProductData: Images collected for variant', [
+            'variant_id' => $variant->id,
+            'variant_sku' => $variant->sku,
+            'images_count' => $imageIndex,
+        ]);
+
         return [
             'name' => $variant->name ?: ($mainProduct->name . $attributeSuffix),
             'description' => $mainProduct->description ?: '',
@@ -1011,6 +1060,7 @@ class BaselinkerService implements ERPSyncServiceInterface
             'ean' => '', // Variants may have own EAN in future
             'tax_rate' => $mainProduct->tax_rate ?: 23,
             'weight' => $mainProduct->weight ?: 0,
+            'images' => $imagesObject, // ETAP_08.8: Variant images
         ];
     }
 

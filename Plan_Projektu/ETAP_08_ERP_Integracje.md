@@ -5,7 +5,7 @@
 - ❌ 8.1 Analiza i dokumentacja systemów ERP
 - ❌ 8.2 Modele i migracje ERP
 - ❌ 8.3 BaseLinker Integration Service
-- ❌ 8.4 Subiekt GT Integration Service
+- 🛠️ 8.4 Subiekt GT Integration Service (FAZY 1-5 ✅, FAZA 6 TESTY ⏳)
 - ❌ 8.5 Microsoft Dynamics Integration
 - ❌ 8.6 Unified ERP Service Layer
 - ❌ 8.7 Jobs i queue system
