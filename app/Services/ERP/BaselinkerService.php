@@ -821,12 +821,22 @@ class BaselinkerService implements ERPSyncServiceInterface
                 'weight' => $variantData['weight'],
             ];
 
-            // ETAP_08.8 FIX: Add variant images if available
-            if (isset($variantData['images']) && count(get_object_vars($variantData['images'])) > 0) {
+            // ETAP_08.8 FIX: Always send images (includes empty strings to prevent inheritance)
+            if (isset($variantData['images'])) {
                 $requestParams['images'] = $variantData['images'];
-                Log::info('createVariantInBaselinker: Adding images', [
+
+                // Count actual images (non-empty values)
+                $actualImages = 0;
+                foreach (get_object_vars($variantData['images']) as $val) {
+                    if (!empty($val)) {
+                        $actualImages++;
+                    }
+                }
+
+                Log::info('createVariantInBaselinker: Setting images for new variant', [
                     'variant_sku' => $variant->sku,
-                    'images_count' => count(get_object_vars($variantData['images'])),
+                    'actual_images' => $actualImages,
+                    'empty_slots' => 16 - $actualImages,
                 ]);
             }
 
@@ -925,12 +935,24 @@ class BaselinkerService implements ERPSyncServiceInterface
                 'weight' => $variantData['weight'],
             ];
 
-            // ETAP_08.8 FIX: Add variant images if available
-            if (isset($variantData['images']) && count(get_object_vars($variantData['images'])) > 0) {
+            // ETAP_08.8 FIX: Always send images to clear old ones and set new ones
+            // buildVariantProductData() fills all 16 positions (real images + empty strings for deletion)
+            if (isset($variantData['images'])) {
                 $requestParams['images'] = $variantData['images'];
-                Log::info('updateVariantInBaselinker: Updating images', [
+
+                // Count actual images (non-empty values)
+                $actualImages = 0;
+                foreach (get_object_vars($variantData['images']) as $val) {
+                    if (!empty($val)) {
+                        $actualImages++;
+                    }
+                }
+
+                Log::info('updateVariantInBaselinker: Sending images to Baselinker', [
                     'variant_sku' => $variant->sku,
-                    'images_count' => count(get_object_vars($variantData['images'])),
+                    'actual_images' => $actualImages,
+                    'empty_slots' => 16 - $actualImages,
+                    'purpose' => 'Clear old images and set new ones',
                 ]);
             }
 
@@ -1040,6 +1062,17 @@ class BaselinkerService implements ERPSyncServiceInterface
 
             // Get full URL from VariantImage accessor
             $imageUrl = $variantImage->url;
+
+            // DEBUG: Log actual URL for troubleshooting
+            Log::info('buildVariantProductData: Processing variant image', [
+                'variant_id' => $variant->id,
+                'variant_sku' => $variant->sku,
+                'image_id' => $variantImage->id,
+                'image_path' => $variantImage->image_path,
+                'image_url_raw' => $imageUrl,
+                'is_cover' => $variantImage->is_cover,
+            ]);
+
             if ($imageUrl && !empty($imageUrl) && !str_contains($imageUrl, 'placeholder')) {
                 // CRITICAL: Baselinker requires "url:" prefix for URL format images!
                 $imagesObject->{(string)$imageIndex} = 'url:' . $imageUrl;
@@ -1047,10 +1080,19 @@ class BaselinkerService implements ERPSyncServiceInterface
             }
         }
 
-        Log::debug('buildVariantProductData: Images collected for variant', [
+        // ETAP_08.8 FIX: Fill remaining positions with empty strings to CLEAR old images!
+        // Baselinker documentation: "delete images by sending an empty string at a specific position"
+        // This ensures old inherited/stale images are removed when variant has fewer images
+        for ($i = $imageIndex; $i < $maxImages; $i++) {
+            $imagesObject->{(string)$i} = '';
+        }
+
+        Log::info('buildVariantProductData: Images prepared for variant', [
             'variant_id' => $variant->id,
             'variant_sku' => $variant->sku,
-            'images_count' => $imageIndex,
+            'new_images_count' => $imageIndex,
+            'empty_slots_count' => $maxImages - $imageIndex,
+            'images_json' => json_encode($imagesObject),
         ]);
 
         return [
@@ -1229,10 +1271,13 @@ class BaselinkerService implements ERPSyncServiceInterface
 
         // DEBUG: Check images format before json_encode
         if (isset($parameters['images'])) {
-            Log::debug('makeRequest: images debug', [
+            Log::info('makeRequest: images being sent to Baselinker API', [
+                'method' => $method,
+                'product_id' => $parameters['product_id'] ?? 'NEW',
+                'sku' => $parameters['sku'] ?? 'N/A',
                 'images_type' => gettype($parameters['images']),
-                'images_class' => is_object($parameters['images']) ? get_class($parameters['images']) : 'N/A',
-                'images_json_sample' => substr(json_encode($parameters['images']), 0, 200),
+                'images_count' => is_object($parameters['images']) ? count(get_object_vars($parameters['images'])) : 0,
+                'images_json' => json_encode($parameters['images']),
             ]);
         }
 
