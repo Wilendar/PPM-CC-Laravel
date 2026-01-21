@@ -100,4 +100,13 @@ interface ERPSyncServiceInterface
      * @return array List of supported features
      */
     public function getSupportedFeatures(): array;
+
+    /**
+     * Find product in ERP by SKU.
+     *
+     * @param ERPConnection $connection Active ERP connection
+     * @param string $sku Product SKU to search for
+     * @return array{success: bool, found: bool, external_id: ?string, data: ?array, message: string}
+     */
+    public function findProductBySku(ERPConnection $connection, string $sku): array;
 }

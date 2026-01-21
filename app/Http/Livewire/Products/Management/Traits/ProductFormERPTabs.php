@@ -728,6 +728,15 @@ trait ProductFormERPTabs
                 // For Baselinker, result contains 'data' with raw API response
                 $externalData = $result['erp_data'] ?? $result['data'] ?? [];
 
+                Log::debug('pullProductDataFromErp: External data BEFORE update', [
+                    'has_prices' => isset($externalData['prices']),
+                    'has_stock' => isset($externalData['stock']),
+                    'prices_count' => isset($externalData['prices']) ? count($externalData['prices']) : 0,
+                    'stock_count' => isset($externalData['stock']) ? count($externalData['stock']) : 0,
+                    'first_price' => isset($externalData['prices']) ? array_slice($externalData['prices'], 0, 1, true) : null,
+                    'first_stock' => isset($externalData['stock']) ? array_slice($externalData['stock'], 0, 1, true) : null,
+                ]);
+
                 // Update external_data cache
                 $erpData->update([
                     'external_data' => $externalData,
@@ -743,6 +752,13 @@ trait ProductFormERPTabs
 
                 // TASK 2c: Reload prices and stock from the new data
                 $erpData->refresh();
+
+                Log::debug('pullProductDataFromErp: After refresh()', [
+                    'external_data_keys' => is_array($erpData->external_data) ? array_keys($erpData->external_data) : 'not_array',
+                    'has_prices_after_refresh' => isset($erpData->external_data['prices']),
+                    'has_stock_after_refresh' => isset($erpData->external_data['stock']),
+                ]);
+
                 $this->overrideFormPricesWithErpData($erpData);
                 $this->overrideFormStockWithErpData($erpData);
 
@@ -1970,5 +1986,110 @@ trait ProductFormERPTabs
         }
 
         return 'linked';
+    }
+
+    // =========================================================================
+    // ETAP_09.1: ERP Data Display Methods (for erp-connection-data.blade.php)
+    // =========================================================================
+
+    /**
+     * Get ERP stock data formatted for display in the UI.
+     * Returns array of warehouse stock records from external_data cache.
+     */
+    public function getErpStockForDisplay(): array
+    {
+        $stock = $this->erpExternalData['external_data']['stock'] ?? [];
+
+        // Ensure we return an array
+        if (!is_array($stock)) {
+            return [];
+        }
+
+        // DEBUG: Log what we're returning
+        if (!empty($stock)) {
+            $firstKey = array_key_first($stock);
+            $firstItem = $stock[$firstKey] ?? null;
+            Log::debug('getErpStockForDisplay RETURNING', [
+                'stock_count' => count($stock),
+                'first_key' => $firstKey,
+                'first_item_keys' => $firstItem ? array_keys($firstItem) : 'null',
+                'first_item_erp_warehouse_code' => $firstItem['erp_warehouse_code'] ?? 'NOT_SET',
+                'first_item_name' => $firstItem['name'] ?? 'NOT_SET',
+            ]);
+        }
+
+        return $stock;
+    }
+
+    /**
+     * Get ERP prices data formatted for display in the UI.
+     * Returns array of price level records from external_data cache.
+     */
+    public function getErpPricesForDisplay(): array
+    {
+        $prices = $this->erpExternalData['external_data']['prices'] ?? [];
+
+        // Ensure we return an array
+        if (!is_array($prices)) {
+            return [];
+        }
+
+        return $prices;
+    }
+
+    /**
+     * Get timestamp when stock data was last updated from ERP.
+     */
+    public function getErpStockUpdatedAt(): ?string
+    {
+        return $this->erpExternalData['last_pull_at'] ?? null;
+    }
+
+    /**
+     * Get timestamp when prices data was last updated from ERP.
+     */
+    public function getErpPricesUpdatedAt(): ?string
+    {
+        return $this->erpExternalData['last_pull_at'] ?? null;
+    }
+
+    /**
+     * Calculate total stock quantity across all warehouses.
+     */
+    public function getErpTotalStock(): float
+    {
+        $stock = $this->getErpStockForDisplay();
+        $total = 0;
+
+        foreach ($stock as $warehouse) {
+            $qty = $warehouse['quantity'] ?? $warehouse['Quantity'] ?? 0;
+            $total += (float) $qty;
+        }
+
+        return $total;
+    }
+
+    /**
+     * Calculate total available stock (quantity - reserved) across all warehouses.
+     */
+    public function getErpAvailableStock(): float
+    {
+        $stock = $this->getErpStockForDisplay();
+        $total = 0;
+
+        foreach ($stock as $warehouse) {
+            $available = $warehouse['available'] ?? $warehouse['Available'] ?? null;
+
+            if ($available !== null) {
+                $total += (float) $available;
+            } else {
+                // Calculate: quantity - reserved
+                $qty = $warehouse['quantity'] ?? $warehouse['Quantity'] ?? 0;
+                $reserved = $warehouse['reserved'] ?? $warehouse['Reserved'] ?? 0;
+                $total += (float) $qty - (float) $reserved;
+            }
+        }
+
+        return $total;
     }
 }

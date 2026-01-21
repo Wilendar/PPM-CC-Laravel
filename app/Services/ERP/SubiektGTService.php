@@ -424,22 +424,58 @@ class SubiektGTService implements ERPSyncServiceInterface
         try {
             $this->initializeForConnection($connection);
 
-            // Try to find product by ID first, then by SKU
-            $subiektProduct = is_numeric($erpProductId)
-                ? $this->queryBuilder->getProductById((int) $erpProductId)
-                : $this->queryBuilder->getProductBySKU($erpProductId);
+            $config = $connection->connection_config;
+            $connectionMode = $config['connection_mode'] ?? 'rest_api';
 
-            if (!$subiektProduct) {
-                return [
-                    'success' => false,
-                    'message' => 'Produkt nie znaleziony w Subiekt GT: ' . $erpProductId,
-                    'product' => null,
+            // REST API mode - use REST client
+            if ($connectionMode === 'rest_api' && $this->restApiClient) {
+                $productResult = is_numeric($erpProductId)
+                    ? $this->restApiClient->getProductById((int) $erpProductId)
+                    : $this->restApiClient->getProductBySku($erpProductId);
+
+                if (!$productResult || !($productResult['success'] ?? false) || empty($productResult['data'])) {
+                    return [
+                        'success' => false,
+                        'message' => 'Produkt nie znaleziony w Subiekt GT: ' . $erpProductId,
+                        'product' => null,
+                    ];
+                }
+
+                $subiektProductData = $productResult['data'];
+                $productId = $subiektProductData['id'] ?? $subiektProductData['Id'] ?? $subiektProductData['tw_Id'] ?? null;
+
+                // Get prices and stock via REST API
+                $pricesResult = $productId ? $this->restApiClient->getProductPrices((int) $productId) : null;
+                $stockResult = $productId ? $this->restApiClient->getProductStock((int) $productId) : null;
+
+                $prices = ($pricesResult && ($pricesResult['success'] ?? false)) ? ($pricesResult['data'] ?? []) : [];
+                $stock = ($stockResult && ($stockResult['success'] ?? false)) ? ($stockResult['data'] ?? []) : [];
+
+                // Create object for transformer
+                $subiektProduct = (object) [
+                    'id' => $productId,
+                    'sku' => $subiektProductData['sku'] ?? $subiektProductData['Sku'] ?? $subiektProductData['tw_Symbol'] ?? '',
+                    'name' => $subiektProductData['name'] ?? $subiektProductData['Name'] ?? $subiektProductData['tw_Nazwa'] ?? '',
+                    'ean' => $subiektProductData['ean'] ?? $subiektProductData['Ean'] ?? $subiektProductData['tw_SWW'] ?? '',
                 ];
-            }
+            } else {
+                // SQL Direct mode - use query builder
+                $subiektProduct = is_numeric($erpProductId)
+                    ? $this->queryBuilder->getProductById((int) $erpProductId)
+                    : $this->queryBuilder->getProductBySKU($erpProductId);
 
-            // Get full product data (prices and stock)
-            $prices = $this->queryBuilder->getProductPrices($subiektProduct->id)->toArray();
-            $stock = $this->queryBuilder->getProductStock($subiektProduct->id)->toArray();
+                if (!$subiektProduct) {
+                    return [
+                        'success' => false,
+                        'message' => 'Produkt nie znaleziony w Subiekt GT: ' . $erpProductId,
+                        'product' => null,
+                    ];
+                }
+
+                // Get full product data (prices and stock)
+                $prices = $this->queryBuilder->getProductPrices($subiektProduct->id)->toArray();
+                $stock = $this->queryBuilder->getProductStock($subiektProduct->id)->toArray();
+            }
 
             // Transform to PPM format
             $ppmData = $this->transformer->subiektToPPM($subiektProduct, $prices, $stock);
@@ -830,6 +866,86 @@ class SubiektGTService implements ERPSyncServiceInterface
                 ],
             ],
         ];
+    }
+
+    /**
+     * Find product in ERP by SKU.
+     *
+     * @param ERPConnection $connection Active ERP connection
+     * @param string $sku Product SKU to search for
+     * @return array{success: bool, found: bool, external_id: ?string, data: ?array, message: string}
+     */
+    public function findProductBySku(ERPConnection $connection, string $sku): array
+    {
+        try {
+            $config = $connection->config;
+            $mode = $config['connection_mode'] ?? 'rest_api';
+
+            if ($mode === 'rest_api') {
+                $client = $this->createRestApiClient($config);
+                $result = $client->getProductBySku($sku);
+
+                if ($result && isset($result['success']) && $result['success']) {
+                    $productData = $result['data'] ?? null;
+                    if ($productData) {
+                        return [
+                            'success' => true,
+                            'found' => true,
+                            'external_id' => (string) ($productData['id'] ?? $productData['Id'] ?? $productData['tw_Id'] ?? null),
+                            'data' => $productData,
+                            'message' => "Znaleziono produkt w Subiekt GT: {$sku}",
+                        ];
+                    }
+                }
+
+                return [
+                    'success' => true,
+                    'found' => false,
+                    'external_id' => null,
+                    'data' => null,
+                    'message' => "Nie znaleziono produktu o SKU: {$sku}",
+                ];
+            }
+
+            // SQL Direct mode
+            $this->configureDynamicConnection($config);
+            $product = DB::connection('subiekt_dynamic')
+                ->table('tw__Towar')
+                ->where('tw_Symbol', $sku)
+                ->where('tw_Aktywny', 1)
+                ->first();
+
+            if ($product) {
+                return [
+                    'success' => true,
+                    'found' => true,
+                    'external_id' => (string) $product->tw_Id,
+                    'data' => (array) $product,
+                    'message' => "Znaleziono produkt w Subiekt GT: {$sku}",
+                ];
+            }
+
+            return [
+                'success' => true,
+                'found' => false,
+                'external_id' => null,
+                'data' => null,
+                'message' => "Nie znaleziono produktu o SKU: {$sku}",
+            ];
+        } catch (\Exception $e) {
+            Log::error('SubiektGTService::findProductBySku error', [
+                'sku' => $sku,
+                'error' => $e->getMessage(),
+            ]);
+
+            return [
+                'success' => false,
+                'found' => false,
+                'external_id' => null,
+                'data' => null,
+                'message' => 'Błąd wyszukiwania: ' . $e->getMessage(),
+            ];
+        }
     }
 
     // ==========================================

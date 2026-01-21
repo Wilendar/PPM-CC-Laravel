@@ -252,6 +252,13 @@ class SubiektDataTransformer
     {
         $ppmPrices = [];
 
+        // DEBUG: Log raw prices data from REST API
+        Log::debug('SubiektDataTransformer::transformPrices RAW DATA', [
+            'prices_count' => count($prices),
+            'first_item' => !empty($prices) ? $prices[0] : null,
+            'first_item_keys' => !empty($prices) && is_array($prices[0]) ? array_keys($prices[0]) : 'not_array',
+        ]);
+
         foreach ($prices as $price) {
             // Support both object (from QueryBuilder) and array (from REST API)
             // REST API returns PascalCase: PriceLevel, PriceLevelName, PriceNet, PriceGross
@@ -297,6 +304,13 @@ class SubiektDataTransformer
     public function transformStock(array $stockData): array
     {
         $ppmStock = [];
+
+        // DEBUG: Log raw stock data from REST API
+        Log::debug('SubiektDataTransformer::transformStock RAW DATA', [
+            'stockData_count' => count($stockData),
+            'first_item' => !empty($stockData) ? $stockData[0] : null,
+            'first_item_keys' => !empty($stockData) && is_array($stockData[0]) ? array_keys($stockData[0]) : 'not_array',
+        ]);
 
         foreach ($stockData as $stock) {
             // Support both object (from QueryBuilder) and array (from REST API)

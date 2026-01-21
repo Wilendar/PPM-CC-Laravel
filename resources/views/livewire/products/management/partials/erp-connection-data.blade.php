@@ -263,21 +263,7 @@
         @php
             $erpStock = $this->getErpStockForDisplay();
             $stockUpdatedAt = $this->getErpStockUpdatedAt();
-            // DEBUG: Log what we're getting
-            \Log::debug('erp-connection-data.blade DEBUG', [
-                'erpStock' => $erpStock,
-                'erpStock_count' => count($erpStock),
-                'erpExternalData_keys' => array_keys($this->erpExternalData ?? []),
-                'external_data_keys' => array_keys($this->erpExternalData['external_data'] ?? []),
-                'has_stock_key' => isset($this->erpExternalData['external_data']['stock']),
-            ]);
         @endphp
-        {{-- DEBUG OUTPUT --}}
-        <div class="md:col-span-2 bg-red-900/30 p-2 rounded text-xs text-white mb-2">
-            DEBUG: erpStock count = {{ count($erpStock) }} |
-            external_data keys = {{ implode(', ', array_keys($this->erpExternalData['external_data'] ?? [])) }} |
-            has stock key = {{ isset($this->erpExternalData['external_data']['stock']) ? 'YES' : 'NO' }}
-        </div>
         @if(!empty($erpStock))
             <div class="md:col-span-2">
                 <label class="block text-sm font-medium text-gray-300 mb-2">
@@ -302,10 +288,23 @@
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-gray-700">
-                            @foreach($erpStock as $warehouse)
+                            @foreach($erpStock as $warehouseKey => $warehouse)
+                                @php
+                                    // Determine warehouse name with proper fallback
+                                    $warehouseName = $warehouse['name']
+                                        ?? $warehouse['erp_warehouse_code']
+                                        ?? $warehouse['warehouse_name']
+                                        ?? $warehouse['warehouseName']
+                                        ?? $warehouse['WarehouseName']
+                                        ?? null;
+
+                                    if (empty($warehouseName)) {
+                                        $warehouseName = 'Magazyn #' . ($warehouse['erp_warehouse_id'] ?? $warehouse['warehouse_id'] ?? $warehouse['warehouseId'] ?? $warehouse['WarehouseId'] ?? '?');
+                                    }
+                                @endphp
                                 <tr class="bg-gray-900 hover:bg-gray-800/50">
                                     <td class="px-4 py-2 text-sm text-gray-300">
-                                        {{ $warehouse['warehouse_name'] ?? 'Magazyn #' . ($warehouse['warehouse_id'] ?? '?') }}
+                                        {{ $warehouseName }}
                                     </td>
                                     <td class="px-4 py-2 text-sm text-white text-right font-medium">
                                         {{ number_format($warehouse['quantity'] ?? 0, 0, ',', ' ') }} szt.
@@ -364,25 +363,32 @@
                         </thead>
                         <tbody class="divide-y divide-gray-700">
                             @foreach($erpPrices as $price)
+                                @php
+                                    // Transformer uses: erp_price_type_id (ID), erp_price_type_code (name), price_net, price_gross
+                                    $level = $price['erp_price_type_id'] ?? $price['level'] ?? $price['priceLevel'] ?? $price['PriceLevel'] ?? $price['price_group_id'] ?? 0;
+                                    $name = $price['erp_price_type_code'] ?? $price['name'] ?? $price['priceLevelName'] ?? $price['PriceLevelName'] ?? null;
+                                    $priceNet = $price['price_net'] ?? $price['priceNet'] ?? $price['PriceNet'] ?? null;
+                                    $priceGross = $price['price_gross'] ?? $price['priceGross'] ?? $price['PriceGross'] ?? null;
+                                @endphp
                                 <tr class="bg-gray-900 hover:bg-gray-800/50">
                                     <td class="px-4 py-2 text-sm text-gray-300">
                                         <span class="inline-flex items-center">
                                             <span class="w-6 h-6 flex items-center justify-center rounded-full bg-blue-900/30 text-blue-300 text-xs mr-2">
-                                                {{ $price['level'] ?? 0 }}
+                                                {{ $level }}
                                             </span>
-                                            {{ $price['name'] ?? 'Poziom ' . ($price['level'] ?? 0) }}
+                                            {{ $name ?? 'Poziom ' . $level }}
                                         </span>
                                     </td>
                                     <td class="px-4 py-2 text-sm text-white text-right font-medium">
-                                        @if($price['price_net'] !== null)
-                                            {{ number_format($price['price_net'], 2, ',', ' ') }} zl
+                                        @if($priceNet !== null)
+                                            {{ number_format($priceNet, 2, ',', ' ') }} zl
                                         @else
                                             <span class="text-gray-500">-</span>
                                         @endif
                                     </td>
                                     <td class="px-4 py-2 text-sm text-green-400 text-right font-medium">
-                                        @if($price['price_gross'] !== null)
-                                            {{ number_format($price['price_gross'], 2, ',', ' ') }} zl
+                                        @if($priceGross !== null)
+                                            {{ number_format($priceGross, 2, ',', ' ') }} zl
                                         @else
                                             <span class="text-gray-500">-</span>
                                         @endif
