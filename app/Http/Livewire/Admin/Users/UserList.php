@@ -280,6 +280,9 @@ class UserList extends Component
             case 'delete':
                 $this->bulkDeleteUsers();
                 break;
+            case 'force_logout':
+                $this->bulkForceLogoutUsers();
+                break;
         }
 
         $this->closeBulkModal();
@@ -364,6 +367,38 @@ class UserList extends Component
         session()->flash('success', 'Usunięto ' . $usersToDelete->count() . ' użytkowników.');
     }
 
+    /**
+     * Bulk force logout selected users from all their active sessions.
+     */
+    public function bulkForceLogoutUsers()
+    {
+        $this->authorize('forceLogout', User::class);
+
+        if (empty($this->selectedUsers)) {
+            session()->flash('error', 'Wybierz przynajmniej jednego uzytkownika.');
+            return;
+        }
+
+        $users = User::whereIn('id', $this->selectedUsers)->get();
+        $totalSessions = 0;
+
+        foreach ($users as $user) {
+            $count = $user->sessions()
+                ->where('is_active', true)
+                ->update([
+                    'is_active' => false,
+                    'ended_at' => now(),
+                    'end_reason' => 'bulk_force_logout'
+                ]);
+            $totalSessions += $count;
+        }
+
+        $this->selectedUsers = [];
+        $this->selectAll = false;
+
+        session()->flash('success', "Wylogowano {$users->count()} uzytkownikow ({$totalSessions} sesji).");
+    }
+
     // ==========================================
     // INDIVIDUAL USER ACTIONS
     // ==========================================
@@ -439,6 +474,7 @@ class UserList extends Component
     {
         $query = User::query()
             ->with(['roles', 'permissions'])
+            ->withCount(['sessions' => fn($q) => $q->where('is_active', true)])
             ->when($this->search, function ($query) {
                 $query->where(function ($q) {
                     $q->where('first_name', 'like', '%' . $this->search . '%')

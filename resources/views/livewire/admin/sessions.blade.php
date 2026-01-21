@@ -1,5 +1,5 @@
 {{-- ETAP_04 FAZA A: Session Monitor View --}}
-<div class="min-h-screen bg-gray-100 dark:bg-gray-900">
+<div wire:poll.5s class="min-h-screen bg-gray-100 dark:bg-gray-900">
     {{-- Page Header --}}
     <div class="bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">

@@ -205,6 +205,24 @@ class UserDetail extends Component
         return redirect()->route('dashboard')->with('info', "Przejęto tożsamość użytkownika: {$this->user->full_name}");
     }
 
+    /**
+     * Force logout user from all active sessions.
+     */
+    public function forceLogoutUser()
+    {
+        $this->authorize('forceLogout', $this->user);
+
+        $count = $this->user->sessions()
+            ->where('is_active', true)
+            ->update([
+                'is_active' => false,
+                'ended_at' => now(),
+                'end_reason' => 'force_admin'
+            ]);
+
+        session()->flash('success', "Uzytkownik zostal wylogowany ze wszystkich sesji ({$count} sesji).");
+    }
+
     // ==========================================
     // PERMISSION MANAGEMENT
     // ==========================================

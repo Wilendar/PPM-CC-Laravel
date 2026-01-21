@@ -265,6 +265,36 @@ class Sessions extends Component
         DB::table('sessions')->where('id', $sessionId)->delete();
     }
 
+    /**
+     * Force logout all sessions except administrators.
+     */
+    public function forceLogoutAllExceptAdmin()
+    {
+        $this->authorize('forceLogoutAll', UserSession::class);
+
+        $adminUserIds = User::role('Admin')->pluck('id');
+
+        $count = UserSession::where('is_active', true)
+            ->whereNotIn('user_id', $adminUserIds)
+            ->update([
+                'is_active' => false,
+                'ended_at' => now(),
+                'end_reason' => 'bulk_force_logout_admin'
+            ]);
+
+        $this->refreshStats();
+        session()->flash('success', "Wylogowano {$count} sesji (oprocz administratorow).");
+    }
+
+    /**
+     * Refresh session statistics.
+     */
+    protected function refreshStats()
+    {
+        $this->calculateSessionStats();
+        $this->detectSecurityIssues();
+    }
+
     // ==========================================
     // BULK OPERATIONS
     // ==========================================
