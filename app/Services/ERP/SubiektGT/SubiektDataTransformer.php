@@ -253,15 +253,21 @@ class SubiektDataTransformer
         $ppmPrices = [];
 
         foreach ($prices as $price) {
-            $ppmPriceGroupId = $this->mapPriceTypeToGroup($price->price_type_id ?? 0);
+            // Support both object (from QueryBuilder) and array (from REST API)
+            $priceTypeId = is_array($price) ? ($price['price_type_id'] ?? $price['PriceLevel'] ?? 0) : ($price->price_type_id ?? 0);
+            $priceTypeCode = is_array($price) ? ($price['price_type_code'] ?? $price['PriceLevelName'] ?? null) : ($price->price_type_code ?? null);
+            $priceNet = is_array($price) ? ($price['price_net'] ?? $price['PriceNet'] ?? 0) : ($price->price_net ?? 0);
+            $priceGross = is_array($price) ? ($price['price_gross'] ?? $price['PriceGross'] ?? 0) : ($price->price_gross ?? 0);
+
+            $ppmPriceGroupId = $this->mapPriceTypeToGroup($priceTypeId);
 
             if ($ppmPriceGroupId !== null) {
                 $ppmPrices[$ppmPriceGroupId] = [
                     'price_group_id' => $ppmPriceGroupId,
-                    'erp_price_type_id' => $price->price_type_id,
-                    'erp_price_type_code' => $price->price_type_code ?? null,
-                    'price_net' => $this->parseDecimal($price->price_net ?? 0),
-                    'price_gross' => $this->parseDecimal($price->price_gross ?? 0),
+                    'erp_price_type_id' => $priceTypeId,
+                    'erp_price_type_code' => $priceTypeCode,
+                    'price_net' => $this->parseDecimal($priceNet),
+                    'price_gross' => $this->parseDecimal($priceGross),
                 ];
             }
         }
@@ -284,16 +290,23 @@ class SubiektDataTransformer
         $ppmStock = [];
 
         foreach ($stockData as $stock) {
-            $ppmWarehouseId = $this->mapWarehouseToPPM($stock->warehouse_id ?? 0);
+            // Support both object (from QueryBuilder) and array (from REST API)
+            $warehouseId = is_array($stock) ? ($stock['warehouse_id'] ?? $stock['WarehouseId'] ?? 0) : ($stock->warehouse_id ?? 0);
+            $warehouseCode = is_array($stock) ? ($stock['warehouse_code'] ?? $stock['WarehouseName'] ?? null) : ($stock->warehouse_code ?? null);
+            $quantity = is_array($stock) ? ($stock['quantity'] ?? $stock['Quantity'] ?? 0) : ($stock->quantity ?? 0);
+            $reserved = is_array($stock) ? ($stock['reserved'] ?? $stock['Reserved'] ?? 0) : ($stock->reserved ?? 0);
+            $available = is_array($stock) ? ($stock['available'] ?? $quantity - $reserved) : ($stock->available ?? $stock->quantity ?? 0);
+
+            $ppmWarehouseId = $this->mapWarehouseToPPM($warehouseId);
 
             if ($ppmWarehouseId !== null) {
                 $ppmStock[$ppmWarehouseId] = [
                     'warehouse_id' => $ppmWarehouseId,
-                    'erp_warehouse_id' => $stock->warehouse_id,
-                    'erp_warehouse_code' => $stock->warehouse_code ?? null,
-                    'quantity' => (int) ($stock->quantity ?? 0),
-                    'reserved' => (int) ($stock->reserved ?? 0),
-                    'available' => (int) ($stock->available ?? $stock->quantity ?? 0),
+                    'erp_warehouse_id' => $warehouseId,
+                    'erp_warehouse_code' => $warehouseCode,
+                    'quantity' => (int) $quantity,
+                    'reserved' => (int) $reserved,
+                    'available' => (int) $available,
                 ];
             }
         }
