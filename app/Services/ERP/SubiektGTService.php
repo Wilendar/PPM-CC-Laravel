@@ -1247,6 +1247,7 @@ class SubiektGTService implements ERPSyncServiceInterface
     /**
      * Update ProductErpData from REST API response.
      *
+     * TASK 1 FIX: Now fetches ALL prices (11 levels) and ALL stock per warehouse
      * Note: API returns camelCase field names (priceNet, priceGross, isActive)
      *
      * @param Product $product
@@ -1256,26 +1257,113 @@ class SubiektGTService implements ERPSyncServiceInterface
      */
     protected function updateProductErpDataFromRestApi(Product $product, ERPConnection $connection, object $subiektProduct): ProductErpData
     {
+        $subiektId = $subiektProduct->id ?? null;
+
+        Log::debug('updateProductErpDataFromRestApi: Starting', [
+            'product_id' => $product->id,
+            'subiekt_id' => $subiektId,
+            'sku' => $subiektProduct->sku ?? null,
+        ]);
+
+        // === FETCH ALL PRICES (11 levels) ===
+        $allPrices = [];
+        if ($subiektId && $this->restApiClient) {
+            try {
+                $pricesResponse = $this->restApiClient->getProductPrices((int) $subiektId);
+                $pricesData = $pricesResponse['data'] ?? [];
+
+                Log::debug('updateProductErpDataFromRestApi: Prices fetched', [
+                    'subiekt_id' => $subiektId,
+                    'prices_count' => count($pricesData),
+                    'raw_prices' => $pricesData,
+                ]);
+
+                // Transform to format: [priceLevel => ['net' => X, 'gross' => Y, 'name' => Z]]
+                foreach ($pricesData as $price) {
+                    $level = $price['priceLevel'] ?? $price['price_level'] ?? null;
+                    if ($level !== null) {
+                        $allPrices[$level] = [
+                            'net' => (float) ($price['priceNet'] ?? $price['price_net'] ?? 0),
+                            'gross' => (float) ($price['priceGross'] ?? $price['price_gross'] ?? 0),
+                            'name' => $price['name'] ?? $price['priceName'] ?? "Cena {$level}",
+                        ];
+                    }
+                }
+            } catch (\Exception $e) {
+                Log::warning('updateProductErpDataFromRestApi: Failed to fetch prices', [
+                    'subiekt_id' => $subiektId,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        // === FETCH ALL STOCK PER WAREHOUSE ===
+        $allStock = [];
+        if ($subiektId && $this->restApiClient) {
+            try {
+                $stockResponse = $this->restApiClient->getProductStock((int) $subiektId);
+                $stockData = $stockResponse['data'] ?? [];
+
+                Log::debug('updateProductErpDataFromRestApi: Stock fetched', [
+                    'subiekt_id' => $subiektId,
+                    'stock_count' => count($stockData),
+                    'raw_stock' => $stockData,
+                ]);
+
+                // Transform to format: [warehouseId => ['quantity' => X, 'reserved' => Y, 'name' => Z]]
+                foreach ($stockData as $stock) {
+                    $warehouseId = $stock['warehouseId'] ?? $stock['warehouse_id'] ?? null;
+                    if ($warehouseId !== null) {
+                        $allStock[$warehouseId] = [
+                            'quantity' => (float) ($stock['quantity'] ?? $stock['stock'] ?? 0),
+                            'reserved' => (float) ($stock['reserved'] ?? $stock['stockReserved'] ?? 0),
+                            'available' => (float) ($stock['available'] ?? (($stock['quantity'] ?? 0) - ($stock['reserved'] ?? 0))),
+                            'name' => $stock['warehouseName'] ?? $stock['warehouse_name'] ?? "Magazyn {$warehouseId}",
+                        ];
+                    }
+                }
+            } catch (\Exception $e) {
+                Log::warning('updateProductErpDataFromRestApi: Failed to fetch stock', [
+                    'subiekt_id' => $subiektId,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
         // Handle both camelCase (new API) and snake_case (legacy) field names
         $externalData = [
-            'subiekt_id' => $subiektProduct->id ?? null,
+            'subiekt_id' => $subiektId,
             'sku' => $subiektProduct->sku ?? null,
             'name' => $subiektProduct->name ?? null,
             'ean' => $subiektProduct->ean ?? null,
-            // New API uses camelCase
+            // Single price (default level) - for backwards compatibility
             'price_net' => $subiektProduct->priceNet ?? $subiektProduct->price_net ?? null,
             'price_gross' => $subiektProduct->priceGross ?? $subiektProduct->price_gross ?? null,
             'stock_quantity' => $subiektProduct->stock ?? $subiektProduct->stock_quantity ?? 0,
             'stock_reserved' => $subiektProduct->stockReserved ?? $subiektProduct->stock_reserved ?? 0,
+            // Other fields
             'is_active' => $subiektProduct->isActive ?? $subiektProduct->is_active ?? true,
             'vat_rate' => $subiektProduct->vatRate ?? $subiektProduct->vat_rate ?? null,
             'group_name' => $subiektProduct->groupName ?? $subiektProduct->group_name ?? null,
             'manufacturer_name' => $subiektProduct->manufacturerName ?? $subiektProduct->manufacturer_name ?? null,
             'unit' => $subiektProduct->unit ?? null,
             'weight' => $subiektProduct->weight ?? null,
+            // === NEW: ALL PRICES AND STOCK ===
+            'prices' => $allPrices,  // [priceLevel => ['net' => X, 'gross' => Y, 'name' => Z]]
+            'stock' => $allStock,     // [warehouseId => ['quantity' => X, 'reserved' => Y, 'name' => Z]]
+            // Metadata
             'fetched_via' => 'rest_api',
             'fetched_at' => now()->toIso8601String(),
+            'prices_fetched_at' => !empty($allPrices) ? now()->toIso8601String() : null,
+            'stock_fetched_at' => !empty($allStock) ? now()->toIso8601String() : null,
         ];
+
+        Log::debug('updateProductErpDataFromRestApi: Saving external_data', [
+            'product_id' => $product->id,
+            'subiekt_id' => $subiektId,
+            'prices_count' => count($allPrices),
+            'stock_count' => count($allStock),
+        ]);
 
         return ProductErpData::updateOrCreate(
             [
@@ -1283,10 +1371,11 @@ class SubiektGTService implements ERPSyncServiceInterface
                 'erp_connection_id' => $connection->id,
             ],
             [
-                'external_id' => (string) ($subiektProduct->id ?? ''),
+                'external_id' => (string) ($subiektId ?? ''),
                 'external_sku' => $subiektProduct->sku ?? $product->sku,
                 'sync_status' => ProductErpData::STATUS_SYNCED,
                 'last_sync_at' => now(),
+                'last_pull_at' => now(),
                 'external_data' => $externalData,
             ]
         );

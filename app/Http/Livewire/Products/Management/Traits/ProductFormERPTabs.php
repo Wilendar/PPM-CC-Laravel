@@ -338,6 +338,209 @@ trait ProductFormERPTabs
             ?? $this->getExternalDataValue('is_active', $erpData)
             ?? $this->erpDefaultData['is_active']
             ?? $this->is_active;
+
+        // === PRICES FROM ERP (TASK 2b) ===
+        // Map ERP price levels to PPM price_group_id
+        $this->overrideFormPricesWithErpData($erpData);
+
+        // === STOCK FROM ERP (TASK 2b) ===
+        // Map ERP warehouse stock to PPM warehouse_id
+        $this->overrideFormStockWithErpData($erpData);
+    }
+
+    /**
+     * TASK 2b: Override form prices with ERP data
+     *
+     * Maps ERP price levels (0-10) to PPM price_group_id using mappings
+     * from ERPConnection.connection_config['price_group_mappings']
+     *
+     * @param ProductErpData $erpData
+     * @return void
+     */
+    protected function overrideFormPricesWithErpData(ProductErpData $erpData): void
+    {
+        $externalData = $erpData->external_data ?? [];
+        $erpPrices = $externalData['prices'] ?? [];
+
+        if (empty($erpPrices)) {
+            Log::debug('overrideFormPricesWithErpData: No prices in external_data', [
+                'product_id' => $this->product?->id,
+                'erp_data_id' => $erpData->id,
+            ]);
+            return;
+        }
+
+        // Get connection for mappings
+        $connection = ERPConnection::find($erpData->erp_connection_id);
+        if (!$connection) {
+            return;
+        }
+
+        $config = $connection->connection_config ?? [];
+        $priceGroupMappings = $config['price_group_mappings'] ?? [];
+
+        Log::debug('overrideFormPricesWithErpData: Starting', [
+            'product_id' => $this->product?->id,
+            'erp_prices_count' => count($erpPrices),
+            'mappings' => $priceGroupMappings,
+        ]);
+
+        // Map each ERP price level to PPM price_group_id
+        foreach ($erpPrices as $erpPriceLevel => $priceData) {
+            $ppmGroupId = $this->mapErpPriceLevelToPpmGroup($erpPriceLevel, $priceGroupMappings);
+
+            if ($ppmGroupId !== null) {
+                // Override form prices array
+                $this->prices[$ppmGroupId] = [
+                    'net' => (float) ($priceData['net'] ?? 0),
+                    'gross' => (float) ($priceData['gross'] ?? 0),
+                    'margin' => $this->prices[$ppmGroupId]['margin'] ?? 0,  // Keep existing margin
+                    'is_active' => $this->prices[$ppmGroupId]['is_active'] ?? true,
+                    'erp_source' => true,  // Mark as loaded from ERP
+                    'erp_price_level' => $erpPriceLevel,
+                    'erp_price_name' => $priceData['name'] ?? null,
+                ];
+
+                Log::debug('overrideFormPricesWithErpData: Mapped price', [
+                    'erp_level' => $erpPriceLevel,
+                    'ppm_group_id' => $ppmGroupId,
+                    'net' => $priceData['net'],
+                    'gross' => $priceData['gross'],
+                ]);
+            }
+        }
+    }
+
+    /**
+     * TASK 2b: Override form stock with ERP data
+     *
+     * Maps ERP warehouse stock to PPM warehouse_id using mappings
+     * from ERPConnection.connection_config['warehouse_mappings']
+     *
+     * @param ProductErpData $erpData
+     * @return void
+     */
+    protected function overrideFormStockWithErpData(ProductErpData $erpData): void
+    {
+        $externalData = $erpData->external_data ?? [];
+        $erpStock = $externalData['stock'] ?? [];
+
+        if (empty($erpStock)) {
+            Log::debug('overrideFormStockWithErpData: No stock in external_data', [
+                'product_id' => $this->product?->id,
+                'erp_data_id' => $erpData->id,
+            ]);
+            return;
+        }
+
+        // Get connection for mappings
+        $connection = ERPConnection::find($erpData->erp_connection_id);
+        if (!$connection) {
+            return;
+        }
+
+        $config = $connection->connection_config ?? [];
+        $warehouseMappings = $config['warehouse_mappings'] ?? [];
+
+        Log::debug('overrideFormStockWithErpData: Starting', [
+            'product_id' => $this->product?->id,
+            'erp_stock_count' => count($erpStock),
+            'mappings' => $warehouseMappings,
+        ]);
+
+        // Map each ERP warehouse to PPM warehouse_id
+        foreach ($erpStock as $erpWarehouseId => $stockData) {
+            $ppmWarehouseId = $this->mapErpWarehouseToPpmWarehouse($erpWarehouseId, $warehouseMappings);
+
+            if ($ppmWarehouseId !== null) {
+                // Override form stock array
+                $this->stock[$ppmWarehouseId] = [
+                    'quantity' => (int) ($stockData['quantity'] ?? 0),
+                    'reserved' => (int) ($stockData['reserved'] ?? 0),
+                    'available' => (int) ($stockData['available'] ?? ($stockData['quantity'] ?? 0) - ($stockData['reserved'] ?? 0)),
+                    'minimum' => $this->stock[$ppmWarehouseId]['minimum'] ?? 0,  // Keep existing minimum
+                    'erp_source' => true,  // Mark as loaded from ERP
+                    'erp_warehouse_id' => $erpWarehouseId,
+                    'erp_warehouse_name' => $stockData['name'] ?? null,
+                ];
+
+                Log::debug('overrideFormStockWithErpData: Mapped stock', [
+                    'erp_warehouse_id' => $erpWarehouseId,
+                    'ppm_warehouse_id' => $ppmWarehouseId,
+                    'quantity' => $stockData['quantity'],
+                    'reserved' => $stockData['reserved'],
+                ]);
+            }
+        }
+    }
+
+    /**
+     * TASK 2a: Map ERP price level to PPM price_group_id
+     *
+     * Uses mappings from ERPConnection.connection_config['price_group_mappings']
+     * Format: ['ppm_group_id' => 'erp_price_level', ...]
+     *
+     * @param int|string $erpPriceLevel
+     * @param array $mappings
+     * @return int|null PPM price_group_id or null if no mapping
+     */
+    protected function mapErpPriceLevelToPpmGroup(int|string $erpPriceLevel, array $mappings): ?int
+    {
+        // Mappings are stored as: PPM group ID => ERP price level
+        // We need to find which PPM group maps to this ERP level
+        foreach ($mappings as $ppmGroupId => $erpLevel) {
+            if ((string) $erpLevel === (string) $erpPriceLevel) {
+                return (int) $ppmGroupId;
+            }
+        }
+
+        // Fallback: If no mapping, try direct ID match (1:1)
+        // This allows ERP price level 0 → PPM group 1, etc.
+        // Only if the PPM group exists in $this->prices
+        if (isset($this->prices[$erpPriceLevel])) {
+            return (int) $erpPriceLevel;
+        }
+
+        Log::debug('mapErpPriceLevelToPpmGroup: No mapping found', [
+            'erp_price_level' => $erpPriceLevel,
+            'available_mappings' => $mappings,
+        ]);
+
+        return null;
+    }
+
+    /**
+     * TASK 2a: Map ERP warehouse ID to PPM warehouse_id
+     *
+     * Uses mappings from ERPConnection.connection_config['warehouse_mappings']
+     * Format: ['ppm_warehouse_id' => 'erp_warehouse_id', ...]
+     *
+     * @param int|string $erpWarehouseId
+     * @param array $mappings
+     * @return int|null PPM warehouse_id or null if no mapping
+     */
+    protected function mapErpWarehouseToPpmWarehouse(int|string $erpWarehouseId, array $mappings): ?int
+    {
+        // Mappings are stored as: PPM warehouse ID => ERP warehouse ID
+        // We need to find which PPM warehouse maps to this ERP warehouse
+        foreach ($mappings as $ppmWarehouseId => $erpId) {
+            if ((string) $erpId === (string) $erpWarehouseId) {
+                return (int) $ppmWarehouseId;
+            }
+        }
+
+        // Fallback: If no mapping, try direct ID match (1:1)
+        // Only if the PPM warehouse exists in $this->stock
+        if (isset($this->stock[$erpWarehouseId])) {
+            return (int) $erpWarehouseId;
+        }
+
+        Log::debug('mapErpWarehouseToPpmWarehouse: No mapping found', [
+            'erp_warehouse_id' => $erpWarehouseId,
+            'available_mappings' => $mappings,
+        ]);
+
+        return null;
     }
 
     /**
@@ -471,6 +674,8 @@ trait ProductFormERPTabs
      * Pull product data from ERP (PULL: ERP -> PPM)
      * MIRRORS: loadProductDataFromPrestaShop() in shop tabs
      *
+     * TASK 2c FIX: Uses factory pattern for different ERP types
+     *
      * @param int $connectionId
      * @param bool $forceRefresh
      * @return void
@@ -494,29 +699,48 @@ trait ProductFormERPTabs
                 return;
             }
 
-            // Use ERP service to pull data
-            $service = app(BaselinkerService::class);
+            Log::debug('pullProductDataFromErp: Starting', [
+                'product_id' => $this->product->id,
+                'connection_id' => $connectionId,
+                'erp_type' => $connection->erp_type,
+                'external_id' => $erpData->external_id,
+            ]);
+
+            // TASK 2c FIX: Use factory pattern for ERP service
+            $service = $this->getErpServiceForConnection($connection);
             $result = $service->syncProductFromERP($connection, $erpData->external_id);
 
             if ($result['success']) {
+                // For Subiekt GT, result contains 'erp_data' with transformed data
+                // For Baselinker, result contains 'data' with raw API response
+                $externalData = $result['erp_data'] ?? $result['data'] ?? [];
+
                 // Update external_data cache
                 $erpData->update([
-                    'external_data' => $result['data'],
+                    'external_data' => $externalData,
                     'last_pull_at' => now(),
                     'sync_status' => ProductErpData::STATUS_SYNCED,
                     'error_message' => null,
                 ]);
 
                 // Refresh UI data
-                $this->erpExternalData['external_data'] = $result['data'];
+                $this->erpExternalData['external_data'] = $externalData;
                 $this->erpExternalData['sync_status'] = ProductErpData::STATUS_SYNCED;
                 $this->erpExternalData['last_pull_at'] = now();
+
+                // TASK 2c: Reload prices and stock from the new data
+                $erpData->refresh();
+                $this->overrideFormPricesWithErpData($erpData);
+                $this->overrideFormStockWithErpData($erpData);
 
                 session()->flash('message', 'Dane pobrane z ERP: ' . $connection->instance_name);
 
                 Log::info('ERP data pulled successfully', [
                     'product_id' => $this->product->id,
                     'connection_id' => $connectionId,
+                    'erp_type' => $connection->erp_type,
+                    'has_prices' => isset($externalData['prices']),
+                    'has_stock' => isset($externalData['stock']),
                 ]);
             } else {
                 $errorMsg = $result['message'] ?? 'Unknown error';
@@ -533,6 +757,25 @@ trait ProductFormERPTabs
         } finally {
             $this->loadingErpData = false;
         }
+    }
+
+    /**
+     * TASK 2c: Get ERP service instance based on connection type
+     *
+     * Factory method for instantiating correct ERP service.
+     *
+     * @param ERPConnection $connection
+     * @return \App\Services\ERP\Contracts\ERPSyncServiceInterface
+     * @throws \RuntimeException
+     */
+    protected function getErpServiceForConnection(ERPConnection $connection)
+    {
+        return match ($connection->erp_type) {
+            'baselinker' => app(\App\Services\ERP\BaselinkerService::class),
+            'subiekt_gt' => app(\App\Services\ERP\SubiektGTService::class),
+            'dynamics' => app(\App\Services\ERP\DynamicsService::class),
+            default => throw new \RuntimeException("Unknown ERP type: {$connection->erp_type}"),
+        };
     }
 
     /**
@@ -1485,6 +1728,8 @@ trait ProductFormERPTabs
      * Called when user clicks "Sprawdź czy jest w ERP".
      * Searches ERP for product by SKU or EAN.
      *
+     * TASK 2c FIX: Uses factory pattern for different ERP types
+     *
      * @param int $connectionId
      * @return void
      */
@@ -1499,19 +1744,35 @@ trait ProductFormERPTabs
         $this->loadingErpData = true;
 
         try {
-            // Use BaselinkerService to search for product by SKU
-            $service = app(BaselinkerService::class);
-            $result = $service->findProductBySku($connection, $this->product->sku);
+            Log::debug('checkProductInErp: Starting', [
+                'product_id' => $this->product->id,
+                'connection_id' => $connectionId,
+                'erp_type' => $connection->erp_type,
+                'sku' => $this->product->sku,
+            ]);
+
+            // TASK 2c FIX: Use factory pattern for ERP service
+            $service = $this->getErpServiceForConnection($connection);
+
+            // For Subiekt GT, use syncProductToERP which searches by SKU
+            // For Baselinker, use findProductBySku if available
+            if (method_exists($service, 'findProductBySku')) {
+                $result = $service->findProductBySku($connection, $this->product->sku);
+            } else {
+                // Fallback: Use syncProductToERP which will find and map the product
+                $result = $service->syncProductToERP($connection, $this->product);
+            }
 
             if ($result['success'] && !empty($result['external_id'])) {
                 // Product FOUND in ERP - link it automatically
-                $this->linkProductToErp($connectionId, $result['external_id'], $result['data'] ?? []);
+                $this->linkProductToErp($connectionId, $result['external_id'], $result['data'] ?? $result['erp_data'] ?? []);
 
                 session()->flash('message', 'Produkt znaleziony w ERP i polaczony: ' . $connection->instance_name);
 
                 Log::info('checkProductInErp: Product found and linked', [
                     'product_id' => $this->product->id,
                     'connection_id' => $connectionId,
+                    'erp_type' => $connection->erp_type,
                     'external_id' => $result['external_id'],
                 ]);
             } else {
@@ -1523,6 +1784,7 @@ trait ProductFormERPTabs
                 Log::info('checkProductInErp: Product not found in ERP', [
                     'product_id' => $this->product->id,
                     'connection_id' => $connectionId,
+                    'erp_type' => $connection->erp_type,
                     'sku' => $this->product->sku,
                 ]);
             }
