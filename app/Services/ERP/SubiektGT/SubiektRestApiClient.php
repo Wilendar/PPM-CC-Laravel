@@ -346,6 +346,44 @@ class SubiektRestApiClient
     }
 
     /**
+     * Update product by ID
+     *
+     * WARNING: Only updates basic fields (Name, Description, EAN, Weight, Unit, Pkwiu).
+     * Stock and prices should NOT be updated via direct SQL - use Sfera API instead.
+     *
+     * @param int $productId Subiekt GT product ID
+     * @param array $data Fields to update (name, description, ean, weight, unit, pkwiu)
+     * @return array Update result
+     */
+    public function updateProduct(int $productId, array $data): array
+    {
+        // Build request body - only include non-null fields
+        $body = array_filter([
+            'Name' => $data['name'] ?? null,
+            'Description' => $data['description'] ?? null,
+            'Ean' => $data['ean'] ?? null,
+            'Weight' => $data['weight'] ?? null,
+            'Unit' => $data['unit'] ?? null,
+            'Pkwiu' => $data['pkwiu'] ?? null,
+        ], fn($value) => $value !== null);
+
+        if (empty($body)) {
+            return [
+                'success' => true,
+                'message' => 'No fields to update',
+                'rows_affected' => 0,
+            ];
+        }
+
+        Log::info('SubiektRestApiClient::updateProduct', [
+            'product_id' => $productId,
+            'fields' => array_keys($body),
+        ]);
+
+        return $this->request('PUT', "/api/products/{$productId}", $body);
+    }
+
+    /**
      * Get all products (handles pagination automatically)
      *
      * @param array $filters Filters (sku, name, modified_since, etc.)

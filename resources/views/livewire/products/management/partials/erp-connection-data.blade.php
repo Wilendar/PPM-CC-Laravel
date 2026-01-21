@@ -259,46 +259,138 @@
             @endif
         </div>
 
-        {{-- Stock Info (read-only from ERP) --}}
-        @if(isset($externalData['stock']))
-            <div class="md:col-span-1">
+        {{-- ETAP_09.1: Stock Info - Full warehouse breakdown (read-only from ERP) --}}
+        @php
+            $erpStock = $this->getErpStockForDisplay();
+            $stockUpdatedAt = $this->getErpStockUpdatedAt();
+            // DEBUG: Log what we're getting
+            \Log::debug('erp-connection-data.blade DEBUG', [
+                'erpStock' => $erpStock,
+                'erpStock_count' => count($erpStock),
+                'erpExternalData_keys' => array_keys($this->erpExternalData ?? []),
+                'external_data_keys' => array_keys($this->erpExternalData['external_data'] ?? []),
+                'has_stock_key' => isset($this->erpExternalData['external_data']['stock']),
+            ]);
+        @endphp
+        {{-- DEBUG OUTPUT --}}
+        <div class="md:col-span-2 bg-red-900/30 p-2 rounded text-xs text-white mb-2">
+            DEBUG: erpStock count = {{ count($erpStock) }} |
+            external_data keys = {{ implode(', ', array_keys($this->erpExternalData['external_data'] ?? [])) }} |
+            has stock key = {{ isset($this->erpExternalData['external_data']['stock']) ? 'YES' : 'NO' }}
+        </div>
+        @if(!empty($erpStock))
+            <div class="md:col-span-2">
                 <label class="block text-sm font-medium text-gray-300 mb-2">
-                    Stan magazynowy w ERP
+                    Stany magazynowe w ERP
                     <span class="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium status-label-inherited">
                         Tylko odczyt
                     </span>
-                </label>
-                <div class="bg-gray-800 border border-gray-600 rounded-md px-4 py-2.5 text-white">
-                    @if(is_array($externalData['stock']))
-                        {{ array_sum($externalData['stock']) }} szt.
-                        @if(count($externalData['stock']) > 1)
-                            <span class="text-gray-400 text-xs ml-2">
-                                ({{ count($externalData['stock']) }} magazynow)
-                            </span>
-                        @endif
-                    @else
-                        {{ $externalData['stock'] }} szt.
+                    @if($stockUpdatedAt)
+                        <span class="ml-2 text-xs text-gray-500">
+                            ({{ \Carbon\Carbon::parse($stockUpdatedAt)->diffForHumans() }})
+                        </span>
                     @endif
+                </label>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-700">
+                        <thead class="bg-gray-800">
+                            <tr>
+                                <th class="px-4 py-2 text-left text-xs font-medium text-gray-400 uppercase">Magazyn</th>
+                                <th class="px-4 py-2 text-right text-xs font-medium text-gray-400 uppercase">Na stanie</th>
+                                <th class="px-4 py-2 text-right text-xs font-medium text-gray-400 uppercase">Zarezerwowane</th>
+                                <th class="px-4 py-2 text-right text-xs font-medium text-gray-400 uppercase">Dostepne</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-700">
+                            @foreach($erpStock as $warehouse)
+                                <tr class="bg-gray-900 hover:bg-gray-800/50">
+                                    <td class="px-4 py-2 text-sm text-gray-300">
+                                        {{ $warehouse['warehouse_name'] ?? 'Magazyn #' . ($warehouse['warehouse_id'] ?? '?') }}
+                                    </td>
+                                    <td class="px-4 py-2 text-sm text-white text-right font-medium">
+                                        {{ number_format($warehouse['quantity'] ?? 0, 0, ',', ' ') }} szt.
+                                    </td>
+                                    <td class="px-4 py-2 text-sm text-yellow-400 text-right">
+                                        {{ number_format($warehouse['reserved'] ?? 0, 0, ',', ' ') }} szt.
+                                    </td>
+                                    <td class="px-4 py-2 text-sm text-green-400 text-right font-medium">
+                                        {{ number_format($warehouse['available'] ?? 0, 0, ',', ' ') }} szt.
+                                    </td>
+                                </tr>
+                            @endforeach
+                            {{-- Total row --}}
+                            <tr class="bg-gray-800 font-semibold">
+                                <td class="px-4 py-2 text-sm text-gray-200">SUMA</td>
+                                <td class="px-4 py-2 text-sm text-white text-right">
+                                    {{ number_format($this->getErpTotalStock(), 0, ',', ' ') }} szt.
+                                </td>
+                                <td class="px-4 py-2 text-sm text-yellow-400 text-right">-</td>
+                                <td class="px-4 py-2 text-sm text-green-400 text-right">
+                                    {{ number_format($this->getErpAvailableStock(), 0, ',', ' ') }} szt.
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
                 </div>
             </div>
         @endif
 
-        {{-- Prices Info (read-only from ERP) --}}
-        @if(isset($externalData['prices']) && is_array($externalData['prices']))
+        {{-- ETAP_09.1: Prices Info - Full price levels table (read-only from ERP) --}}
+        @php
+            $erpPrices = $this->getErpPricesForDisplay();
+            $pricesUpdatedAt = $this->getErpPricesUpdatedAt();
+        @endphp
+        @if(!empty($erpPrices))
             <div class="md:col-span-2">
                 <label class="block text-sm font-medium text-gray-300 mb-2">
-                    Ceny w ERP
+                    Ceny w ERP (wszystkie poziomy cenowe)
                     <span class="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium status-label-inherited">
                         Tylko odczyt
                     </span>
-                </label>
-                <div class="flex flex-wrap gap-2">
-                    @foreach($externalData['prices'] as $priceGroupId => $price)
-                        <span class="inline-flex items-center px-3 py-1.5 bg-gray-800 border border-gray-600 rounded-md text-sm">
-                            <span class="text-gray-400">Gr. {{ $priceGroupId }}:</span>
-                            <span class="ml-1 text-white font-medium">{{ number_format($price, 2) }} zl</span>
+                    @if($pricesUpdatedAt)
+                        <span class="ml-2 text-xs text-gray-500">
+                            ({{ \Carbon\Carbon::parse($pricesUpdatedAt)->diffForHumans() }})
                         </span>
-                    @endforeach
+                    @endif
+                </label>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-700">
+                        <thead class="bg-gray-800">
+                            <tr>
+                                <th class="px-4 py-2 text-left text-xs font-medium text-gray-400 uppercase">Poziom cenowy</th>
+                                <th class="px-4 py-2 text-right text-xs font-medium text-gray-400 uppercase">Cena netto</th>
+                                <th class="px-4 py-2 text-right text-xs font-medium text-gray-400 uppercase">Cena brutto</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-700">
+                            @foreach($erpPrices as $price)
+                                <tr class="bg-gray-900 hover:bg-gray-800/50">
+                                    <td class="px-4 py-2 text-sm text-gray-300">
+                                        <span class="inline-flex items-center">
+                                            <span class="w-6 h-6 flex items-center justify-center rounded-full bg-blue-900/30 text-blue-300 text-xs mr-2">
+                                                {{ $price['level'] ?? 0 }}
+                                            </span>
+                                            {{ $price['name'] ?? 'Poziom ' . ($price['level'] ?? 0) }}
+                                        </span>
+                                    </td>
+                                    <td class="px-4 py-2 text-sm text-white text-right font-medium">
+                                        @if($price['price_net'] !== null)
+                                            {{ number_format($price['price_net'], 2, ',', ' ') }} zl
+                                        @else
+                                            <span class="text-gray-500">-</span>
+                                        @endif
+                                    </td>
+                                    <td class="px-4 py-2 text-sm text-green-400 text-right font-medium">
+                                        @if($price['price_gross'] !== null)
+                                            {{ number_format($price['price_gross'], 2, ',', ' ') }} zl
+                                        @else
+                                            <span class="text-gray-500">-</span>
+                                        @endif
+                                    </td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
                 </div>
             </div>
         @endif

@@ -168,6 +168,20 @@ app.MapGet("/api/stock/{id:int}", async (ISubiektRepository repo, int id) =>
     }
 });
 
+// Get all prices by product ID (all 10 price levels)
+app.MapGet("/api/prices/{id:int}", async (ISubiektRepository repo, int id) =>
+{
+    try
+    {
+        var prices = await repo.GetPricesByProductIdAsync(id);
+        return Results.Ok(new { success = true, timestamp = DateTime.Now.ToString("o"), data = prices });
+    }
+    catch (Exception ex)
+    {
+        return Results.Ok(new { success = false, error = ex.Message });
+    }
+});
+
 // Get warehouses
 app.MapGet("/api/warehouses", async (ISubiektRepository repo) =>
 {

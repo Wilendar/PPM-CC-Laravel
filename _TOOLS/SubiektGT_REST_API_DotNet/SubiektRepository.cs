@@ -12,6 +12,7 @@ public interface ISubiektRepository
     Task<Product?> GetProductBySkuAsync(string sku, int priceLevel, int warehouseId);
     Task<(IEnumerable<Stock> Stock, int TotalCount)> GetAllStockAsync(int page, int pageSize);
     Task<IEnumerable<Stock>> GetStockByProductIdAsync(int productId);
+    Task<IEnumerable<ProductPrice>> GetPricesByProductIdAsync(int productId);
     Task<IEnumerable<Warehouse>> GetWarehousesAsync();
     Task<IEnumerable<PriceLevel>> GetPriceLevelsAsync();
     Task<IEnumerable<VatRate>> GetVatRatesAsync();
@@ -246,6 +247,87 @@ public class SubiektRepository : ISubiektRepository
         return await conn.QueryAsync<Stock>(sql, new { productId });
     }
 
+    public async Task<IEnumerable<ProductPrice>> GetPricesByProductIdAsync(int productId)
+    {
+        using var conn = GetConnection();
+
+        // Get price level names from tw_Parametr
+        var nameSql = @"
+            SELECT TOP 1
+                twp_NazwaCeny1 AS Name1, twp_NazwaCeny2 AS Name2, twp_NazwaCeny3 AS Name3,
+                twp_NazwaCeny4 AS Name4, twp_NazwaCeny5 AS Name5, twp_NazwaCeny6 AS Name6,
+                twp_NazwaCeny7 AS Name7, twp_NazwaCeny8 AS Name8, twp_NazwaCeny9 AS Name9,
+                twp_NazwaCeny10 AS Name10
+            FROM tw_Parametr";
+
+        var names = await conn.QueryFirstOrDefaultAsync<dynamic>(nameSql);
+
+        // Default names if tw_Parametr is empty
+        var levelNames = new Dictionary<int, string>
+        {
+            { 0, names?.Name1 ?? "Detaliczna" },
+            { 1, names?.Name2 ?? "Cena 1" },
+            { 2, names?.Name3 ?? "Cena 2" },
+            { 3, names?.Name4 ?? "Cena 3" },
+            { 4, names?.Name5 ?? "Cena 4" },
+            { 5, names?.Name6 ?? "Cena 5" },
+            { 6, names?.Name7 ?? "Cena 6" },
+            { 7, names?.Name8 ?? "Cena 7" },
+            { 8, names?.Name9 ?? "Cena 8" },
+            { 9, names?.Name10 ?? "Cena 9" }
+        };
+
+        // Get all 10 price levels for the product
+        var priceSql = @"
+            SELECT
+                c.tc_IdTowar AS ProductId,
+                t.tw_Symbol AS Sku,
+                c.tc_CenaNetto0 AS Net0, c.tc_CenaBrutto0 AS Gross0,
+                c.tc_CenaNetto1 AS Net1, c.tc_CenaBrutto1 AS Gross1,
+                c.tc_CenaNetto2 AS Net2, c.tc_CenaBrutto2 AS Gross2,
+                c.tc_CenaNetto3 AS Net3, c.tc_CenaBrutto3 AS Gross3,
+                c.tc_CenaNetto4 AS Net4, c.tc_CenaBrutto4 AS Gross4,
+                c.tc_CenaNetto5 AS Net5, c.tc_CenaBrutto5 AS Gross5,
+                c.tc_CenaNetto6 AS Net6, c.tc_CenaBrutto6 AS Gross6,
+                c.tc_CenaNetto7 AS Net7, c.tc_CenaBrutto7 AS Gross7,
+                c.tc_CenaNetto8 AS Net8, c.tc_CenaBrutto8 AS Gross8,
+                c.tc_CenaNetto9 AS Net9, c.tc_CenaBrutto9 AS Gross9
+            FROM tw_Cena c
+            JOIN tw__Towar t ON c.tc_IdTowar = t.tw_Id
+            WHERE c.tc_IdTowar = @productId";
+
+        var priceData = await conn.QueryFirstOrDefaultAsync<dynamic>(priceSql, new { productId });
+
+        if (priceData == null)
+            return Enumerable.Empty<ProductPrice>();
+
+        var prices = new List<ProductPrice>();
+        for (int i = 0; i < 10; i++)
+        {
+            var netProp = $"Net{i}";
+            var grossProp = $"Gross{i}";
+
+            decimal net = 0, gross = 0;
+            var priceDict = (IDictionary<string, object>)priceData;
+            if (priceDict.ContainsKey(netProp) && priceDict[netProp] != null)
+                net = Convert.ToDecimal(priceDict[netProp]);
+            if (priceDict.ContainsKey(grossProp) && priceDict[grossProp] != null)
+                gross = Convert.ToDecimal(priceDict[grossProp]);
+
+            prices.Add(new ProductPrice
+            {
+                ProductId = (int)priceData.ProductId,
+                Sku = (string)priceData.Sku,
+                PriceLevel = i,
+                PriceLevelName = levelNames[i],
+                PriceNet = net,
+                PriceGross = gross
+            });
+        }
+
+        return prices;
+    }
+
     public async Task<IEnumerable<Warehouse>> GetWarehousesAsync()
     {
         using var conn = GetConnection();
@@ -421,6 +503,16 @@ public class Stock
     public string WarehouseName { get; set; } = "";
     public decimal Quantity { get; set; }
     public decimal Reserved { get; set; }
+}
+
+public class ProductPrice
+{
+    public int ProductId { get; set; }
+    public string Sku { get; set; } = "";
+    public int PriceLevel { get; set; }
+    public string PriceLevelName { get; set; } = "";
+    public decimal PriceNet { get; set; }
+    public decimal PriceGross { get; set; }
 }
 
 public class Warehouse
