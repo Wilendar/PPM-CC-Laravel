@@ -377,6 +377,11 @@ Route::prefix('admin')->name('admin.')->group(function () {
     Route::get('/integrations', \App\Http\Livewire\Admin\ERP\ERPManager::class)->name('integrations');
 
     // ==========================================
+    // SESSION MANAGEMENT - FAZA C User Management
+    // ==========================================
+    Route::get('/sessions', \App\Http\Livewire\Admin\Sessions::class)->name('sessions');
+
+    // ==========================================
     // BUG REPORTS / HELPDESK SYSTEM
     // ==========================================
     Route::prefix('bug-reports')->name('bug-reports.')->group(function () {

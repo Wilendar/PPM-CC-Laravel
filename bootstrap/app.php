@@ -1,9 +1,12 @@
 <?php
 
 use App\Http\Middleware\AdminMiddleware;
+use App\Http\Middleware\CheckAccountLockMiddleware;
+use App\Http\Middleware\ForcePasswordChangeMiddleware;
 use App\Http\Middleware\PermissionMiddleware;
 use App\Http\Middleware\RoleMiddleware;
 use App\Http\Middleware\RoleOrPermissionMiddleware;
+use App\Http\Middleware\TrackUserSessionMiddleware;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -32,11 +35,15 @@ return Application::configure(basePath: dirname(__DIR__))
             'permission' => PermissionMiddleware::class,
             'role_or_permission' => RoleOrPermissionMiddleware::class,
             'admin' => AdminMiddleware::class,
+            // Security middleware (FAZA C)
+            'track_session' => TrackUserSessionMiddleware::class,
+            'force_password_change' => ForcePasswordChangeMiddleware::class,
+            'check_account_lock' => CheckAccountLockMiddleware::class,
         ]);
         
         // Global middleware dla wszystkich requests
         $middleware->web(append: [
-            // Add any global web middleware here if needed
+            TrackUserSessionMiddleware::class,
         ]);
         
         // API middleware

@@ -43,13 +43,22 @@
 # ✅ CLAUDE.md, AGENTS.md - project instructions
 # ✅ .claude/ - agent system configuration
 # ✅ Plan_Projektu/ - ETAP tracking
-# ✅ _DOCS/ - project documentation (including credentials for private repo)
-# ✅ _ISSUES_FIXES/ - knowledge base
-# ✅ _TOOLS/ - development scripts
-# ✅ _AGENT_REPORTS/ - agent work reports
-# ✅ References/ - UI mockups
+_DOCS/ - project documentation (including credentials for private repo)
+_ISSUES_FIXES/ - knowledge base
+_TOOLS/ - development scripts
+_AGENT_REPORTS/ - agent work reports
+References/ - UI mockups
+_OTHER/
+_TEMP/
+_TEST/
+Plan_Projektu copy/
+_ARCHIVE/
+_BACKUP/
+_DIAGNOSTICS/
+_REPORTS/
 # ============================================
 /_TEMP
 _TEMP/recent_logs.txt
 _TEMP/recent_logs.txt
 nul
+/.subtask/
