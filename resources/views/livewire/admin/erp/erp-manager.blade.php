@@ -320,6 +320,18 @@
                                             </svg>
                                         </button>
 
+                                        <!-- Edit -->
+                                        <button wire:click="editConnection({{ $connection->id }})"
+                                                class="inline-flex items-center px-2 py-1 text-xs font-medium
+                                                       text-orange-400 hover:text-orange-300 hover:bg-orange-500/10
+                                                       rounded transition-colors duration-150"
+                                                title="Edit Connection">
+                                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                      d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                                            </svg>
+                                        </button>
+
                                         <!-- Details -->
                                         <button wire:click="showDetails({{ $connection->id }})"
                                                 class="inline-flex items-center px-2 py-1 text-xs font-medium
@@ -368,7 +380,7 @@
                 <!-- Header -->
                 <div class="flex items-center justify-between px-4 py-3 border-b border-gray-700">
                     <h2 class="text-lg font-semibold text-white">
-                        Add ERP Connection - Step {{ $wizardStep }}/4
+                        {{ $editingConnectionId ? 'Edit' : 'Add' }} ERP Connection - Step {{ $wizardStep }}/4
                     </h2>
                     <button wire:click="closeWizard" class="p-1 text-gray-400 hover:text-white hover:bg-gray-700 rounded">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -728,6 +740,147 @@
                                 </div>
                             @endif
 
+                            {{-- ERP → PPM Mapping Section --}}
+                            @if(count($availableErpWarehouses) > 0 || count($availableErpPriceLevels) > 0)
+                                <div class="p-3 bg-orange-900/30 border border-orange-700/50 rounded-md space-y-4">
+                                    <div class="flex items-center justify-between">
+                                        <h4 class="text-sm font-medium text-orange-300">ERP → PPM Mapping</h4>
+                                        @if(count($mappingSummary) > 0)
+                                            <div class="flex items-center gap-3 text-xs">
+                                                <span class="text-gray-400">
+                                                    Warehouses: <span class="text-white">{{ $mappingSummary['warehouses']['mapped'] ?? 0 }}/{{ $mappingSummary['warehouses']['total'] ?? 0 }}</span>
+                                                </span>
+                                                <span class="text-gray-400">
+                                                    Price Groups: <span class="text-white">{{ $mappingSummary['price_groups']['mapped'] ?? 0 }}/{{ $mappingSummary['price_groups']['total'] ?? 0 }}</span>
+                                                </span>
+                                            </div>
+                                        @endif
+                                    </div>
+
+                                    {{-- Bulk Operations Panel (FAZA C) --}}
+                                    <div class="p-2 bg-gray-800/50 rounded border border-gray-700/50">
+                                        <div class="flex items-center flex-wrap gap-2">
+                                            <span class="text-xs text-gray-400 mr-2">Operacje grupowe:</span>
+                                            <button wire:click="autoMapByName"
+                                                    class="px-2 py-1 text-xs text-blue-400 hover:text-blue-300 hover:bg-blue-500/10 border border-blue-500/30 rounded transition-colors"
+                                                    title="Automatycznie dopasuj ERP do PPM po podobieństwie nazwy">
+                                                <svg class="w-3 h-3 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                                                </svg>
+                                                Auto-mapuj wg nazwy
+                                            </button>
+                                            <button wire:click="createAllMissingWarehousesFromErp"
+                                                    class="px-2 py-1 text-xs text-green-400 hover:text-green-300 hover:bg-green-500/10 border border-green-500/30 rounded transition-colors"
+                                                    title="Utwórz wszystkie brakujące magazyny z ERP">
+                                                <svg class="w-3 h-3 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                                                </svg>
+                                                + Wszystkie magazyny
+                                            </button>
+                                            <button wire:click="createAllMissingPriceGroupsFromErp"
+                                                    class="px-2 py-1 text-xs text-purple-400 hover:text-purple-300 hover:bg-purple-500/10 border border-purple-500/30 rounded transition-colors"
+                                                    title="Utwórz wszystkie brakujące grupy cenowe z ERP">
+                                                <svg class="w-3 h-3 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                                                </svg>
+                                                + Wszystkie grupy cenowe
+                                            </button>
+                                            <button wire:click="openReplaceAllConfirmModal"
+                                                    class="px-2 py-1 text-xs text-red-400 hover:text-red-300 hover:bg-red-500/10 border border-red-500/30 rounded transition-colors"
+                                                    title="Usuń istniejące mapowania i utwórz wszystkie od nowa z ERP">
+                                                <svg class="w-3 h-3 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                                                </svg>
+                                                Zastąp wszystkie
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    {{-- Warehouse Mapping --}}
+                                    @if(count($availableErpWarehouses) > 0)
+                                        <div>
+                                            <label class="block text-xs font-medium text-gray-300 mb-2">Warehouse Mapping (ERP → PPM)</label>
+                                            <div class="space-y-2 max-h-40 overflow-y-auto">
+                                                @foreach($availableErpWarehouses as $erpWarehouse)
+                                                    <div class="flex items-center gap-2 p-2 bg-gray-800/50 rounded">
+                                                        <span class="text-xs text-gray-300 w-32 truncate" title="{{ $erpWarehouse['name'] }}">
+                                                            {{ $erpWarehouse['symbol'] ?: $erpWarehouse['name'] }}
+                                                        </span>
+                                                        <span class="text-gray-500">→</span>
+                                                        <select wire:model="warehouseMappings.{{ $erpWarehouse['id'] }}"
+                                                                class="flex-1 px-2 py-1 text-xs bg-gray-700 border border-gray-600 rounded text-white focus:outline-none focus:border-orange-400">
+                                                            <option value="">-- Nie mapuj --</option>
+                                                            @foreach($ppmWarehouses as $ppmWarehouse)
+                                                                <option value="{{ $ppmWarehouse['id'] }}">{{ $ppmWarehouse['name'] }}</option>
+                                                            @endforeach
+                                                        </select>
+                                                        @if(empty($warehouseMappings[$erpWarehouse['id']] ?? null))
+                                                            <button wire:click="createWarehouseFromErp({{ $erpWarehouse['id'] }})"
+                                                                    class="px-2 py-1 text-xs text-green-400 hover:text-green-300 hover:bg-green-500/10 rounded"
+                                                                    title="Utwórz nowy magazyn w PPM">
+                                                                + Utwórz
+                                                            </button>
+                                                        @else
+                                                            <button wire:click="replaceWarehouseWithErp({{ $warehouseMappings[$erpWarehouse['id']] }}, {{ $erpWarehouse['id'] }})"
+                                                                    wire:confirm="Czy na pewno chcesz zastąpić dane magazynu PPM danymi z ERP? Nazwa i kod zostaną zaktualizowane."
+                                                                    class="px-2 py-1 text-xs text-yellow-400 hover:text-yellow-300 hover:bg-yellow-500/10 rounded"
+                                                                    title="Zastąp dane PPM danymi z ERP">
+                                                                ⟳ Zastąp
+                                                            </button>
+                                                        @endif
+                                                    </div>
+                                                @endforeach
+                                            </div>
+                                        </div>
+                                    @endif
+
+                                    {{-- Price Group Mapping --}}
+                                    @if(count($availableErpPriceLevels) > 0)
+                                        <div>
+                                            <label class="block text-xs font-medium text-gray-300 mb-2">Price Group Mapping (ERP → PPM)</label>
+                                            <div class="space-y-2 max-h-40 overflow-y-auto">
+                                                @foreach($availableErpPriceLevels as $erpPriceLevel)
+                                                    <div class="flex items-center gap-2 p-2 bg-gray-800/50 rounded">
+                                                        <span class="text-xs text-gray-300 w-32 truncate" title="{{ $erpPriceLevel['name'] }}">
+                                                            {{ $erpPriceLevel['name'] }}
+                                                        </span>
+                                                        <span class="text-gray-500">→</span>
+                                                        <select wire:model="priceGroupMappings.{{ $erpPriceLevel['id'] }}"
+                                                                class="flex-1 px-2 py-1 text-xs bg-gray-700 border border-gray-600 rounded text-white focus:outline-none focus:border-orange-400">
+                                                            <option value="">-- Nie mapuj --</option>
+                                                            @foreach($ppmPriceGroups as $ppmPriceGroup)
+                                                                <option value="{{ $ppmPriceGroup['id'] }}">{{ $ppmPriceGroup['name'] }}</option>
+                                                            @endforeach
+                                                        </select>
+                                                        @if(empty($priceGroupMappings[$erpPriceLevel['id']] ?? null))
+                                                            <button wire:click="createPriceGroupFromErp({{ $erpPriceLevel['id'] }})"
+                                                                    class="px-2 py-1 text-xs text-green-400 hover:text-green-300 hover:bg-green-500/10 rounded"
+                                                                    title="Utwórz nową grupę cenową w PPM">
+                                                                + Utwórz
+                                                            </button>
+                                                        @else
+                                                            <button wire:click="replacePriceGroupWithErp({{ $priceGroupMappings[$erpPriceLevel['id']] }}, {{ $erpPriceLevel['id'] }})"
+                                                                    wire:confirm="Czy na pewno chcesz zastąpić dane grupy cenowej PPM danymi z ERP? Nazwa zostanie zaktualizowana."
+                                                                    class="px-2 py-1 text-xs text-yellow-400 hover:text-yellow-300 hover:bg-yellow-500/10 rounded"
+                                                                    title="Zastąp dane PPM danymi z ERP">
+                                                                ⟳ Zastąp
+                                                            </button>
+                                                        @endif
+                                                    </div>
+                                                @endforeach
+                                            </div>
+                                        </div>
+                                    @endif
+
+                                    {{-- Info about auto-save --}}
+                                    <div class="pt-2 border-t border-orange-700/30">
+                                        <p class="text-xs text-gray-500 italic">
+                                            Mapowania zostaną automatycznie zapisane po kliknięciu "Save Changes".
+                                        </p>
+                                    </div>
+                                </div>
+                            @endif
+
                             <div>
                                 <label class="block text-xs font-medium text-gray-300 mb-1">Sync Mode</label>
                                 <select wire:model="connectionForm.sync_mode"
@@ -805,7 +958,7 @@
                             <button wire:click="completeWizard"
                                     class="px-4 py-1.5 text-xs font-medium text-white btn-enterprise-primary rounded"
                                     {{ !$authTestResult || !$authTestResult['success'] ? 'disabled' : '' }}>
-                                Create Connection
+                                {{ $editingConnectionId ? 'Save Changes' : 'Create Connection' }}
                             </button>
                         @endif
                     </div>
@@ -908,6 +1061,85 @@
                     <button wire:click="closeDetails" class="px-4 py-1.5 text-xs font-medium text-gray-300 hover:text-white border border-gray-600 hover:border-gray-500 rounded">
                         Close
                     </button>
+                </div>
+            </div>
+        </div>
+    @endif
+
+    {{-- Replace All Confirmation Modal --}}
+    @if($showReplaceAllConfirmModal)
+        <div class="fixed inset-0 z-50 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+            <div class="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:p-0">
+                {{-- Backdrop --}}
+                <div class="fixed inset-0 bg-gray-900/80 transition-opacity" wire:click="closeReplaceAllConfirmModal"></div>
+
+                {{-- Modal Panel --}}
+                <div class="relative inline-block overflow-hidden text-left align-middle transition-all transform bg-gray-800 border border-red-600/50 rounded-lg shadow-2xl sm:my-8 sm:w-full sm:max-w-lg">
+                    {{-- Header --}}
+                    <div class="px-6 py-4 bg-red-900/30 border-b border-red-600/30">
+                        <div class="flex items-center gap-3">
+                            <div class="flex-shrink-0 w-10 h-10 flex items-center justify-center rounded-full bg-red-600/20">
+                                <svg class="w-6 h-6 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                                </svg>
+                            </div>
+                            <h3 class="text-lg font-semibold text-red-300" id="modal-title">
+                                Potwierdzenie operacji destrukcyjnej
+                            </h3>
+                        </div>
+                    </div>
+
+                    {{-- Body --}}
+                    <div class="px-6 py-5">
+                        <div class="space-y-4">
+                            <p class="text-sm text-gray-300">
+                                Ta operacja jest <strong class="text-red-400">NIEODWRACALNA</strong> i spowoduje:
+                            </p>
+
+                            <ul class="text-sm text-gray-400 space-y-2 list-none">
+                                <li class="flex items-start gap-2">
+                                    <svg class="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                                    </svg>
+                                    <span><strong>Usunięcie WSZYSTKICH magazynów</strong> w systemie wraz z ich danymi o stanach</span>
+                                </li>
+                                <li class="flex items-start gap-2">
+                                    <svg class="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                                    </svg>
+                                    <span><strong>Usunięcie WSZYSTKICH grup cenowych</strong> w systemie wraz z cenami produktów</span>
+                                </li>
+                                <li class="flex items-start gap-2">
+                                    <svg class="w-5 h-5 text-green-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                                    </svg>
+                                    <span><strong>Utworzenie nowych magazynów i grup cenowych</strong> z aktualnych danych ERP</span>
+                                </li>
+                            </ul>
+
+                            <div class="p-3 bg-yellow-900/30 border border-yellow-600/30 rounded-lg">
+                                <p class="text-xs text-yellow-300">
+                                    <strong>Uwaga:</strong> Wszystkie produkty stracą powiązanie ze stanami magazynowymi i cenami w usuniętych encjach.
+                                    Będzie konieczna ponowna synchronizacja z ERP.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    {{-- Footer --}}
+                    <div class="flex items-center justify-end gap-3 px-6 py-4 bg-gray-900/50 border-t border-gray-700">
+                        <button wire:click="closeReplaceAllConfirmModal"
+                                class="px-4 py-2 text-sm font-medium text-gray-300 hover:text-white bg-gray-700 hover:bg-gray-600 border border-gray-600 rounded-lg transition-colors">
+                            Anuluj
+                        </button>
+                        <button wire:click="replaceAllWithErp"
+                                class="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 border border-red-500 rounded-lg transition-colors flex items-center gap-2">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                            </svg>
+                            Tak, usuń i zastąp wszystko
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>

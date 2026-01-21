@@ -39,6 +39,7 @@ class ERPManager extends Component
     public $selectedConnection = null;
     public $testingConnection = false;
     public $syncingERP = false;
+    public bool $showReplaceAllConfirmModal = false;
 
     // Filters and Search
     public $search = '';
@@ -467,6 +468,32 @@ class ERPManager extends Component
 
             if ($result['success']) {
                 session()->flash('success', 'Uwierzytelnienie z systemem ERP zostało pomyślnie przetestowane!');
+
+                // Extract and store ERP warehouses for mapping
+                if (!empty($result['details']['warehouses'])) {
+                    $this->availableErpWarehouses = collect($result['details']['warehouses'])
+                        ->map(fn($w) => [
+                            'id' => $w['mag_Id'] ?? $w['id'] ?? 0,
+                            'name' => $w['mag_Nazwa'] ?? $w['name'] ?? 'Unknown',
+                            'symbol' => $w['mag_Symbol'] ?? $w['symbol'] ?? '',
+                        ])
+                        ->toArray();
+                }
+
+                // Extract and store ERP price levels for mapping
+                if (!empty($result['details']['price_types'])) {
+                    $this->availableErpPriceLevels = collect($result['details']['price_types'])
+                        ->map(fn($p) => [
+                            'id' => $p['rc_Id'] ?? $p['id'] ?? 0,
+                            'name' => $p['rc_Nazwa'] ?? $p['name'] ?? 'Unknown',
+                            'description' => $p['rc_Opis'] ?? $p['description'] ?? '',
+                        ])
+                        ->toArray();
+                }
+
+                // Load PPM data for mapping dropdowns
+                $this->loadPpmMappingData();
+                $this->loadMappingSummary();
             } else {
                 session()->flash('error', 'Test uwierzytelnienia nieudany: ' . $result['message']);
             }
@@ -485,7 +512,7 @@ class ERPManager extends Component
     }
 
     /**
-     * Complete wizard and save connection.
+     * Complete wizard and save connection (create or update).
      */
     public function completeWizard()
     {
@@ -510,36 +537,64 @@ class ERPManager extends Component
                 if (isset($this->authTestResult['auth_expires_at'])) {
                     $connectionData['auth_expires_at'] = $this->authTestResult['auth_expires_at'];
                 }
-            } else {
+            } else if (!$this->editingConnectionId) {
+                // Only set pending status for new connections
                 $connectionData['auth_status'] = ERPConnection::AUTH_PENDING;
                 $connectionData['connection_status'] = ERPConnection::CONNECTION_DISCONNECTED;
             }
 
-            // Debug logging
-            \Log::info('ERPManager::completeWizard creating connection', [
-                'data_keys' => array_keys($connectionData),
-                'erp_type' => $connectionData['erp_type'] ?? 'missing',
-                'instance_name' => $connectionData['instance_name'] ?? 'missing',
-            ]);
+            // UPDATE existing connection
+            if ($this->editingConnectionId) {
+                $connection = ERPConnection::findOrFail($this->editingConnectionId);
 
-            $connection = ERPConnection::create($connectionData);
+                \Log::info('ERPManager::completeWizard updating connection', [
+                    'connection_id' => $this->editingConnectionId,
+                    'erp_type' => $connectionData['erp_type'] ?? 'missing',
+                    'instance_name' => $connectionData['instance_name'] ?? 'missing',
+                    'warehouse_mappings_count' => count($this->warehouseMappings),
+                    'price_group_mappings_count' => count($this->priceGroupMappings),
+                ]);
 
-            session()->flash('success', 'Połączenie ERP zostało dodane pomyślnie!');
+                $connection->update($connectionData);
 
-            $this->closeWizard();
-            $this->dispatch('connectionCreated', $connection->id);
+                // AUTO-SAVE mappings to PPM models (Warehouse, PriceGroup)
+                // This replaces the separate "Zapisz mapowania" button
+                $this->saveMappingsToModelsInternal();
+
+                session()->flash('success', "Połączenie '{$connection->instance_name}' zostało zaktualizowane wraz z mapowaniami!");
+
+                $this->closeWizard();
+                $this->dispatch('connectionUpdated', $connection->id);
+            }
+            // CREATE new connection
+            else {
+                \Log::info('ERPManager::completeWizard creating connection', [
+                    'data_keys' => array_keys($connectionData),
+                    'erp_type' => $connectionData['erp_type'] ?? 'missing',
+                    'instance_name' => $connectionData['instance_name'] ?? 'missing',
+                ]);
+
+                $connection = ERPConnection::create($connectionData);
+
+                session()->flash('success', 'Połączenie ERP zostało dodane pomyślnie!');
+
+                $this->closeWizard();
+                $this->dispatch('connectionCreated', $connection->id);
+            }
 
         } catch (\Exception $e) {
             \Log::error('ERPManager::completeWizard ERROR', [
                 'message' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
             ]);
-            session()->flash('error', 'Błąd podczas dodawania połączenia ERP: ' . $e->getMessage());
+            $action = $this->editingConnectionId ? 'aktualizacji' : 'dodawania';
+            session()->flash('error', "Błąd podczas {$action} połączenia ERP: " . $e->getMessage());
         }
     }
 
     /**
      * Build connection configuration array.
+     * INCLUDES warehouse and price group mappings for persistence!
      */
     protected function buildConnectionConfig(): array
     {
@@ -548,8 +603,11 @@ class ERPManager extends Component
                 return $this->baselinkerConfig;
             case 'subiekt_gt':
                 // Force SSL verification off (sapi.mpptrade.pl certificate issue)
+                // CRITICAL: Include mappings for persistence!
                 return array_merge($this->subiektConfig, [
                     'rest_api_verify_ssl' => false,
+                    'warehouse_mappings' => $this->warehouseMappings,
+                    'price_group_mappings' => $this->priceGroupMappings,
                 ]);
             case 'dynamics':
                 return $this->dynamicsConfig;
@@ -581,6 +639,7 @@ class ERPManager extends Component
     public function closeWizard()
     {
         $this->showAddConnection = false;
+        $this->editingConnectionId = null;
         $this->resetWizard();
     }
 
@@ -745,6 +804,162 @@ class ERPManager extends Component
     }
 
     /**
+     * Edit existing connection - load data and open wizard.
+     *
+     * @param int $connectionId
+     */
+    public function editConnection(int $connectionId): void
+    {
+        $connection = ERPConnection::findOrFail($connectionId);
+
+        // Store editing connection ID
+        $this->editingConnectionId = $connectionId;
+
+        // Load connection data into form
+        $this->connectionForm = [
+            'erp_type' => $connection->erp_type,
+            'instance_name' => $connection->instance_name,
+            'description' => $connection->description,
+            'is_active' => $connection->is_active,
+            'priority' => $connection->priority,
+            'connection_config' => $connection->connection_config ?? [],
+            'sync_mode' => $connection->sync_mode,
+            'auto_sync_products' => $connection->auto_sync_products,
+            'auto_sync_stock' => $connection->auto_sync_stock,
+            'auto_sync_prices' => $connection->auto_sync_prices,
+            'auto_sync_orders' => $connection->auto_sync_orders,
+            'max_retry_attempts' => $connection->max_retry_attempts,
+            'retry_delay_seconds' => $connection->retry_delay_seconds,
+            'auto_disable_on_errors' => $connection->auto_disable_on_errors ?? false,
+            'error_threshold' => $connection->error_threshold ?? 10,
+            'webhook_enabled' => $connection->webhook_enabled ?? false,
+            'notify_on_errors' => $connection->notify_on_errors,
+            'notify_on_sync_complete' => $connection->notify_on_sync_complete ?? false,
+            'notify_on_auth_expire' => $connection->notify_on_auth_expire,
+        ];
+
+        // Load ERP-specific config
+        $config = $connection->connection_config ?? [];
+
+        switch ($connection->erp_type) {
+            case 'baselinker':
+                $this->baselinkerConfig = array_merge($this->baselinkerConfig, [
+                    'api_token' => $config['api_token'] ?? '',
+                    'inventory_id' => $config['inventory_id'] ?? '',
+                    'warehouse_mappings' => $config['warehouse_mappings'] ?? [],
+                ]);
+                break;
+
+            case 'subiekt_gt':
+                $this->subiektConfig = array_merge($this->subiektConfig, [
+                    'connection_mode' => $config['connection_mode'] ?? 'rest_api',
+                    'rest_api_url' => $config['rest_api_url'] ?? 'https://sapi.mpptrade.pl',
+                    'rest_api_key' => $config['rest_api_key'] ?? '',
+                    'rest_api_timeout' => $config['rest_api_timeout'] ?? 30,
+                    'rest_api_verify_ssl' => $config['rest_api_verify_ssl'] ?? false,
+                    'default_warehouse_id' => $config['default_warehouse_id'] ?? 1,
+                    'default_price_type_id' => $config['default_price_type_id'] ?? 1,
+                    'warehouse_mappings' => $config['warehouse_mappings'] ?? [],
+                    'price_group_mappings' => $config['price_group_mappings'] ?? [],
+                    'create_missing_products' => $config['create_missing_products'] ?? false,
+                ]);
+                break;
+
+            case 'dynamics':
+                $this->dynamicsConfig = array_merge($this->dynamicsConfig, [
+                    'tenant_id' => $config['tenant_id'] ?? '',
+                    'client_id' => $config['client_id'] ?? '',
+                    'client_secret' => $config['client_secret'] ?? '',
+                    'odata_url' => $config['odata_url'] ?? '',
+                    'company_id' => $config['company_id'] ?? '',
+                    'entity_mappings' => $config['entity_mappings'] ?? [],
+                ]);
+                break;
+        }
+
+        // Set wizard to Step 4 (Mappings) for quick access to settings
+        $this->wizardStep = 4;
+        $this->authTestResult = [
+            'success' => $connection->connection_status === ERPConnection::CONNECTION_CONNECTED,
+            'message' => 'Using existing connection data',
+            'details' => [],
+        ];
+
+        // Load PPM warehouses and price groups for mapping dropdowns
+        $this->loadPpmMappingData();
+
+        // Load ERP warehouses and price levels from saved config or fetch fresh
+        $this->loadErpMappingDataForEdit($connection);
+
+        // Load existing mappings from connection_config
+        // Format: ERP_ID => PPM_ID
+        $this->warehouseMappings = $config['warehouse_mappings'] ?? [];
+        $this->priceGroupMappings = $config['price_group_mappings'] ?? [];
+
+        // If no mappings in config, try to reconstruct from PPM models (erp_mapping field)
+        if (empty($this->warehouseMappings)) {
+            $this->reconstructMappingsFromModels($connection->erp_type);
+        }
+
+        // Calculate mapping summary
+        $this->loadMappingSummary();
+
+        // Open wizard
+        $this->showAddConnection = true;
+    }
+
+    /**
+     * Load ERP warehouse and price level data for edit mode.
+     *
+     * @param ERPConnection $connection
+     */
+    protected function loadErpMappingDataForEdit(ERPConnection $connection): void
+    {
+        try {
+            $service = $this->getERPService($connection->erp_type);
+            $config = $connection->connection_config ?? [];
+
+            // Test connection and get fresh data
+            $result = $service->testAuthentication($config);
+
+            if ($result['success']) {
+                // Store in authTestResult for UI
+                $this->authTestResult['details'] = $result['details'] ?? [];
+
+                // Extract warehouses
+                if (!empty($result['details']['warehouses'])) {
+                    $this->availableErpWarehouses = collect($result['details']['warehouses'])
+                        ->map(fn($w) => [
+                            'id' => $w['mag_Id'] ?? $w['id'] ?? 0,
+                            'name' => $w['mag_Nazwa'] ?? $w['name'] ?? 'Unknown',
+                            'symbol' => $w['mag_Symbol'] ?? $w['symbol'] ?? '',
+                        ])
+                        ->toArray();
+                }
+
+                // Extract price levels
+                if (!empty($result['details']['price_types'])) {
+                    $this->availableErpPriceLevels = collect($result['details']['price_types'])
+                        ->map(fn($p) => [
+                            'id' => $p['rc_Id'] ?? $p['id'] ?? 0,
+                            'name' => $p['rc_Nazwa'] ?? $p['name'] ?? 'Unknown',
+                            'description' => $p['rc_Opis'] ?? $p['description'] ?? '',
+                        ])
+                        ->toArray();
+                }
+            }
+        } catch (\Exception $e) {
+            \Log::warning('ERPManager::loadErpMappingDataForEdit failed', [
+                'connection_id' => $connection->id,
+                'error' => $e->getMessage(),
+            ]);
+            // Use empty arrays - user can still edit other settings
+            $this->availableErpWarehouses = [];
+            $this->availableErpPriceLevels = [];
+        }
+    }
+
+    /**
      * Update search query and reset pagination.
      */
     public function updatedSearch()
@@ -825,6 +1040,39 @@ class ERPManager extends Component
             ->ordered()
             ->get(['id', 'name', 'code'])
             ->toArray();
+    }
+
+    /**
+     * Reconstruct mappings from PPM models' erp_mapping field.
+     * Used when connection_config doesn't have mappings (backward compatibility).
+     *
+     * @param string $erpType
+     */
+    protected function reconstructMappingsFromModels(string $erpType): void
+    {
+        // Reconstruct warehouse mappings from Warehouse.erp_mapping
+        $warehouses = \App\Models\Warehouse::whereNotNull("erp_mapping->{$erpType}")->get();
+        foreach ($warehouses as $warehouse) {
+            $mapping = $warehouse->erp_mapping[$erpType] ?? null;
+            if ($mapping && isset($mapping['id'])) {
+                $this->warehouseMappings[$mapping['id']] = $warehouse->id;
+            }
+        }
+
+        // Reconstruct price group mappings from PriceGroup.erp_mapping
+        $priceGroups = \App\Models\PriceGroup::whereNotNull("erp_mapping->{$erpType}")->get();
+        foreach ($priceGroups as $priceGroup) {
+            $mapping = $priceGroup->erp_mapping[$erpType] ?? null;
+            if ($mapping && isset($mapping['id'])) {
+                $this->priceGroupMappings[$mapping['id']] = $priceGroup->id;
+            }
+        }
+
+        \Log::debug('Reconstructed mappings from models', [
+            'erp_type' => $erpType,
+            'warehouses' => count($this->warehouseMappings),
+            'price_groups' => count($this->priceGroupMappings),
+        ]);
     }
 
     /**
@@ -928,8 +1176,19 @@ class ERPManager extends Component
 
     /**
      * Save mappings to PPM models (Warehouse and PriceGroup).
+     * Called by user button click - shows notification.
      */
     public function saveMappingsToModels(): void
+    {
+        $this->saveMappingsToModelsInternal();
+        $this->dispatch('notify', type: 'success', message: 'Mapowania zostaly zapisane');
+    }
+
+    /**
+     * Internal method to save mappings without notification.
+     * Called automatically by completeWizard().
+     */
+    protected function saveMappingsToModelsInternal(): void
     {
         $erpType = $this->connectionForm['erp_type'];
 
@@ -994,6 +1253,438 @@ class ERPManager extends Component
             }
         }
 
-        $this->dispatch('notify', type: 'success', message: 'Mapowania zostaly zapisane');
+        \Log::info('Mappings saved to models', [
+            'erp_type' => $erpType,
+            'warehouses_mapped' => count(array_filter($this->warehouseMappings)),
+            'price_groups_mapped' => count(array_filter($this->priceGroupMappings)),
+        ]);
+    }
+
+    // =========================================================================
+    // FAZA B: REPLACE EXISTING FEATURE
+    // =========================================================================
+
+    /**
+     * Replace existing PPM warehouse data with ERP data.
+     * Updates name and symbol from ERP, maintaining PPM ID.
+     *
+     * @param int $ppmWarehouseId PPM warehouse to replace
+     * @param int $erpWarehouseId Source ERP warehouse
+     */
+    public function replaceWarehouseWithErp(int $ppmWarehouseId, int $erpWarehouseId): void
+    {
+        $warehouse = \App\Models\Warehouse::find($ppmWarehouseId);
+        if (!$warehouse) {
+            $this->addError('replace', 'Magazyn PPM nie zostal znaleziony');
+            return;
+        }
+
+        $erpWarehouse = collect($this->availableErpWarehouses)
+            ->firstWhere('id', $erpWarehouseId);
+
+        if (!$erpWarehouse) {
+            $this->addError('replace', 'Magazyn ERP nie zostal znaleziony');
+            return;
+        }
+
+        // Check for related products
+        $relatedProducts = $warehouse->stock()->count();
+        if ($relatedProducts > 0) {
+            \Log::info('Replacing warehouse with products', [
+                'warehouse_id' => $ppmWarehouseId,
+                'related_products' => $relatedProducts,
+            ]);
+        }
+
+        $erpType = $this->connectionForm['erp_type'];
+
+        // Update warehouse with ERP data
+        $warehouse->update([
+            'name' => $erpWarehouse['name'] ?? $warehouse->name,
+            'code' => $erpWarehouse['symbol'] ?? $warehouse->code,
+        ]);
+
+        // Set ERP mapping
+        $warehouse->setErpMapping($erpType, [
+            'id' => $erpWarehouseId,
+            'name' => $erpWarehouse['name'] ?? null,
+            'symbol' => $erpWarehouse['symbol'] ?? null,
+            'connection_id' => $this->editingConnectionId ?? 0,
+            'replaced_at' => now()->toIso8601String(),
+            'synced_at' => now()->toIso8601String(),
+        ]);
+
+        // Update mapping
+        $this->warehouseMappings[$erpWarehouseId] = $ppmWarehouseId;
+
+        $this->loadPpmMappingData();
+        $this->loadMappingSummary();
+
+        $this->dispatch('notify', type: 'success', message: "Magazyn '{$warehouse->name}' zostal zaktualizowany danymi z ERP");
+    }
+
+    /**
+     * Replace existing PPM price group data with ERP data.
+     * Updates name from ERP, maintaining PPM ID.
+     *
+     * @param int $ppmPriceGroupId PPM price group to replace
+     * @param int $erpPriceLevelId Source ERP price level
+     */
+    public function replacePriceGroupWithErp(int $ppmPriceGroupId, int $erpPriceLevelId): void
+    {
+        $priceGroup = \App\Models\PriceGroup::find($ppmPriceGroupId);
+        if (!$priceGroup) {
+            $this->addError('replace', 'Grupa cenowa PPM nie zostala znaleziona');
+            return;
+        }
+
+        $erpPriceLevel = collect($this->availableErpPriceLevels)
+            ->firstWhere('id', $erpPriceLevelId);
+
+        if (!$erpPriceLevel) {
+            $this->addError('replace', 'Poziom cenowy ERP nie zostal znaleziony');
+            return;
+        }
+
+        // Check for related prices
+        $relatedPrices = $priceGroup->prices()->count();
+        if ($relatedPrices > 0) {
+            \Log::info('Replacing price group with prices', [
+                'price_group_id' => $ppmPriceGroupId,
+                'related_prices' => $relatedPrices,
+            ]);
+        }
+
+        $erpType = $this->connectionForm['erp_type'];
+
+        // Update price group with ERP data
+        $priceGroup->update([
+            'name' => $erpPriceLevel['name'] ?? $priceGroup->name,
+            'description' => $erpPriceLevel['description'] ?? "Zaktualizowano z ERP: {$erpType}",
+        ]);
+
+        // Set ERP mapping
+        $priceGroup->setErpMapping($erpType, [
+            'id' => $erpPriceLevelId,
+            'name' => $erpPriceLevel['name'] ?? null,
+            'description' => $erpPriceLevel['description'] ?? null,
+            'connection_id' => $this->editingConnectionId ?? 0,
+            'replaced_at' => now()->toIso8601String(),
+            'synced_at' => now()->toIso8601String(),
+        ]);
+
+        // Update mapping
+        $this->priceGroupMappings[$erpPriceLevelId] = $ppmPriceGroupId;
+
+        $this->loadPpmMappingData();
+        $this->loadMappingSummary();
+
+        $this->dispatch('notify', type: 'success', message: "Grupa cenowa '{$priceGroup->name}' zostala zaktualizowana danymi z ERP");
+    }
+
+    // =========================================================================
+    // FAZA C: BULK OPERATIONS
+    // =========================================================================
+
+    /**
+     * Replace ALL existing PPM warehouses and price groups with ERP data.
+     * This destructive operation:
+     * 1. Clears all existing ERP mappings
+     * 2. Deletes all PPM warehouses/price groups that came from this ERP
+     * 3. Creates new ones from current ERP data
+     *
+     * REQUIRES: User confirmation via wire:confirm
+     */
+    /**
+     * Open confirmation modal for Replace All operation.
+     */
+    public function openReplaceAllConfirmModal(): void
+    {
+        $this->showReplaceAllConfirmModal = true;
+    }
+
+    /**
+     * Close confirmation modal for Replace All operation.
+     */
+    public function closeReplaceAllConfirmModal(): void
+    {
+        $this->showReplaceAllConfirmModal = false;
+    }
+
+    /**
+     * Execute Replace All operation after user confirmation via modal.
+     */
+    public function replaceAllWithErp(): void
+    {
+        $this->showReplaceAllConfirmModal = false; // Close modal first
+        $erpType = $this->connectionForm['erp_type'];
+        $connectionId = $this->editingConnectionId ?? 0;
+
+        \Log::info('replaceAllWithErp STARTED', [
+            'erp_type' => $erpType,
+            'connection_id' => $connectionId,
+            'available_erp_warehouses' => count($this->availableErpWarehouses),
+            'available_erp_price_levels' => count($this->availableErpPriceLevels),
+        ]);
+
+        $deletedWarehouses = 0;
+        $deletedPriceGroups = 0;
+        $createdWarehouses = 0;
+        $createdPriceGroups = 0;
+
+        \DB::beginTransaction();
+        try {
+            // 1. Delete ALL warehouses (not just those with ERP mapping!)
+            $warehousesToDelete = \App\Models\Warehouse::all();
+
+            \Log::info('Warehouses to delete (ALL)', [
+                'count' => $warehousesToDelete->count(),
+            ]);
+
+            foreach ($warehousesToDelete as $warehouse) {
+                // Force delete all related stock records first
+                $deletedStocks = $warehouse->stock()->delete();
+                if ($deletedStocks > 0) {
+                    \Log::info('Deleted stock records for warehouse replacement', [
+                        'warehouse_id' => $warehouse->id,
+                        'name' => $warehouse->name,
+                        'deleted_stocks' => $deletedStocks,
+                    ]);
+                }
+
+                // Now delete the warehouse
+                $warehouse->forceDelete(); // Use forceDelete to bypass SoftDeletes
+                $deletedWarehouses++;
+            }
+
+            // 2. Delete ALL price groups (not just those with ERP mapping!)
+            $priceGroupsToDelete = \App\Models\PriceGroup::all();
+
+            \Log::info('Price groups to delete (ALL)', [
+                'count' => $priceGroupsToDelete->count(),
+            ]);
+
+            foreach ($priceGroupsToDelete as $priceGroup) {
+                // Force delete all related price records first
+                $deletedPrices = $priceGroup->prices()->delete();
+                if ($deletedPrices > 0) {
+                    \Log::info('Deleted price records for price group replacement', [
+                        'price_group_id' => $priceGroup->id,
+                        'name' => $priceGroup->name,
+                        'deleted_prices' => $deletedPrices,
+                    ]);
+                }
+
+                // Now delete the price group
+                $priceGroup->forceDelete(); // Use forceDelete to bypass SoftDeletes
+                $deletedPriceGroups++;
+            }
+
+            // 3. Clear component mapping state
+            $this->warehouseMappings = [];
+            $this->priceGroupMappings = [];
+
+            // 4. Create all warehouses from ERP
+            foreach ($this->availableErpWarehouses as $erpWarehouse) {
+                $warehouse = \App\Models\Warehouse::createFromErpData(
+                    $erpType,
+                    $erpWarehouse,
+                    $connectionId
+                );
+                $this->warehouseMappings[$erpWarehouse['id']] = $warehouse->id;
+                $createdWarehouses++;
+            }
+
+            // 5. Create all price groups from ERP
+            foreach ($this->availableErpPriceLevels as $erpPriceLevel) {
+                $priceGroup = \App\Models\PriceGroup::createFromErpData(
+                    $erpType,
+                    $erpPriceLevel,
+                    $connectionId
+                );
+                $this->priceGroupMappings[$erpPriceLevel['id']] = $priceGroup->id;
+                $createdPriceGroups++;
+            }
+
+            \DB::commit();
+
+            \Log::info('replaceAllWithErp COMPLETED', [
+                'deleted_warehouses' => $deletedWarehouses,
+                'deleted_price_groups' => $deletedPriceGroups,
+                'created_warehouses' => $createdWarehouses,
+                'created_price_groups' => $createdPriceGroups,
+            ]);
+
+            // Refresh data
+            $this->loadPpmMappingData();
+            $this->loadMappingSummary();
+
+            $this->dispatch('notify', type: 'success', message: "Zastąpiono dane ERP: usunięto {$deletedWarehouses} magazynów i {$deletedPriceGroups} grup cenowych, utworzono {$createdWarehouses} magazynów i {$createdPriceGroups} grup cenowych");
+
+        } catch (\Exception $e) {
+            \DB::rollBack();
+            \Log::error('replaceAllWithErp failed', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+            $this->dispatch('notify', type: 'error', message: 'Błąd podczas zastępowania danych: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Create all missing warehouses from ERP in one operation.
+     * Only creates warehouses that don't have a PPM mapping yet.
+     */
+    public function createAllMissingWarehousesFromErp(): void
+    {
+        $created = 0;
+        $erpType = $this->connectionForm['erp_type'];
+        $connectionId = $this->editingConnectionId ?? 0;
+
+        foreach ($this->availableErpWarehouses as $erpWarehouse) {
+            // Skip if already mapped
+            if (!empty($this->warehouseMappings[$erpWarehouse['id']] ?? null)) {
+                continue;
+            }
+
+            // Create new warehouse
+            $warehouse = \App\Models\Warehouse::createFromErpData(
+                $erpType,
+                $erpWarehouse,
+                $connectionId
+            );
+
+            // Auto-assign mapping
+            $this->warehouseMappings[$erpWarehouse['id']] = $warehouse->id;
+            $created++;
+        }
+
+        if ($created > 0) {
+            $this->loadPpmMappingData();
+            $this->loadMappingSummary();
+            $this->dispatch('notify', type: 'success', message: "Utworzono {$created} nowych magazynow z ERP");
+        } else {
+            $this->dispatch('notify', type: 'info', message: 'Wszystkie magazyny ERP sa juz zmapowane');
+        }
+    }
+
+    /**
+     * Create all missing price groups from ERP in one operation.
+     * Only creates price groups that don't have a PPM mapping yet.
+     */
+    public function createAllMissingPriceGroupsFromErp(): void
+    {
+        $created = 0;
+        $erpType = $this->connectionForm['erp_type'];
+        $connectionId = $this->editingConnectionId ?? 0;
+
+        foreach ($this->availableErpPriceLevels as $erpPriceLevel) {
+            // Skip if already mapped
+            if (!empty($this->priceGroupMappings[$erpPriceLevel['id']] ?? null)) {
+                continue;
+            }
+
+            // Create new price group
+            $priceGroup = \App\Models\PriceGroup::createFromErpData(
+                $erpType,
+                $erpPriceLevel,
+                $connectionId
+            );
+
+            // Auto-assign mapping
+            $this->priceGroupMappings[$erpPriceLevel['id']] = $priceGroup->id;
+            $created++;
+        }
+
+        if ($created > 0) {
+            $this->loadPpmMappingData();
+            $this->loadMappingSummary();
+            $this->dispatch('notify', type: 'success', message: "Utworzono {$created} nowych grup cenowych z ERP");
+        } else {
+            $this->dispatch('notify', type: 'info', message: 'Wszystkie poziomy cenowe ERP sa juz zmapowane');
+        }
+    }
+
+    /**
+     * Auto-map ERP entities to PPM by name similarity.
+     * Uses Levenshtein distance to find best matches.
+     */
+    public function autoMapByName(): void
+    {
+        $warehousesMapped = 0;
+        $priceGroupsMapped = 0;
+
+        // Auto-map warehouses
+        foreach ($this->availableErpWarehouses as $erpWarehouse) {
+            // Skip if already mapped
+            if (!empty($this->warehouseMappings[$erpWarehouse['id']] ?? null)) {
+                continue;
+            }
+
+            $erpName = strtolower($erpWarehouse['name'] ?? '');
+            $erpSymbol = strtolower($erpWarehouse['symbol'] ?? '');
+
+            $bestMatch = null;
+            $bestScore = PHP_INT_MAX;
+
+            foreach ($this->ppmWarehouses as $ppmWarehouse) {
+                $ppmName = strtolower($ppmWarehouse['name'] ?? '');
+                $ppmCode = strtolower($ppmWarehouse['code'] ?? '');
+
+                // Calculate similarity scores
+                $nameScore = levenshtein($erpName, $ppmName);
+                $symbolScore = $erpSymbol && $ppmCode ? levenshtein($erpSymbol, $ppmCode) : PHP_INT_MAX;
+                $score = min($nameScore, $symbolScore);
+
+                // Consider exact matches or very close matches (score <= 3)
+                if ($score < $bestScore && $score <= 5) {
+                    $bestScore = $score;
+                    $bestMatch = $ppmWarehouse;
+                }
+            }
+
+            if ($bestMatch) {
+                $this->warehouseMappings[$erpWarehouse['id']] = $bestMatch['id'];
+                $warehousesMapped++;
+            }
+        }
+
+        // Auto-map price groups
+        foreach ($this->availableErpPriceLevels as $erpPriceLevel) {
+            // Skip if already mapped
+            if (!empty($this->priceGroupMappings[$erpPriceLevel['id']] ?? null)) {
+                continue;
+            }
+
+            $erpName = strtolower($erpPriceLevel['name'] ?? '');
+
+            $bestMatch = null;
+            $bestScore = PHP_INT_MAX;
+
+            foreach ($this->ppmPriceGroups as $ppmPriceGroup) {
+                $ppmName = strtolower($ppmPriceGroup['name'] ?? '');
+
+                $score = levenshtein($erpName, $ppmName);
+
+                // Consider exact matches or very close matches (score <= 5)
+                if ($score < $bestScore && $score <= 5) {
+                    $bestScore = $score;
+                    $bestMatch = $ppmPriceGroup;
+                }
+            }
+
+            if ($bestMatch) {
+                $this->priceGroupMappings[$erpPriceLevel['id']] = $bestMatch['id'];
+                $priceGroupsMapped++;
+            }
+        }
+
+        $this->loadMappingSummary();
+
+        if ($warehousesMapped > 0 || $priceGroupsMapped > 0) {
+            $this->dispatch('notify', type: 'success', message: "Auto-mapowanie: {$warehousesMapped} magazynow, {$priceGroupsMapped} grup cenowych");
+        } else {
+            $this->dispatch('notify', type: 'info', message: 'Nie znaleziono pasujacych nazw do auto-mapowania');
+        }
     }
 }
