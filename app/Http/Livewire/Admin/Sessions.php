@@ -717,8 +717,9 @@ class Sessions extends Component
             'sessions' => $this->sessions,
             'users' => $this->users,
             'deviceTypes' => $this->deviceTypes,
-        ])->layout('layouts.app', [
-            'title' => 'Zarządzanie Sesjami - Admin PPM'
+        ])->layout('layouts.admin', [
+            'title' => 'Monitor Sesji - Admin PPM',
+            'breadcrumb' => 'Monitor Sesji'
         ]);
     }
 }

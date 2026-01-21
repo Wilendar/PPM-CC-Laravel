@@ -647,8 +647,9 @@ class UserForm extends Component
             'dateFormatOptions' => $this->dateFormatOptions,
             'inheritedPermissions' => $this->getInheritedPermissions(),
             'allUserPermissions' => $this->getAllUserPermissions(),
-        ])->layout('layouts.app', [
-            'title' => ($this->isEditing ? 'Edytuj użytkownika: ' . $this->user->full_name : 'Dodaj nowego użytkownika') . ' - Admin PPM'
+        ])->layout('layouts.admin', [
+            'title' => ($this->isEditing ? 'Edytuj uzytkownika: ' . $this->user->full_name : 'Dodaj nowego uzytkownika') . ' - Admin PPM',
+            'breadcrumb' => $this->isEditing ? 'Edycja uzytkownika' : 'Nowy uzytkownik'
         ]);
     }
 }

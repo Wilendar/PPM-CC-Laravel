@@ -201,26 +201,6 @@ class User extends Authenticatable implements MustVerifyEmail
     // ==========================================
 
     /**
-     * Get UI preference by key with default.
-     */
-    public function getUIPreference(string $key, $default = null)
-    {
-        $prefs = $this->ui_preferences ?? [];
-        return $prefs[$key] ?? $default;
-    }
-
-    /**
-     * Update UI preference (merges and persists to DB).
-     */
-    public function updateUIPreference(string $key, $value): void
-    {
-        $prefs = $this->ui_preferences ?? [];
-        $prefs[$key] = $value;
-        $this->ui_preferences = $prefs;
-        $this->save();
-    }
-
-    /**
      * Update last login timestamp.
      */
     public function updateLastLogin(): void
@@ -323,11 +303,16 @@ class User extends Authenticatable implements MustVerifyEmail
 
     /**
      * Check if user has any of the specified roles.
+     * Accepts array or pipe-separated string (e.g., 'Admin|Manager').
      */
-    public function hasAnyRole(array $roles): bool
+    public function hasAnyRole(array|string $roles): bool
     {
+        if (is_string($roles)) {
+            $roles = explode('|', $roles);
+        }
+
         foreach ($roles as $role) {
-            if ($this->hasRole($role)) {
+            if ($this->hasRole(trim($role))) {
                 return true;
             }
         }

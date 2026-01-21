@@ -474,8 +474,9 @@ class RoleList extends Component
             'permissionMatrix' => $this->permissionMatrix,
             'roleTemplates' => $this->getRoleTemplates(),
             'compareRolesData' => $this->compareRolesData,
-        ])->layout('layouts.app', [
-            'title' => 'Zarządzanie Rolami - Admin PPM'
+        ])->layout('layouts.admin', [
+            'title' => 'Zarzadzanie Rolami - Admin PPM',
+            'breadcrumb' => 'Role'
         ]);
     }
 }

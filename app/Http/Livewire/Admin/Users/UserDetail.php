@@ -397,8 +397,9 @@ class UserDetail extends Component
             'allUserPermissions' => $this->allUserPermissions,
             'permissionsByModule' => $this->permissionsByModule,
             'userStats' => $this->userStats,
-        ])->layout('layouts.app', [
-            'title' => 'Profil użytkownika: ' . $this->user->full_name . ' - Admin PPM'
+        ])->layout('layouts.admin', [
+            'title' => 'Profil uzytkownika: ' . $this->user->full_name . ' - Admin PPM',
+            'breadcrumb' => 'Szczegoly uzytkownika'
         ]);
     }
 }

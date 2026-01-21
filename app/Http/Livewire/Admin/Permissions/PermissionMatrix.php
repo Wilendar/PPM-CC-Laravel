@@ -681,8 +681,9 @@ class PermissionMatrix extends Component
             'roles' => $this->roles,
             'selectedRoleData' => $this->selectedRoleData,
             'permissionsByModule' => $this->permissionsByModule,
-        ])->layout('layouts.app', [
-            'title' => 'Macierz Uprawnień - Admin PPM'
+        ])->layout('layouts.admin', [
+            'title' => 'Macierz Uprawnien - Admin PPM',
+            'breadcrumb' => 'Uprawnienia'
         ]);
     }
 }

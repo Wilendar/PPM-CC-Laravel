@@ -676,8 +676,9 @@ class AuditLogs extends Component
             'users' => $this->users,
             'actions' => $this->actions,
             'models' => $this->models,
-        ])->layout('layouts.app', [
-            'title' => 'Logi Audytu - Admin PPM'
+        ])->layout('layouts.admin', [
+            'title' => 'Logi Audytu - Admin PPM',
+            'breadcrumb' => 'Logi audytu'
         ]);
     }
 }

@@ -552,8 +552,9 @@ class UserList extends Component
             'roles' => $this->roles,
             'companies' => $this->companies,
             'stats' => $this->stats,
-        ])->layout('layouts.app', [
-            'title' => 'Zarządzanie Użytkownikami - Admin PPM'
+        ])->layout('layouts.admin', [
+            'title' => 'Zarzadzanie Uzytkownikami - Admin PPM',
+            'breadcrumb' => 'Uzytkownicy'
         ]);
     }
 }
