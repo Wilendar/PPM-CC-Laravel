@@ -47,6 +47,17 @@ class ERPManager extends Component
     public $sortBy = 'priority';
     public $sortDirection = 'asc';
 
+    // Mapping Management
+    public bool $clearExistingMappingsOnSave = false;
+    public ?int $editingConnectionId = null;
+    public array $availableErpWarehouses = [];
+    public array $availableErpPriceLevels = [];
+    public array $warehouseMappings = [];
+    public array $priceGroupMappings = [];
+    public array $ppmWarehouses = [];
+    public array $ppmPriceGroups = [];
+    public array $mappingSummary = [];
+
     // Add/Edit ERP Form
     public $connectionForm = [
         'erp_type' => 'baselinker',
@@ -792,5 +803,197 @@ class ERPManager extends Component
     {
         session()->flash('success', 'Synchronizacja ERP została ukończona!');
         $this->dispatch('refreshConnections');
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | MAPPING MANAGEMENT METHODS
+    |--------------------------------------------------------------------------
+    */
+
+    /**
+     * Load PPM warehouses and price groups for mapping selection.
+     */
+    public function loadPpmMappingData(): void
+    {
+        $this->ppmWarehouses = \App\Models\Warehouse::active()
+            ->ordered()
+            ->get(['id', 'name', 'code'])
+            ->toArray();
+
+        $this->ppmPriceGroups = \App\Models\PriceGroup::active()
+            ->ordered()
+            ->get(['id', 'name', 'code'])
+            ->toArray();
+    }
+
+    /**
+     * Load and calculate mapping summary statistics.
+     */
+    public function loadMappingSummary(): void
+    {
+        $mappedWarehouses = count(array_filter($this->warehouseMappings));
+        $totalErpWarehouses = count($this->availableErpWarehouses);
+
+        $mappedPriceGroups = count(array_filter($this->priceGroupMappings));
+        $totalErpPriceGroups = count($this->availableErpPriceLevels);
+
+        $this->mappingSummary = [
+            'warehouses' => [
+                'mapped' => $mappedWarehouses,
+                'total' => $totalErpWarehouses,
+                'percentage' => $totalErpWarehouses > 0
+                    ? round(($mappedWarehouses / $totalErpWarehouses) * 100)
+                    : 0,
+            ],
+            'price_groups' => [
+                'mapped' => $mappedPriceGroups,
+                'total' => $totalErpPriceGroups,
+                'percentage' => $totalErpPriceGroups > 0
+                    ? round(($mappedPriceGroups / $totalErpPriceGroups) * 100)
+                    : 0,
+            ],
+        ];
+    }
+
+    /**
+     * Create warehouse in PPM from ERP data and auto-assign mapping.
+     *
+     * @param int $erpWarehouseId ERP warehouse ID
+     */
+    public function createWarehouseFromErp(int $erpWarehouseId): void
+    {
+        $erpWarehouse = collect($this->availableErpWarehouses)
+            ->firstWhere('id', $erpWarehouseId);
+
+        if (!$erpWarehouse) {
+            $this->addError('warehouse', 'Nie znaleziono magazynu ERP');
+            return;
+        }
+
+        $erpType = $this->connectionForm['erp_type'];
+        $connectionId = $this->editingConnectionId ?? 0;
+
+        $warehouse = \App\Models\Warehouse::createFromErpData(
+            $erpType,
+            $erpWarehouse,
+            $connectionId
+        );
+
+        // Refresh PPM warehouses list
+        $this->loadPpmMappingData();
+
+        // Auto-assign mapping
+        $this->warehouseMappings[$erpWarehouseId] = $warehouse->id;
+
+        $this->loadMappingSummary();
+
+        $this->dispatch('notify', type: 'success', message: "Utworzono magazyn: {$warehouse->name}");
+    }
+
+    /**
+     * Create price group in PPM from ERP data and auto-assign mapping.
+     *
+     * @param int $erpPriceLevelId ERP price level ID
+     */
+    public function createPriceGroupFromErp(int $erpPriceLevelId): void
+    {
+        $erpPriceLevel = collect($this->availableErpPriceLevels)
+            ->firstWhere('id', $erpPriceLevelId);
+
+        if (!$erpPriceLevel) {
+            $this->addError('priceGroup', 'Nie znaleziono poziomu cenowego ERP');
+            return;
+        }
+
+        $erpType = $this->connectionForm['erp_type'];
+        $connectionId = $this->editingConnectionId ?? 0;
+
+        $priceGroup = \App\Models\PriceGroup::createFromErpData(
+            $erpType,
+            $erpPriceLevel,
+            $connectionId
+        );
+
+        // Refresh PPM price groups list
+        $this->loadPpmMappingData();
+
+        // Auto-assign mapping
+        $this->priceGroupMappings[$erpPriceLevelId] = $priceGroup->id;
+
+        $this->loadMappingSummary();
+
+        $this->dispatch('notify', type: 'success', message: "Utworzono grupe cenowa: {$priceGroup->name}");
+    }
+
+    /**
+     * Save mappings to PPM models (Warehouse and PriceGroup).
+     */
+    public function saveMappingsToModels(): void
+    {
+        $erpType = $this->connectionForm['erp_type'];
+
+        // Clear existing mappings if requested
+        if ($this->clearExistingMappingsOnSave) {
+            \App\Models\Warehouse::whereNotNull('erp_mapping->' . $erpType)
+                ->each(fn($w) => $w->clearErpMapping($erpType));
+
+            \App\Models\PriceGroup::whereNotNull('erp_mapping->' . $erpType)
+                ->each(fn($pg) => $pg->clearErpMapping($erpType));
+
+            $this->clearExistingMappingsOnSave = false;
+        }
+
+        // Save warehouse mappings
+        foreach ($this->warehouseMappings as $erpWarehouseId => $ppmWarehouseId) {
+            if (!$ppmWarehouseId) {
+                continue;
+            }
+
+            $warehouse = \App\Models\Warehouse::find($ppmWarehouseId);
+            if (!$warehouse) {
+                continue;
+            }
+
+            $erpWarehouse = collect($this->availableErpWarehouses)
+                ->firstWhere('id', $erpWarehouseId);
+
+            if ($erpWarehouse) {
+                $warehouse->setErpMapping($erpType, [
+                    'id' => $erpWarehouseId,
+                    'name' => $erpWarehouse['name'] ?? null,
+                    'symbol' => $erpWarehouse['symbol'] ?? null,
+                    'connection_id' => $this->editingConnectionId ?? 0,
+                    'synced_at' => now()->toIso8601String(),
+                ]);
+            }
+        }
+
+        // Save price group mappings
+        foreach ($this->priceGroupMappings as $erpPriceLevelId => $ppmPriceGroupId) {
+            if (!$ppmPriceGroupId) {
+                continue;
+            }
+
+            $priceGroup = \App\Models\PriceGroup::find($ppmPriceGroupId);
+            if (!$priceGroup) {
+                continue;
+            }
+
+            $erpPriceLevel = collect($this->availableErpPriceLevels)
+                ->firstWhere('id', $erpPriceLevelId);
+
+            if ($erpPriceLevel) {
+                $priceGroup->setErpMapping($erpType, [
+                    'id' => $erpPriceLevelId,
+                    'name' => $erpPriceLevel['name'] ?? null,
+                    'description' => $erpPriceLevel['description'] ?? null,
+                    'connection_id' => $this->editingConnectionId ?? 0,
+                    'synced_at' => now()->toIso8601String(),
+                ]);
+            }
+        }
+
+        $this->dispatch('notify', type: 'success', message: 'Mapowania zostaly zapisane');
     }
 }

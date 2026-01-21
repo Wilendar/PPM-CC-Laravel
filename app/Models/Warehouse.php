@@ -619,4 +619,74 @@ class Warehouse extends Model
     {
         return $this->type === 'custom';
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | ERP INTEGRATION METHODS
+    |--------------------------------------------------------------------------
+    */
+
+    /**
+     * Create warehouse from ERP data
+     *
+     * @param string $erpType (baselinker, subiekt_gt, dynamics)
+     * @param array $erpData ERP warehouse data
+     * @param int $connectionId ERP connection ID
+     * @return static
+     */
+    public static function createFromErpData(string $erpType, array $erpData, int $connectionId): static
+    {
+        $name = $erpData['name'] ?? $erpData['symbol'] ?? 'Magazyn ERP';
+        $code = strtolower(preg_replace('/[^a-zA-Z0-9_]/', '_', $name));
+        $code = substr($code, 0, 50) . '_' . $erpType . '_' . $erpData['id'];
+
+        // Ensure unique code
+        $baseCode = $code;
+        $counter = 1;
+        while (static::where('code', $code)->exists()) {
+            $code = $baseCode . '_' . $counter;
+            $counter++;
+        }
+
+        $warehouse = static::create([
+            'name' => $name,
+            'code' => $code,
+            'type' => 'custom',
+            'is_active' => true,
+            'is_default' => false,
+            'sort_order' => static::max('sort_order') + 1 ?: 1,
+            'country' => 'PL',
+            'erp_mapping' => [
+                $erpType => [
+                    'id' => $erpData['id'],
+                    'name' => $erpData['name'] ?? null,
+                    'symbol' => $erpData['symbol'] ?? null,
+                    'connection_id' => $connectionId,
+                    'synced_at' => now()->toIso8601String(),
+                ],
+            ],
+            'notes' => "Utworzony automatycznie z ERP: {$erpType} (ID: {$erpData['id']})",
+        ]);
+
+        return $warehouse;
+    }
+
+    /**
+     * Clear ERP mapping for specific system
+     *
+     * @param string $erpType (baselinker, subiekt_gt, dynamics)
+     * @return bool
+     */
+    public function clearErpMapping(string $erpType): bool
+    {
+        $mappings = $this->erp_mapping ?? [];
+
+        if (isset($mappings[$erpType])) {
+            unset($mappings[$erpType]);
+            $this->erp_mapping = empty($mappings) ? null : $mappings;
+            return $this->save();
+        }
+
+        return true;
+    }
 }
