@@ -254,19 +254,19 @@ class SubiektDataTransformer
 
         foreach ($prices as $price) {
             // Support both object (from QueryBuilder) and array (from REST API)
-            // REST API returns camelCase: priceLevel, priceLevelName, priceNet, priceGross
+            // REST API returns PascalCase: PriceLevel, PriceLevelName, PriceNet, PriceGross
             $priceTypeId = is_array($price)
-                ? ($price['price_type_id'] ?? $price['priceLevel'] ?? $price['PriceLevel'] ?? 0)
-                : ($price->price_type_id ?? 0);
+                ? ($price['PriceLevel'] ?? $price['priceLevel'] ?? $price['price_type_id'] ?? 0)
+                : ($price->PriceLevel ?? $price->priceLevel ?? $price->price_type_id ?? 0);
             $priceTypeCode = is_array($price)
-                ? ($price['price_type_code'] ?? $price['priceLevelName'] ?? $price['PriceLevelName'] ?? null)
-                : ($price->price_type_code ?? null);
+                ? ($price['PriceLevelName'] ?? $price['priceLevelName'] ?? $price['price_type_code'] ?? null)
+                : ($price->PriceLevelName ?? $price->priceLevelName ?? $price->price_type_code ?? null);
             $priceNet = is_array($price)
-                ? ($price['price_net'] ?? $price['priceNet'] ?? $price['PriceNet'] ?? 0)
-                : ($price->price_net ?? 0);
+                ? ($price['PriceNet'] ?? $price['priceNet'] ?? $price['price_net'] ?? 0)
+                : ($price->PriceNet ?? $price->priceNet ?? $price->price_net ?? 0);
             $priceGross = is_array($price)
-                ? ($price['price_gross'] ?? $price['priceGross'] ?? $price['PriceGross'] ?? 0)
-                : ($price->price_gross ?? 0);
+                ? ($price['PriceGross'] ?? $price['priceGross'] ?? $price['price_gross'] ?? 0)
+                : ($price->PriceGross ?? $price->priceGross ?? $price->price_gross ?? 0);
 
             $ppmPriceGroupId = $this->mapPriceTypeToGroup($priceTypeId);
 
@@ -300,19 +300,19 @@ class SubiektDataTransformer
 
         foreach ($stockData as $stock) {
             // Support both object (from QueryBuilder) and array (from REST API)
-            // REST API returns camelCase: warehouseId, warehouseName, quantity, reserved
+            // REST API returns PascalCase: WarehouseId, WarehouseName, Quantity, Reserved
             $warehouseId = is_array($stock)
-                ? ($stock['warehouse_id'] ?? $stock['warehouseId'] ?? $stock['WarehouseId'] ?? 0)
-                : ($stock->warehouse_id ?? 0);
+                ? ($stock['WarehouseId'] ?? $stock['warehouseId'] ?? $stock['warehouse_id'] ?? 0)
+                : ($stock->WarehouseId ?? $stock->warehouseId ?? $stock->warehouse_id ?? 0);
             $warehouseCode = is_array($stock)
-                ? ($stock['warehouse_code'] ?? $stock['warehouseName'] ?? $stock['WarehouseName'] ?? null)
-                : ($stock->warehouse_code ?? null);
+                ? ($stock['WarehouseName'] ?? $stock['warehouseName'] ?? $stock['warehouse_code'] ?? null)
+                : ($stock->WarehouseName ?? $stock->warehouseName ?? $stock->warehouse_code ?? null);
             $quantity = is_array($stock)
-                ? ($stock['quantity'] ?? $stock['Quantity'] ?? 0)
-                : ($stock->quantity ?? 0);
+                ? ($stock['Quantity'] ?? $stock['quantity'] ?? 0)
+                : ($stock->Quantity ?? $stock->quantity ?? 0);
             $reserved = is_array($stock)
-                ? ($stock['reserved'] ?? $stock['Reserved'] ?? 0)
-                : ($stock->reserved ?? 0);
+                ? ($stock['Reserved'] ?? $stock['reserved'] ?? 0)
+                : ($stock->Reserved ?? $stock->reserved ?? 0);
             $available = is_array($stock)
                 ? ($stock['available'] ?? $quantity - $reserved)
                 : ($stock->available ?? $stock->quantity ?? 0);

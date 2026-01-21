@@ -1279,13 +1279,14 @@ class SubiektGTService implements ERPSyncServiceInterface
                 ]);
 
                 // Transform to format: [priceLevel => ['net' => X, 'gross' => Y, 'name' => Z]]
+                // REST API returns PascalCase: PriceLevel, PriceLevelName, PriceNet, PriceGross
                 foreach ($pricesData as $price) {
-                    $level = $price['priceLevel'] ?? $price['price_level'] ?? null;
+                    $level = $price['PriceLevel'] ?? $price['priceLevel'] ?? $price['price_level'] ?? null;
                     if ($level !== null) {
                         $allPrices[$level] = [
-                            'net' => (float) ($price['priceNet'] ?? $price['price_net'] ?? 0),
-                            'gross' => (float) ($price['priceGross'] ?? $price['price_gross'] ?? 0),
-                            'name' => $price['name'] ?? $price['priceName'] ?? "Cena {$level}",
+                            'net' => (float) ($price['PriceNet'] ?? $price['priceNet'] ?? $price['price_net'] ?? 0),
+                            'gross' => (float) ($price['PriceGross'] ?? $price['priceGross'] ?? $price['price_gross'] ?? 0),
+                            'name' => $price['PriceLevelName'] ?? $price['priceLevelName'] ?? $price['name'] ?? $price['priceName'] ?? "Cena {$level}",
                         ];
                     }
                 }
@@ -1311,14 +1312,15 @@ class SubiektGTService implements ERPSyncServiceInterface
                 ]);
 
                 // Transform to format: [warehouseId => ['quantity' => X, 'reserved' => Y, 'name' => Z]]
+                // REST API returns PascalCase: WarehouseId, WarehouseName, Quantity, Reserved
                 foreach ($stockData as $stock) {
-                    $warehouseId = $stock['warehouseId'] ?? $stock['warehouse_id'] ?? null;
+                    $warehouseId = $stock['WarehouseId'] ?? $stock['warehouseId'] ?? $stock['warehouse_id'] ?? null;
                     if ($warehouseId !== null) {
                         $allStock[$warehouseId] = [
-                            'quantity' => (float) ($stock['quantity'] ?? $stock['stock'] ?? 0),
-                            'reserved' => (float) ($stock['reserved'] ?? $stock['stockReserved'] ?? 0),
-                            'available' => (float) ($stock['available'] ?? (($stock['quantity'] ?? 0) - ($stock['reserved'] ?? 0))),
-                            'name' => $stock['warehouseName'] ?? $stock['warehouse_name'] ?? "Magazyn {$warehouseId}",
+                            'quantity' => (float) ($stock['Quantity'] ?? $stock['quantity'] ?? $stock['stock'] ?? 0),
+                            'reserved' => (float) ($stock['Reserved'] ?? $stock['reserved'] ?? $stock['stockReserved'] ?? 0),
+                            'available' => (float) ($stock['available'] ?? (($stock['Quantity'] ?? $stock['quantity'] ?? 0) - ($stock['Reserved'] ?? $stock['reserved'] ?? 0))),
+                            'name' => $stock['WarehouseName'] ?? $stock['warehouseName'] ?? $stock['warehouse_name'] ?? "Magazyn {$warehouseId}",
                         ];
                     }
                 }
