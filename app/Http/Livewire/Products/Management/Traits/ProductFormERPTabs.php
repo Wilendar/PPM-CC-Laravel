@@ -390,22 +390,28 @@ trait ProductFormERPTabs
             $ppmGroupId = $this->mapErpPriceLevelToPpmGroup($erpPriceLevel, $priceGroupMappings);
 
             if ($ppmGroupId !== null) {
+                // FIX: Support both camelCase (REST API) and snake_case (transformer) key formats
+                // Transformer returns: price_net, price_gross
+                // Form expects: net, gross
+                $priceNet = $priceData['price_net'] ?? $priceData['priceNet'] ?? $priceData['net'] ?? 0;
+                $priceGross = $priceData['price_gross'] ?? $priceData['priceGross'] ?? $priceData['gross'] ?? 0;
+
                 // Override form prices array
                 $this->prices[$ppmGroupId] = [
-                    'net' => (float) ($priceData['net'] ?? 0),
-                    'gross' => (float) ($priceData['gross'] ?? 0),
+                    'net' => (float) $priceNet,
+                    'gross' => (float) $priceGross,
                     'margin' => $this->prices[$ppmGroupId]['margin'] ?? 0,  // Keep existing margin
                     'is_active' => $this->prices[$ppmGroupId]['is_active'] ?? true,
                     'erp_source' => true,  // Mark as loaded from ERP
                     'erp_price_level' => $erpPriceLevel,
-                    'erp_price_name' => $priceData['name'] ?? null,
+                    'erp_price_name' => $priceData['erp_price_type_code'] ?? $priceData['name'] ?? null,
                 ];
 
                 Log::debug('overrideFormPricesWithErpData: Mapped price', [
                     'erp_level' => $erpPriceLevel,
                     'ppm_group_id' => $ppmGroupId,
-                    'net' => $priceData['net'],
-                    'gross' => $priceData['gross'],
+                    'net' => $priceNet,
+                    'gross' => $priceGross,
                 ]);
             }
         }
@@ -453,22 +459,29 @@ trait ProductFormERPTabs
             $ppmWarehouseId = $this->mapErpWarehouseToPpmWarehouse($erpWarehouseId, $warehouseMappings);
 
             if ($ppmWarehouseId !== null) {
+                // FIX: Support both transformer format and various REST API formats
+                // Transformer returns: quantity, reserved, available, erp_warehouse_code
+                $qty = (int) ($stockData['quantity'] ?? $stockData['Quantity'] ?? 0);
+                $res = (int) ($stockData['reserved'] ?? $stockData['Reserved'] ?? 0);
+                $avail = (int) ($stockData['available'] ?? $stockData['Available'] ?? ($qty - $res));
+
                 // Override form stock array
                 $this->stock[$ppmWarehouseId] = [
-                    'quantity' => (int) ($stockData['quantity'] ?? 0),
-                    'reserved' => (int) ($stockData['reserved'] ?? 0),
-                    'available' => (int) ($stockData['available'] ?? ($stockData['quantity'] ?? 0) - ($stockData['reserved'] ?? 0)),
+                    'quantity' => $qty,
+                    'reserved' => $res,
+                    'available' => $avail,
                     'minimum' => $this->stock[$ppmWarehouseId]['minimum'] ?? 0,  // Keep existing minimum
                     'erp_source' => true,  // Mark as loaded from ERP
                     'erp_warehouse_id' => $erpWarehouseId,
-                    'erp_warehouse_name' => $stockData['name'] ?? null,
+                    'erp_warehouse_name' => $stockData['erp_warehouse_code'] ?? $stockData['warehouseName'] ?? $stockData['name'] ?? null,
                 ];
 
                 Log::debug('overrideFormStockWithErpData: Mapped stock', [
                     'erp_warehouse_id' => $erpWarehouseId,
                     'ppm_warehouse_id' => $ppmWarehouseId,
-                    'quantity' => $stockData['quantity'],
-                    'reserved' => $stockData['reserved'],
+                    'quantity' => $qty,
+                    'reserved' => $res,
+                    'available' => $avail,
                 ]);
             }
         }
