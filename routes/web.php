@@ -271,10 +271,20 @@ Route::middleware(['auth'])->prefix('help')->name('help.')->group(function () {
 // ADMIN ROUTES (tylko istniejące komponenty Livewire)
 // ==========================================
 
-// DEVELOPMENT: AdminMiddleware tymczasowo wyłączony dla testów
-// Uwaga: autoryzacja przez AdminMiddleware (bez 'auth'),
-// aby goscie dostawali 200 z widokiem logowania pod /admin
-Route::prefix('admin')->name('admin.')->group(function () {
+// DEV_AUTH_BYPASS: Controlled via SystemSettings or .env fallback
+// Admin Panel → System Settings → Security → "Development Mode"
+// WARNING: NEVER enable in production!
+$devAuthBypass = false;
+try {
+    // Try database setting first, fallback to .env
+    $devAuthBypass = \App\Models\SystemSetting::get('dev_auth_bypass', env('DEV_AUTH_BYPASS', false));
+} catch (\Exception $e) {
+    // Database not ready - use .env fallback
+    $devAuthBypass = env('DEV_AUTH_BYPASS', false);
+}
+$adminMiddleware = $devAuthBypass ? [] : ['auth'];
+
+Route::prefix('admin')->name('admin.')->middleware($adminMiddleware)->group(function () {
     
     // Admin Dashboard - działający komponent Livewire
     Route::get('/', \App\Http\Livewire\Dashboard\AdminDashboard::class)->name('dashboard');

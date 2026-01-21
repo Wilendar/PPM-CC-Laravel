@@ -234,6 +234,12 @@ class SystemSettings extends Component
                 'min' => 60,
                 'max' => 3600,
             ],
+            'dev_auth_bypass' => [
+                'label' => '⚠️ DEV MODE: Wyłącz autoryzację',
+                'type' => 'boolean',
+                'value' => $this->settingsService->get('dev_auth_bypass', false),
+                'description' => 'UWAGA: Włączenie pozwala na dostęp do panelu admina bez logowania. NIGDY nie włączaj na produkcji!',
+            ],
         ];
     }
 
