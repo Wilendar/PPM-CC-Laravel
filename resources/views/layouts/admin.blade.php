@@ -614,8 +614,75 @@
                                     </svg>
                                     System
                                 </div>
-                                <a href="/admin/system-settings" class="sidebar-link-disabled flex items-center px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-700 hover:text-white transition-colors duration-200"
-                                   title="W przygotowaniu"
+                                <!-- Users -->
+                                <a href="/admin/users" class="flex items-center px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-700 hover:text-white transition-colors duration-200 {{ request()->is('admin/users*') ? 'bg-gray-700 text-white' : '' }}"
+                                   :title="sidebarCollapsed ? 'Uzytkownicy' : ''"
+                                   :class="{ 'justify-center': sidebarCollapsed }">
+                                    <svg class="w-4 h-4 flex-shrink-0"
+                                         :class="{ 'mr-0': sidebarCollapsed, 'mr-3': !sidebarCollapsed }"
+                                         fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z"></path>
+                                    </svg>
+                                    <span x-show="!sidebarCollapsed" x-transition class="whitespace-nowrap">Uzytkownicy</span>
+                                </a>
+                                <!-- Roles -->
+                                <a href="/admin/roles" class="flex items-center px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-700 hover:text-white transition-colors duration-200 {{ request()->is('admin/roles*') ? 'bg-gray-700 text-white' : '' }}"
+                                   :title="sidebarCollapsed ? 'Role' : ''"
+                                   :class="{ 'justify-center': sidebarCollapsed }">
+                                    <svg class="w-4 h-4 flex-shrink-0"
+                                         :class="{ 'mr-0': sidebarCollapsed, 'mr-3': !sidebarCollapsed }"
+                                         fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path>
+                                    </svg>
+                                    <span x-show="!sidebarCollapsed" x-transition class="whitespace-nowrap">Role</span>
+                                </a>
+                                <!-- Permissions -->
+                                <a href="/admin/permissions" class="flex items-center px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-700 hover:text-white transition-colors duration-200 {{ request()->is('admin/permissions*') ? 'bg-gray-700 text-white' : '' }}"
+                                   :title="sidebarCollapsed ? 'Uprawnienia' : ''"
+                                   :class="{ 'justify-center': sidebarCollapsed }">
+                                    <svg class="w-4 h-4 flex-shrink-0"
+                                         :class="{ 'mr-0': sidebarCollapsed, 'mr-3': !sidebarCollapsed }"
+                                         fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"></path>
+                                    </svg>
+                                    <span x-show="!sidebarCollapsed" x-transition class="whitespace-nowrap">Uprawnienia</span>
+                                </a>
+                                <!-- Sessions -->
+                                <a href="/admin/sessions" class="flex items-center px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-700 hover:text-white transition-colors duration-200 {{ request()->is('admin/sessions*') ? 'bg-gray-700 text-white' : '' }}"
+                                   :title="sidebarCollapsed ? 'Sesje' : ''"
+                                   :class="{ 'justify-center': sidebarCollapsed }">
+                                    <svg class="w-4 h-4 flex-shrink-0"
+                                         :class="{ 'mr-0': sidebarCollapsed, 'mr-3': !sidebarCollapsed }"
+                                         fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
+                                    </svg>
+                                    <span x-show="!sidebarCollapsed" x-transition class="whitespace-nowrap">Sesje</span>
+                                </a>
+                                <!-- Security -->
+                                <a href="/admin/security" class="flex items-center px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-700 hover:text-white transition-colors duration-200 {{ request()->is('admin/security*') ? 'bg-gray-700 text-white' : '' }}"
+                                   :title="sidebarCollapsed ? 'Bezpieczenstwo' : ''"
+                                   :class="{ 'justify-center': sidebarCollapsed }">
+                                    <svg class="w-4 h-4 flex-shrink-0"
+                                         :class="{ 'mr-0': sidebarCollapsed, 'mr-3': !sidebarCollapsed }"
+                                         fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
+                                    </svg>
+                                    <span x-show="!sidebarCollapsed" x-transition class="whitespace-nowrap">Bezpieczenstwo</span>
+                                </a>
+                                <!-- Audit Logs -->
+                                <a href="/admin/activity-log" class="flex items-center px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-700 hover:text-white transition-colors duration-200 {{ request()->is('admin/activity-log*') ? 'bg-gray-700 text-white' : '' }}"
+                                   :title="sidebarCollapsed ? 'Logi audytu' : ''"
+                                   :class="{ 'justify-center': sidebarCollapsed }">
+                                    <svg class="w-4 h-4 flex-shrink-0"
+                                         :class="{ 'mr-0': sidebarCollapsed, 'mr-3': !sidebarCollapsed }"
+                                         fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path>
+                                    </svg>
+                                    <span x-show="!sidebarCollapsed" x-transition class="whitespace-nowrap">Logi audytu</span>
+                                </a>
+                                <!-- Settings -->
+                                <a href="/admin/system-settings" class="flex items-center px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-700 hover:text-white transition-colors duration-200 {{ request()->is('admin/system-settings*') ? 'bg-gray-700 text-white' : '' }}"
+                                   :title="sidebarCollapsed ? 'Ustawienia' : ''"
                                    :class="{ 'justify-center': sidebarCollapsed }">
                                     <svg class="w-4 h-4 flex-shrink-0"
                                          :class="{ 'mr-0': sidebarCollapsed, 'mr-3': !sidebarCollapsed }"
@@ -625,8 +692,9 @@
                                     </svg>
                                     <span x-show="!sidebarCollapsed" x-transition class="whitespace-nowrap">Ustawienia</span>
                                 </a>
-                                <a href="/admin/backup" class="sidebar-link-disabled flex items-center px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-700 hover:text-white transition-colors duration-200"
-                                   title="W przygotowaniu"
+                                <!-- Backup -->
+                                <a href="/admin/backup" class="flex items-center px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-700 hover:text-white transition-colors duration-200 {{ request()->is('admin/backup*') ? 'bg-gray-700 text-white' : '' }}"
+                                   :title="sidebarCollapsed ? 'Backup' : ''"
                                    :class="{ 'justify-center': sidebarCollapsed }">
                                     <svg class="w-4 h-4 flex-shrink-0"
                                          :class="{ 'mr-0': sidebarCollapsed, 'mr-3': !sidebarCollapsed }"
@@ -635,8 +703,9 @@
                                     </svg>
                                     <span x-show="!sidebarCollapsed" x-transition class="whitespace-nowrap">Backup</span>
                                 </a>
-                                <a href="/admin/maintenance" class="sidebar-link-disabled flex items-center px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-700 hover:text-white transition-colors duration-200"
-                                   title="W przygotowaniu"
+                                <!-- Maintenance -->
+                                <a href="/admin/maintenance" class="flex items-center px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-700 hover:text-white transition-colors duration-200 {{ request()->is('admin/maintenance*') ? 'bg-gray-700 text-white' : '' }}"
+                                   :title="sidebarCollapsed ? 'Konserwacja' : ''"
                                    :class="{ 'justify-center': sidebarCollapsed }">
                                     <svg class="w-4 h-4 flex-shrink-0"
                                          :class="{ 'mr-0': sidebarCollapsed, 'mr-3': !sidebarCollapsed }"
@@ -645,6 +714,7 @@
                                     </svg>
                                     <span x-show="!sidebarCollapsed" x-transition class="whitespace-nowrap">Konserwacja</span>
                                 </a>
+                                <!-- Media -->
                                 <a href="/admin/media" class="flex items-center px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-700 hover:text-white transition-colors duration-200 {{ request()->is('admin/media') ? 'bg-gray-700 text-white' : '' }}"
                                    :title="sidebarCollapsed ? 'Media' : ''"
                                    :class="{ 'justify-center': sidebarCollapsed }">
@@ -655,6 +725,7 @@
                                     </svg>
                                     <span x-show="!sidebarCollapsed" x-transition class="whitespace-nowrap">Media</span>
                                 </a>
+                                <!-- Bug Reports -->
                                 <a href="/admin/bug-reports" class="flex items-center px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-700 hover:text-white transition-colors duration-200 {{ request()->is('admin/bug-reports*') ? 'bg-gray-700 text-white' : '' }}"
                                    :title="sidebarCollapsed ? 'Zgloszenia' : ''"
                                    :class="{ 'justify-center': sidebarCollapsed }">
@@ -665,8 +736,9 @@
                                     </svg>
                                     <span x-show="!sidebarCollapsed" x-transition class="whitespace-nowrap">Zgloszenia</span>
                                 </a>
-                                <a href="/admin/integrations" class="sidebar-link-disabled flex items-center px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-700 hover:text-white transition-colors duration-200"
-                                   title="W przygotowaniu"
+                                <!-- ERP Integrations -->
+                                <a href="/admin/integrations" class="flex items-center px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-700 hover:text-white transition-colors duration-200 {{ request()->is('admin/integrations*') ? 'bg-gray-700 text-white' : '' }}"
+                                   :title="sidebarCollapsed ? 'Integracje ERP' : ''"
                                    :class="{ 'justify-center': sidebarCollapsed }">
                                     <svg class="w-4 h-4 flex-shrink-0"
                                          :class="{ 'mr-0': sidebarCollapsed, 'mr-3': !sidebarCollapsed }"
@@ -674,46 +746,6 @@
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 4a2 2 0 114 0v1a1 1 0 001 1h3a1 1 0 011 1v3a1 1 0 01-1 1h-1a2 2 0 100 4h1a1 1 0 011 1v3a1 1 0 01-1 1h-3a1 1 0 01-1-1v-1a2 2 0 10-4 0v1a1 1 0 01-1 1H7a1 1 0 01-1-1v-3a1 1 0 00-1-1H4a2 2 0 110-4h1a1 1 0 001-1V7a1 1 0 011-1h3a1 1 0 001-1V4z"></path>
                                     </svg>
                                     <span x-show="!sidebarCollapsed" x-transition class="whitespace-nowrap">Integracje ERP</span>
-                                </a>
-                                <a href="/admin/users" class="sidebar-link-disabled flex items-center px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-700 hover:text-white transition-colors duration-200"
-                                   title="W przygotowaniu"
-                                   :class="{ 'justify-center': sidebarCollapsed }">
-                                    <svg class="w-4 h-4 flex-shrink-0"
-                                         :class="{ 'mr-0': sidebarCollapsed, 'mr-3': !sidebarCollapsed }"
-                                         fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z"></path>
-                                    </svg>
-                                    <span x-show="!sidebarCollapsed" x-transition class="whitespace-nowrap">Użytkownicy</span>
-                                </a>
-                                <a href="/admin/logs" class="sidebar-link-disabled flex items-center px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-700 hover:text-white transition-colors duration-200"
-                                   title="W przygotowaniu"
-                                   :class="{ 'justify-center': sidebarCollapsed }">
-                                    <svg class="w-4 h-4 flex-shrink-0"
-                                         :class="{ 'mr-0': sidebarCollapsed, 'mr-3': !sidebarCollapsed }"
-                                         fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-                                    </svg>
-                                    <span x-show="!sidebarCollapsed" x-transition class="whitespace-nowrap">Logi systemowe</span>
-                                </a>
-                                <a href="/admin/monitoring" class="sidebar-link-disabled flex items-center px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-700 hover:text-white transition-colors duration-200"
-                                   title="W przygotowaniu"
-                                   :class="{ 'justify-center': sidebarCollapsed }">
-                                    <svg class="w-4 h-4 flex-shrink-0"
-                                         :class="{ 'mr-0': sidebarCollapsed, 'mr-3': !sidebarCollapsed }"
-                                         fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
-                                    </svg>
-                                    <span x-show="!sidebarCollapsed" x-transition class="whitespace-nowrap">Monitoring</span>
-                                </a>
-                                <a href="/admin/api" class="sidebar-link-disabled flex items-center px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-700 hover:text-white transition-colors duration-200"
-                                   title="W przygotowaniu"
-                                   :class="{ 'justify-center': sidebarCollapsed }">
-                                    <svg class="w-4 h-4 flex-shrink-0"
-                                         :class="{ 'mr-0': sidebarCollapsed, 'mr-3': !sidebarCollapsed }"
-                                         fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"></path>
-                                    </svg>
-                                    <span x-show="!sidebarCollapsed" x-transition class="whitespace-nowrap">API Management</span>
                                 </a>
                             </div>
 

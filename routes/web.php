@@ -510,13 +510,31 @@ Route::prefix('admin')->name('admin.')->middleware($adminMiddleware)->group(func
             ->name('uve');
     });
 
-    // Users Management - ETAP_04 FAZA A (User Management - completed, awaiting deployment)
-    Route::get('/users', function () {
-        return view('placeholder-page', [
-            'title' => 'Zarządzanie Użytkownikami',
-            'message' => 'Panel zarządzania użytkownikami z 7-poziomowym systemem ról został zaimplementowany i oczekuje na deployment.',
-            'etap' => 'ETAP_04 FAZA A - User Management (✅ COMPLETED, awaiting deployment)'
-        ]);
+    // ==========================================
+    // USER MANAGEMENT - ETAP_04 FAZA A (ACTIVE)
+    // ==========================================
+    Route::prefix('users')->name('users.')->group(function () {
+        Route::get('/', \App\Http\Livewire\Admin\Users\UserList::class)->name('index');
+        Route::get('/create', \App\Http\Livewire\Admin\Users\UserForm::class)->name('create');
+        Route::get('/{user}', \App\Http\Livewire\Admin\Users\UserDetail::class)->name('show');
+        Route::get('/{user}/edit', \App\Http\Livewire\Admin\Users\UserForm::class)->name('edit');
+    });
+
+    // ==========================================
+    // ROLES & PERMISSIONS MANAGEMENT
+    // ==========================================
+    Route::get('/roles', \App\Http\Livewire\Admin\Roles\RoleList::class)->name('roles.index');
+    Route::get('/permissions', \App\Http\Livewire\Admin\Permissions\PermissionMatrix::class)->name('permissions.index');
+
+    // ==========================================
+    // SECURITY DASHBOARD & AUDIT LOGS
+    // ==========================================
+    Route::get('/security', \App\Http\Livewire\Admin\Security\SecurityDashboard::class)->name('security.index');
+    Route::get('/activity-log', \App\Http\Livewire\Admin\AuditLogs::class)->name('activity-log.index');
+
+    // Legacy alias for backward compatibility
+    Route::get('/users-legacy', function () {
+        return redirect()->route('admin.users.index');
     })->name('users');
 
     // FAZA D: Advanced Features Routes - TODO: Upload components to server
