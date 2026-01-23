@@ -386,31 +386,32 @@ class AuditLogs extends Component
 
     protected function calculateStats()
     {
-        $query = AuditLog::query();
-        
-        if ($this->dateFromFilter) {
-            $query->where('created_at', '>=', Carbon::parse($this->dateFromFilter)->startOfDay());
-        }
-        
-        if ($this->dateToFilter) {
-            $query->where('created_at', '<=', Carbon::parse($this->dateToFilter)->endOfDay());
-        }
-        
-        // Activity stats
+        // Build base date filter closure to reuse
+        $applyDateFilters = function ($query) {
+            if ($this->dateFromFilter) {
+                $query->where('created_at', '>=', Carbon::parse($this->dateFromFilter)->startOfDay());
+            }
+            if ($this->dateToFilter) {
+                $query->where('created_at', '<=', Carbon::parse($this->dateToFilter)->endOfDay());
+            }
+            return $query;
+        };
+
+        // Activity stats - each query is independent
         $this->activityStats = [
-            'total_logs' => $query->count(),
-            'unique_users' => $query->distinct('user_id')->whereNotNull('user_id')->count(),
-            'unique_ips' => $query->distinct('ip_address')->whereNotNull('ip_address')->count(),
-            'system_actions' => $query->whereNull('user_id')->count(),
+            'total_logs' => $applyDateFilters(AuditLog::query())->count(),
+            'unique_users' => $applyDateFilters(AuditLog::query())->whereNotNull('user_id')->distinct('user_id')->count('user_id'),
+            'unique_ips' => $applyDateFilters(AuditLog::query())->whereNotNull('ip_address')->distinct('ip_address')->count('ip_address'),
+            'system_actions' => $applyDateFilters(AuditLog::query())->whereNull('user_id')->count(),
         ];
-        
-        // Top users by activity
-        $this->topUsers = $query->select('user_id', DB::raw('count(*) as activity_count'))
+
+        // Top users by activity - fresh query
+        $this->topUsers = $applyDateFilters(AuditLog::query())
+            ->select('user_id', DB::raw('count(*) as activity_count'))
             ->whereNotNull('user_id')
             ->groupBy('user_id')
             ->orderBy('activity_count', 'desc')
             ->limit(10)
-            ->with('user')
             ->get()
             ->map(function ($item) {
                 return [
@@ -421,9 +422,10 @@ class AuditLogs extends Component
             ->filter(function ($item) {
                 return $item['user'] !== null;
             });
-        
-        // Top actions (event column in DB, 'action' alias for display)
-        $this->topActions = $query->select('event', DB::raw('count(*) as action_count'))
+
+        // Top actions (event column in DB, 'action' alias for display) - fresh query
+        $this->topActions = $applyDateFilters(AuditLog::query())
+            ->select('event', DB::raw('count(*) as action_count'))
             ->groupBy('event')
             ->orderBy('action_count', 'desc')
             ->limit(10)

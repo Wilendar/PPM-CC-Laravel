@@ -339,7 +339,8 @@ class RoleList extends Component
     protected function getRolesQuery(): Builder
     {
         return Role::query()
-            ->withCount('users')
+            // Use subquery for users_count to avoid Spatie guard_name issue with withCount('users')
+            ->selectRaw('roles.*, (SELECT COUNT(*) FROM model_has_roles WHERE model_has_roles.role_id = roles.id) as users_count')
             ->with('permissions')
             ->when($this->search, function ($query) {
                 $query->where('name', 'like', '%' . $this->search . '%')
@@ -368,7 +369,8 @@ class RoleList extends Component
 
     public function getRoleUsageStatsProperty()
     {
-        $roles = Role::withCount('users')->get();
+        // Use subquery for users_count to avoid Spatie guard_name issue with withCount('users')
+        $roles = Role::selectRaw('roles.*, (SELECT COUNT(*) FROM model_has_roles WHERE model_has_roles.role_id = roles.id) as users_count')->get();
         
         return $roles->mapWithKeys(function ($role) {
             return [$role->id => [

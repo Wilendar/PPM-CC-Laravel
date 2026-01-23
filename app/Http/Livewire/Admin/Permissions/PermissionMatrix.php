@@ -605,7 +605,10 @@ class PermissionMatrix extends Component
             return null;
         }
         
-        return Role::with('permissions', 'users')->findOrFail($this->selectedRole);
+        // Load role with permissions, users_count via subquery (avoid Spatie guard_name issue)
+        return Role::with('permissions')
+            ->selectRaw('roles.*, (SELECT COUNT(*) FROM model_has_roles WHERE model_has_roles.role_id = roles.id) as users_count')
+            ->findOrFail($this->selectedRole);
     }
 
     public function getPermissionModules()

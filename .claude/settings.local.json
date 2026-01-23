@@ -142,6 +142,7 @@
       "Bash(Select-String -Pattern \"PullProductsFromPrestaShop|job|queue|failed|error\" -Context 2,2)",
       "Bash(Select-Object -First 50)",
       "Skill(subiekt-gt-integration)",
+      "Skill(permission-management)",
       "Bash(Select-String -Pattern \"variant|Variant|SPKAS01|11180|error|Error\" -Context 0,2)",
       "Bash($result = plink -ssh host379076@host379076.hostido.net.pl -P 64321 -i $HostidoKey -batch \"tail -n 100 domains/ppm.mpptrade.pl/public_html/storage/logs/laravel.log | grep -i -E ''variant|SPKAS01|11180|Error|error''\")",
       "Bash($result)",
@@ -165,7 +166,12 @@
       "Bash(powershell:*)",
       "Bash(del \"D:\\\\Skrypty\\\\PPM-CC-Laravel\\\\reset_stuck_job.php\")",
       "WebFetch(domain:github.com)",
-      "Bash(dotnet --version:*)"
+      "Bash(dotnet --version:*)",
+      "Bash(subtask diff --stat fix/prices-erp-sync)",
+      "Bash(subtask diff --stat fix/stock-save-sync)",
+      "Bash(subtask diff --stat feature/lock-unlock-tabs)",
+      "Bash(subtask merge:*)",
+      "Bash(git stash:*)"
     ],
     "deny": [],
     "ask": []
