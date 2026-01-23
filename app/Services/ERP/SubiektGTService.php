@@ -1973,6 +1973,213 @@ class SubiektGTService implements ERPSyncServiceInterface
     // ==========================================
 
     /**
+     * Create a new product in Subiekt GT ERP.
+     *
+     * This is a public facade method for creating products directly in Subiekt GT.
+     * It handles:
+     * - Connection validation
+     * - Product data mapping (PPM → Subiekt GT format)
+     * - API call via REST client
+     * - IntegrationMapping creation on success
+     * - Error handling with logging
+     *
+     * IMPORTANT: Requires Sfera GT to be enabled on the API server!
+     *
+     * @param Product $product PPM Product model to create in ERP
+     * @param ERPConnection|null $connection ERP connection (uses first active if null)
+     * @return array{success: bool, message: string, external_id: ?string, action: string, error_code?: string}
+     */
+    public function createProductInErp(Product $product, ?ERPConnection $connection = null): array
+    {
+        $startTime = microtime(true);
+
+        try {
+            // 1. Get or validate connection
+            if (!$connection) {
+                $connection = ERPConnection::where('erp_type', ERPConnection::ERP_SUBIEKT_GT)
+                    ->where('is_active', true)
+                    ->first();
+
+                if (!$connection) {
+                    Log::warning('SubiektGTService::createProductInErp - No active Subiekt GT connection found');
+                    return [
+                        'success' => false,
+                        'message' => 'Brak aktywnego polaczenia z Subiekt GT',
+                        'external_id' => null,
+                        'action' => 'no_connection',
+                        'error_code' => 'NO_CONNECTION',
+                    ];
+                }
+            }
+
+            $config = $connection->connection_config;
+            $connectionMode = $config['connection_mode'] ?? 'rest_api';
+
+            // 2. Validate connection mode - only REST API supports create
+            if ($connectionMode !== 'rest_api') {
+                Log::warning('SubiektGTService::createProductInErp - Connection mode does not support create', [
+                    'mode' => $connectionMode,
+                ]);
+                return [
+                    'success' => false,
+                    'message' => 'Tworzenie produktow wymaga trybu REST API',
+                    'external_id' => null,
+                    'action' => 'unsupported_mode',
+                    'error_code' => 'UNSUPPORTED_MODE',
+                ];
+            }
+
+            // 3. Validate product has required fields
+            if (empty($product->sku)) {
+                return [
+                    'success' => false,
+                    'message' => 'Produkt musi miec SKU aby utworzyc go w Subiekt GT',
+                    'external_id' => null,
+                    'action' => 'validation_error',
+                    'error_code' => 'MISSING_SKU',
+                ];
+            }
+
+            // 4. Check if product already exists in Subiekt GT
+            $existsResult = $this->findProductBySku($connection, $product->sku);
+            if ($existsResult['found']) {
+                Log::info('SubiektGTService::createProductInErp - Product already exists', [
+                    'sku' => $product->sku,
+                    'external_id' => $existsResult['external_id'],
+                ]);
+                return [
+                    'success' => false,
+                    'message' => 'Produkt o SKU ' . $product->sku . ' juz istnieje w Subiekt GT (ID: ' . $existsResult['external_id'] . ')',
+                    'external_id' => $existsResult['external_id'],
+                    'action' => 'already_exists',
+                    'error_code' => 'ALREADY_EXISTS',
+                ];
+            }
+
+            // 5. Create REST API client and call create
+            $client = $this->createRestApiClient($config);
+            $createResult = $this->createProductInSubiekt($client, $product, $config, $connection->id);
+
+            $responseTime = round((microtime(true) - $startTime) * 1000, 2);
+
+            if ($createResult['success']) {
+                $externalId = (string) ($createResult['external_id'] ?? $createResult['product_id'] ?? null);
+
+                // 6. Create IntegrationMapping
+                if ($externalId) {
+                    $this->updateIntegrationMapping($product, $connection, $externalId);
+
+                    // 7. Fetch fresh data and update ProductErpData
+                    try {
+                        $this->initializeForConnection($connection);
+                        $freshResponse = $client->getProductById((int) $externalId);
+                        if ($freshResponse['success'] ?? false) {
+                            $freshProduct = (object) ($freshResponse['data'] ?? []);
+                            $this->updateProductErpDataFromRestApi($product, $connection, $freshProduct);
+                        }
+                    } catch (\Exception $e) {
+                        Log::warning('SubiektGTService::createProductInErp - Failed to fetch fresh data', [
+                            'sku' => $product->sku,
+                            'external_id' => $externalId,
+                            'error' => $e->getMessage(),
+                        ]);
+                    }
+                }
+
+                IntegrationLog::info(
+                    'product_create',
+                    'Product created in Subiekt GT',
+                    [
+                        'product_id' => $product->id,
+                        'product_sku' => $product->sku,
+                        'external_id' => $externalId,
+                        'response_time_ms' => $responseTime,
+                    ],
+                    IntegrationLog::INTEGRATION_SUBIEKT_GT,
+                    (string) $connection->id
+                );
+
+                return [
+                    'success' => true,
+                    'message' => $createResult['message'] ?? 'Produkt utworzony w Subiekt GT',
+                    'external_id' => $externalId,
+                    'action' => 'created',
+                    'response_time_ms' => $responseTime,
+                ];
+            }
+
+            // Create failed
+            IntegrationLog::error(
+                'product_create',
+                'Failed to create product in Subiekt GT',
+                [
+                    'product_id' => $product->id,
+                    'product_sku' => $product->sku,
+                    'error' => $createResult['message'] ?? 'Unknown error',
+                    'error_code' => $createResult['error_code'] ?? null,
+                    'response_time_ms' => $responseTime,
+                ],
+                IntegrationLog::INTEGRATION_SUBIEKT_GT,
+                (string) $connection->id
+            );
+
+            return [
+                'success' => false,
+                'message' => $createResult['message'] ?? 'Nie udalo sie utworzyc produktu w Subiekt GT',
+                'external_id' => null,
+                'action' => 'create_failed',
+                'error_code' => $createResult['error_code'] ?? 'CREATE_FAILED',
+                'response_time_ms' => $responseTime,
+            ];
+
+        } catch (SubiektApiException $e) {
+            $responseTime = round((microtime(true) - $startTime) * 1000, 2);
+
+            IntegrationLog::error(
+                'product_create',
+                'Subiekt API error during product create',
+                [
+                    'product_id' => $product->id,
+                    'product_sku' => $product->sku,
+                    'error' => $e->getMessage(),
+                    'http_status' => $e->getHttpStatusCode(),
+                ],
+                IntegrationLog::INTEGRATION_SUBIEKT_GT,
+                (string) ($connection?->id ?? 'unknown'),
+                $e
+            );
+
+            return [
+                'success' => false,
+                'message' => 'Blad API Subiekt GT: ' . $e->getMessage(),
+                'external_id' => null,
+                'action' => 'api_error',
+                'error_code' => 'API_ERROR',
+                'response_time_ms' => $responseTime,
+            ];
+
+        } catch (\Exception $e) {
+            $responseTime = round((microtime(true) - $startTime) * 1000, 2);
+
+            Log::error('SubiektGTService::createProductInErp - Unexpected error', [
+                'product_id' => $product->id,
+                'product_sku' => $product->sku,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return [
+                'success' => false,
+                'message' => 'Nieoczekiwany blad: ' . $e->getMessage(),
+                'external_id' => null,
+                'action' => 'error',
+                'error_code' => 'UNKNOWN_ERROR',
+                'response_time_ms' => $responseTime,
+            ];
+        }
+    }
+
+    /**
      * Get warehouses from Subiekt GT for mapping UI.
      *
      * @param ERPConnection $connection
