@@ -59,6 +59,7 @@ class RolePermissionSeeder extends Seeder
             'prices.update' => 'Edycja cen',
             'prices.groups' => 'Zarządzanie grupami cenowymi',
             'prices.cost' => 'Dostęp do cen zakupu',
+            'products.prices.unlock' => 'Odblokowanie edycji cen produktu',
             
             // === MAGAZYNY ===
             'stock.read' => 'Odczyt stanów magazynowych',
@@ -66,6 +67,7 @@ class RolePermissionSeeder extends Seeder
             'stock.reservations' => 'Zarządzanie rezerwacjami',
             'stock.delivery' => 'Panel dostaw',
             'stock.locations' => 'Lokalizacje magazynowe',
+            'products.stock.unlock' => 'Odblokowanie edycji stanów magazynowych produktu',
             
             // === INTEGRACJE ===
             'integrations.read' => 'Odczyt statusu integracji',
@@ -133,8 +135,10 @@ class RolePermissionSeeder extends Seeder
             'media.create', 'media.read', 'media.update', 'media.delete', 'media.upload',
             // Ceny - pełny dostęp
             'prices.read', 'prices.update', 'prices.groups', 'prices.cost',
+            'products.prices.unlock',
             // Magazyny - pełny dostęp
             'stock.read', 'stock.update', 'stock.reservations', 'stock.delivery', 'stock.locations',
+            'products.stock.unlock',
             // Integracje - sync i config
             'integrations.read', 'integrations.sync', 'integrations.config', 
             'integrations.prestashop', 'integrations.erp',

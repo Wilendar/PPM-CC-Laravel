@@ -1,12 +1,44 @@
 {{-- resources/views/livewire/products/management/tabs/stock-tab.blade.php --}}
 <div class="tab-content active space-y-6">
     <div class="flex items-center justify-between mb-6">
-        <h3 class="text-lg font-medium text-white">
-            <svg class="w-6 h-6 inline mr-2 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-            </svg>
-            Stany magazynowe
-        </h3>
+        <div class="flex items-center gap-3">
+            <h3 class="text-lg font-medium text-white">
+                <svg class="w-6 h-6 inline mr-2 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                </svg>
+                Stany magazynowe
+            </h3>
+
+            {{-- Lock/Unlock Button --}}
+            @if($this->canUnlockStock())
+                <button type="button"
+                        wire:click="toggleStockLock"
+                        class="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg transition-all duration-200 {{ $stockUnlocked ? 'bg-green-600 hover:bg-green-700 text-white' : 'bg-gray-700 hover:bg-gray-600 text-gray-300' }}"
+                        title="{{ $stockUnlocked ? 'Zablokuj edycje stanow' : 'Odblokuj edycje stanow' }}">
+                    @if($stockUnlocked)
+                        {{-- Lock Open Icon (Heroicons) --}}
+                        <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 10.5V6.75a4.5 4.5 0 119 0v3.75M3.75 21.75h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H3.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
+                        </svg>
+                        <span>Odblokowane</span>
+                    @else
+                        {{-- Lock Closed Icon (Heroicons) --}}
+                        <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
+                        </svg>
+                        <span>Zablokowane</span>
+                    @endif
+                </button>
+            @else
+                {{-- Read-only indicator for users without permission --}}
+                <span class="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg bg-gray-800 text-gray-400 border border-gray-700">
+                    <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
+                    </svg>
+                    <span>Tylko odczyt</span>
+                </span>
+            @endif
+        </div>
 
         {{-- Active Shop Indicator --}}
         @if($activeShopId !== null && isset($availableShops))
@@ -85,10 +117,11 @@
                                     <input type="number"
                                            min="0"
                                            wire:model.defer="stock.{{ $warehouseId }}.quantity"
-                                           class="w-full bg-gray-700 border border-gray-600 text-white text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 px-3 py-2"
-                                           placeholder="0">
+                                           class="w-full border text-sm rounded-lg px-3 py-2 {{ $stockUnlocked ? 'bg-gray-700 border-gray-600 text-white focus:ring-blue-500 focus:border-blue-500' : 'bg-gray-800 border-gray-700 text-gray-400 cursor-not-allowed' }}"
+                                           placeholder="0"
+                                           {{ $stockUnlocked ? '' : 'readonly' }}>
                                     @if($actualAvailable != $available)
-                                        <span class="text-xs text-gray-500 mt-1 block">Dostępne: {{ $actualAvailable }}</span>
+                                        <span class="text-xs text-gray-500 mt-1 block">Dostepne: {{ $actualAvailable }}</span>
                                     @endif
                                 </td>
 
@@ -97,8 +130,9 @@
                                     <input type="number"
                                            min="0"
                                            wire:model.defer="stock.{{ $warehouseId }}.reserved"
-                                           class="w-full bg-gray-700 border border-gray-600 text-orange-400 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 px-3 py-2"
-                                           placeholder="0">
+                                           class="w-full border text-sm rounded-lg px-3 py-2 {{ $stockUnlocked ? 'bg-gray-700 border-gray-600 text-orange-400 focus:ring-blue-500 focus:border-blue-500' : 'bg-gray-800 border-gray-700 text-gray-500 cursor-not-allowed' }}"
+                                           placeholder="0"
+                                           {{ $stockUnlocked ? '' : 'readonly' }}>
                                 </td>
 
                                 {{-- Minimum Stock Level (editable) --}}
@@ -106,8 +140,9 @@
                                     <input type="number"
                                            min="0"
                                            wire:model.defer="stock.{{ $warehouseId }}.minimum"
-                                           class="w-full bg-gray-700 border border-gray-600 text-white text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 px-3 py-2"
-                                           placeholder="0">
+                                           class="w-full border text-sm rounded-lg px-3 py-2 {{ $stockUnlocked ? 'bg-gray-700 border-gray-600 text-white focus:ring-blue-500 focus:border-blue-500' : 'bg-gray-800 border-gray-700 text-gray-400 cursor-not-allowed' }}"
+                                           placeholder="0"
+                                           {{ $stockUnlocked ? '' : 'readonly' }}>
                                 </td>
 
                                 {{-- Stock Status (readonly, auto-calculated) --}}

@@ -1,12 +1,44 @@
 {{-- resources/views/livewire/products/management/tabs/prices-tab.blade.php --}}
 <div class="tab-content active space-y-6">
     <div class="flex items-center justify-between mb-6">
-        <h3 class="text-lg font-medium text-white">
-            <svg class="w-6 h-6 inline mr-2 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            Ceny produktu
-        </h3>
+        <div class="flex items-center gap-3">
+            <h3 class="text-lg font-medium text-white">
+                <svg class="w-6 h-6 inline mr-2 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                Ceny produktu
+            </h3>
+
+            {{-- Lock/Unlock Button --}}
+            @if($this->canUnlockPrices())
+                <button type="button"
+                        wire:click="togglePricesLock"
+                        class="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg transition-all duration-200 {{ $pricesUnlocked ? 'bg-green-600 hover:bg-green-700 text-white' : 'bg-gray-700 hover:bg-gray-600 text-gray-300' }}"
+                        title="{{ $pricesUnlocked ? 'Zablokuj edycje cen' : 'Odblokuj edycje cen' }}">
+                    @if($pricesUnlocked)
+                        {{-- Lock Open Icon (Heroicons) --}}
+                        <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 10.5V6.75a4.5 4.5 0 119 0v3.75M3.75 21.75h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H3.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
+                        </svg>
+                        <span>Odblokowane</span>
+                    @else
+                        {{-- Lock Closed Icon (Heroicons) --}}
+                        <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
+                        </svg>
+                        <span>Zablokowane</span>
+                    @endif
+                </button>
+            @else
+                {{-- Read-only indicator for users without permission --}}
+                <span class="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg bg-gray-800 text-gray-400 border border-gray-700">
+                    <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
+                    </svg>
+                    <span>Tylko odczyt</span>
+                </span>
+            @endif
+        </div>
 
         {{-- Active Shop Indicator --}}
         @if($activeShopId !== null && isset($availableShops))
@@ -82,8 +114,9 @@
                                            min="0"
                                            wire:model.defer="prices.{{ $groupId }}.net"
                                            @input="calculateGross($event.target.value, {{ $groupId }})"
-                                           class="w-full bg-gray-700 border border-gray-600 text-white text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 px-3 py-2"
-                                           placeholder="0.00">
+                                           class="w-full border text-sm rounded-lg px-3 py-2 {{ $pricesUnlocked ? 'bg-gray-700 border-gray-600 text-white focus:ring-blue-500 focus:border-blue-500' : 'bg-gray-800 border-gray-700 text-gray-400 cursor-not-allowed' }}"
+                                           placeholder="0.00"
+                                           {{ $pricesUnlocked ? '' : 'readonly' }}>
                                 </td>
 
                                 {{-- Price Gross --}}
@@ -93,8 +126,9 @@
                                            min="0"
                                            wire:model.defer="prices.{{ $groupId }}.gross"
                                            @input="calculateNet($event.target.value, {{ $groupId }})"
-                                           class="w-full bg-gray-700 border border-gray-600 text-white text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 px-3 py-2"
-                                           placeholder="0.00">
+                                           class="w-full border text-sm rounded-lg px-3 py-2 {{ $pricesUnlocked ? 'bg-gray-700 border-gray-600 text-white focus:ring-blue-500 focus:border-blue-500' : 'bg-gray-800 border-gray-700 text-gray-400 cursor-not-allowed' }}"
+                                           placeholder="0.00"
+                                           {{ $pricesUnlocked ? '' : 'readonly' }}>
                                 </td>
 
                                 {{-- Margin (readonly for now) --}}
@@ -110,7 +144,8 @@
                                 <td class="px-4 py-3 text-center">
                                     <input type="checkbox"
                                            wire:model.defer="prices.{{ $groupId }}.is_active"
-                                           class="w-4 h-4 text-blue-600 bg-gray-700 border-gray-600 rounded focus:ring-blue-500 focus:ring-2">
+                                           class="w-4 h-4 text-blue-600 bg-gray-700 border-gray-600 rounded focus:ring-blue-500 focus:ring-2 {{ !$pricesUnlocked ? 'cursor-not-allowed opacity-50' : '' }}"
+                                           {{ $pricesUnlocked ? '' : 'disabled' }}>
                                 </td>
                             </tr>
                         @empty

@@ -205,6 +205,12 @@ class ProductForm extends Component
     public array $priceGroups = [];  // Cache of PriceGroup models
     public array $warehouses = [];   // Cache of Warehouse models
 
+    // === LOCK/UNLOCK SYSTEM (2026-01-23) ===
+    // Security feature: Prices and Stock tabs are LOCKED by default (readonly)
+    // Users with products.prices.unlock / products.stock.unlock permissions can toggle
+    public bool $pricesUnlocked = false;  // false = locked (readonly), true = editable
+    public bool $stockUnlocked = false;   // false = locked (readonly), true = editable
+
     // === UI STATE ===
     public bool $isSaving = false;
     public bool $categoryEditingDisabled = false; // FIX #13: Reactive property for Alpine.js :disabled binding
@@ -1605,6 +1611,68 @@ class ProductForm extends Component
 
         $this->activeTab = $tab;
         $this->dispatch('tab-switched', ['tab' => $tab]);
+    }
+
+    /**
+     * Toggle prices tab lock/unlock state
+     * Requires products.prices.unlock permission
+     */
+    public function togglePricesLock(): void
+    {
+        if (!auth()->user()?->can('products.prices.unlock')) {
+            Log::warning('[Lock/Unlock] User attempted to unlock prices without permission', [
+                'user_id' => auth()->id(),
+                'product_id' => $this->product?->id,
+            ]);
+            return;
+        }
+
+        $this->pricesUnlocked = !$this->pricesUnlocked;
+
+        Log::info('[Lock/Unlock] Prices tab state changed', [
+            'unlocked' => $this->pricesUnlocked,
+            'user_id' => auth()->id(),
+            'product_id' => $this->product?->id,
+        ]);
+    }
+
+    /**
+     * Toggle stock tab lock/unlock state
+     * Requires products.stock.unlock permission
+     */
+    public function toggleStockLock(): void
+    {
+        if (!auth()->user()?->can('products.stock.unlock')) {
+            Log::warning('[Lock/Unlock] User attempted to unlock stock without permission', [
+                'user_id' => auth()->id(),
+                'product_id' => $this->product?->id,
+            ]);
+            return;
+        }
+
+        $this->stockUnlocked = !$this->stockUnlocked;
+
+        Log::info('[Lock/Unlock] Stock tab state changed', [
+            'unlocked' => $this->stockUnlocked,
+            'user_id' => auth()->id(),
+            'product_id' => $this->product?->id,
+        ]);
+    }
+
+    /**
+     * Check if user can unlock prices tab
+     */
+    public function canUnlockPrices(): bool
+    {
+        return auth()->user()?->can('products.prices.unlock') ?? false;
+    }
+
+    /**
+     * Check if user can unlock stock tab
+     */
+    public function canUnlockStock(): bool
+    {
+        return auth()->user()?->can('products.stock.unlock') ?? false;
     }
 
     /**
