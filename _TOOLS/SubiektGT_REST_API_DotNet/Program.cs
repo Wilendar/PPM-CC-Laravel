@@ -8,6 +8,30 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddScoped<ISubiektRepository, SubiektRepository>();
 builder.Services.AddSingleton(builder.Configuration);
 
+// Configure Sfera GT (for write operations)
+builder.Services.Configure<SferaConfig>(builder.Configuration.GetSection("Sfera"));
+
+// Register Sfera services
+// Use DirectSqlProductWriter as fallback when Sfera COM is not available
+var useSfera = builder.Configuration.GetValue<bool>("Sfera:Enabled", false);
+if (useSfera)
+{
+    builder.Services.AddSingleton<SferaService>();
+    builder.Services.AddScoped<ISferaProductWriter, SferaProductWriter>();
+}
+else
+{
+    // Fallback to DirectSQL for basic updates (no creates, no prices)
+    builder.Services.AddScoped<ISferaProductWriter, DirectSqlProductWriter>();
+}
+
+// Add logging
+builder.Services.AddLogging(logging =>
+{
+    logging.AddConsole();
+    logging.SetMinimumLevel(LogLevel.Information);
+});
+
 var app = builder.Build();
 
 // API Key middleware
@@ -249,6 +273,244 @@ app.MapGet("/api/schema/{tableName}", async (ISubiektRepository repo, string tab
     catch (Exception ex)
     {
         return Results.Ok(new { success = false, error = ex.Message });
+    }
+});
+
+// ==================== WRITE ENDPOINTS (Sfera GT) ====================
+
+// Check Sfera GT connection status
+app.MapGet("/api/sfera/health", async (IServiceProvider sp) =>
+{
+    try
+    {
+        var sferaService = sp.GetService<SferaService>();
+        if (sferaService == null)
+        {
+            return Results.Ok(new
+            {
+                success = true,
+                timestamp = DateTime.Now.ToString("o"),
+                sfera_enabled = false,
+                mode = "DirectSQL",
+                message = "Sfera GT not configured. Using DirectSQL fallback (limited write operations)."
+            });
+        }
+
+        var health = await sferaService.TestConnectionAsync();
+        return Results.Ok(new
+        {
+            success = health.Success,
+            timestamp = DateTime.Now.ToString("o"),
+            sfera_enabled = true,
+            mode = "Sfera",
+            status = health.Status,
+            server = health.Server,
+            database = health.Database,
+            version = health.Version,
+            response_time_ms = health.ResponseTimeMs,
+            error = health.Error
+        });
+    }
+    catch (Exception ex)
+    {
+        return Results.Ok(new
+        {
+            success = false,
+            timestamp = DateTime.Now.ToString("o"),
+            error = ex.Message
+        });
+    }
+});
+
+// Create new product
+// POST /api/products
+// Body: ProductWriteRequest JSON
+app.MapPost("/api/products", async (ProductWriteRequest request, ISferaProductWriter writer) =>
+{
+    try
+    {
+        var result = await writer.CreateProductAsync(request);
+
+        if (result.Success)
+        {
+            return Results.Created($"/api/products/{result.ProductId}", new
+            {
+                success = true,
+                timestamp = result.Timestamp.ToString("o"),
+                data = new
+                {
+                    product_id = result.ProductId,
+                    sku = result.Sku,
+                    action = result.Action,
+                    message = result.Message
+                }
+            });
+        }
+
+        // Return appropriate status code based on error
+        var statusCode = result.ErrorCode switch
+        {
+            "VALIDATION_ERROR" => 400,
+            "DUPLICATE_SKU" => 409,
+            "SFERA_REQUIRED" => 501,
+            "SFERA_CONNECTION_FAILED" => 503,
+            _ => 400
+        };
+
+        return Results.Json(new
+        {
+            success = false,
+            timestamp = result.Timestamp.ToString("o"),
+            error = result.Error,
+            error_code = result.ErrorCode
+        }, statusCode: statusCode);
+    }
+    catch (Exception ex)
+    {
+        return Results.Json(new
+        {
+            success = false,
+            timestamp = DateTime.Now.ToString("o"),
+            error = ex.Message,
+            error_code = "INTERNAL_ERROR"
+        }, statusCode: 500);
+    }
+});
+
+// Update product by ID
+// PUT /api/products/{id}
+// Body: ProductWriteRequest JSON
+app.MapPut("/api/products/{id:int}", async (int id, ProductWriteRequest request, ISferaProductWriter writer) =>
+{
+    try
+    {
+        var result = await writer.UpdateProductAsync(id, request);
+
+        if (result.Success)
+        {
+            return Results.Ok(new
+            {
+                success = true,
+                timestamp = result.Timestamp.ToString("o"),
+                data = new
+                {
+                    product_id = result.ProductId,
+                    sku = result.Sku,
+                    action = result.Action,
+                    rows_affected = result.RowsAffected,
+                    message = result.Message
+                }
+            });
+        }
+
+        var statusCode = result.ErrorCode switch
+        {
+            "PRODUCT_NOT_FOUND" => 404,
+            "VALIDATION_ERROR" => 400,
+            "SFERA_CONNECTION_FAILED" => 503,
+            _ => 400
+        };
+
+        return Results.Json(new
+        {
+            success = false,
+            timestamp = result.Timestamp.ToString("o"),
+            error = result.Error,
+            error_code = result.ErrorCode
+        }, statusCode: statusCode);
+    }
+    catch (Exception ex)
+    {
+        return Results.Json(new
+        {
+            success = false,
+            timestamp = DateTime.Now.ToString("o"),
+            error = ex.Message,
+            error_code = "INTERNAL_ERROR"
+        }, statusCode: 500);
+    }
+});
+
+// Update product by SKU
+// PUT /api/products/sku/{sku}
+// Body: ProductWriteRequest JSON
+app.MapPut("/api/products/sku/{sku}", async (string sku, ProductWriteRequest request, ISferaProductWriter writer) =>
+{
+    try
+    {
+        var result = await writer.UpdateProductBySkuAsync(sku, request);
+
+        if (result.Success)
+        {
+            return Results.Ok(new
+            {
+                success = true,
+                timestamp = result.Timestamp.ToString("o"),
+                data = new
+                {
+                    product_id = result.ProductId,
+                    sku = result.Sku ?? sku,
+                    action = result.Action,
+                    rows_affected = result.RowsAffected,
+                    message = result.Message
+                }
+            });
+        }
+
+        var statusCode = result.ErrorCode switch
+        {
+            "PRODUCT_NOT_FOUND" => 404,
+            "VALIDATION_ERROR" => 400,
+            "SFERA_CONNECTION_FAILED" => 503,
+            _ => 400
+        };
+
+        return Results.Json(new
+        {
+            success = false,
+            timestamp = result.Timestamp.ToString("o"),
+            error = result.Error,
+            error_code = result.ErrorCode
+        }, statusCode: statusCode);
+    }
+    catch (Exception ex)
+    {
+        return Results.Json(new
+        {
+            success = false,
+            timestamp = DateTime.Now.ToString("o"),
+            error = ex.Message,
+            error_code = "INTERNAL_ERROR"
+        }, statusCode: 500);
+    }
+});
+
+// Check if product exists by SKU
+// HEAD /api/products/sku/{sku}
+app.MapMethods("/api/products/sku/{sku}/exists", new[] { "HEAD", "GET" }, async (string sku, ISferaProductWriter writer) =>
+{
+    try
+    {
+        var exists = await writer.ProductExistsAsync(sku);
+        var productId = exists ? await writer.GetProductIdBySkuAsync(sku) : null;
+
+        return Results.Ok(new
+        {
+            success = true,
+            timestamp = DateTime.Now.ToString("o"),
+            exists = exists,
+            product_id = productId,
+            sku = sku
+        });
+    }
+    catch (Exception ex)
+    {
+        return Results.Json(new
+        {
+            success = false,
+            timestamp = DateTime.Now.ToString("o"),
+            error = ex.Message
+        }, statusCode: 500);
     }
 });
 

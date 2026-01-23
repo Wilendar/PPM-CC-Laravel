@@ -146,9 +146,21 @@
                                 wire:click="pullProductDataFromErp({{ $connection->id }})"
                                 wire:loading.attr="disabled"
                                 title="Pobierz dane z {{ $connection->instance_name }}"
-                                class="px-3 py-2 text-xs bg-green-600 hover:bg-green-700 text-white rounded-r-lg transition-colors duration-200 flex items-center">
+                                class="px-3 py-2 text-xs bg-green-600 hover:bg-green-700 text-white transition-colors duration-200 flex items-center">
                             <svg class="w-3.5 h-3.5" wire:loading.class="animate-spin" wire:target="pullProductDataFromErp({{ $connection->id }})" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                            </svg>
+                        </button>
+
+                        {{-- ETAP_09.5: Unlink from ERP Button --}}
+                        <button type="button"
+                                wire:click="unlinkFromErp({{ $connection->id }})"
+                                wire:loading.attr="disabled"
+                                wire:confirm="Czy na pewno chcesz odlaczyc ten produkt od {{ $connection->instance_name }}? Powiazanie zostanie usuniete, ale produkt pozostanie w ERP."
+                                title="Odlacz od {{ $connection->instance_name }}"
+                                class="px-3 py-2 text-xs bg-red-600 hover:bg-red-700 text-white rounded-r-lg transition-colors duration-200 flex items-center">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
                             </svg>
                         </button>
                     @else

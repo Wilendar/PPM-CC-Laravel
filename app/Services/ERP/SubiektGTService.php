@@ -878,7 +878,7 @@ class SubiektGTService implements ERPSyncServiceInterface
     public function findProductBySku(ERPConnection $connection, string $sku): array
     {
         try {
-            $config = $connection->config;
+            $config = $connection->connection_config;
             $mode = $config['connection_mode'] ?? 'rest_api';
 
             if ($mode === 'rest_api') {
@@ -1264,7 +1264,8 @@ class SubiektGTService implements ERPSyncServiceInterface
      * In REST API mode, we can:
      * - Read product data from Subiekt GT
      * - Map existing products by SKU
-     * - Write operations require Sfera API on the wrapper side
+     * - UPDATE existing products (basic fields + prices if Sfera enabled)
+     * - CREATE new products (requires Sfera enabled on API server)
      *
      * @param ERPConnection $connection
      * @param Product $product
@@ -1275,6 +1276,7 @@ class SubiektGTService implements ERPSyncServiceInterface
         try {
             $config = $connection->connection_config;
             $client = $this->createRestApiClient($config);
+            $syncDirection = $config['sync_direction'] ?? 'pull'; // pull, push, bidirectional
 
             // Try to find product in Subiekt GT by SKU
             try {
@@ -1288,19 +1290,56 @@ class SubiektGTService implements ERPSyncServiceInterface
                 }
             }
 
+            // === PRODUCT EXISTS IN SUBIEKT GT ===
             if ($subiektProduct) {
-                // Product exists - create mapping
-                $externalId = (string) ($subiektProduct->id ?? $subiektProduct['id'] ?? null);
+                $externalId = (string) ($subiektProduct['Id'] ?? $subiektProduct['id'] ?? null);
 
                 // Convert to object if array
                 if (is_array($subiektProduct)) {
                     $subiektProduct = (object) $subiektProduct;
                 }
 
-                // Update mapping
-                $this->updateIntegrationMapping($product, $connection, $externalId);
+                // Check if we should push changes to Subiekt GT
+                $shouldPush = in_array($syncDirection, ['push', 'bidirectional']);
 
-                // Update ProductErpData with Subiekt data
+                if ($shouldPush) {
+                    // Try to update product in Subiekt GT
+                    $updateResult = $this->pushProductToSubiekt($client, $product, $externalId, $config);
+
+                    if ($updateResult['success']) {
+                        // Update mapping
+                        $this->updateIntegrationMapping($product, $connection, $externalId);
+                        $this->updateProductErpDataFromRestApi($product, $connection, $subiektProduct);
+
+                        IntegrationLog::info(
+                            'product_sync',
+                            'Product updated in Subiekt GT via REST API',
+                            [
+                                'product_sku' => $product->sku,
+                                'subiekt_id' => $externalId,
+                                'action' => $updateResult['action'] ?? 'updated',
+                            ],
+                            IntegrationLog::INTEGRATION_SUBIEKT_GT,
+                            (string) $connection->id
+                        );
+
+                        return [
+                            'success' => true,
+                            'message' => $updateResult['message'] ?? 'Produkt zaktualizowany w Subiekt GT',
+                            'external_id' => $externalId,
+                            'action' => $updateResult['action'] ?? 'updated',
+                        ];
+                    }
+
+                    // Update failed but we can still map
+                    Log::warning('SubiektGTService: Update failed, falling back to mapping only', [
+                        'sku' => $product->sku,
+                        'error' => $updateResult['message'] ?? 'Unknown error',
+                    ]);
+                }
+
+                // Just map (pull mode or update failed)
+                $this->updateIntegrationMapping($product, $connection, $externalId);
                 $this->updateProductErpDataFromRestApi($product, $connection, $subiektProduct);
 
                 IntegrationLog::info(
@@ -1322,11 +1361,68 @@ class SubiektGTService implements ERPSyncServiceInterface
                 ];
             }
 
-            // Product not found in Subiekt GT
-            // Note: Creating products requires Sfera API on the wrapper side
+            // === PRODUCT NOT FOUND IN SUBIEKT GT ===
+            // Check if we should create it
+            $shouldCreate = in_array($syncDirection, ['push', 'bidirectional'])
+                && ($config['create_in_erp'] ?? false);
+
+            if ($shouldCreate) {
+                $createResult = $this->createProductInSubiekt($client, $product, $config);
+
+                if ($createResult['success']) {
+                    $externalId = (string) ($createResult['external_id'] ?? $createResult['product_id'] ?? null);
+
+                    // Create mapping
+                    if ($externalId) {
+                        $this->updateIntegrationMapping($product, $connection, $externalId);
+
+                        // Fetch fresh data from Subiekt GT
+                        try {
+                            $freshResponse = $client->getProductById((int) $externalId);
+                            $freshProduct = (object) ($freshResponse['data'] ?? []);
+                            $this->updateProductErpDataFromRestApi($product, $connection, $freshProduct);
+                        } catch (\Exception $e) {
+                            Log::warning('SubiektGTService: Failed to fetch fresh data after create', [
+                                'sku' => $product->sku,
+                                'external_id' => $externalId,
+                                'error' => $e->getMessage(),
+                            ]);
+                        }
+                    }
+
+                    IntegrationLog::info(
+                        'product_sync',
+                        'Product created in Subiekt GT via REST API',
+                        [
+                            'product_sku' => $product->sku,
+                            'subiekt_id' => $externalId,
+                        ],
+                        IntegrationLog::INTEGRATION_SUBIEKT_GT,
+                        (string) $connection->id
+                    );
+
+                    return [
+                        'success' => true,
+                        'message' => $createResult['message'] ?? 'Produkt utworzony w Subiekt GT',
+                        'external_id' => $externalId,
+                        'action' => 'created',
+                    ];
+                }
+
+                // Create failed
+                return [
+                    'success' => false,
+                    'message' => $createResult['message'] ?? 'Nie udalo sie utworzyc produktu w Subiekt GT',
+                    'external_id' => null,
+                    'action' => 'create_failed',
+                    'error_code' => $createResult['error_code'] ?? null,
+                ];
+            }
+
+            // Product not found and we're not configured to create
             return [
                 'success' => false,
-                'message' => 'Produkt nie istnieje w Subiekt GT. Tworzenie produktow wymaga Sfera API.',
+                'message' => 'Produkt nie istnieje w Subiekt GT. Tworzenie produktow wymaga wlaczenia opcji "create_in_erp".',
                 'external_id' => null,
                 'action' => 'not_found',
             ];
@@ -1358,6 +1454,246 @@ class SubiektGTService implements ERPSyncServiceInterface
                 'external_id' => null,
             ];
         }
+    }
+
+    /**
+     * Push product data TO Subiekt GT (UPDATE).
+     *
+     * @param SubiektRestApiClient $client
+     * @param Product $product
+     * @param string $externalId Subiekt GT product ID
+     * @param array $config Connection config
+     * @return array
+     */
+    protected function pushProductToSubiekt(SubiektRestApiClient $client, Product $product, string $externalId, array $config): array
+    {
+        try {
+            // Build update data from PPM product
+            $updateData = $this->mapPpmProductToSubiekt($product, $config);
+
+            if (empty($updateData)) {
+                return [
+                    'success' => true,
+                    'message' => 'Brak zmian do wyslania',
+                    'action' => 'no_changes',
+                ];
+            }
+
+            Log::info('SubiektGTService: Pushing product to Subiekt GT', [
+                'sku' => $product->sku,
+                'external_id' => $externalId,
+                'fields' => array_keys($updateData),
+            ]);
+
+            // Use PUT endpoint
+            $result = $client->updateProductBySku($product->sku, $updateData);
+
+            if ($result['success'] ?? false) {
+                return [
+                    'success' => true,
+                    'message' => $result['data']['message'] ?? 'Produkt zaktualizowany',
+                    'action' => $result['data']['action'] ?? 'updated',
+                ];
+            }
+
+            // Check for specific error codes
+            $errorCode = $result['error_code'] ?? null;
+
+            // SFERA_REQUIRED means server doesn't have Sfera enabled
+            // We can still do basic field updates in DirectSQL mode
+            if ($errorCode === 'SFERA_REQUIRED') {
+                Log::info('SubiektGTService: Sfera not available, using DirectSQL fallback');
+                // The API will use DirectSQL fallback automatically
+            }
+
+            return [
+                'success' => false,
+                'message' => $result['error'] ?? 'Blad aktualizacji produktu',
+                'error_code' => $errorCode,
+            ];
+
+        } catch (SubiektApiException $e) {
+            return [
+                'success' => false,
+                'message' => 'Blad API: ' . $e->getMessage(),
+                'error_code' => 'API_ERROR',
+            ];
+        } catch (\Exception $e) {
+            return [
+                'success' => false,
+                'message' => 'Blad: ' . $e->getMessage(),
+                'error_code' => 'UNKNOWN',
+            ];
+        }
+    }
+
+    /**
+     * Create product IN Subiekt GT (POST).
+     *
+     * @param SubiektRestApiClient $client
+     * @param Product $product
+     * @param array $config Connection config
+     * @return array
+     */
+    protected function createProductInSubiekt(SubiektRestApiClient $client, Product $product, array $config): array
+    {
+        try {
+            // First check if Sfera is available (required for create)
+            try {
+                $sferaHealth = $client->checkSferaHealth();
+                $sferaEnabled = $sferaHealth['sfera_enabled'] ?? false;
+
+                if (!$sferaEnabled) {
+                    return [
+                        'success' => false,
+                        'message' => 'Tworzenie produktow wymaga Sfera GT na serwerze API',
+                        'error_code' => 'SFERA_REQUIRED',
+                    ];
+                }
+            } catch (\Exception $e) {
+                Log::warning('SubiektGTService: Could not check Sfera health', [
+                    'error' => $e->getMessage(),
+                ]);
+                // Continue anyway - the create endpoint will return proper error
+            }
+
+            // Build create data from PPM product
+            $createData = $this->mapPpmProductToSubiekt($product, $config, true);
+
+            if (empty($createData['sku'])) {
+                return [
+                    'success' => false,
+                    'message' => 'SKU jest wymagane do utworzenia produktu',
+                    'error_code' => 'VALIDATION_ERROR',
+                ];
+            }
+
+            Log::info('SubiektGTService: Creating product in Subiekt GT', [
+                'sku' => $product->sku,
+                'name' => $product->name,
+            ]);
+
+            // Use POST endpoint
+            $result = $client->createProduct($createData);
+
+            if ($result['success'] ?? false) {
+                return [
+                    'success' => true,
+                    'message' => $result['data']['message'] ?? 'Produkt utworzony',
+                    'external_id' => $result['data']['product_id'] ?? null,
+                    'product_id' => $result['data']['product_id'] ?? null,
+                ];
+            }
+
+            return [
+                'success' => false,
+                'message' => $result['error'] ?? 'Blad tworzenia produktu',
+                'error_code' => $result['error_code'] ?? null,
+            ];
+
+        } catch (SubiektApiException $e) {
+            return [
+                'success' => false,
+                'message' => 'Blad API: ' . $e->getMessage(),
+                'error_code' => 'API_ERROR',
+            ];
+        } catch (\Exception $e) {
+            return [
+                'success' => false,
+                'message' => 'Blad: ' . $e->getMessage(),
+                'error_code' => 'UNKNOWN',
+            ];
+        }
+    }
+
+    /**
+     * Map PPM Product to Subiekt GT format.
+     *
+     * @param Product $product
+     * @param array $config Connection config (for price/warehouse mappings)
+     * @param bool $isCreate Whether this is for create (include SKU)
+     * @return array Data for Subiekt GT API
+     */
+    protected function mapPpmProductToSubiekt(Product $product, array $config, bool $isCreate = false): array
+    {
+        $data = [];
+
+        // SKU (only for create)
+        if ($isCreate) {
+            $data['sku'] = $product->sku;
+        }
+
+        // Basic fields
+        if (!empty($product->name)) {
+            $data['name'] = mb_substr($product->name, 0, 50); // Subiekt limit
+        }
+
+        if ($product->description !== null) {
+            $data['description'] = $product->description;
+        }
+
+        if (!empty($product->ean)) {
+            $data['ean'] = mb_substr($product->ean, 0, 20);
+        }
+
+        if ($product->weight !== null && $product->weight > 0) {
+            $data['weight'] = (float) $product->weight;
+        }
+
+        // Unit mapping
+        $unitMapping = $config['unit_mapping'] ?? [];
+        if (!empty($product->unit)) {
+            $data['unit'] = $unitMapping[$product->unit] ?? $product->unit;
+        }
+
+        // VAT rate mapping
+        $vatRateMapping = $config['vat_rate_mapping'] ?? [];
+        if (!empty($product->tax_rate) && isset($vatRateMapping[$product->tax_rate])) {
+            $data['vat_rate_id'] = (int) $vatRateMapping[$product->tax_rate];
+        }
+
+        // Price group mapping - map PPM price groups to Subiekt price levels
+        $priceGroupMapping = $config['price_group_mappings'] ?? [];
+        $prices = [];
+
+        // Get product prices from PPM
+        $productPrices = $product->prices ?? [];
+        if ($productPrices instanceof \Illuminate\Database\Eloquent\Collection) {
+            $productPrices = $productPrices->toArray();
+        }
+
+        foreach ($productPrices as $priceData) {
+            $ppmGroupId = $priceData['price_group_id'] ?? $priceData['group_id'] ?? null;
+            if ($ppmGroupId && isset($priceGroupMapping[$ppmGroupId])) {
+                $subiektLevel = (int) $priceGroupMapping[$ppmGroupId];
+                $prices[$subiektLevel] = [
+                    'net' => (float) ($priceData['price_net'] ?? $priceData['price'] ?? 0),
+                    'gross' => isset($priceData['price_gross']) ? (float) $priceData['price_gross'] : null,
+                ];
+            }
+        }
+
+        // Also map base price if available
+        if (!empty($product->price_net)) {
+            $defaultPriceLevel = $config['default_price_level'] ?? 0;
+            if (!isset($prices[$defaultPriceLevel])) {
+                $prices[$defaultPriceLevel] = [
+                    'net' => (float) $product->price_net,
+                    'gross' => !empty($product->price_gross) ? (float) $product->price_gross : null,
+                ];
+            }
+        }
+
+        if (!empty($prices)) {
+            $data['prices'] = $prices;
+        }
+
+        // Active status
+        if (isset($product->is_active)) {
+            $data['is_active'] = (bool) $product->is_active;
+        }
+
+        return $data;
     }
 
     /**

@@ -151,7 +151,21 @@
       "Bash(\"C:\\\\Program Files\\\\PuTTY\\\\pscp.exe\":*)",
       "Bash(\"C:\\\\Program Files\\\\PuTTY\\\\pscp.exe\" -i \"D:\\\\SSH\\\\Hostido\\\\HostidoSSHNoPass.ppk\" -P 64321 \"D:\\\\Skrypty\\\\PPM-CC-Laravel\\\\resources\\\\views\\\\livewire\\\\products\\\\management\\\\partials\\\\erp-sync-status-panel.blade.php\" host379076@host379076.hostido.net.pl:domains/ppm.mpptrade.pl/public_html/resources/views/livewire/products/management/partials/erp-sync-status-panel.blade.php)",
       "Bash(\"C:\\\\Program Files\\\\PuTTY\\\\plink.exe\" -ssh host379076@host379076.hostido.net.pl -P 64321 -i \"D:\\\\SSH\\\\Hostido\\\\HostidoSSHNoPass.ppk\" -batch \"cd domains/ppm.mpptrade.pl/public_html && php artisan view:clear && php artisan cache:clear && php artisan config:clear\")",
-      "Bash(\"C:\\\\Program Files\\\\PuTTY\\\\plink.exe\" -ssh host379076@host379076.hostido.net.pl -P 64321 -i \"D:\\\\SSH\\\\Hostido\\\\HostidoSSHNoPass.ppk\" -batch \"cd domains/ppm.mpptrade.pl/public_html && php artisan cache:clear && php artisan config:clear\")"
+      "Bash(\"C:\\\\Program Files\\\\PuTTY\\\\plink.exe\" -ssh host379076@host379076.hostido.net.pl -P 64321 -i \"D:\\\\SSH\\\\Hostido\\\\HostidoSSHNoPass.ppk\" -batch \"cd domains/ppm.mpptrade.pl/public_html && php artisan cache:clear && php artisan config:clear\")",
+      "Bash(subtask list:*)",
+      "Bash(Select-String -Pattern \"subiekt|erp|sync|job|11216\" -CaseSensitive:$false)",
+      "Bash(powershell -Command \"plink -ssh host379076@host379076.hostido.net.pl -P 64321 -i ''D:\\\\OneDrive - MPP TRADE\\\\SSH\\\\Hostido\\\\HostidoSSHNoPass.ppk'' -batch ''php domains/ppm.mpptrade.pl/public_html/artisan queue:failed''\")",
+      "Bash(powershell -Command \"plink -ssh host379076@host379076.hostido.net.pl -P 64321 -i ''D:\\\\OneDrive - MPP TRADE\\\\SSH\\\\Hostido\\\\HostidoSSHNoPass.ppk'' -batch ''php domains/ppm.mpptrade.pl/public_html/artisan config:show queue.default''\")",
+      "Bash(powershell -Command \"plink -ssh host379076@host379076.hostido.net.pl -P 64321 -i ''D:\\\\OneDrive - MPP TRADE\\\\SSH\\\\Hostido\\\\HostidoSSHNoPass.ppk'' -batch ''php domains/ppm.mpptrade.pl/public_html/artisan db:table jobs --compact''\")",
+      "Bash(powershell -Command \"plink -ssh host379076@host379076.hostido.net.pl -P 64321 -i ''D:\\\\OneDrive - MPP TRADE\\\\SSH\\\\Hostido\\\\HostidoSSHNoPass.ppk'' -batch ''php domains/ppm.mpptrade.pl/public_html/artisan tinker --execute=\"\"echo json_encode\\(DB::table\\(chr\\(106\\).chr\\(111\\).chr\\(98\\).chr\\(115\\)\\)->count\\(\\)\\)\"\"''\")",
+      "Bash(powershell -Command \"plink -ssh host379076@host379076.hostido.net.pl -P 64321 -i ''D:\\\\OneDrive - MPP TRADE\\\\SSH\\\\Hostido\\\\HostidoSSHNoPass.ppk'' -batch ''cd domains/ppm.mpptrade.pl/public_html && php -r \"\"require\\(chr\\(98\\).chr\\(111\\).chr\\(111\\).chr\\(116\\).chr\\(115\\).chr\\(116\\).chr\\(114\\).chr\\(97\\).chr\\(112\\).chr\\(47\\).chr\\(97\\).chr\\(112\\).chr\\(112\\).chr\\(46\\).chr\\(112\\).chr\\(104\\).chr\\(112\\)\\); echo App::make\\(chr\\(100\\).chr\\(98\\)\\)->table\\(chr\\(106\\).chr\\(111\\).chr\\(98\\).chr\\(115\\)\\)->count\\(\\);\"\"''\")",
+      "Bash(powershell -Command \"plink -ssh host379076@host379076.hostido.net.pl -P 64321 -i ''D:\\\\OneDrive - MPP TRADE\\\\SSH\\\\Hostido\\\\HostidoSSHNoPass.ppk'' -batch ''grep -i \"\"SyncProductToERP\"\" domains/ppm.mpptrade.pl/public_html/storage/logs/laravel.log 2>/dev/null | tail -30''\")",
+      "Bash(powershell -Command \"plink -ssh host379076@host379076.hostido.net.pl -P 64321 -i ''D:\\\\OneDrive - MPP TRADE\\\\SSH\\\\Hostido\\\\HostidoSSHNoPass.ppk'' -batch ''tail -200 domains/ppm.mpptrade.pl/public_html/storage/logs/laravel.log 2>/dev/null | grep -i erp''\")",
+      "Bash(powershell -Command \"plink -ssh host379076@host379076.hostido.net.pl -P 64321 -i ''D:\\\\OneDrive - MPP TRADE\\\\SSH\\\\Hostido\\\\HostidoSSHNoPass.ppk'' -batch ''cd domains/ppm.mpptrade.pl/public_html && php artisan tinker --execute=\"\"App\\\\Models\\\\ProductErpData::where\\([\\\\\"\"product_id\\\\\"\" => 11216, \\\\\"\"sync_status\\\\\"\" => \\\\\"\"syncing\\\\\"\"]\\)->update\\([\\\\\"\"sync_status\\\\\"\" => \\\\\"\"error\\\\\"\", \\\\\"\"error_message\\\\\"\" => \\\\\"\"Job utknol - queue worker nie dziala\\\\\"\"]\\)\"\"''\")",
+      "Bash(powershell:*)",
+      "Bash(del \"D:\\\\Skrypty\\\\PPM-CC-Laravel\\\\reset_stuck_job.php\")",
+      "WebFetch(domain:github.com)",
+      "Bash(dotnet --version:*)"
     ],
     "deny": [],
     "ask": []

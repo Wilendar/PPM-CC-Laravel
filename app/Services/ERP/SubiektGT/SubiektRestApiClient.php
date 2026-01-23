@@ -348,24 +348,16 @@ class SubiektRestApiClient
     /**
      * Update product by ID
      *
-     * WARNING: Only updates basic fields (Name, Description, EAN, Weight, Unit, Pkwiu).
-     * Stock and prices should NOT be updated via direct SQL - use Sfera API instead.
+     * Supports updating: Name, Description, EAN, Weight, Unit, Pkwiu, VatRateId, GroupId, Prices
+     * Note: Stock cannot be updated directly - only through documents (PZ, WZ, MM)
      *
      * @param int $productId Subiekt GT product ID
-     * @param array $data Fields to update (name, description, ean, weight, unit, pkwiu)
+     * @param array $data Fields to update
      * @return array Update result
      */
     public function updateProduct(int $productId, array $data): array
     {
-        // Build request body - only include non-null fields
-        $body = array_filter([
-            'Name' => $data['name'] ?? null,
-            'Description' => $data['description'] ?? null,
-            'Ean' => $data['ean'] ?? null,
-            'Weight' => $data['weight'] ?? null,
-            'Unit' => $data['unit'] ?? null,
-            'Pkwiu' => $data['pkwiu'] ?? null,
-        ], fn($value) => $value !== null);
+        $body = $this->buildProductWriteBody($data);
 
         if (empty($body)) {
             return [
@@ -381,6 +373,160 @@ class SubiektRestApiClient
         ]);
 
         return $this->request('PUT', "/api/products/{$productId}", $body);
+    }
+
+    /**
+     * Update product by SKU
+     *
+     * @param string $sku Product SKU
+     * @param array $data Fields to update
+     * @return array Update result
+     */
+    public function updateProductBySku(string $sku, array $data): array
+    {
+        $body = $this->buildProductWriteBody($data);
+
+        if (empty($body)) {
+            return [
+                'success' => true,
+                'message' => 'No fields to update',
+                'rows_affected' => 0,
+            ];
+        }
+
+        Log::info('SubiektRestApiClient::updateProductBySku', [
+            'sku' => $sku,
+            'fields' => array_keys($body),
+        ]);
+
+        $encodedSku = rawurlencode($sku);
+        return $this->request('PUT', "/api/products/sku/{$encodedSku}", $body);
+    }
+
+    /**
+     * Create new product in Subiekt GT
+     *
+     * IMPORTANT: Requires Sfera GT to be enabled on the API server!
+     * Will return error if Sfera is not configured.
+     *
+     * @param array $data Product data
+     *   - sku: string (required, max 20 chars)
+     *   - name: string (required, max 50 chars)
+     *   - description: string|null
+     *   - ean: string|null (max 20 chars)
+     *   - unit: string|null (max 10 chars, e.g. "szt", "kg")
+     *   - pkwiu: string|null
+     *   - weight: float|null (in kg)
+     *   - vat_rate_id: int|null (FK to sl_StawkaVAT)
+     *   - group_id: int|null (FK to sl_GrupaTw)
+     *   - prices: array|null [level => ['net' => float, 'gross' => float|null]]
+     * @return array Create result with product_id on success
+     */
+    public function createProduct(array $data): array
+    {
+        $body = $this->buildProductWriteBody($data, true);
+
+        Log::info('SubiektRestApiClient::createProduct', [
+            'sku' => $data['sku'] ?? 'N/A',
+            'name' => $data['name'] ?? 'N/A',
+        ]);
+
+        return $this->request('POST', '/api/products', $body);
+    }
+
+    /**
+     * Check if product exists by SKU
+     *
+     * @param string $sku Product SKU
+     * @return array ['exists' => bool, 'product_id' => int|null]
+     */
+    public function productExists(string $sku): array
+    {
+        $encodedSku = rawurlencode($sku);
+        return $this->request('GET', "/api/products/sku/{$encodedSku}/exists");
+    }
+
+    /**
+     * Check Sfera GT connection status
+     *
+     * @return array Health check result with sfera_enabled flag
+     */
+    public function checkSferaHealth(): array
+    {
+        return $this->request('GET', '/api/sfera/health');
+    }
+
+    /**
+     * Build request body for product write operations
+     *
+     * @param array $data Input data
+     * @param bool $isCreate Whether this is a create operation
+     * @return array Request body
+     */
+    protected function buildProductWriteBody(array $data, bool $isCreate = false): array
+    {
+        $body = [];
+
+        // Basic fields
+        if ($isCreate && isset($data['sku'])) {
+            $body['Sku'] = $data['sku'];
+        }
+        if (isset($data['name'])) {
+            $body['Name'] = $data['name'];
+        }
+        if (array_key_exists('description', $data)) {
+            $body['Description'] = $data['description'];
+        }
+        if (array_key_exists('ean', $data)) {
+            $body['Ean'] = $data['ean'];
+        }
+        if (isset($data['unit'])) {
+            $body['Unit'] = $data['unit'];
+        }
+        if (array_key_exists('pkwiu', $data)) {
+            $body['Pkwiu'] = $data['pkwiu'];
+        }
+        if (isset($data['weight'])) {
+            $body['Weight'] = (float)$data['weight'];
+        }
+
+        // Reference IDs
+        if (isset($data['vat_rate_id'])) {
+            $body['VatRateId'] = (int)$data['vat_rate_id'];
+        }
+        if (isset($data['group_id'])) {
+            $body['GroupId'] = (int)$data['group_id'];
+        }
+        if (isset($data['manufacturer_id'])) {
+            $body['ManufacturerId'] = (int)$data['manufacturer_id'];
+        }
+
+        // Status
+        if (isset($data['is_active'])) {
+            $body['IsActive'] = (bool)$data['is_active'];
+        }
+
+        // Prices (array of price levels)
+        // Format: ['prices' => [0 => ['net' => 100.00, 'gross' => 123.00], 1 => ['net' => 90.00]]]
+        if (!empty($data['prices']) && is_array($data['prices'])) {
+            $prices = [];
+            foreach ($data['prices'] as $level => $priceData) {
+                if (!is_numeric($level) || $level < 0 || $level > 9) {
+                    continue;
+                }
+                $prices[(int)$level] = [
+                    'Net' => (float)($priceData['net'] ?? $priceData['Net'] ?? 0),
+                    'Gross' => isset($priceData['gross']) || isset($priceData['Gross'])
+                        ? (float)($priceData['gross'] ?? $priceData['Gross'])
+                        : null,
+                ];
+            }
+            if (!empty($prices)) {
+                $body['Prices'] = $prices;
+            }
+        }
+
+        return $body;
     }
 
     /**

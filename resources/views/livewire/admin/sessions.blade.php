@@ -296,7 +296,9 @@
                                 <span class="text-sm text-gray-600 dark:text-gray-300">{{ ucfirst($device['type']) }}</span>
                                 <div class="flex items-center">
                                     <div class="w-32 h-2 bg-gray-200 dark:bg-gray-700 rounded-full mr-2">
-                                        <div class="h-2 bg-blue-600 rounded-full" style="width: {{ $device['percentage'] }}%"></div>
+                                        <div class="h-2 rounded-full progress-bar-brand"
+                                             x-data="{ percent: {{ $device['percentage'] }} }"
+                                             :style="{ width: percent + '%' }"></div>
                                     </div>
                                     <span class="text-sm text-gray-900 dark:text-white">{{ $device['percentage'] }}%</span>
                                 </div>
@@ -314,7 +316,9 @@
                                 <span class="text-sm text-gray-600 dark:text-gray-300">{{ $location['country'] }}</span>
                                 <div class="flex items-center">
                                     <div class="w-32 h-2 bg-gray-200 dark:bg-gray-700 rounded-full mr-2">
-                                        <div class="h-2 bg-green-600 rounded-full" style="width: {{ $location['percentage'] }}%"></div>
+                                        <div class="h-2 rounded-full progress-bar-secondary"
+                                             x-data="{ percent: {{ $location['percentage'] }} }"
+                                             :style="{ width: percent + '%' }"></div>
                                     </div>
                                     <span class="text-sm text-gray-900 dark:text-white">{{ $location['count'] }}</span>
                                 </div>

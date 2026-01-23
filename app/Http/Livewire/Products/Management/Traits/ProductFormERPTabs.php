@@ -493,30 +493,52 @@ trait ProductFormERPTabs
      * Uses mappings from ERPConnection.connection_config['price_group_mappings']
      * Format: ['ppm_group_id' => 'erp_price_level', ...]
      *
+     * Fallback strategies:
+     * 1. Explicit mappings from config
+     * 2. Direct ID match if exists in $this->prices
+     * 3. Search by code suffix pattern: _subiekt_gt_{level} or _{level}
+     *
      * @param int|string $erpPriceLevel
      * @param array $mappings
      * @return int|null PPM price_group_id or null if no mapping
      */
     protected function mapErpPriceLevelToPpmGroup(int|string $erpPriceLevel, array $mappings): ?int
     {
-        // Mappings are stored as: PPM group ID => ERP price level
-        // We need to find which PPM group maps to this ERP level
+        // Strategy 1: Explicit mappings (PPM group ID => ERP price level)
         foreach ($mappings as $ppmGroupId => $erpLevel) {
             if ((string) $erpLevel === (string) $erpPriceLevel) {
                 return (int) $ppmGroupId;
             }
         }
 
-        // Fallback: If no mapping, try direct ID match (1:1)
-        // This allows ERP price level 0 → PPM group 1, etc.
-        // Only if the PPM group exists in $this->prices
+        // Strategy 2: Direct ID match (1:1)
         if (isset($this->prices[$erpPriceLevel])) {
             return (int) $erpPriceLevel;
+        }
+
+        // Strategy 3: Search by code suffix in $this->priceGroups
+        // Codes like 'detaliczna_subiekt_gt_0' contain the ERP level as suffix
+        if (!empty($this->priceGroups)) {
+            $suffix1 = '_subiekt_gt_' . $erpPriceLevel;  // e.g., '_subiekt_gt_0'
+            $suffix2 = '_' . $erpPriceLevel;             // e.g., '_0'
+
+            foreach ($this->priceGroups as $ppmGroupId => $group) {
+                $code = $group['code'] ?? '';
+                if (str_ends_with($code, $suffix1) || str_ends_with($code, $suffix2)) {
+                    Log::debug('mapErpPriceLevelToPpmGroup: Found by code suffix', [
+                        'erp_level' => $erpPriceLevel,
+                        'ppm_group_id' => $ppmGroupId,
+                        'code' => $code,
+                    ]);
+                    return (int) $ppmGroupId;
+                }
+            }
         }
 
         Log::debug('mapErpPriceLevelToPpmGroup: No mapping found', [
             'erp_price_level' => $erpPriceLevel,
             'available_mappings' => $mappings,
+            'priceGroups_count' => count($this->priceGroups ?? []),
         ]);
 
         return null;
@@ -528,29 +550,52 @@ trait ProductFormERPTabs
      * Uses mappings from ERPConnection.connection_config['warehouse_mappings']
      * Format: ['ppm_warehouse_id' => 'erp_warehouse_id', ...]
      *
+     * Fallback strategies:
+     * 1. Explicit mappings from config
+     * 2. Direct ID match if exists in $this->stock
+     * 3. Search by code suffix pattern: _subiekt_gt_{id} or _{id}
+     *
      * @param int|string $erpWarehouseId
      * @param array $mappings
      * @return int|null PPM warehouse_id or null if no mapping
      */
     protected function mapErpWarehouseToPpmWarehouse(int|string $erpWarehouseId, array $mappings): ?int
     {
-        // Mappings are stored as: PPM warehouse ID => ERP warehouse ID
-        // We need to find which PPM warehouse maps to this ERP warehouse
+        // Strategy 1: Explicit mappings (PPM warehouse ID => ERP warehouse ID)
         foreach ($mappings as $ppmWarehouseId => $erpId) {
             if ((string) $erpId === (string) $erpWarehouseId) {
                 return (int) $ppmWarehouseId;
             }
         }
 
-        // Fallback: If no mapping, try direct ID match (1:1)
-        // Only if the PPM warehouse exists in $this->stock
+        // Strategy 2: Direct ID match (1:1)
         if (isset($this->stock[$erpWarehouseId])) {
             return (int) $erpWarehouseId;
+        }
+
+        // Strategy 3: Search by code suffix in $this->warehouses
+        // Codes like 'sprzeda__subiekt_gt_1' contain the ERP warehouse ID as suffix
+        if (!empty($this->warehouses)) {
+            $suffix1 = '_subiekt_gt_' . $erpWarehouseId;  // e.g., '_subiekt_gt_1'
+            $suffix2 = '_' . $erpWarehouseId;             // e.g., '_1'
+
+            foreach ($this->warehouses as $ppmWarehouseId => $warehouse) {
+                $code = $warehouse['code'] ?? '';
+                if (str_ends_with($code, $suffix1) || str_ends_with($code, $suffix2)) {
+                    Log::debug('mapErpWarehouseToPpmWarehouse: Found by code suffix', [
+                        'erp_warehouse_id' => $erpWarehouseId,
+                        'ppm_warehouse_id' => $ppmWarehouseId,
+                        'code' => $code,
+                    ]);
+                    return (int) $ppmWarehouseId;
+                }
+            }
         }
 
         Log::debug('mapErpWarehouseToPpmWarehouse: No mapping found', [
             'erp_warehouse_id' => $erpWarehouseId,
             'available_mappings' => $mappings,
+            'warehouses_count' => count($this->warehouses ?? []),
         ]);
 
         return null;
@@ -737,7 +782,7 @@ trait ProductFormERPTabs
                     'first_stock' => isset($externalData['stock']) ? array_slice($externalData['stock'], 0, 1, true) : null,
                 ]);
 
-                // Update external_data cache
+                // Update external_data cache in database
                 $erpData->update([
                     'external_data' => $externalData,
                     'last_pull_at' => now(),
@@ -745,20 +790,26 @@ trait ProductFormERPTabs
                     'error_message' => null,
                 ]);
 
+                // FIX: Set external_data directly on model instance for immediate use
+                // Don't rely on refresh() - it might have JSON encoding/decoding issues
+                $erpData->external_data = $externalData;
+                $erpData->last_pull_at = now();
+                $erpData->sync_status = ProductErpData::STATUS_SYNCED;
+
                 // Refresh UI data
                 $this->erpExternalData['external_data'] = $externalData;
                 $this->erpExternalData['sync_status'] = ProductErpData::STATUS_SYNCED;
                 $this->erpExternalData['last_pull_at'] = now();
 
-                // TASK 2c: Reload prices and stock from the new data
-                $erpData->refresh();
-
-                Log::debug('pullProductDataFromErp: After refresh()', [
+                Log::debug('pullProductDataFromErp: After setting external_data directly', [
                     'external_data_keys' => is_array($erpData->external_data) ? array_keys($erpData->external_data) : 'not_array',
-                    'has_prices_after_refresh' => isset($erpData->external_data['prices']),
-                    'has_stock_after_refresh' => isset($erpData->external_data['stock']),
+                    'has_prices' => isset($erpData->external_data['prices']),
+                    'has_stock' => isset($erpData->external_data['stock']),
+                    'prices_count' => isset($erpData->external_data['prices']) ? count($erpData->external_data['prices']) : 0,
+                    'stock_count' => isset($erpData->external_data['stock']) ? count($erpData->external_data['stock']) : 0,
                 ]);
 
+                // Override form prices and stock with ERP data
                 $this->overrideFormPricesWithErpData($erpData);
                 $this->overrideFormStockWithErpData($erpData);
 
@@ -880,11 +931,27 @@ trait ProductFormERPTabs
             // Update UI status
             $this->erpExternalData['sync_status'] = ProductErpData::STATUS_SYNCING;
 
-            // ETAP_08.5 Step 4: Dispatch async Job
-            SyncProductToERP::dispatch($this->product, $connection);
+            // ETAP_08.5 Step 4: Dispatch SYNC Job (synchronous - no queue worker needed)
+            // FIX 2026-01-22: Use dispatchSync() instead of dispatch() for Hostido shared hosting
+            // Queue worker is not running, so jobs would stay in queue forever
+            SyncProductToERP::dispatchSync($this->product, $connection);
 
-            // ETAP_08.6: Notify Alpine to start ERP polling (analogia do PrestaShop job-started)
-            $this->dispatch('erp-job-started');
+            // Job completed synchronously - update UI immediately
+            $erpData->refresh();
+            if ($erpData->sync_status === ProductErpData::STATUS_SYNCED) {
+                $this->activeErpJobStatus = 'completed';
+                $this->erpJobResult = 'success';
+                $this->erpJobMessage = 'Synchronizacja zakonczona pomyslnie';
+                $this->erpExternalData['sync_status'] = ProductErpData::STATUS_SYNCED;
+            } elseif ($erpData->sync_status === ProductErpData::STATUS_ERROR) {
+                $this->activeErpJobStatus = 'failed';
+                $this->erpJobResult = 'error';
+                $this->erpJobMessage = $erpData->error_message ?? 'Blad synchronizacji';
+                $this->erpExternalData['sync_status'] = ProductErpData::STATUS_ERROR;
+            }
+
+            // ETAP_08.6: Notify Alpine about job completion (not start - job is done)
+            $this->dispatch('erp-job-completed');
 
             Log::info('ERP sync job dispatched with tracking (SHOP-TAB PATTERN)', [
                 'product_id' => $this->product->id,
@@ -1192,11 +1259,26 @@ trait ProductFormERPTabs
                 // Update UI status
                 $this->erpExternalData['sync_status'] = ProductErpData::STATUS_SYNCING;
 
-                // Step 4: Dispatch async Job
-                SyncProductToERP::dispatch($this->product, $connection);
+                // Step 4: Dispatch SYNC Job (synchronous - no queue worker needed)
+                // FIX 2026-01-22: Use dispatchSync() for Hostido shared hosting
+                SyncProductToERP::dispatchSync($this->product, $connection);
 
-                // ETAP_08.6: Notify Alpine to start ERP polling
-                $this->dispatch('erp-job-started');
+                // Job completed synchronously - update UI immediately
+                $erpData->refresh();
+                if ($erpData->sync_status === ProductErpData::STATUS_SYNCED) {
+                    $this->activeErpJobStatus = 'completed';
+                    $this->erpJobResult = 'success';
+                    $this->erpJobMessage = 'Synchronizacja zakonczona pomyslnie';
+                    $this->erpExternalData['sync_status'] = ProductErpData::STATUS_SYNCED;
+                } elseif ($erpData->sync_status === ProductErpData::STATUS_ERROR) {
+                    $this->activeErpJobStatus = 'failed';
+                    $this->erpJobResult = 'error';
+                    $this->erpJobMessage = $erpData->error_message ?? 'Blad synchronizacji';
+                    $this->erpExternalData['sync_status'] = ProductErpData::STATUS_ERROR;
+                }
+
+                // ETAP_08.6: Notify Alpine about job completion
+                $this->dispatch('erp-job-completed');
 
                 Log::info('saveErpContextAndDispatchJob: ERP sync job dispatched with tracking', [
                     'product_id' => $this->product->id,
@@ -1887,6 +1969,8 @@ trait ProductFormERPTabs
      * Called when user clicks "Dodać do ERP?".
      * Creates new product in ERP system via sync job.
      *
+     * ETAP_09.5 FIX: Block CREATE for Subiekt GT without Sfera
+     *
      * @param int $connectionId
      * @return void
      */
@@ -1895,6 +1979,20 @@ trait ProductFormERPTabs
         $connection = ERPConnection::find($connectionId);
         if (!$connection || !$this->product) {
             $this->addError('erp_add', 'Brak polaczenia ERP lub produktu');
+            return;
+        }
+
+        // ETAP_09.5: Block CREATE for Subiekt GT without Sfera
+        // DirectSQL mode cannot create products - only UPDATE existing ones
+        if ($connection->erp_type === 'subiekt_gt') {
+            $this->addError('erp_add', 'Tworzenie produktow w Subiekt GT nie jest dostepne. Sfera GT nie jest wlaczona na serwerze API. Mozesz jedynie synchronizowac istniejace produkty.');
+
+            Log::warning('addProductToErp: Blocked CREATE for Subiekt GT - Sfera not available', [
+                'product_id' => $this->product->id,
+                'product_sku' => $this->product->sku,
+                'connection_id' => $connectionId,
+            ]);
+
             return;
         }
 
@@ -2091,5 +2189,87 @@ trait ProductFormERPTabs
         }
 
         return $total;
+    }
+
+    // ==========================================
+    // ETAP_09.5: UNLINK PRODUCT FROM ERP
+    // ==========================================
+
+    /**
+     * ETAP_09.5: Unlink product from ERP connection
+     *
+     * Removes the ProductErpData record linking this product to the ERP.
+     * Does NOT delete the product from ERP - only removes local mapping.
+     *
+     * @param int $connectionId
+     * @return void
+     */
+    public function unlinkFromErp(int $connectionId): void
+    {
+        $connection = ERPConnection::find($connectionId);
+        if (!$connection || !$this->product) {
+            $this->addError('erp_unlink', 'Brak polaczenia ERP lub produktu');
+            return;
+        }
+
+        try {
+            // Find and delete the ProductErpData record
+            $erpData = $this->product->erpData()
+                ->where('erp_connection_id', $connectionId)
+                ->first();
+
+            if (!$erpData) {
+                $this->addError('erp_unlink', 'Produkt nie jest powiazany z tym ERP');
+                return;
+            }
+
+            // Store external_id for logging
+            $externalId = $erpData->external_id;
+
+            // Delete the ERP data record
+            $erpData->delete();
+
+            // Reset UI state if this was the active ERP tab
+            if ($this->activeErpConnectionId === $connectionId) {
+                $this->erpExternalData = [
+                    'connection' => $connection,
+                    'erp_data_id' => null,
+                    'external_id' => null,
+                    'sync_status' => 'not_linked',
+                    'pending_fields' => [],
+                    'external_data' => [],
+                    'last_sync_at' => null,
+                    'last_pull_at' => null,
+                    'last_push_at' => null,
+                    'error_message' => null,
+                ];
+
+                // Restore PPM defaults to form
+                $this->loadDefaultDataToForm();
+            }
+
+            // Reset job tracking if active
+            if ($this->activeErpJobConnectionId === $connectionId) {
+                $this->resetErpJobTracking();
+            }
+
+            session()->flash('message', 'Produkt odlaczony od ERP: ' . $connection->instance_name);
+
+            Log::info('unlinkFromErp: Product unlinked from ERP', [
+                'product_id' => $this->product->id,
+                'product_sku' => $this->product->sku,
+                'connection_id' => $connectionId,
+                'connection_name' => $connection->instance_name,
+                'former_external_id' => $externalId,
+            ]);
+
+        } catch (\Exception $e) {
+            $this->addError('erp_unlink', 'Blad odlaczania od ERP: ' . $e->getMessage());
+            Log::error('unlinkFromErp error', [
+                'product_id' => $this->product->id,
+                'connection_id' => $connectionId,
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 }

@@ -222,6 +222,26 @@ class SyncProductToERP implements ShouldQueue, ShouldBeUnique
                 $exception?->getTraceAsString()
             );
         }
+
+        // FIX 2026-01-22: Update ProductErpData status to error
+        // This is critical for UI to reflect the failed state
+        try {
+            $erpData = ProductErpData::where('product_id', $this->product->id)
+                ->where('erp_connection_id', $this->erpConnection->id)
+                ->first();
+
+            if ($erpData) {
+                $erpData->update([
+                    'sync_status' => ProductErpData::STATUS_ERROR,
+                    'error_message' => $message,
+                ]);
+            }
+        } catch (\Exception $e) {
+            Log::warning('SyncProductToERP: Failed to update ProductErpData status', [
+                'product_id' => $this->product->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 
     /**
