@@ -5,105 +5,19 @@ using Microsoft.Extensions.Logging;
 
 namespace SubiektApi;
 
-// ==================== CONFIGURATION ====================
-
-public class SferaConfig
-{
-    public bool Enabled { get; set; }
-    public string Server { get; set; } = "";
-    public string Database { get; set; } = "";
-    public bool UseWindowsAuth { get; set; }
-    public string User { get; set; } = "";
-    public string Password { get; set; } = "";
-    public string Operator { get; set; } = "";
-    public string OperatorPassword { get; set; } = "";
-    public int Timeout { get; set; } = 60;
-}
-
-// ==================== REQUEST/RESPONSE MODELS ====================
-
-public class ProductWriteRequest
-{
-    public string? Sku { get; set; }
-    public string? Name { get; set; }
-    public string? Description { get; set; }
-    public string? Unit { get; set; }
-    public string? Ean { get; set; }
-    public string? Pkwiu { get; set; }
-    public decimal? Weight { get; set; }
-    public decimal? PriceNet { get; set; }
-    public decimal? PriceGross { get; set; }
-    public int? VatRateId { get; set; }
-    public int? GroupId { get; set; }
-    public int? ManufacturerId { get; set; }
-
-    // Price levels (0-10)
-    public Dictionary<int, decimal>? PricesNet { get; set; }
-    public Dictionary<int, decimal>? PricesGross { get; set; }
-}
-
-public class ProductWriteResult
-{
-    public bool Success { get; set; }
-    public int? ProductId { get; set; }
-    public string? Sku { get; set; }
-    public string? Action { get; set; }
-    public string? Message { get; set; }
-    public string? Error { get; set; }
-    public string? ErrorCode { get; set; }
-    public int RowsAffected { get; set; }
-    public DateTime Timestamp { get; set; } = DateTime.Now;
-}
-
-public class SferaHealthResult
-{
-    public bool Success { get; set; }
-    public string? Status { get; set; }
-    public string? Server { get; set; }
-    public string? Database { get; set; }
-    public string? Version { get; set; }
-    public double ResponseTimeMs { get; set; }
-    public string? Error { get; set; }
-}
-
 // ==================== INTERFACES ====================
 
+/// <summary>
+/// Interface for product write operations in Subiekt GT.
+/// Implemented by SferaProductWriter (COM) and DirectSqlProductWriter (SQL).
+/// </summary>
 public interface ISferaProductWriter
 {
-    Task<ProductWriteResult> CreateProductAsync(ProductWriteRequest request);
-    Task<ProductWriteResult> UpdateProductAsync(int productId, ProductWriteRequest request);
-    Task<ProductWriteResult> UpdateProductBySkuAsync(string sku, ProductWriteRequest request);
+    Task<ProductWriteResponse> CreateProductAsync(ProductWriteRequest request);
+    Task<ProductWriteResponse> UpdateProductAsync(int productId, ProductWriteRequest request);
+    Task<ProductWriteResponse> UpdateProductBySkuAsync(string sku, ProductWriteRequest request);
     Task<bool> ProductExistsAsync(string sku);
     Task<int?> GetProductIdBySkuAsync(string sku);
-}
-
-// ==================== SFERA SERVICE (COM/OLE) ====================
-
-/// <summary>
-/// Sfera GT service for COM/OLE operations (requires Sfera license)
-/// Currently a placeholder - requires Windows with Sfera COM installed
-/// </summary>
-public class SferaService
-{
-    private readonly SferaConfig _config;
-    private readonly ILogger<SferaService> _logger;
-
-    public SferaService(IOptions<SferaConfig> config, ILogger<SferaService> logger)
-    {
-        _config = config.Value;
-        _logger = logger;
-    }
-
-    public Task<SferaHealthResult> TestConnectionAsync()
-    {
-        // Placeholder - would use COM interop with InsERT.gt
-        return Task.FromResult(new SferaHealthResult
-        {
-            Success = false,
-            Status = "not_implemented",
-            Error = "Sfera COM interop not implemented. Use DirectSQL fallback."
-        });
-    }
 }
 
 // ==================== SFERA PRODUCT WRITER (COM) ====================
@@ -128,7 +42,7 @@ public class SferaProductWriter : ISferaProductWriter
         _logger = logger;
     }
 
-    public async Task<ProductWriteResult> CreateProductAsync(ProductWriteRequest request)
+    public async Task<ProductWriteResponse> CreateProductAsync(ProductWriteRequest request)
     {
         // TODO: Implement using Sfera COM
         // var gt = new COM('Insert.gt');
@@ -136,29 +50,32 @@ public class SferaProductWriter : ISferaProductWriter
         // towar.Symbol = request.Sku;
         // towar.Zapisz();
 
-        return new ProductWriteResult
+        return new ProductWriteResponse
         {
             Success = false,
+            Timestamp = DateTime.Now,
             Error = "Sfera COM interop not implemented",
             ErrorCode = "SFERA_NOT_IMPLEMENTED"
         };
     }
 
-    public async Task<ProductWriteResult> UpdateProductAsync(int productId, ProductWriteRequest request)
+    public async Task<ProductWriteResponse> UpdateProductAsync(int productId, ProductWriteRequest request)
     {
-        return new ProductWriteResult
+        return new ProductWriteResponse
         {
             Success = false,
+            Timestamp = DateTime.Now,
             Error = "Sfera COM interop not implemented",
             ErrorCode = "SFERA_NOT_IMPLEMENTED"
         };
     }
 
-    public async Task<ProductWriteResult> UpdateProductBySkuAsync(string sku, ProductWriteRequest request)
+    public async Task<ProductWriteResponse> UpdateProductBySkuAsync(string sku, ProductWriteRequest request)
     {
-        return new ProductWriteResult
+        return new ProductWriteResponse
         {
             Success = false,
+            Timestamp = DateTime.Now,
             Error = "Sfera COM interop not implemented",
             ErrorCode = "SFERA_NOT_IMPLEMENTED"
         };
@@ -195,14 +112,15 @@ public class DirectSqlProductWriter : ISferaProductWriter
     /// WARNING: This bypasses Sfera business logic!
     /// Uses MAX(tw_Id)+1 for ID generation (risk of race conditions).
     /// </summary>
-    public async Task<ProductWriteResult> CreateProductAsync(ProductWriteRequest request)
+    public async Task<ProductWriteResponse> CreateProductAsync(ProductWriteRequest request)
     {
         // Validation
         if (string.IsNullOrWhiteSpace(request.Sku))
         {
-            return new ProductWriteResult
+            return new ProductWriteResponse
             {
                 Success = false,
+                Timestamp = DateTime.Now,
                 Error = "SKU is required",
                 ErrorCode = "VALIDATION_ERROR"
             };
@@ -210,9 +128,10 @@ public class DirectSqlProductWriter : ISferaProductWriter
 
         if (string.IsNullOrWhiteSpace(request.Name))
         {
-            return new ProductWriteResult
+            return new ProductWriteResponse
             {
                 Success = false,
+                Timestamp = DateTime.Now,
                 Error = "Name is required",
                 ErrorCode = "VALIDATION_ERROR"
             };
@@ -221,9 +140,10 @@ public class DirectSqlProductWriter : ISferaProductWriter
         // SKU max 20 chars
         if (request.Sku.Length > 20)
         {
-            return new ProductWriteResult
+            return new ProductWriteResponse
             {
                 Success = false,
+                Timestamp = DateTime.Now,
                 Error = "SKU must be max 20 characters",
                 ErrorCode = "VALIDATION_ERROR"
             };
@@ -232,9 +152,10 @@ public class DirectSqlProductWriter : ISferaProductWriter
         // Name max 50 chars
         if (request.Name.Length > 50)
         {
-            return new ProductWriteResult
+            return new ProductWriteResponse
             {
                 Success = false,
+                Timestamp = DateTime.Now,
                 Error = "Name must be max 50 characters",
                 ErrorCode = "VALIDATION_ERROR"
             };
@@ -250,9 +171,10 @@ public class DirectSqlProductWriter : ISferaProductWriter
 
         if (existingId.HasValue)
         {
-            return new ProductWriteResult
+            return new ProductWriteResponse
             {
                 Success = false,
+                Timestamp = DateTime.Now,
                 ProductId = existingId.Value,
                 Sku = request.Sku,
                 Error = $"Product with SKU '{request.Sku}' already exists (ID: {existingId.Value})",
@@ -281,11 +203,21 @@ public class DirectSqlProductWriter : ISferaProductWriter
                 "Creating product: SKU={Sku}, Name={Name}, ID={Id}",
                 request.Sku, request.Name, newTwId);
 
-            // Default values
-            var unit = request.Unit ?? "szt";
+            // Default values - MUST match Subiekt GT GUI standards
+            // CRITICAL: Unit MUST include dot ("szt." not "szt") - GUI requires this format!
+            var unit = request.Unit ?? "szt.";
+            if (!unit.EndsWith(".") && unit.Length < 10)
+            {
+                unit += "."; // Ensure unit ends with dot
+            }
             var description = request.Description ?? "";
             var ean = request.Ean ?? "";
             var pkwiu = request.Pkwiu ?? "";
+
+            // Default VAT rate (23% = ID 100001) if not specified
+            // This ensures product is properly configured for invoicing
+            const int DEFAULT_VAT_RATE_ID = 100001;
+            var vatRateId = request.VatRateId ?? DEFAULT_VAT_RATE_ID;
 
             // INSERT into tw__Towar (minimum required fields + NOT NULL fields)
             var insertTowarSql = @"
@@ -327,6 +259,8 @@ public class DirectSqlProductWriter : ISferaProductWriter
                     tw_KomunikatDokumenty,
                     tw_MechanizmPodzielonejPlatnosci,
                     tw_GrupaJpkVat,
+                    tw_CzasDostawy,
+                    tw_DniWaznosc,
                     tw_OplCukrowaPodlega,
                     tw_OplCukrowaInneSlodzace,
                     tw_OplCukrowaSok,
@@ -339,6 +273,7 @@ public class DirectSqlProductWriter : ISferaProductWriter
                     tw_AkcyzaMarkaWyrobow,
                     tw_AkcyzaWielkoscProducenta,
                     tw_IdVatSp,
+                    tw_IdVatZak,
                     tw_IdGrupa,
                     tw_IdPodstDostawca,
                     tw_Masa
@@ -381,6 +316,8 @@ public class DirectSqlProductWriter : ISferaProductWriter
                     @tw_KomunikatDokumenty,
                     @tw_MechanizmPodzielonejPlatnosci,
                     @tw_GrupaJpkVat,
+                    @tw_CzasDostawy,
+                    @tw_DniWaznosc,
                     @tw_OplCukrowaPodlega,
                     @tw_OplCukrowaInneSlodzace,
                     @tw_OplCukrowaSok,
@@ -393,6 +330,7 @@ public class DirectSqlProductWriter : ISferaProductWriter
                     @tw_AkcyzaMarkaWyrobow,
                     @tw_AkcyzaWielkoscProducenta,
                     @tw_IdVatSp,
+                    @tw_IdVatZak,
                     @tw_IdGrupa,
                     @tw_IdPodstDostawca,
                     @tw_Masa
@@ -414,11 +352,11 @@ public class DirectSqlProductWriter : ISferaProductWriter
                 tw_UrzNazwa = request.Name.Length > 50 ? request.Name.Substring(0, 50) : request.Name,
                 tw_PodstKodKresk = ean.Length > 20 ? ean.Substring(0, 20) : ean,
                 tw_WWW = "",
-                tw_JakPrzySp = false,
+                tw_JakPrzySp = true,           // CRITICAL: Must be true for GUI visibility!
                 tw_PrzezWartosc = false,
                 tw_CenaOtwarta = false,
                 tw_KontrolaTW = false,
-                tw_SklepInternet = false,
+                tw_SklepInternet = true,       // CRITICAL: Must be true for GUI visibility!
                 tw_Pole1 = "", tw_Pole2 = "", tw_Pole3 = "", tw_Pole4 = "",
                 tw_Pole5 = "", tw_Pole6 = "", tw_Pole7 = "", tw_Pole8 = "",
                 tw_Uwagi = "",
@@ -434,9 +372,11 @@ public class DirectSqlProductWriter : ISferaProductWriter
                 tw_OdwrotneObciazenie = false,
                 tw_ProgKwotowyOO = 0,
                 tw_DodawalnyDoZW = false,
-                tw_KomunikatDokumenty = 0,
+                tw_KomunikatDokumenty = 3,     // CRITICAL: Must be 3 for GUI visibility!
                 tw_MechanizmPodzielonejPlatnosci = false,
-                tw_GrupaJpkVat = 0,
+                tw_GrupaJpkVat = -1,           // CRITICAL: Must be -1 for GUI visibility!
+                tw_CzasDostawy = 0,            // Required: delivery time in days
+                tw_DniWaznosc = 0,             // Required: validity days
                 tw_OplCukrowaPodlega = false,
                 tw_OplCukrowaInneSlodzace = false,
                 tw_OplCukrowaSok = false,
@@ -448,7 +388,8 @@ public class DirectSqlProductWriter : ISferaProductWriter
                 tw_ObjetySysKaucyjnym = false,
                 tw_AkcyzaMarkaWyrobow = "",
                 tw_AkcyzaWielkoscProducenta = "",
-                tw_IdVatSp = request.VatRateId,
+                tw_IdVatSp = vatRateId,        // Use default if not specified
+                tw_IdVatZak = vatRateId,       // Same VAT for purchase
                 tw_IdGrupa = request.GroupId,
                 tw_IdPodstDostawca = request.ManufacturerId,
                 tw_Masa = request.Weight
@@ -544,9 +485,30 @@ public class DirectSqlProductWriter : ISferaProductWriter
 
             _logger.LogInformation("Inserted tw_Cena with ID={Id} for product ID={ProductId}", newTcId, newTwId);
 
-            // NOTE: We do NOT insert into tw_Stan
-            // Stock levels should be 0 by default and changed only through documents (PZ, WZ)
-            // Direct manipulation of tw_Stan can break inventory integrity
+            // CRITICAL FIX: Insert into tw_Stan for default warehouses
+            // Without this record, product won't be visible in Subiekt GT GUI!
+            // GUI requires at least one warehouse assignment to display product in:
+            // - Kartoteka towarow (product list)
+            // - Document issuing (FV, WZ, etc.)
+            // - Stock views
+            var defaultWarehouseIds = new[] { 1, 4 }; // "Sprzedaz" (1) and "Stany" (4)
+
+            foreach (var warehouseId in defaultWarehouseIds)
+            {
+                var insertStanSql = @"
+                    INSERT INTO tw_Stan (st_TowId, st_MagId, st_Stan, st_StanMin, st_StanRez, st_StanMax)
+                    VALUES (@productId, @warehouseId, 0, 0, 0, 0)";
+
+                await conn.ExecuteAsync(insertStanSql, new
+                {
+                    productId = newTwId,
+                    warehouseId = warehouseId
+                }, transaction);
+            }
+
+            _logger.LogInformation(
+                "Inserted tw_Stan for product ID={Id}, warehouses: [{Warehouses}]",
+                newTwId, string.Join(", ", defaultWarehouseIds));
 
             transaction.Commit();
 
@@ -554,15 +516,17 @@ public class DirectSqlProductWriter : ISferaProductWriter
                 "Successfully created product: SKU={Sku}, ID={Id} (DirectSQL)",
                 request.Sku, newTwId);
 
-            return new ProductWriteResult
+            return new ProductWriteResponse
             {
                 Success = true,
+                Timestamp = DateTime.Now,
                 ProductId = newTwId,
                 Sku = request.Sku,
                 Action = "created",
                 Message = $"Product created successfully via DirectSQL (ID: {newTwId}). " +
+                          "Assigned to warehouses: Sprzedaz, Stany. " +
                           "WARNING: This bypasses Sfera business logic - verify in Subiekt GT GUI!",
-                RowsAffected = 2 // tw__Towar + tw_Cena
+                RowsAffected = 4 // tw__Towar + tw_Cena + 2x tw_Stan
             };
         }
         catch (SqlException ex)
@@ -573,9 +537,10 @@ public class DirectSqlProductWriter : ISferaProductWriter
                 "SQL error creating product SKU={Sku}: {Message}",
                 request.Sku, ex.Message);
 
-            return new ProductWriteResult
+            return new ProductWriteResponse
             {
                 Success = false,
+                Timestamp = DateTime.Now,
                 Sku = request.Sku,
                 Error = $"SQL error: {ex.Message}",
                 ErrorCode = "SQL_ERROR"
@@ -589,9 +554,10 @@ public class DirectSqlProductWriter : ISferaProductWriter
                 "Error creating product SKU={Sku}: {Message}",
                 request.Sku, ex.Message);
 
-            return new ProductWriteResult
+            return new ProductWriteResponse
             {
                 Success = false,
+                Timestamp = DateTime.Now,
                 Sku = request.Sku,
                 Error = ex.Message,
                 ErrorCode = "INTERNAL_ERROR"
@@ -599,7 +565,7 @@ public class DirectSqlProductWriter : ISferaProductWriter
         }
     }
 
-    public async Task<ProductWriteResult> UpdateProductAsync(int productId, ProductWriteRequest request)
+    public async Task<ProductWriteResponse> UpdateProductAsync(int productId, ProductWriteRequest request)
     {
         using var conn = GetConnection();
         await conn.OpenAsync();
@@ -611,9 +577,10 @@ public class DirectSqlProductWriter : ISferaProductWriter
 
         if (existingSku == null)
         {
-            return new ProductWriteResult
+            return new ProductWriteResponse
             {
                 Success = false,
+                Timestamp = DateTime.Now,
                 ProductId = productId,
                 Error = $"Product with ID {productId} not found",
                 ErrorCode = "PRODUCT_NOT_FOUND"
@@ -739,9 +706,10 @@ public class DirectSqlProductWriter : ISferaProductWriter
                 "Updated product ID={Id} (SKU={Sku}), rows affected: {Rows}",
                 productId, existingSku, rowsAffected);
 
-            return new ProductWriteResult
+            return new ProductWriteResponse
             {
                 Success = true,
+                Timestamp = DateTime.Now,
                 ProductId = productId,
                 Sku = existingSku,
                 Action = "updated",
@@ -757,9 +725,10 @@ public class DirectSqlProductWriter : ISferaProductWriter
                 "Error updating product ID={Id}: {Message}",
                 productId, ex.Message);
 
-            return new ProductWriteResult
+            return new ProductWriteResponse
             {
                 Success = false,
+                Timestamp = DateTime.Now,
                 ProductId = productId,
                 Error = ex.Message,
                 ErrorCode = "UPDATE_ERROR"
@@ -767,15 +736,16 @@ public class DirectSqlProductWriter : ISferaProductWriter
         }
     }
 
-    public async Task<ProductWriteResult> UpdateProductBySkuAsync(string sku, ProductWriteRequest request)
+    public async Task<ProductWriteResponse> UpdateProductBySkuAsync(string sku, ProductWriteRequest request)
     {
         var productId = await GetProductIdBySkuAsync(sku);
 
         if (!productId.HasValue)
         {
-            return new ProductWriteResult
+            return new ProductWriteResponse
             {
                 Success = false,
+                Timestamp = DateTime.Now,
                 Sku = sku,
                 Error = $"Product with SKU '{sku}' not found",
                 ErrorCode = "PRODUCT_NOT_FOUND"

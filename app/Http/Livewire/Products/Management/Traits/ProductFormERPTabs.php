@@ -1963,9 +1963,9 @@ trait ProductFormERPTabs
      * ETAP_08.8: Add product to ERP (create new in ERP)
      *
      * Called when user clicks "Dodać do ERP?".
-     * Creates new product in ERP system via sync job.
+     * Creates new product in ERP system.
      *
-     * ETAP_09.5 FIX: Block CREATE for Subiekt GT without Sfera
+     * ETAP_09.6: Subiekt GT CREATE enabled via DirectSQL REST API
      *
      * @param int $connectionId
      * @return void
@@ -1978,30 +1978,76 @@ trait ProductFormERPTabs
             return;
         }
 
-        // ETAP_09.5: Block CREATE for Subiekt GT without Sfera
-        // DirectSQL mode cannot create products - only UPDATE existing ones
-        if ($connection->erp_type === 'subiekt_gt') {
-            $this->addError('erp_add', 'Tworzenie produktow w Subiekt GT nie jest dostepne. Sfera GT nie jest wlaczona na serwerze API. Mozesz jedynie synchronizowac istniejace produkty.');
-
-            Log::warning('addProductToErp: Blocked CREATE for Subiekt GT - Sfera not available', [
-                'product_id' => $this->product->id,
-                'product_sku' => $this->product->sku,
-                'connection_id' => $connectionId,
-            ]);
-
-            return;
-        }
-
         try {
-            // Create ProductErpData record WITHOUT external_id (will be created by sync)
+            // ETAP_09.6: For Subiekt GT - create immediately via REST API
+            if ($connection->erp_type === 'subiekt_gt') {
+                $subiektService = app(\App\Services\ERP\SubiektGTService::class);
+                $createResult = $subiektService->createProductInErp($this->product, $connection);
+
+                if ($createResult['success']) {
+                    // Product created successfully - update UI
+                    $externalId = $createResult['external_id'];
+
+                    // Refresh erpExternalData
+                    $this->selectErpTab($connectionId);
+
+                    session()->flash('message', 'Produkt utworzony w Subiekt GT (ID: ' . $externalId . ')');
+
+                    Log::info('addProductToErp: Product created in Subiekt GT', [
+                        'product_id' => $this->product->id,
+                        'product_sku' => $this->product->sku,
+                        'external_id' => $externalId,
+                        'connection_id' => $connectionId,
+                    ]);
+
+                    return;
+                }
+
+                // Handle special case: product already exists
+                if (($createResult['error_code'] ?? '') === 'ALREADY_EXISTS') {
+                    $externalId = $createResult['external_id'];
+
+                    // Link existing product
+                    $erpData = $this->product->erpData()->updateOrCreate(
+                        ['erp_connection_id' => $connectionId],
+                        [
+                            'external_id' => $externalId,
+                            'sync_status' => ProductErpData::STATUS_SYNCED,
+                        ]
+                    );
+
+                    $this->selectErpTab($connectionId);
+
+                    session()->flash('message', 'Produkt juz istnieje w Subiekt GT (ID: ' . $externalId . '). Powiazano.');
+
+                    Log::info('addProductToErp: Linked existing Subiekt GT product', [
+                        'product_id' => $this->product->id,
+                        'external_id' => $externalId,
+                    ]);
+
+                    return;
+                }
+
+                // Other errors
+                $this->addError('erp_add', $createResult['message'] ?? 'Blad tworzenia w Subiekt GT');
+
+                Log::error('addProductToErp: Subiekt GT create failed', [
+                    'product_id' => $this->product->id,
+                    'product_sku' => $this->product->sku,
+                    'result' => $createResult,
+                ]);
+
+                return;
+            }
+
+            // For other ERP types - original logic (prepare for sync)
             $erpData = $this->product->erpData()->create([
                 'erp_connection_id' => $connectionId,
-                'external_id' => null,  // Will be filled after sync creates product
+                'external_id' => null,
                 'sync_status' => ProductErpData::STATUS_PENDING,
-                'pending_fields' => ['sku', 'name', 'ean', 'manufacturer', 'weight'],  // Mark all as pending
+                'pending_fields' => ['sku', 'name', 'ean', 'manufacturer', 'weight'],
             ]);
 
-            // Update UI state
             $this->erpExternalData = [
                 'connection' => $connection,
                 'erp_data_id' => $erpData->id,
@@ -2023,7 +2069,7 @@ trait ProductFormERPTabs
             ]);
 
         } catch (\Exception $e) {
-            $this->addError('erp_add', 'Blad przygotowania do ERP: ' . $e->getMessage());
+            $this->addError('erp_add', 'Blad dodawania do ERP: ' . $e->getMessage());
             Log::error('addProductToErp error', [
                 'product_id' => $this->product->id,
                 'connection_id' => $connectionId,

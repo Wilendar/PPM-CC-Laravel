@@ -1564,24 +1564,8 @@ class SubiektGTService implements ERPSyncServiceInterface
     protected function createProductInSubiekt(SubiektRestApiClient $client, Product $product, array $config, ?int $connectionId = null): array
     {
         try {
-            // First check if Sfera is available (required for create)
-            try {
-                $sferaHealth = $client->checkSferaHealth();
-                $sferaEnabled = $sferaHealth['sfera_enabled'] ?? false;
-
-                if (!$sferaEnabled) {
-                    return [
-                        'success' => false,
-                        'message' => 'Tworzenie produktow wymaga Sfera GT na serwerze API',
-                        'error_code' => 'SFERA_REQUIRED',
-                    ];
-                }
-            } catch (\Exception $e) {
-                Log::warning('SubiektGTService: Could not check Sfera health', [
-                    'error' => $e->getMessage(),
-                ]);
-                // Continue anyway - the create endpoint will return proper error
-            }
+            // NOTE: DirectSQL now supports CREATE operations without Sfera!
+            // Removed Sfera health check - let the API endpoint handle it.
 
             // Build create data from PPM product (using ERP data if available)
             $createData = $this->mapPpmProductToSubiekt($product, $config, true, $connectionId);

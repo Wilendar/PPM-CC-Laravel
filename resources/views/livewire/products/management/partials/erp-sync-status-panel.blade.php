@@ -465,14 +465,14 @@
                                             </span>
                                         </td>
                                         <td class="px-4 py-2 text-sm text-white text-right font-medium">
-                                            @if($price['price_net'] !== null)
+                                            @if(isset($price['price_net']) && $price['price_net'] !== null)
                                                 {{ number_format($price['price_net'], 2, ',', ' ') }} zl
                                             @else
                                                 <span class="text-gray-500">-</span>
                                             @endif
                                         </td>
                                         <td class="px-4 py-2 text-sm text-green-400 text-right font-medium">
-                                            @if($price['price_gross'] !== null)
+                                            @if(isset($price['price_gross']) && $price['price_gross'] !== null)
                                                 {{ number_format($price['price_gross'], 2, ',', ' ') }} zl
                                             @else
                                                 <span class="text-gray-500">-</span>

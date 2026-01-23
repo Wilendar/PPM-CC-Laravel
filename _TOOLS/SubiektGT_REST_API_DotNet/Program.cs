@@ -485,6 +485,103 @@ app.MapPut("/api/products/sku/{sku}", async (string sku, ProductWriteRequest req
     }
 });
 
+// Fix product visibility - adds missing tw_Stan records and fixes required fields
+// POST /api/products/{id}/fix-visibility
+app.MapPost("/api/products/{id:int}/fix-visibility", async (int id, ISubiektRepository repo, IConfiguration config) =>
+{
+    try
+    {
+        var connectionString = config.GetConnectionString("SubiektGT");
+        using var conn = new SqlConnection(connectionString);
+        await conn.OpenAsync();
+
+        // Check if product exists
+        var product = await conn.QueryFirstOrDefaultAsync<dynamic>(
+            "SELECT tw_Id, tw_Symbol FROM tw__Towar WHERE tw_Id = @id AND tw_Usuniety = 0",
+            new { id });
+
+        if (product == null)
+        {
+            return Results.NotFound(new { success = false, error = "Product not found", error_code = "PRODUCT_NOT_FOUND" });
+        }
+
+        using var transaction = conn.BeginTransaction();
+        var fixes = new List<string>();
+
+        try
+        {
+            // Fix 1: Update critical fields in tw__Towar
+            var updateTowarSql = @"
+                UPDATE tw__Towar SET
+                    tw_JakPrzySp = 1,
+                    tw_SklepInternet = 1,
+                    tw_KomunikatDokumenty = 3,
+                    tw_GrupaJpkVat = -1,
+                    tw_CzasDostawy = ISNULL(tw_CzasDostawy, 0),
+                    tw_DniWaznosc = ISNULL(tw_DniWaznosc, 0),
+                    tw_IdVatSp = ISNULL(tw_IdVatSp, 100001),
+                    tw_IdVatZak = ISNULL(tw_IdVatZak, 100001),
+                    tw_JednMiary = CASE WHEN tw_JednMiary NOT LIKE '%.' THEN tw_JednMiary + '.' ELSE tw_JednMiary END,
+                    tw_JednMiaryZak = CASE WHEN tw_JednMiaryZak NOT LIKE '%.' THEN tw_JednMiaryZak + '.' ELSE tw_JednMiaryZak END,
+                    tw_JednMiarySprz = CASE WHEN tw_JednMiarySprz NOT LIKE '%.' THEN tw_JednMiarySprz + '.' ELSE tw_JednMiarySprz END
+                WHERE tw_Id = @id";
+
+            var towarRows = await conn.ExecuteAsync(updateTowarSql, new { id }, transaction);
+            fixes.Add($"tw__Towar fields updated ({towarRows} row)");
+
+            // Fix 2: Add missing tw_Stan records for default warehouses (1 and 4)
+            var defaultWarehouseIds = new[] { 1, 4 };
+            foreach (var warehouseId in defaultWarehouseIds)
+            {
+                var existsStan = await conn.ExecuteScalarAsync<int>(
+                    "SELECT COUNT(*) FROM tw_Stan WHERE st_TowId = @productId AND st_MagId = @warehouseId",
+                    new { productId = id, warehouseId }, transaction);
+
+                if (existsStan == 0)
+                {
+                    var insertStanSql = @"
+                        INSERT INTO tw_Stan (st_TowId, st_MagId, st_Stan, st_StanMin, st_StanRez, st_StanMax)
+                        VALUES (@productId, @warehouseId, 0, 0, 0, 0)";
+
+                    await conn.ExecuteAsync(insertStanSql, new { productId = id, warehouseId }, transaction);
+                    fixes.Add($"Added tw_Stan for warehouse {warehouseId}");
+                }
+                else
+                {
+                    fixes.Add($"tw_Stan for warehouse {warehouseId} already exists");
+                }
+            }
+
+            transaction.Commit();
+
+            return Results.Ok(new
+            {
+                success = true,
+                timestamp = DateTime.Now.ToString("o"),
+                product_id = id,
+                sku = (string)product.tw_Symbol,
+                fixes_applied = fixes,
+                message = "Product visibility fixed. Please restart Subiekt GT to see changes."
+            });
+        }
+        catch (Exception ex)
+        {
+            transaction.Rollback();
+            throw;
+        }
+    }
+    catch (Exception ex)
+    {
+        return Results.Json(new
+        {
+            success = false,
+            timestamp = DateTime.Now.ToString("o"),
+            error = ex.Message,
+            error_code = "INTERNAL_ERROR"
+        }, statusCode: 500);
+    }
+});
+
 // Check if product exists by SKU
 // HEAD /api/products/sku/{sku}
 app.MapMethods("/api/products/sku/{sku}/exists", new[] { "HEAD", "GET" }, async (string sku, ISferaProductWriter writer) =>
