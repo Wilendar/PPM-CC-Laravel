@@ -422,10 +422,10 @@ class User extends Authenticatable implements MustVerifyEmail
     public function getPrimaryRole(): string
     {
         $roleHierarchy = ['Admin', 'Manager', 'Editor', 'Warehouseman', 'Salesperson', 'Claims', 'User'];
-        $userRoles = $this->getRoleNames();
+        $userRoles = $this->getRoleNames(); // Returns Collection
 
         foreach ($roleHierarchy as $role) {
-            if (in_array($role, $userRoles)) {
+            if ($userRoles->contains($role)) {
                 return $role;
             }
         }

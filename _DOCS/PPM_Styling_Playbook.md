@@ -178,5 +178,64 @@ Używaj `@class` do dokładania stanów (`disabled`, `loading`). Dodatkowe efekt
 
 ---
 
-**Ostatnia aktualizacja:** 2025-12-23
-**Autor:** Codex (na bazie PPM_Color_Style_Guide.md)
+---
+
+## 11. WYKRYTE BLEDY W STYLOWANIU (AUDIT 2026-01-23)
+
+### A) Strony z niezdefiniowanymi klasami buttonow
+
+**Pliki:**
+- `permission-matrix.blade.php` - uzywa `btn`, `btn-primary`, `btn-success` (NIE ISTNIEJA!)
+- `backup-manager.blade.php` - uzywa jasnych kolorow w dark mode
+
+**Problem:** Klasy `btn`, `btn-primary`, `btn-success` NIE SA ZDEFINIOWANE w CSS PPM.
+
+**Rozwiazanie:** Zamien na `.btn-enterprise-primary`, `.btn-enterprise-secondary`, `.btn-enterprise-danger`
+
+### B) Inline styles w "wzorcowych" stronach
+
+**Pliki:**
+- `shop-manager.blade.php` - MASOWO lamie zasady:
+  - `style="background: linear-gradient(...);"` - ZAKAZANE
+  - `style="color: #e0ac7e !important;"` - ZAKAZANE
+  - `onmouseover="this.style.background='...'"` - ZAKAZANE
+
+**Problem:** "Poprawne" wizualnie strony uzywaja inline styles zamiast CSS classes.
+
+**Rozwiazanie:** Stworz klasy CSS dla gradientow i uzywaj ich zamiast inline.
+
+### C) Light mode colors w dark mode UI
+
+**Pliki:**
+- `backup-manager.blade.php`:
+  - `border-gray-300` - powinno byc `border-gray-600`
+  - `hover:bg-gray-50` - powinno byc `hover:bg-gray-700`
+  - `bg-gray-50` - powinno byc `bg-gray-700`
+
+### D) Dynamiczne klasy kolorow
+
+**Akceptowalne wzorce:**
+```php
+// OK - dynamiczne kolory dla rol
+bg-{{ $roleColor }}-100 dark:bg-{{ $roleColor }}-900/30
+text-{{ $color }}-600 dark:text-{{ $color }}-400
+```
+
+**Zakazane:**
+```php
+// WRONG - hardcoded hex
+style="background-color: #{{ $color }};"
+```
+
+---
+
+## 12. SKILL REFERENCE
+
+Kompletny skill z wszystkimi zasadami: `.claude/skills/ppm-style-book/`
+
+Uzywaj polecenia: `/ppm-style-book` lub invoke skill `ppm-style-book`
+
+---
+
+**Ostatnia aktualizacja:** 2026-01-23
+**Autor:** Codex (na bazie PPM_Color_Style_Guide.md + Audit produkcji)

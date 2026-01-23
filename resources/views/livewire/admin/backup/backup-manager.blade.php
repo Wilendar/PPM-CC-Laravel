@@ -3,13 +3,13 @@
     <div class="flex justify-between items-center mb-6">
         <div>
             <h1 class="text-2xl font-bold text-white">Zarządzanie Backupami</h1>
-            <p class="text-gray-600">Tworzenie, przywracanie i zarządzanie kopiami zapasowymi</p>
+            <p class="text-gray-400">Tworzenie, przywracanie i zarządzanie kopiami zapasowymi</p>
         </div>
         
         <div class="flex space-x-3">
             <button type="button" 
                     wire:click="refreshBackups" 
-                    class="px-4 py-2 text-sm border border-gray-300 rounded-md hover:bg-gray-50">
+                    class="px-4 py-2 text-sm border border-gray-600 rounded-md hover:bg-gray-700 text-gray-300">
                 <i class="fas fa-sync mr-2"></i>Odśwież
             </button>
             
@@ -25,7 +25,7 @@
     <!-- Messages -->
     @if($message)
     <div class="mb-6">
-        <div class="p-4 rounded-md {{ $messageType === 'success' ? 'bg-green-50 text-green-800 border border-green-200' : ($messageType === 'error' ? 'bg-red-50 text-red-800 border border-red-200' : 'bg-blue-50 text-blue-800 border border-blue-200') }}">
+        <div class="p-4 rounded-md {{ $messageType === 'success' ? 'bg-green-900/30 text-green-300 border border-green-700' : ($messageType === 'error' ? 'bg-red-900/30 text-red-300 border border-red-700' : 'bg-blue-900/30 text-blue-300 border border-blue-700') }}">
             <div class="flex justify-between items-center">
                 <div class="flex items-center">
                     <i class="fas fa-{{ $messageType === 'success' ? 'check-circle' : ($messageType === 'error' ? 'exclamation-circle' : 'info-circle') }} mr-2"></i>
@@ -41,11 +41,11 @@
     <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
         <div class="bg-gray-800 rounded-lg shadow p-6">
             <div class="flex items-center">
-                <div class="p-2 bg-blue-100 rounded-lg">
-                    <i class="fas fa-database text-blue-600"></i>
+                <div class="p-2 bg-blue-900/30 rounded-lg">
+                    <i class="fas fa-database text-blue-400"></i>
                 </div>
                 <div class="ml-4">
-                    <p class="text-sm font-medium text-gray-600">Wszystkie backupy</p>
+                    <p class="text-sm font-medium text-gray-400">Wszystkie backupy</p>
                     <p class="text-2xl font-semibold text-white">{{ $stats['total_backups'] ?? 0 }}</p>
                 </div>
             </div>
@@ -53,11 +53,11 @@
         
         <div class="bg-gray-800 rounded-lg shadow p-6">
             <div class="flex items-center">
-                <div class="p-2 bg-green-100 rounded-lg">
-                    <i class="fas fa-check-circle text-green-600"></i>
+                <div class="p-2 bg-green-900/30 rounded-lg">
+                    <i class="fas fa-check-circle text-green-400"></i>
                 </div>
                 <div class="ml-4">
-                    <p class="text-sm font-medium text-gray-600">Ukończone</p>
+                    <p class="text-sm font-medium text-gray-400">Ukończone</p>
                     <p class="text-2xl font-semibold text-white">{{ $stats['completed_backups'] ?? 0 }}</p>
                 </div>
             </div>
@@ -65,11 +65,11 @@
         
         <div class="bg-gray-800 rounded-lg shadow p-6">
             <div class="flex items-center">
-                <div class="p-2 bg-red-100 rounded-lg">
-                    <i class="fas fa-exclamation-circle text-red-600"></i>
+                <div class="p-2 bg-red-900/30 rounded-lg">
+                    <i class="fas fa-exclamation-circle text-red-400"></i>
                 </div>
                 <div class="ml-4">
-                    <p class="text-sm font-medium text-gray-600">Nieudane</p>
+                    <p class="text-sm font-medium text-gray-400">Nieudane</p>
                     <p class="text-2xl font-semibold text-white">{{ $stats['failed_backups'] ?? 0 }}</p>
                 </div>
             </div>
@@ -77,11 +77,11 @@
         
         <div class="bg-gray-800 rounded-lg shadow p-6">
             <div class="flex items-center">
-                <div class="p-2 bg-purple-100 rounded-lg">
-                    <i class="fas fa-hdd text-purple-600"></i>
+                <div class="p-2 bg-purple-900/30 rounded-lg">
+                    <i class="fas fa-hdd text-purple-400"></i>
                 </div>
                 <div class="ml-4">
-                    <p class="text-sm font-medium text-gray-600">Rozmiar</p>
+                    <p class="text-sm font-medium text-gray-400">Rozmiar</p>
                     <p class="text-2xl font-semibold text-white">{{ $this->formatFileSize($stats['total_size_bytes'] ?? 0) }}</p>
                 </div>
             </div>
@@ -96,7 +96,7 @@
                 <span>Wolne miejsce</span>
                 <span>{{ $this->formatFileSize($diskSpace['free_bytes']) }}</span>
             </div>
-            <div class="w-full bg-gray-200 rounded-full h-2">
+            <div class="w-full bg-gray-700 rounded-full h-2">
                 <div class="bg-blue-600 h-2 rounded-full" style="width: {{ $this->getDiskUsagePercentage($diskSpace) }}%"></div>
             </div>
             <div class="flex justify-between text-xs text-gray-500">
@@ -108,23 +108,23 @@
 
     <!-- Tabs -->
     <div class="bg-gray-800 shadow-sm rounded-lg">
-        <div class="border-b border-gray-200">
+        <div class="border-b border-gray-700">
             <nav class="-mb-px flex space-x-8 px-6">
                 <button type="button" 
                         wire:click="switchTab('backups')"
-                        class="py-4 px-1 border-b-2 font-medium text-sm {{ $activeTab === 'backups' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300' }}">
+                        class="py-4 px-1 border-b-2 font-medium text-sm {{ $activeTab === 'backups' ? 'border-blue-500 text-blue-400' : 'border-transparent text-gray-400 hover:text-gray-200 hover:border-gray-500' }}">
                     <i class="fas fa-list mr-2"></i>Lista Backupów
                 </button>
                 
                 <button type="button" 
                         wire:click="switchTab('create')"
-                        class="py-4 px-1 border-b-2 font-medium text-sm {{ $activeTab === 'create' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300' }}">
+                        class="py-4 px-1 border-b-2 font-medium text-sm {{ $activeTab === 'create' ? 'border-blue-500 text-blue-400' : 'border-transparent text-gray-400 hover:text-gray-200 hover:border-gray-500' }}">
                     <i class="fas fa-plus mr-2"></i>Utwórz Backup
                 </button>
                 
                 <button type="button" 
                         wire:click="switchTab('settings')"
-                        class="py-4 px-1 border-b-2 font-medium text-sm {{ $activeTab === 'settings' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300' }}">
+                        class="py-4 px-1 border-b-2 font-medium text-sm {{ $activeTab === 'settings' ? 'border-blue-500 text-blue-400' : 'border-transparent text-gray-400 hover:text-gray-200 hover:border-gray-500' }}">
                     <i class="fas fa-cog mr-2"></i>Ustawienia
                 </button>
             </nav>
@@ -139,17 +139,17 @@
                         <input type="text" 
                                wire:model.debounce.300ms="search"
                                placeholder="Szukaj backupów..."
-                               class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                               class="w-full px-3 py-2 border border-gray-600 rounded-md bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
                     </div>
                     
-                    <select wire:model="filterType" class="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <select wire:model="filterType" class="px-3 py-2 border border-gray-600 rounded-md bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
                         <option value="">Wszystkie typy</option>
                         @foreach($backupTypes as $type => $label)
                         <option value="{{ $type }}">{{ $label }}</option>
                         @endforeach
                     </select>
                     
-                    <select wire:model="filterStatus" class="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <select wire:model="filterStatus" class="px-3 py-2 border border-gray-600 rounded-md bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
                         <option value="">Wszystkie statusy</option>
                         <option value="pending">Oczekuje</option>
                         <option value="running">Trwa</option>
@@ -167,8 +167,8 @@
 
                 <!-- Backups table -->
                 <div class="overflow-x-auto">
-                    <table class="min-w-full divide-y divide-gray-200">
-                        <thead class="bg-gray-50">
+                    <table class="min-w-full divide-y divide-gray-700">
+                        <thead class="bg-gray-900">
                             <tr>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                     Backup
@@ -187,9 +187,9 @@
                                 </th>
                             </tr>
                         </thead>
-                        <tbody class="bg-gray-800 divide-y divide-gray-200">
+                        <tbody class="bg-gray-800 divide-y divide-gray-700">
                             @forelse($backups as $backup)
-                            <tr class="hover:bg-gray-50">
+                            <tr class="hover:bg-gray-700">
                                 <td class="px-6 py-4 whitespace-nowrap">
                                     <div class="flex items-center">
                                         <div class="p-2 bg-gray-100 rounded-lg mr-3">
@@ -205,7 +205,7 @@
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap">
                                     <div class="space-y-1">
-                                        <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-800">
+                                        <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-gray-700 text-gray-200">
                                             {{ $backup->type_label }}
                                         </span>
                                         <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-{{ $backup->status_color }}-100 text-{{ $backup->status_color }}-800">
@@ -270,8 +270,8 @@
                             </tr>
                             
                             @if($backup->error_message)
-                            <tr class="bg-red-50">
-                                <td colspan="5" class="px-6 py-2 text-sm text-red-700">
+                            <tr class="bg-red-900/20">
+                                <td colspan="5" class="px-6 py-2 text-sm text-red-300">
                                     <i class="fas fa-exclamation-triangle mr-2"></i>
                                     {{ $backup->error_message }}
                                 </td>
@@ -301,9 +301,9 @@
                     
                     <div class="space-y-6">
                         <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-2">Typ backupu</label>
+                            <label class="block text-sm font-medium text-gray-300 mb-2">Typ backupu</label>
                             <select wire:model="newBackupType" 
-                                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                    class="w-full px-3 py-2 border border-gray-600 rounded-md bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
                                 @foreach($backupTypes as $type => $label)
                                 <option value="{{ $type }}">{{ $label }}</option>
                                 @endforeach
@@ -311,11 +311,11 @@
                         </div>
                         
                         <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-2">Nazwa backupu (opcjonalnie)</label>
+                            <label class="block text-sm font-medium text-gray-300 mb-2">Nazwa backupu (opcjonalnie)</label>
                             <input type="text" 
                                    wire:model="newBackupName"
                                    placeholder="Zostanie wygenerowana automatycznie"
-                                   class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                   class="w-full px-3 py-2 border border-gray-600 rounded-md bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
                         </div>
                         
                         <!-- Configuration options -->
@@ -324,7 +324,7 @@
                             
                             @foreach($backupConfiguration as $key => $value)
                             <div class="flex items-center justify-between">
-                                <label class="text-sm text-gray-700">{{ ucwords(str_replace('_', ' ', $key)) }}</label>
+                                <label class="text-sm text-gray-300">{{ ucwords(str_replace('_', ' ', $key)) }}</label>
                                 
                                 @if(is_bool($value))
                                 <input type="checkbox" 
@@ -342,7 +342,7 @@
                         <div class="flex justify-end space-x-3">
                             <button type="button" 
                                     wire:click="resetForm"
-                                    class="px-4 py-2 border border-gray-300 rounded-md text-sm hover:bg-gray-50">
+                                    class="px-4 py-2 border border-gray-600 rounded-md bg-gray-700 text-white text-sm hover:bg-gray-700">
                                 Reset
                             </button>
                             
@@ -368,9 +368,9 @@
                     
                     <div class="space-y-6">
                         <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-2">Częstotliwość automatycznych backupów</label>
+                            <label class="block text-sm font-medium text-gray-300 mb-2">Częstotliwość automatycznych backupów</label>
                             <select wire:model="settings.backup_frequency" 
-                                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                    class="w-full px-3 py-2 border border-gray-600 rounded-md bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
                                 <option value="manual">Tylko ręczne</option>
                                 <option value="daily">Codziennie</option>
                                 <option value="weekly">Tygodniowo</option>
@@ -379,12 +379,12 @@
                         </div>
                         
                         <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-2">Przechowywanie backupów (dni)</label>
+                            <label class="block text-sm font-medium text-gray-300 mb-2">Przechowywanie backupów (dni)</label>
                             <input type="number" 
                                    wire:model="settings.backup_retention_days"
                                    min="1" 
                                    max="365"
-                                   class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                   class="w-full px-3 py-2 border border-gray-600 rounded-md bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
                         </div>
                         
                         <div class="space-y-4">
@@ -392,28 +392,28 @@
                                 <input type="checkbox" 
                                        wire:model="settings.backup_compress"
                                        class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500">
-                                <label class="ml-2 text-sm text-gray-700">Kompresja backupów (zalecane)</label>
+                                <label class="ml-2 text-sm text-gray-300">Kompresja backupów (zalecane)</label>
                             </div>
                             
                             <div class="flex items-center">
                                 <input type="checkbox" 
                                        wire:model="settings.backup_encrypt"
                                        class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500">
-                                <label class="ml-2 text-sm text-gray-700">Szyfrowanie backupów</label>
+                                <label class="ml-2 text-sm text-gray-300">Szyfrowanie backupów</label>
                             </div>
                             
                             <div class="flex items-center">
                                 <input type="checkbox" 
                                        wire:model="settings.backup_include_logs"
                                        class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500">
-                                <label class="ml-2 text-sm text-gray-700">Uwzględnij pliki logów</label>
+                                <label class="ml-2 text-sm text-gray-300">Uwzględnij pliki logów</label>
                             </div>
                             
                             <div class="flex items-center">
                                 <input type="checkbox" 
                                        wire:model="settings.backup_auto_cleanup"
                                        class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500">
-                                <label class="ml-2 text-sm text-gray-700">Automatyczne usuwanie starych backupów</label>
+                                <label class="ml-2 text-sm text-gray-300">Automatyczne usuwanie starych backupów</label>
                             </div>
                         </div>
                         

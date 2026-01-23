@@ -2,6 +2,7 @@
 
 use App\Http\Middleware\AdminMiddleware;
 use App\Http\Middleware\CheckAccountLockMiddleware;
+use App\Http\Middleware\DevAuthBypass;
 use App\Http\Middleware\ForcePasswordChangeMiddleware;
 use App\Http\Middleware\PermissionMiddleware;
 use App\Http\Middleware\RoleMiddleware;
@@ -41,6 +42,11 @@ return Application::configure(basePath: dirname(__DIR__))
             'check_account_lock' => CheckAccountLockMiddleware::class,
         ]);
         
+        // Dev auth bypass - auto-login admin w trybie dev (MUSI być przed innymi!)
+        $middleware->web(prepend: [
+            DevAuthBypass::class,
+        ]);
+
         // Global middleware dla wszystkich requests
         $middleware->web(append: [
             TrackUserSessionMiddleware::class,

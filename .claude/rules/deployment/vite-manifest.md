@@ -15,7 +15,7 @@ pscp -i $HostidoKey -P 64321 "public/build/.vite/manifest.json" host379076@host3
 
 ## Complete Assets Deployment
 ```powershell
-$HostidoKey = "D:\OneDrive - MPP TRADE\SSH\Hostido\HostidoSSHNoPass.ppk"
+$HostidoKey = "D:\SSH\Hostido\HostidoSSHNoPass.ppk"
 
 # 1. Build locally
 npm run build

@@ -515,9 +515,10 @@ Route::prefix('admin')->name('admin.')->middleware($adminMiddleware)->group(func
     // ==========================================
     Route::prefix('users')->name('users.')->group(function () {
         Route::get('/', \App\Http\Livewire\Admin\Users\UserList::class)->name('index');
-        Route::get('/create', \App\Http\Livewire\Admin\Users\UserForm::class)->name('create');
-        Route::get('/{user}', \App\Http\Livewire\Admin\Users\UserDetail::class)->name('show');
-        Route::get('/{user}/edit', \App\Http\Livewire\Admin\Users\UserForm::class)->name('edit');
+        // UserForm używa wrapper views z powodu problemów z Livewire 3 full-page component routing
+        Route::get('/create', [\App\Http\Controllers\Admin\UserFormController::class, 'create'])->name('create');
+        Route::get('/{user}', \App\Http\Livewire\Admin\Users\UserDetail::class)->name('show')->whereNumber('user');
+        Route::get('/{user}/edit', [\App\Http\Controllers\Admin\UserFormController::class, 'edit'])->name('edit')->whereNumber('user');
     });
 
     // ==========================================

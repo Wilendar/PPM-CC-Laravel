@@ -9,11 +9,7 @@ use App\Services\CompatibilityManager;
 use App\Services\CompatibilityVehicleService;
 use App\Services\CompatibilityBulkService;
 use App\Services\CompatibilityCacheService;
-use App\Services\VisualEditor\BlockRegistry;
-use App\Services\VisualEditor\BlockRenderer;
-use App\Services\VisualEditor\CssDeploymentService;
-use App\Services\VisualEditor\DescriptionRenderer;
-use App\Services\VisualEditor\StylesetManager;
+use App\Services\Permissions\PermissionModuleLoader;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -32,36 +28,8 @@ class AppServiceProvider extends ServiceProvider
         $this->app->singleton(CompatibilityCacheService::class);
         $this->app->singleton(CompatibilityManager::class);
 
-        // Visual Editor Services (ETAP_07f - Visual Description Editor)
-        $this->app->singleton(StylesetManager::class);
-
-        $this->app->singleton(BlockRegistry::class, function ($app) {
-            $registry = new BlockRegistry();
-            $registry->discoverBlocks();
-            return $registry;
-        });
-
-        $this->app->singleton(BlockRenderer::class, function ($app) {
-            return new BlockRenderer(
-                $app->make(BlockRegistry::class),
-                $app->make(StylesetManager::class)
-            );
-        });
-
-        // Description Renderer (ETAP_07f Faza 8 - Rendering i Export)
-        $this->app->singleton(DescriptionRenderer::class, function ($app) {
-            return new DescriptionRenderer(
-                $app->make(BlockRegistry::class),
-                $app->make(StylesetManager::class)
-            );
-        });
-
-        // CSS Deployment Service (ETAP_07f Faza 8.4)
-        $this->app->singleton(CssDeploymentService::class, function ($app) {
-            return new CssDeploymentService(
-                $app->make(StylesetManager::class)
-            );
-        });
+        // Permission Module Loader (Modular Permissions Architecture)
+        $this->app->singleton(PermissionModuleLoader::class);
     }
 
     /**

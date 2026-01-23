@@ -11,27 +11,26 @@
     
     <!-- Animated Background Elements with MPP TRADE Colors -->
     <div class="absolute inset-0 overflow-hidden pointer-events-none">
-        <div class="absolute -top-32 -right-32 w-64 h-64 rounded-full blur-3xl animate-pulse" style="background: radial-gradient(circle, rgba(224, 172, 126, 0.1), rgba(209, 151, 90, 0.05));"></div>
-        <div class="absolute -bottom-32 -left-32 w-64 h-64 rounded-full blur-3xl animate-pulse" style="background: radial-gradient(circle, rgba(209, 151, 90, 0.1), rgba(224, 172, 126, 0.05)); animation-delay: 2s;"></div>
-        <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-96 h-96 rounded-full blur-3xl animate-pulse" style="background: radial-gradient(circle, rgba(224, 172, 126, 0.05), rgba(209, 151, 90, 0.03)); animation-delay: 4s;"></div>
+        <div class="shop-bg-blob shop-bg-blob--mpp-1"></div>
+        <div class="shop-bg-blob shop-bg-blob--mpp-2"></div>
+        <div class="shop-bg-blob shop-bg-blob--mpp-3"></div>
     </div>
     
     <!-- Page Header -->
-    <div class="relative backdrop-blur-xl shadow-2xl" style="background: linear-gradient(135deg, rgba(31, 41, 55, 0.95), rgba(17, 24, 39, 0.95)); border-bottom: 1px solid rgba(224, 172, 126, 0.3); z-index: 1;">
+    <div class="relative shadow-2xl shop-header-gradient z-10">
         <div class="max-w-7xl mx-auto px-6 sm:px-8 lg:px-12">
             <div class="flex items-center justify-between h-24">
                 <div class="flex items-center">
                     <!-- Logo and Title -->
                     <div class="flex-shrink-0">
-                        <div class="relative w-12 h-12 rounded-xl flex items-center justify-center shadow-lg transform transition-transform duration-300 hover:scale-105" style="background: linear-gradient(45deg, #e0ac7e, #d1975a);">
+                        <div class="relative w-12 h-12 rounded-xl flex items-center justify-center shadow-lg transform transition-transform duration-300 hover:scale-105 shop-icon-gradient-mpp">
                             <svg class="w-7 h-7 text-white relative z-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path>
                             </svg>
-                            <div class="absolute inset-0 rounded-xl opacity-75 blur animate-pulse" style="background: linear-gradient(45deg, #e0ac7e, #d1975a);"></div>
                         </div>
                     </div>
                     <div class="ml-4 flex-1 min-w-0">
-                        <h1 class="text-xl font-bold tracking-tight" style="color: #e0ac7e !important;">
+                        <h1 class="text-xl font-bold tracking-tight text-mpp-primary">
                             SKLEPY PRESTASHOP
                         </h1>
                         <p class="text-xs font-medium text-gray-400 tracking-wide">
@@ -41,11 +40,8 @@
                 </div>
                 
                 <!-- Add Shop Button -->
-                <button wire:click="startWizard" 
-                        class="relative inline-flex items-center px-6 py-3 border border-transparent text-sm font-bold rounded-lg text-white transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl"
-                        style="background: linear-gradient(45deg, #e0ac7e, #d1975a);"
-                        onmouseover="this.style.background='linear-gradient(45deg, #d1975a, #c08449)'"
-                        onmouseout="this.style.background='linear-gradient(45deg, #e0ac7e, #d1975a)'">
+                <button wire:click="startWizard"
+                        class="btn-enterprise-primary">
                     <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
                     </svg>
@@ -60,8 +56,7 @@
 
             <!-- Flash Messages -->
             @if (session()->has('success'))
-            <div class="mb-6 backdrop-blur-xl rounded-2xl p-4 shadow-2xl relative overflow-hidden"
-                 style="background: linear-gradient(135deg, rgba(34, 197, 94, 0.8), rgba(21, 128, 61, 0.6)); border: 1px solid rgba(34, 197, 94, 0.3);"
+            <div class="mb-6 backdrop-blur-xl rounded-2xl p-4 shadow-2xl relative overflow-hidden flash-success-gradient"
                  x-data="{ show: true }"
                  x-show="show"
                  x-transition:enter="transition ease-out duration-300"
@@ -95,8 +90,7 @@
             @endif
 
             @if (session()->has('error'))
-            <div class="mb-6 backdrop-blur-xl rounded-2xl p-4 shadow-2xl relative overflow-hidden"
-                 style="background: linear-gradient(135deg, rgba(239, 68, 68, 0.8), rgba(185, 28, 28, 0.6)); border: 1px solid rgba(239, 68, 68, 0.3);"
+            <div class="mb-6 backdrop-blur-xl rounded-2xl p-4 shadow-2xl relative overflow-hidden flash-error-gradient"
                  x-data="{ show: true }"
                  x-show="show"
                  x-transition:enter="transition ease-out duration-300"
@@ -132,8 +126,7 @@
             <!-- Statistics Cards -->
             <div class="grid grid-cols-1 md:grid-cols-5 gap-6 mb-8">
                 <!-- Total Shops -->
-                <div class="backdrop-blur-xl rounded-2xl p-6 shadow-2xl relative overflow-hidden" 
-                     style="background: linear-gradient(135deg, rgba(59, 130, 246, 0.8), rgba(29, 78, 216, 0.6)); border: 1px solid rgba(59, 130, 246, 0.2);">
+                <div class="backdrop-blur-xl rounded-2xl p-6 shadow-2xl relative overflow-hidden stat-card-blue">
                     <div class="relative z-10 flex items-center">
                         <div class="flex-shrink-0">
                             <div class="w-14 h-14 bg-gradient-to-br from-blue-400 to-blue-600 rounded-xl flex items-center justify-center shadow-xl">
@@ -154,8 +147,7 @@
                 </div>
 
                 <!-- Active Shops -->
-                <div class="backdrop-blur-xl rounded-2xl p-6 shadow-2xl relative overflow-hidden" 
-                     style="background: linear-gradient(135deg, rgba(34, 197, 94, 0.8), rgba(21, 128, 61, 0.6)); border: 1px solid rgba(34, 197, 94, 0.2);">
+                <div class="backdrop-blur-xl rounded-2xl p-6 shadow-2xl relative overflow-hidden stat-card-green">
                     <div class="relative z-10 flex items-center">
                         <div class="flex-shrink-0">
                             <div class="w-14 h-14 bg-gradient-to-br from-green-400 to-green-600 rounded-xl flex items-center justify-center shadow-xl">
@@ -176,8 +168,7 @@
                 </div>
 
                 <!-- Connected Shops -->
-                <div class="backdrop-blur-xl rounded-2xl p-6 shadow-2xl relative overflow-hidden" 
-                     style="background: linear-gradient(135deg, rgba(6, 182, 212, 0.8), rgba(8, 145, 178, 0.6)); border: 1px solid rgba(6, 182, 212, 0.2);">
+                <div class="backdrop-blur-xl rounded-2xl p-6 shadow-2xl relative overflow-hidden stat-card-cyan">
                     <div class="relative z-10 flex items-center">
                         <div class="flex-shrink-0">
                             <div class="w-14 h-14 bg-gradient-to-br from-cyan-400 to-cyan-600 rounded-xl flex items-center justify-center shadow-xl">
@@ -198,8 +189,7 @@
                 </div>
 
                 <!-- Issues -->
-                <div class="backdrop-blur-xl rounded-2xl p-6 shadow-2xl relative overflow-hidden" 
-                     style="background: linear-gradient(135deg, rgba(245, 158, 11, 0.8), rgba(217, 119, 6, 0.6)); border: 1px solid rgba(245, 158, 11, 0.2);">
+                <div class="backdrop-blur-xl rounded-2xl p-6 shadow-2xl relative overflow-hidden stat-card-amber">
                     <div class="relative z-10 flex items-center">
                         <div class="flex-shrink-0">
                             <div class="w-14 h-14 bg-gradient-to-br from-yellow-400 to-yellow-600 rounded-xl flex items-center justify-center shadow-xl">
@@ -220,8 +210,7 @@
                 </div>
 
                 <!-- Sync Due -->
-                <div class="backdrop-blur-xl rounded-2xl p-6 shadow-2xl relative overflow-hidden" 
-                     style="background: linear-gradient(135deg, rgba(168, 85, 247, 0.8), rgba(124, 58, 237, 0.6)); border: 1px solid rgba(168, 85, 247, 0.2);">
+                <div class="backdrop-blur-xl rounded-2xl p-6 shadow-2xl relative overflow-hidden stat-card-purple">
                     <div class="relative z-10 flex items-center">
                         <div class="flex-shrink-0">
                             <div class="w-14 h-14 bg-gradient-to-br from-purple-400 to-purple-600 rounded-xl flex items-center justify-center shadow-xl">
@@ -244,7 +233,7 @@
 
             <!-- Filters and Search -->
             <div class="backdrop-blur-xl rounded-2xl p-6 shadow-2xl mb-8 relative overflow-hidden" 
-                 style="background: linear-gradient(135deg, rgba(31, 41, 55, 0.8), rgba(17, 24, 39, 0.6)); border: 1px solid rgba(224, 172, 126, 0.2);">
+                 class="shop-card-gradient">
                 <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between space-y-4 lg:space-y-0 lg:space-x-6">
                     <!-- Search -->
                     <div class="flex-1 max-w-md">
@@ -257,16 +246,14 @@
                             <input wire:model.debounce.300ms="search"
                                    type="text" 
                                    class="block w-full pl-10 pr-3 py-3 border border-gray-600 rounded-lg bg-gray-800 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:border-transparent transition-colors duration-200" 
-                                   style="focus:ring-color: #e0ac7e;"
-                                   placeholder="Szukaj sklepów...">
+                                                                      placeholder="Szukaj sklepów...">
                         </div>
                     </div>
 
                     <!-- Status Filter -->
                     <div class="flex-shrink-0">
                         <select wire:model="statusFilter" 
-                                class="block w-full px-4 py-3 border border-gray-600 rounded-lg bg-gray-800 text-white focus:outline-none focus:ring-2 focus:border-transparent transition-colors duration-200"
-                                style="focus:ring-color: #e0ac7e;">
+                                class="block w-full px-4 py-3 border border-gray-600 rounded-lg bg-gray-800 text-white focus:outline-none focus:ring-2 focus:ring-[#e0ac7e] focus:border-transparent transition-colors duration-200">
                             <option value="all">Wszystkie statusy</option>
                             <option value="active">Aktywne</option>
                             <option value="inactive">Nieaktywne</option>
@@ -279,8 +266,7 @@
                     <!-- Sort Options -->
                     <div class="flex-shrink-0">
                         <select wire:model="sortBy" 
-                                class="block w-full px-4 py-3 border border-gray-600 rounded-lg bg-gray-800 text-white focus:outline-none focus:ring-2 focus:border-transparent transition-colors duration-200"
-                                style="focus:ring-color: #e0ac7e;">
+                                class="block w-full px-4 py-3 border border-gray-600 rounded-lg bg-gray-800 text-white focus:outline-none focus:ring-2 focus:ring-[#e0ac7e] focus:border-transparent transition-colors duration-200">
                             <option value="name">Sortuj: Nazwa</option>
                             <option value="created_at">Sortuj: Data dodania</option>
                             <option value="last_sync_at">Sortuj: Ostatnia sync</option>
@@ -303,15 +289,15 @@
 
             <!-- Shops List -->
             <div class="backdrop-blur-xl rounded-2xl shadow-2xl relative overflow-hidden" 
-                 style="background: linear-gradient(135deg, rgba(31, 41, 55, 0.8), rgba(17, 24, 39, 0.6)); border: 1px solid rgba(224, 172, 126, 0.2);">
+                 class="shop-card-gradient">
                  
                 <!-- Header -->
-                <div class="px-6 py-4 border-b" style="border-color: rgba(224, 172, 126, 0.2);">
+                <div class="px-6 py-4 border-b" class="border-mpp-accent">
                     <h3 class="text-lg font-bold text-white flex items-center">
-                        <svg class="w-5 h-5 mr-2" style="color: #e0ac7e;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg class="w-5 h-5 mr-2" class="text-mpp-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path>
                         </svg>
-                        <span style="color: #e0ac7e;">Lista Sklepów</span>
+                        <span class="text-mpp-primary">Lista Sklepów</span>
                     </h3>
                 </div>
 
@@ -322,7 +308,7 @@
                         <div class="hidden lg:block overflow-x-auto">
                             <table class="min-w-full">
                                 <thead class="bg-gray-800 bg-opacity-50">
-                                    <tr class="border-b" style="border-color: rgba(224, 172, 126, 0.1);">
+                                    <tr class="border-b" class="border-mpp-accent">
                                         <th wire:click="sortBy('name')" 
                                             class="px-6 py-4 text-left text-sm font-medium text-gray-300 uppercase tracking-wider cursor-pointer hover:text-white transition-colors duration-200">
                                             <div class="flex items-center space-x-1">
@@ -594,7 +580,7 @@
                         <div class="block lg:hidden space-y-4 p-6">
                             @foreach($shops as $shop)
                             <div class="backdrop-blur-xl rounded-2xl p-6 shadow-2xl relative overflow-hidden" 
-                                 style="background: linear-gradient(135deg, rgba(55, 65, 81, 0.8), rgba(31, 41, 55, 0.6)); border: 1px solid rgba(224, 172, 126, 0.2);">
+                                 class="shop-panel-gradient">
                                 <!-- Shop Header -->
                                 <div class="flex items-center justify-between mb-4">
                                     <div class="flex items-center space-x-3">
@@ -739,7 +725,7 @@
                         </div>
 
                         <!-- Pagination -->
-                        <div class="px-6 py-4 border-t" style="border-color: rgba(224, 172, 126, 0.2);">
+                        <div class="px-6 py-4 border-t" class="border-mpp-accent">
                             {{ $shops->links() }}
                         </div>
 
@@ -761,7 +747,7 @@
                             <div class="mt-6">
                                 <button wire:click="startWizard" 
                                         class="inline-flex items-center px-6 py-3 border border-transparent text-sm font-medium rounded-lg text-white transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl"
-                                        style="background: linear-gradient(45deg, #e0ac7e, #d1975a);">
+                                        class="shop-icon-gradient-mpp">
                                     <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
                                     </svg>
@@ -789,14 +775,14 @@
 
     <!-- Shop Details Modal -->
     @if($showShopDetails && $selectedShop)
-    <div class="fixed inset-0 z-50 overflow-y-auto" style="z-index: 9999;">
+    <div class="fixed inset-0 z-50 overflow-y-auto" >
         <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
             <!-- Background overlay -->
             <div class="fixed inset-0 bg-black bg-opacity-75 transition-opacity" wire:click="closeDetails"></div>
 
             <!-- Modal -->
             <div class="inline-block align-bottom bg-gray-800 rounded-lg px-6 pt-5 pb-4 text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-4xl sm:w-full sm:p-6"
-                 style="background: linear-gradient(135deg, rgba(31, 41, 55, 0.95), rgba(17, 24, 39, 0.95)); border: 1px solid rgba(224, 172, 126, 0.3);">
+                 class="shop-modal-gradient">
 
                 <!-- Header -->
                 <div class="flex items-center justify-between mb-6">
@@ -815,7 +801,7 @@
                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     <!-- Basic Information -->
                     <div class="space-y-4">
-                        <div class="backdrop-blur-xl rounded-xl p-4" style="background: linear-gradient(135deg, rgba(55, 65, 81, 0.6), rgba(31, 41, 55, 0.4)); border: 1px solid rgba(224, 172, 126, 0.2);">
+                        <div class="backdrop-blur-xl rounded-xl p-4" class="shop-panel-gradient">
                             <h4 class="text-lg font-semibold text-white mb-3">Podstawowe informacje</h4>
 
                             <dl class="space-y-3">
@@ -859,7 +845,7 @@
                         </div>
 
                         <!-- Connection Status -->
-                        <div class="backdrop-blur-xl rounded-xl p-4" style="background: linear-gradient(135deg, rgba(55, 65, 81, 0.6), rgba(31, 41, 55, 0.4)); border: 1px solid rgba(224, 172, 126, 0.2);">
+                        <div class="backdrop-blur-xl rounded-xl p-4" class="shop-panel-gradient">
                             <h4 class="text-lg font-semibold text-white mb-3">Status połączenia</h4>
 
                             <dl class="space-y-3">
@@ -919,7 +905,7 @@
                     <!-- Sync Information & Recent Jobs -->
                     <div class="space-y-4">
                         <!-- Sync Statistics -->
-                        <div class="backdrop-blur-xl rounded-xl p-4" style="background: linear-gradient(135deg, rgba(55, 65, 81, 0.6), rgba(31, 41, 55, 0.4)); border: 1px solid rgba(224, 172, 126, 0.2);">
+                        <div class="backdrop-blur-xl rounded-xl p-4" class="shop-panel-gradient">
                             <h4 class="text-lg font-semibold text-white mb-3">Statystyki synchronizacji</h4>
 
                             <dl class="space-y-3">
@@ -960,7 +946,7 @@
 
                         <!-- Recent Sync Jobs -->
                         @if($selectedShop->syncJobs && $selectedShop->syncJobs->count() > 0)
-                        <div class="backdrop-blur-xl rounded-xl p-4" style="background: linear-gradient(135deg, rgba(55, 65, 81, 0.6), rgba(31, 41, 55, 0.4)); border: 1px solid rgba(224, 172, 126, 0.2);">
+                        <div class="backdrop-blur-xl rounded-xl p-4" class="shop-panel-gradient">
                             <h4 class="text-lg font-semibold text-white mb-3">Ostatnie zadania synchronizacji</h4>
 
                             <div class="space-y-2">
@@ -1007,7 +993,7 @@
 
                     <div class="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
                         <!-- API Version Compatibility -->
-                        <div class="backdrop-blur-xl rounded-xl p-4" style="background: linear-gradient(135deg, rgba(55, 65, 81, 0.6), rgba(31, 41, 55, 0.4)); border: 1px solid rgba(224, 172, 126, 0.2);">
+                        <div class="backdrop-blur-xl rounded-xl p-4" class="shop-panel-gradient">
                             <div class="flex items-center justify-between mb-3">
                                 <h4 class="text-lg font-semibold text-white">Kompatybilność API</h4>
                                 @switch($selectedShop->connection_details['api_version_check']['status'])
@@ -1037,7 +1023,7 @@
                         </div>
 
                         <!-- SSL/TLS Status -->
-                        <div class="backdrop-blur-xl rounded-xl p-4" style="background: linear-gradient(135deg, rgba(55, 65, 81, 0.6), rgba(31, 41, 55, 0.4)); border: 1px solid rgba(224, 172, 126, 0.2);">
+                        <div class="backdrop-blur-xl rounded-xl p-4" class="shop-panel-gradient">
                             <div class="flex items-center justify-between mb-3">
                                 <h4 class="text-lg font-semibold text-white">SSL/TLS</h4>
                                 @switch($selectedShop->connection_details['ssl_tls_status']['security_level'])
@@ -1073,7 +1059,7 @@
                         </div>
 
                         <!-- API Rate Limits -->
-                        <div class="backdrop-blur-xl rounded-xl p-4" style="background: linear-gradient(135deg, rgba(55, 65, 81, 0.6), rgba(31, 41, 55, 0.4)); border: 1px solid rgba(224, 172, 126, 0.2);">
+                        <div class="backdrop-blur-xl rounded-xl p-4" class="shop-panel-gradient">
                             <div class="flex items-center justify-between mb-3">
                                 <h4 class="text-lg font-semibold text-white">Limity API</h4>
                                 @switch($selectedShop->connection_details['rate_limits']['status'])
@@ -1108,7 +1094,7 @@
                         </div>
 
                         <!-- Response Time Metrics -->
-                        <div class="backdrop-blur-xl rounded-xl p-4" style="background: linear-gradient(135deg, rgba(55, 65, 81, 0.6), rgba(31, 41, 55, 0.4)); border: 1px solid rgba(224, 172, 126, 0.2);">
+                        <div class="backdrop-blur-xl rounded-xl p-4" class="shop-panel-gradient">
                             <div class="flex items-center justify-between mb-3">
                                 <h4 class="text-lg font-semibold text-white">Czas odpowiedzi</h4>
                                 @switch($selectedShop->connection_details['response_metrics']['status'])
@@ -1150,7 +1136,7 @@
                         </div>
 
                         <!-- Error Rate Tracking -->
-                        <div class="backdrop-blur-xl rounded-xl p-4" style="background: linear-gradient(135deg, rgba(55, 65, 81, 0.6), rgba(31, 41, 55, 0.4)); border: 1px solid rgba(224, 172, 126, 0.2);">
+                        <div class="backdrop-blur-xl rounded-xl p-4" class="shop-panel-gradient">
                             <div class="flex items-center justify-between mb-3">
                                 <h4 class="text-lg font-semibold text-white">Wskaźnik błędów</h4>
                                 @switch($selectedShop->connection_details['error_tracking']['alert_level'])
@@ -1238,14 +1224,14 @@
 
     <!-- Delete Confirmation Modal -->
     @if($showDeleteConfirm)
-    <div class="fixed inset-0 z-50 overflow-y-auto" style="z-index: 9999;">
+    <div class="fixed inset-0 z-50 overflow-y-auto" >
         <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
             <!-- Background overlay -->
             <div class="fixed inset-0 bg-black bg-opacity-75 transition-opacity" wire:click="cancelDelete"></div>
 
             <!-- Modal -->
             <div class="inline-block align-bottom bg-gray-800 rounded-lg px-6 pt-5 pb-4 text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full sm:p-6" 
-                 style="background: linear-gradient(135deg, rgba(31, 41, 55, 0.95), rgba(17, 24, 39, 0.95)); border: 1px solid rgba(224, 172, 126, 0.3);">
+                 class="shop-modal-gradient">
                 
                 <div class="sm:flex sm:items-start">
                     <div class="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-red-900 bg-opacity-40 sm:mx-0 sm:h-10 sm:w-10">

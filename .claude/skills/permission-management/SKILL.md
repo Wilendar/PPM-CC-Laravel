@@ -1,7 +1,7 @@
 ---
 name: permission-management
 description: "Manage PPM permissions - add, update, remove permission modules. Use when working with admin/permissions panel or adding new features requiring permissions."
-version: 1.0.0
+version: 1.2.0
 author: Claude Code
 created: 2026-01-23
 updated: 2026-01-23
@@ -57,6 +57,27 @@ Ten skill zawiera **kompletną wiedzę** o systemie uprawnień PPM opartym na Sp
 ---
 
 ## DODAWANIE NOWEGO MODUŁU UPRAWNIEŃ
+
+### QUICK START: Użyj Template
+
+**Najszybsza metoda dla AI agentów:**
+
+```bash
+# 1. Skopiuj template
+cp config/permissions/_template.php config/permissions/{module_name}.php
+
+# 2. Edytuj plik (zamień placeholdery)
+
+# 3. Uruchom seeder
+php artisan db:seed --class=RolePermissionSeeder
+
+# 4. Wyczyść cache
+php artisan cache:clear
+```
+
+**Template:** `resources/_template.php` (kopia w tym skill) lub `config/permissions/_template.php`
+
+---
 
 ### Krok 1: Zdefiniuj Uprawnienia
 
@@ -419,14 +440,56 @@ Permission::create(['name' => 'my.permission', 'guard_name' => 'web']);
 |------|------|
 | `app/Http/Livewire/Admin/Permissions/PermissionMatrix.php` | Panel uprawnień |
 | `app/Http/Livewire/Admin/Roles/RoleList.php` | Lista ról |
+| `app/Services/Permissions/PermissionModuleLoader.php` | Loader modułów |
 | `app/Policies/` | Wszystkie policy |
 | `config/permission.php` | Konfiguracja Spatie |
-| `database/seeders/PermissionSeeder.php` | Seeder uprawnień |
-| `config/permissions/` | Moduły uprawnień (do utworzenia) |
+| `config/permissions/` | Moduły uprawnień |
+| `config/permissions/_template.php` | **Template dla nowych modułów** |
+| `database/seeders/RolePermissionSeeder.php` | Seeder uprawnień |
+
+## SKILL RESOURCES
+
+| Plik | Opis |
+|------|------|
+| `resources/_template.php` | **Kopia template do użycia przez AI agentów** |
+
+---
+
+## ZNANE PROBLEMY (GAPS)
+
+### GAP #1: PermissionMatrix nie uzywa PermissionModuleLoader
+
+**Status:** ✅ ZAMKNIETE (2026-01-23)
+**Priorytet:** SREDNI
+
+**Problem:** `PermissionMatrix.php` uzywalo hardcoded metody `getPermissionModules()` zamiast `PermissionModuleLoader`.
+
+**Rozwiazanie zastosowane:** Zmodyfikowano `getPermissionModules()` w `PermissionMatrix.php`:
+- Dodano import `App\Services\Permissions\PermissionModuleLoader`
+- Metoda teraz uzywa `PermissionModuleLoader::getPermissionsByModule()`
+- Zachowano kompatybilnosc z DB permissions (potrzebne dla UI toggling)
+- Dodano obsluge orphan permissions (w DB ale nie w config)
+
+**Zweryfikowane:** Screenshot /admin/permissions pokazuje poprawne moduly z config/permissions/*.php
 
 ---
 
 ## CHANGELOG
+
+### v1.3.0 (2026-01-23)
+- [FIX] Zamknieto GAP #1: PermissionMatrix teraz uzywa PermissionModuleLoader
+- [CODE] Zmodyfikowano getPermissionModules() w PermissionMatrix.php
+- [VERIFY] Zweryfikowano dzialanie na produkcji (screenshot)
+
+### v1.2.0 (2026-01-23)
+- [DOCS] Dodano sekcję ZNANE PROBLEMY (GAPS)
+- [DOCS] Udokumentowano GAP #1: PermissionMatrix integracja
+- [LINK] Dodano referencję do Plan_Projektu/PERMISSION_MODULAR_ARCHITECTURE.md
+
+### v1.1.0 (2026-01-23)
+- [ADD] Dodano `resources/_template.php` - kopia template dla AI agentów
+- [DOCS] Zaktualizowano sekcję PLIKI REFERENCYJNE
+- [DOCS] Dodano QUICK START z użyciem template
 
 ### v1.0.0 (2026-01-23)
 - [INIT] Utworzono skill z kompletną dokumentacją systemu uprawnień PPM

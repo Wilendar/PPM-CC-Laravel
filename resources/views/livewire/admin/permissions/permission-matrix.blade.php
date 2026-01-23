@@ -13,21 +13,21 @@
         <!-- Action buttons -->
         <div class="flex space-x-2">
             @if($hasChanges)
-                <button wire:click="saveChanges" 
+                <button wire:click="saveChanges"
                         wire:loading.attr="disabled"
-                        class="btn btn-success">
+                        class="btn-enterprise-success">
                     <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
                     </svg>
                     Zapisz zmiany
                 </button>
                 
-                <button wire:click="discardChanges" class="btn btn-secondary">
+                <button wire:click="discardChanges" class="btn-enterprise-secondary">
                     Odrzuć
                 </button>
             @endif
             
-            <button @click="showTemplates = true" class="btn btn-outline-primary">
+            <button @click="showTemplates = true" class="btn-enterprise-ghost">
                 <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
                 </svg>
@@ -44,12 +44,11 @@
                 <label class="block text-sm font-medium text-gray-300 mb-2">
                     Wybierz rolę:
                 </label>
-                <select wire:model="selectedRole" 
-                        class="w-full px-3 py-2 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white">
-                    <option value="">-- Wybierz rolę --</option>
+                <select wire:model="selectedRole"
+                        class="w-full px-3 py-2 border border-gray-600 rounded-lg bg-gray-700 text-white focus:ring-2 focus:ring-[#e0ac7e] focus:border-transparent">
+                    <option value="" class="bg-gray-700 text-white">-- Wybierz rolę --</option>
                     @foreach($roles as $role)
-                        <option value="{{ $role->id }}" 
-                                class="flex items-center">
+                        <option value="{{ $role->id }}" class="bg-gray-700 text-white">
                             {{ $role->name }}
                             ({{ $role->users_count ?? 0 }} użytkowników)
                         </option>
@@ -86,16 +85,16 @@
                     Szybkie akcje:
                 </label>
                 <div class="flex flex-wrap gap-2">
-                    <button wire:click="applyTemplate('read_only')" 
-                            class="px-3 py-1 text-xs bg-blue-100 text-blue-800 rounded-full hover:bg-blue-200 transition-colors">
+                    <button wire:click="applyTemplate('read_only')"
+                            class="px-3 py-1 text-xs bg-blue-900/40 text-blue-300 rounded-full hover:bg-blue-900/60 transition-colors">
                         Tylko odczyt
                     </button>
-                    <button wire:click="applyTemplate('manager_level')" 
-                            class="px-3 py-1 text-xs bg-green-100 text-green-800 rounded-full hover:bg-green-200 transition-colors">
+                    <button wire:click="applyTemplate('manager_level')"
+                            class="px-3 py-1 text-xs bg-green-900/40 text-green-300 rounded-full hover:bg-green-900/60 transition-colors">
                         Poziom Menadżer
                     </button>
-                    <button wire:click="applyTemplate('full_access')" 
-                            class="px-3 py-1 text-xs bg-red-100 text-red-800 rounded-full hover:bg-red-200 transition-colors">
+                    <button wire:click="applyTemplate('full_access')"
+                            class="px-3 py-1 text-xs bg-red-900/40 text-red-300 rounded-full hover:bg-red-900/60 transition-colors">
                         Pełny dostęp
                     </button>
                 </div>
@@ -103,12 +102,12 @@
         </div>
         
         @if($hasChanges)
-        <div class="mt-4 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+        <div class="mt-4 p-3 bg-yellow-900/20 border border-yellow-800 rounded-lg">
             <div class="flex items-center">
                 <svg class="w-5 h-5 text-yellow-400 mr-2" fill="currentColor" viewBox="0 0 20 20">
                     <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"></path>
                 </svg>
-                <span class="text-yellow-800 dark:text-yellow-200 font-medium">
+                <span class="text-yellow-200 font-medium">
                     Masz niezapisane zmiany uprawnień
                 </span>
             </div>
@@ -122,14 +121,14 @@
         <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <div class="flex items-center space-x-4">
                 @if(!$bulkSelectMode)
-                    <button wire:click="enableBulkSelect" class="btn btn-outline-secondary">
+                    <button wire:click="enableBulkSelect" class="btn-enterprise-ghost">
                         <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                         </svg>
                         Operacje masowe
                     </button>
                 @else
-                    <button wire:click="disableBulkSelect" class="btn btn-secondary">
+                    <button wire:click="disableBulkSelect" class="btn-enterprise-secondary">
                         Anuluj
                     </button>
                     
@@ -152,7 +151,7 @@
                 </span>
                 
                 <select wire:model="bulkAction" 
-                        class="px-3 py-1 text-sm border border-gray-600 rounded focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white">
+                        class="px-3 py-1 text-sm border border-gray-600 rounded focus:ring-2 focus:ring-blue-500 bg-gray-700 text-white">
                     <option value="">-- Akcja --</option>
                     <option value="enable">Włącz</option>
                     <option value="disable">Wyłącz</option>
@@ -160,7 +159,7 @@
                 
                 <button wire:click="executeBulkAction" 
                         :disabled="!$wire.bulkAction"
-                        class="btn btn-primary btn-sm">
+                        class="btn-enterprise-primary btn-enterprise-sm">
                     Wykonaj
                 </button>
             </div>
@@ -173,11 +172,11 @@
         @foreach($permissionsByModule as $moduleName => $permissions)
         <div class="border-b border-gray-700 last:border-b-0">
             <!-- Module header -->
-            <div class="px-6 py-4 bg-gray-50 dark:bg-gray-900/50">
+            <div class="px-6 py-4 bg-gray-900/50">
                 <div class="flex items-center justify-between">
                     <div class="flex items-center space-x-3">
                         <button wire:click="toggleModuleExpansion('{{ $moduleName }}')" 
-                                class="p-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors">
+                                class="p-1 rounded-full hover:bg-gray-700 transition-colors">
                             <svg class="w-4 h-4 transform transition-transform {{ $expandedModules[$moduleName] ?? true ? 'rotate-90' : '' }}" 
                                  fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
@@ -189,7 +188,7 @@
                         </h3>
                         
                         <button wire:click="toggleModule('{{ $moduleName }}')" 
-                                class="px-3 py-1 text-xs bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 rounded-full transition-colors">
+                                class="px-3 py-1 text-xs bg-gray-700 hover:bg-gray-600 rounded-full transition-colors">
                             {{ $moduleStats[$moduleName]['enabled'] ?? 0 === $moduleStats[$moduleName]['total'] ?? 0 ? 'Wyłącz wszystkie' : 'Włącz wszystkie' }}
                         </button>
                     </div>
@@ -197,7 +196,7 @@
                     <div class="flex items-center space-x-4">
                         <!-- Progress bar -->
                         <div class="flex items-center space-x-2">
-                            <div class="w-24 h-2 bg-gray-200 dark:bg-gray-600 rounded-full overflow-hidden">
+                            <div class="w-24 h-2 bg-gray-600 rounded-full overflow-hidden">
                                 <div class="h-full bg-gradient-to-r from-green-400 to-green-600 transition-all duration-300"
                                      style="width: {{ $moduleStats[$moduleName]['percentage'] ?? 0 }}%"></div>
                             </div>
@@ -214,7 +213,7 @@
             <div class="px-6 py-4">
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     @foreach($permissions as $permission)
-                    <div class="flex items-center justify-between p-3 rounded-lg border border-gray-200 dark:border-gray-600 hover:bg-gray-700/50 transition-colors">
+                    <div class="flex items-center justify-between p-3 rounded-lg border border-gray-600 hover:bg-gray-700/50 transition-colors">
                         <div class="flex items-center space-x-3">
                             @if($bulkSelectMode)
                                 <input type="checkbox" 
@@ -228,7 +227,7 @@
                                     {{ str_replace('.', ' › ', $permission->name) }}
                                 </div>
                                 @if($permission->description)
-                                <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                <div class="text-xs text-gray-400 mt-1">
                                     {{ $permission->description }}
                                 </div>
                                 @endif
@@ -239,11 +238,11 @@
                             <!-- Permission status indicator -->
                             <div class="flex items-center space-x-1">
                                 @if($permissionMatrix[$permission->id] ?? false)
-                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-900/50 text-green-300">
                                         Włączone
                                     </span>
                                 @else
-                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200">
+                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-700 text-gray-300">
                                         Wyłączone
                                     </span>
                                 @endif
@@ -255,7 +254,7 @@
                                        wire:click="togglePermission({{ $permission->id }})"
                                        :checked="{{ $permissionMatrix[$permission->id] ?? false ? 'true' : 'false' }}"
                                        class="sr-only peer">
-                                <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-gray-800 after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
+                                <div class="w-11 h-6 bg-gray-700 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-gray-400 after:border-gray-600 after:border after:rounded-full after:h-5 after:w-5 after:transition-all border-gray-600 peer-checked:bg-blue-600"></div>
                             </label>
                         </div>
                     </div>
@@ -273,7 +272,7 @@
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-1a2 2 0 00-2-2H6a2 2 0 00-2 2v1a2 2 0 002 2zM12 15V9m0 0l3 3m-3-3l-3 3"></path>
         </svg>
         <h3 class="mt-4 text-sm font-medium text-white">Wybierz rolę</h3>
-        <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+        <p class="mt-1 text-sm text-gray-400">
             Wybierz rolę z listy powyżej, aby zarządzać jej uprawnieniami.
         </p>
     </div>
@@ -298,32 +297,32 @@
                     <div class="space-y-2 mb-6">
                         <h4 class="text-sm font-medium text-gray-300">Predefiniowane szablony:</h4>
                         
-                        <button wire:click="applyTemplate('read_only')" 
+                        <button wire:click="applyTemplate('read_only')"
                                 @click="showTemplates = false"
-                                class="w-full text-left p-3 rounded-lg border border-gray-200 dark:border-gray-600 hover:bg-gray-700 transition-colors">
+                                class="w-full text-left p-3 rounded-lg border border-gray-600 hover:bg-gray-700 transition-colors">
                             <div class="font-medium">Tylko odczyt</div>
-                            <div class="text-xs text-gray-500 dark:text-gray-400">Podstawowe uprawnienia do przeglądania</div>
+                            <div class="text-xs text-gray-400">Podstawowe uprawnienia do przeglądania</div>
                         </button>
                         
-                        <button wire:click="applyTemplate('editor_level')" 
+                        <button wire:click="applyTemplate('editor_level')"
                                 @click="showTemplates = false"
-                                class="w-full text-left p-3 rounded-lg border border-gray-200 dark:border-gray-600 hover:bg-gray-700 transition-colors">
+                                class="w-full text-left p-3 rounded-lg border border-gray-600 hover:bg-gray-700 transition-colors">
                             <div class="font-medium">Poziom Redaktor</div>
-                            <div class="text-xs text-gray-500 dark:text-gray-400">Edycja opisów, zdjęć, kategorii</div>
+                            <div class="text-xs text-gray-400">Edycja opisów, zdjęć, kategorii</div>
                         </button>
                         
-                        <button wire:click="applyTemplate('manager_level')" 
+                        <button wire:click="applyTemplate('manager_level')"
                                 @click="showTemplates = false"
-                                class="w-full text-left p-3 rounded-lg border border-gray-200 dark:border-gray-600 hover:bg-gray-700 transition-colors">
+                                class="w-full text-left p-3 rounded-lg border border-gray-600 hover:bg-gray-700 transition-colors">
                             <div class="font-medium">Poziom Menadżer</div>
-                            <div class="text-xs text-gray-500 dark:text-gray-400">CRUD produktów + import/export</div>
+                            <div class="text-xs text-gray-400">CRUD produktów + import/export</div>
                         </button>
                         
-                        <button wire:click="applyTemplate('full_access')" 
+                        <button wire:click="applyTemplate('full_access')"
                                 @click="showTemplates = false"
-                                class="w-full text-left p-3 rounded-lg border border-gray-200 dark:border-gray-600 hover:bg-gray-700 transition-colors">
+                                class="w-full text-left p-3 rounded-lg border border-gray-600 hover:bg-gray-700 transition-colors">
                             <div class="font-medium">Pełny dostęp</div>
-                            <div class="text-xs text-gray-500 dark:text-gray-400">Wszystkie uprawnienia systemowe</div>
+                            <div class="text-xs text-gray-400">Wszystkie uprawnienia systemowe</div>
                         </button>
                     </div>
                     
@@ -333,10 +332,10 @@
                         <h4 class="text-sm font-medium text-gray-300">Niestandardowe szablony:</h4>
                         
                         @foreach($customTemplates as $templateName => $template)
-                        <div class="flex items-center justify-between p-3 rounded-lg border border-gray-200 dark:border-gray-600">
+                        <div class="flex items-center justify-between p-3 rounded-lg border border-gray-600">
                             <div>
                                 <div class="font-medium">{{ $template['name'] }}</div>
-                                <div class="text-xs text-gray-500 dark:text-gray-400">
+                                <div class="text-xs text-gray-400">
                                     {{ count($template['permissions']) }} uprawnień
                                     • {{ $template['created_by'] }}
                                     • {{ \Carbon\Carbon::parse($template['created_at'])->format('d.m.Y') }}
@@ -359,13 +358,13 @@
                     @endif
                 </div>
                 
-                <div class="bg-gray-50 dark:bg-gray-700 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
-                    <button @click="showSaveTemplate = true" 
-                            class="btn btn-primary mb-2 sm:mb-0 sm:ml-2">
+                <div class="bg-gray-700 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                    <button @click="showSaveTemplate = true"
+                            class="btn-enterprise-primary mb-2 sm:mb-0 sm:ml-2">
                         Zapisz jako szablon
                     </button>
-                    <button @click="showTemplates = false" 
-                            class="btn btn-secondary">
+                    <button @click="showTemplates = false"
+                            class="btn-enterprise-secondary">
                         Zamknij
                     </button>
                 </div>

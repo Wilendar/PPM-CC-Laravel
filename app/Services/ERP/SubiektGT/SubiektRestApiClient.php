@@ -265,7 +265,7 @@ class SubiektRestApiClient
      * @param array $params Query parameters
      *   - page: int (default: 1)
      *   - pageSize: int (default: 100, max: 500)
-     *   - priceLevel: int (default: 0, range: 0-10, maps to tc_CenaNetto0..10)
+     *   - priceLevel: int (default: 1, range: 1-10, maps to tc_CenaNetto1..10, level 0 is unused)
      *   - warehouseId: int (default: 1)
      *   - sku: string (filter by SKU, LIKE)
      *   - name: string (filter by name, LIKE)
@@ -312,7 +312,7 @@ class SubiektRestApiClient
      * Get single product by ID
      *
      * @param int $productId Subiekt GT product ID
-     * @param int|null $priceLevel Price level (0-10, maps to tc_CenaNetto0..10)
+     * @param int|null $priceLevel Price level (1-10, maps to tc_CenaNetto1..10, level 0 is unused)
      * @param int|null $warehouseId Warehouse ID
      * @return array Product data
      */
@@ -330,7 +330,7 @@ class SubiektRestApiClient
      * Get single product by SKU
      *
      * @param string $sku Product SKU
-     * @param int|null $priceLevel Price level (0-10, maps to tc_CenaNetto0..10)
+     * @param int|null $priceLevel Price level (1-10, maps to tc_CenaNetto1..10, level 0 is unused)
      * @param int|null $warehouseId Warehouse ID
      * @return array Product data
      */
@@ -527,21 +527,42 @@ class SubiektRestApiClient
 
         // Prices (array of price levels)
         // Format: ['prices' => [0 => ['net' => 100.00, 'gross' => 123.00], 1 => ['net' => 90.00]]]
+        // IMPORTANT: API expects PricesNet and PricesGross as Dictionary<int, decimal>
+        // NOT Prices as Dictionary<int, PriceData> - that field is ignored by DirectSQL writer!
         if (!empty($data['prices']) && is_array($data['prices'])) {
-            $prices = [];
+            $pricesNet = new \stdClass();
+            $pricesGross = new \stdClass();
+            $hasNet = false;
+            $hasGross = false;
+
             foreach ($data['prices'] as $level => $priceData) {
-                if (!is_numeric($level) || $level < 0 || $level > 9) {
+                // IMPORTANT: Level 0 (tc_CenaNetto0) is UNUSED in Subiekt GT with price groups!
+                // Skip level 0 - it should always remain 0.0000, mapping starts from level 1
+                if (!is_numeric($level) || $level < 1 || $level > 10) {
                     continue;
                 }
-                $prices[(int)$level] = [
-                    'Net' => (float)($priceData['net'] ?? $priceData['Net'] ?? 0),
-                    'Gross' => isset($priceData['gross']) || isset($priceData['Gross'])
-                        ? (float)($priceData['gross'] ?? $priceData['Gross'])
-                        : null,
-                ];
+
+                // Use string keys to ensure JSON encodes as {"0": 825.0} not [825.0]
+                $levelKey = (string)(int)$level;
+
+                $netValue = $priceData['net'] ?? $priceData['Net'] ?? null;
+                if ($netValue !== null) {
+                    $pricesNet->$levelKey = (float)$netValue;
+                    $hasNet = true;
+                }
+
+                $grossValue = $priceData['gross'] ?? $priceData['Gross'] ?? null;
+                if ($grossValue !== null) {
+                    $pricesGross->$levelKey = (float)$grossValue;
+                    $hasGross = true;
+                }
             }
-            if (!empty($prices)) {
-                $body['Prices'] = $prices;
+
+            if ($hasNet) {
+                $body['PricesNet'] = $pricesNet;
+            }
+            if ($hasGross) {
+                $body['PricesGross'] = $pricesGross;
             }
         }
 

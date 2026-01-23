@@ -9866,3 +9866,139 @@ hex-color-picker {
     background: rgba(239, 68, 68, 0.18);
     color: #fca5a5;
 }
+
+/* ==========================================================================
+   Shop Manager Components (PPM Style Book Compliant)
+   ========================================================================== */
+
+/* Animated background blobs */
+.shop-bg-blob {
+    position: absolute;
+    border-radius: 9999px;
+    filter: blur(48px);
+    animation: pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+.shop-bg-blob--mpp-1 {
+    width: 16rem;
+    height: 16rem;
+    top: -8rem;
+    right: -8rem;
+    background: radial-gradient(circle, rgba(224, 172, 126, 0.1), rgba(209, 151, 90, 0.05));
+}
+
+.shop-bg-blob--mpp-2 {
+    width: 16rem;
+    height: 16rem;
+    bottom: -8rem;
+    left: -8rem;
+    background: radial-gradient(circle, rgba(209, 151, 90, 0.1), rgba(224, 172, 126, 0.05));
+    animation-delay: 2s;
+}
+
+.shop-bg-blob--mpp-3 {
+    width: 24rem;
+    height: 24rem;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: radial-gradient(circle, rgba(224, 172, 126, 0.05), rgba(209, 151, 90, 0.03));
+    animation-delay: 4s;
+}
+
+/* Header gradient */
+.shop-header-gradient {
+    background: linear-gradient(135deg, rgba(31, 41, 55, 0.95), rgba(17, 24, 39, 0.95));
+    border-bottom: 1px solid rgba(224, 172, 126, 0.3);
+    backdrop-filter: blur(16px);
+}
+
+/* Icon gradient box */
+.shop-icon-gradient-mpp {
+    background: linear-gradient(45deg, #e0ac7e, #d1975a);
+}
+
+.shop-icon-gradient-mpp::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: linear-gradient(45deg, #e0ac7e, #d1975a);
+    opacity: 0.75;
+    filter: blur(4px);
+    animation: pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* Text colors */
+.text-mpp-primary {
+    color: var(--mpp-primary, #e0ac7e) !important;
+}
+
+/* Flash message gradients */
+.flash-success-gradient {
+    background: linear-gradient(135deg, rgba(34, 197, 94, 0.8), rgba(21, 128, 61, 0.6));
+    border: 1px solid rgba(34, 197, 94, 0.3);
+}
+
+.flash-error-gradient {
+    background: linear-gradient(135deg, rgba(239, 68, 68, 0.8), rgba(185, 28, 28, 0.6));
+    border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+/* Stat cards with color gradients */
+.stat-card-blue {
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.8), rgba(29, 78, 216, 0.6));
+    border: 1px solid rgba(59, 130, 246, 0.2);
+}
+
+.stat-card-green {
+    background: linear-gradient(135deg, rgba(34, 197, 94, 0.8), rgba(21, 128, 61, 0.6));
+    border: 1px solid rgba(34, 197, 94, 0.2);
+}
+
+.stat-card-cyan {
+    background: linear-gradient(135deg, rgba(6, 182, 212, 0.8), rgba(8, 145, 178, 0.6));
+    border: 1px solid rgba(6, 182, 212, 0.2);
+}
+
+.stat-card-amber {
+    background: linear-gradient(135deg, rgba(245, 158, 11, 0.8), rgba(217, 119, 6, 0.6));
+    border: 1px solid rgba(245, 158, 11, 0.2);
+}
+
+.stat-card-purple {
+    background: linear-gradient(135deg, rgba(168, 85, 247, 0.8), rgba(124, 58, 237, 0.6));
+    border: 1px solid rgba(168, 85, 247, 0.2);
+}
+
+/* Shop card and panel gradients */
+.shop-card-gradient {
+    background: linear-gradient(135deg, rgba(31, 41, 55, 0.8), rgba(17, 24, 39, 0.6));
+    border: 1px solid rgba(224, 172, 126, 0.2);
+}
+
+.shop-panel-gradient {
+    background: linear-gradient(135deg, rgba(55, 65, 81, 0.6), rgba(31, 41, 55, 0.4));
+    border: 1px solid rgba(224, 172, 126, 0.2);
+    backdrop-filter: blur(16px);
+}
+
+/* Modal gradient */
+.shop-modal-gradient {
+    background: linear-gradient(135deg, rgba(31, 41, 55, 0.95), rgba(17, 24, 39, 0.95));
+    border: 1px solid rgba(224, 172, 126, 0.3);
+}
+
+/* Border accents */
+.border-mpp-accent {
+    border-color: rgba(224, 172, 126, 0.2);
+}
+
+.border-mpp-accent-strong {
+    border-color: rgba(224, 172, 126, 0.3);
+}
+
+/* Modal z-index layer */
+.shop-modal-layer {
+    z-index: 100;
+}

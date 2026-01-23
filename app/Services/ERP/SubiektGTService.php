@@ -1275,6 +1275,11 @@ class SubiektGTService implements ERPSyncServiceInterface
     {
         try {
             $config = $connection->connection_config;
+
+            // CRITICAL FIX: Reconstruct mappings from PriceGroup/Warehouse models
+            // because connection_config may not have them (they're stored in model.erp_mapping)
+            $config = $this->enrichConfigWithMappingsFromModels($config, $connection->erp_type);
+
             $client = $this->createRestApiClient($config);
             $syncDirection = $config['sync_direction'] ?? 'pull'; // pull, push, bidirectional
 
@@ -1712,8 +1717,16 @@ class SubiektGTService implements ERPSyncServiceInterface
         }
 
         // Price group mapping - map PPM price groups to Subiekt price levels
-        $priceGroupMapping = $config['price_group_mappings'] ?? [];
+        // IMPORTANT: Config stores ERP_LEVEL => PPM_GROUP (for PULL direction)
+        // For PUSH we need PPM_GROUP => ERP_LEVEL (inverted)
+        $erpToPpmMapping = $config['price_group_mappings'] ?? [];
+        $ppmToErpMapping = array_flip($erpToPpmMapping); // Invert for PUSH direction
         $prices = [];
+
+        Log::debug('mapPpmProductToSubiekt: Price mapping', [
+            'erpToPpmMapping' => $erpToPpmMapping,
+            'ppmToErpMapping' => $ppmToErpMapping,
+        ]);
 
         // Get product prices from PPM
         $productPrices = $product->prices ?? [];
@@ -1723,18 +1736,24 @@ class SubiektGTService implements ERPSyncServiceInterface
 
         foreach ($productPrices as $priceData) {
             $ppmGroupId = $priceData['price_group_id'] ?? $priceData['group_id'] ?? null;
-            if ($ppmGroupId && isset($priceGroupMapping[$ppmGroupId])) {
-                $subiektLevel = (int) $priceGroupMapping[$ppmGroupId];
+            if ($ppmGroupId && isset($ppmToErpMapping[$ppmGroupId])) {
+                $subiektLevel = (int) $ppmToErpMapping[$ppmGroupId];
                 $prices[$subiektLevel] = [
                     'net' => (float) ($priceData['price_net'] ?? $priceData['price'] ?? 0),
                     'gross' => isset($priceData['price_gross']) ? (float) $priceData['price_gross'] : null,
                 ];
+                Log::debug('mapPpmProductToSubiekt: Mapped price', [
+                    'ppmGroupId' => $ppmGroupId,
+                    'subiektLevel' => $subiektLevel,
+                    'net' => $prices[$subiektLevel]['net'],
+                ]);
             }
         }
 
         // Also map base price if available
+        // IMPORTANT: Level 0 is UNUSED in Subiekt GT with price groups - use level 1 as default
         if (!empty($product->price_net)) {
-            $defaultPriceLevel = $config['default_price_level'] ?? 0;
+            $defaultPriceLevel = $config['default_price_level'] ?? 1; // Changed: 0 → 1 (level 0 is unused)
             if (!isset($prices[$defaultPriceLevel])) {
                 $prices[$defaultPriceLevel] = [
                     'net' => (float) $product->price_net,
@@ -1950,6 +1969,58 @@ class SubiektGTService implements ERPSyncServiceInterface
             'message' => 'Sfera API mode nie jest jeszcze zaimplementowany',
             'external_id' => null,
         ];
+    }
+
+    /**
+     * Enrich config with mappings from PriceGroup and Warehouse models.
+     *
+     * CRITICAL FIX: ERPManager stores mappings in model.erp_mapping (PriceGroup, Warehouse),
+     * but SyncProductToERP job uses connection_config which may not have them.
+     * This method reconstructs mappings from the source of truth (models).
+     *
+     * @param array $config Original connection config
+     * @param string $erpType ERP type (e.g., 'subiekt_gt')
+     * @return array Enriched config with mappings
+     */
+    protected function enrichConfigWithMappingsFromModels(array $config, string $erpType): array
+    {
+        // Reconstruct warehouse mappings from Warehouse.erp_mapping
+        $warehouseMappings = [];
+        $warehouses = \App\Models\Warehouse::whereNotNull("erp_mapping->{$erpType}")->get();
+        foreach ($warehouses as $warehouse) {
+            $mapping = $warehouse->erp_mapping[$erpType] ?? null;
+            if ($mapping && isset($mapping['id'])) {
+                $warehouseMappings[$mapping['id']] = $warehouse->id;
+            }
+        }
+
+        // Reconstruct price group mappings from PriceGroup.erp_mapping
+        $priceGroupMappings = [];
+        $priceGroups = \App\Models\PriceGroup::whereNotNull("erp_mapping->{$erpType}")->get();
+        foreach ($priceGroups as $priceGroup) {
+            $mapping = $priceGroup->erp_mapping[$erpType] ?? null;
+            if ($mapping && isset($mapping['id'])) {
+                $priceGroupMappings[$mapping['id']] = $priceGroup->id;
+            }
+        }
+
+        Log::debug('enrichConfigWithMappingsFromModels: Reconstructed mappings', [
+            'erp_type' => $erpType,
+            'warehouse_mappings' => $warehouseMappings,
+            'price_group_mappings' => $priceGroupMappings,
+            'original_warehouse_mappings' => $config['warehouse_mappings'] ?? [],
+            'original_price_group_mappings' => $config['price_group_mappings'] ?? [],
+        ]);
+
+        // Merge reconstructed mappings into config (override empty arrays)
+        if (!empty($warehouseMappings)) {
+            $config['warehouse_mappings'] = $warehouseMappings;
+        }
+        if (!empty($priceGroupMappings)) {
+            $config['price_group_mappings'] = $priceGroupMappings;
+        }
+
+        return $config;
     }
 
     // ==========================================

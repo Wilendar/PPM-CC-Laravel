@@ -50,22 +50,22 @@ $HostidoKey = "D:\..."; pscp -i $HostidoKey ...
 
 **✅ CORRECT (always works):**
 ```bash
-pwsh -NoProfile -Command "pscp -i 'D:\OneDrive - MPP TRADE\SSH\Hostido\HostidoSSHNoPass.ppk' -P 64321 'local' 'remote'"
+pwsh -NoProfile -Command "pscp -i 'D:\SSH\Hostido\HostidoSSHNoPass.ppk' -P 64321 'local' 'remote'"
 ```
 
 **1. File Upload (pscp - REAL):**
 ```bash
-pwsh -NoProfile -Command "pscp -i 'D:\OneDrive - MPP TRADE\SSH\Hostido\HostidoSSHNoPass.ppk' -P 64321 'app\Http\Livewire\Products\Categories\CategoryTree.php' 'host379076@host379076.hostido.net.pl:domains/ppm.mpptrade.pl/public_html/app/Http/Livewire/Products/Categories/CategoryTree.php'"
+pwsh -NoProfile -Command "pscp -i 'D:\SSH\Hostido\HostidoSSHNoPass.ppk' -P 64321 'app\Http\Livewire\Products\Categories\CategoryTree.php' 'host379076@host379076.hostido.net.pl:domains/ppm.mpptrade.pl/public_html/app/Http/Livewire/Products/Categories/CategoryTree.php'"
 ```
 
 **2. Cache Clear (plink - REAL):**
 ```bash
-pwsh -NoProfile -Command "plink -ssh host379076@host379076.hostido.net.pl -P 64321 -i 'D:\OneDrive - MPP TRADE\SSH\Hostido\HostidoSSHNoPass.ppk' -batch 'cd domains/ppm.mpptrade.pl/public_html && php artisan view:clear && php artisan cache:clear && php artisan config:clear'"
+pwsh -NoProfile -Command "plink -ssh host379076@host379076.hostido.net.pl -P 64321 -i 'D:\SSH\Hostido\HostidoSSHNoPass.ppk' -batch 'cd domains/ppm.mpptrade.pl/public_html && php artisan view:clear && php artisan cache:clear && php artisan config:clear'"
 ```
 
 **3. Verification (plink - REAL):**
 ```bash
-pwsh -NoProfile -Command "plink -ssh host379076@host379076.hostido.net.pl -P 64321 -i 'D:\OneDrive - MPP TRADE\SSH\Hostido\HostidoSSHNoPass.ppk' -batch 'grep -n showMergeCategoriesModal domains/ppm.mpptrade.pl/public_html/app/Http/Livewire/Products/Categories/CategoryTree.php | head -3'"
+pwsh -NoProfile -Command "plink -ssh host379076@host379076.hostido.net.pl -P 64321 -i 'D:\SSH\Hostido\HostidoSSHNoPass.ppk' -batch 'grep -n showMergeCategoriesModal domains/ppm.mpptrade.pl/public_html/app/Http/Livewire/Products/Categories/CategoryTree.php | head -3'"
 ```
 
 **QUOTING RULES:**
@@ -158,15 +158,15 @@ Get-ChildItem "public/build/assets/*.css" | Select-Object Name, Length, LastWrit
 # ✅ Note: ALL files with today's date MUST be uploaded!
 
 # 3. UPLOAD **ALL** ASSETS (not selective!)
-pwsh -NoProfile -Command "pscp -i 'D:\OneDrive - MPP TRADE\SSH\Hostido\HostidoSSHNoPass.ppk' -P 64321 -r 'public/build/assets/*' 'host379076@host379076.hostido.net.pl:domains/ppm.mpptrade.pl/public_html/public/build/assets/'"
+pwsh -NoProfile -Command "pscp -i 'D:\SSH\Hostido\HostidoSSHNoPass.ppk' -P 64321 -r 'public/build/assets/*' 'host379076@host379076.hostido.net.pl:domains/ppm.mpptrade.pl/public_html/public/build/assets/'"
 # ⚠️ CRITICAL: -r flag uploads entire directory
 
 # 4. UPLOAD MANIFEST (ROOT location - Laravel reads this!)
-pwsh -NoProfile -Command "pscp -i 'D:\OneDrive - MPP TRADE\SSH\Hostido\HostidoSSHNoPass.ppk' -P 64321 'public/build/.vite/manifest.json' 'host379076@host379076.hostido.net.pl:domains/ppm.mpptrade.pl/public_html/public/build/manifest.json'"
+pwsh -NoProfile -Command "pscp -i 'D:\SSH\Hostido\HostidoSSHNoPass.ppk' -P 64321 'public/build/.vite/manifest.json' 'host379076@host379076.hostido.net.pl:domains/ppm.mpptrade.pl/public_html/public/build/manifest.json'"
 # ⚠️ CRITICAL: ROOT public/build/manifest.json, NOT .vite subdirectory!
 
 # 5. CLEAR ALL CACHES
-pwsh -NoProfile -Command "plink -ssh host379076@host379076.hostido.net.pl -P 64321 -i 'D:\OneDrive - MPP TRADE\SSH\Hostido\HostidoSSHNoPass.ppk' -batch 'cd domains/ppm.mpptrade.pl/public_html && php artisan view:clear && php artisan cache:clear && php artisan config:clear'"
+pwsh -NoProfile -Command "plink -ssh host379076@host379076.hostido.net.pl -P 64321 -i 'D:\SSH\Hostido\HostidoSSHNoPass.ppk' -batch 'cd domains/ppm.mpptrade.pl/public_html && php artisan view:clear && php artisan cache:clear && php artisan config:clear'"
 
 # 6. VERIFY CRITICAL FILES (HTTP 200 check - MANDATORY!)
 # ⚠️ IMPORTANT: Update these hashes after each npm run build!
@@ -352,7 +352,7 @@ Log::debug('methodName COMPLETED', [
 ```
 Domain: ppm.mpptrade.pl
 Host: host379076@host379076.hostido.net.pl:64321
-SSH Key: D:\OneDrive - MPP TRADE\SSH\Hostido\HostidoSSHNoPass.ppk
+SSH Key: D:\SSH\Hostido\HostidoSSHNoPass.ppk
 Laravel Root: domains/ppm.mpptrade.pl/public_html/
 Database: host379076_ppm@localhost (MariaDB 10.11.13)
 PHP: 8.3.23 (native)
@@ -390,7 +390,7 @@ param(
 )
 
 # Configuration
-$HostidoKey = "D:\OneDrive - MPP TRADE\SSH\Hostido\HostidoSSHNoPass.ppk"
+$HostidoKey = "D:\SSH\Hostido\HostidoSSHNoPass.ppk"
 $RemoteHost = "host379076@host379076.hostido.net.pl"
 $RemotePort = 64321
 $RemotePath = "domains/ppm.mpptrade.pl/public_html"
@@ -669,7 +669,7 @@ param(
     [switch]$ClearCache
 )
 
-$HostidoKey = "D:\OneDrive - MPP TRADE\SSH\Hostido\HostidoSSHNoPass.ppk"
+$HostidoKey = "D:\SSH\Hostido\HostidoSSHNoPass.ppk"
 $RemoteHost = "host379076@host379076.hostido.net.pl"
 $RemotePort = 64321
 $RemotePath = "domains/ppm.mpptrade.pl/public_html"
@@ -729,7 +729,7 @@ Clear-ApplicationCache
 ```powershell
 # health_check.ps1 - Post-deployment verification
 
-$HostidoKey = "D:\OneDrive - MPP TRADE\SSH\Hostido\HostidoSSHNoPass.ppk"
+$HostidoKey = "D:\SSH\Hostido\HostidoSSHNoPass.ppk"
 $RemoteHost = "host379076@host379076.hostido.net.pl"
 $RemotePort = 64321
 $RemotePath = "domains/ppm.mpptrade.pl/public_html"

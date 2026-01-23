@@ -2,13 +2,13 @@
 <div x-data="roleListManager()" class="space-y-6">
     {{-- Flash Messages --}}
     @if(session()->has('success'))
-        <div class="bg-green-100 dark:bg-green-900/30 border border-green-400 dark:border-green-700 text-green-700 dark:text-green-300 px-4 py-3 rounded-lg relative" role="alert">
+        <div class="bg-green-900/30 border border-green-700 text-green-300 px-4 py-3 rounded-lg relative" role="alert">
             <span class="block sm:inline">{{ session('success') }}</span>
         </div>
     @endif
 
     @if(session()->has('error'))
-        <div class="bg-red-100 dark:bg-red-900/30 border border-red-400 dark:border-red-700 text-red-700 dark:text-red-300 px-4 py-3 rounded-lg relative" role="alert">
+        <div class="bg-red-900/30 border border-red-700 text-red-300 px-4 py-3 rounded-lg relative" role="alert">
             <span class="block sm:inline">{{ session('error') }}</span>
         </div>
     @endif
@@ -149,8 +149,8 @@
                 @foreach($roleUsageStats as $roleId => $stats)
                     <div class="bg-gray-700 rounded-lg p-4 text-center">
                         <div class="inline-flex items-center justify-center w-10 h-10 rounded-full mb-2
-                                    bg-{{ $stats['color'] }}-100 dark:bg-{{ $stats['color'] }}-900/30">
-                            <span class="text-{{ $stats['color'] }}-600 dark:text-{{ $stats['color'] }}-400 font-bold">
+                                    bg-{{ $stats['color'] }}-900/30">
+                            <span class="text-{{ $stats['color'] }}-400 font-bold">
                                 {{ $stats['level'] }}
                             </span>
                         </div>
@@ -233,8 +233,8 @@
                                                 $roleColor = $role->color ?? 'gray';
                                             @endphp
                                             <span class="inline-flex items-center justify-center w-8 h-8 rounded-full mr-3
-                                                         bg-{{ $roleColor }}-100 dark:bg-{{ $roleColor }}-900/30">
-                                                <span class="text-{{ $roleColor }}-600 dark:text-{{ $roleColor }}-400 font-bold text-sm">
+                                                         bg-{{ $roleColor }}-900/30">
+                                                <span class="text-{{ $roleColor }}-400 font-bold text-sm">
                                                     {{ $role->level ?? 7 }}
                                                 </span>
                                             </span>
@@ -242,7 +242,7 @@
                                                 <div class="text-sm font-medium text-white flex items-center">
                                                     {{ $role->name }}
                                                     @if($role->is_system ?? false)
-                                                        <span class="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400">
+                                                        <span class="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-900/30 text-yellow-400">
                                                             Systemowa
                                                         </span>
                                                     @endif
@@ -270,8 +270,7 @@
                                             $hierarchyInfo = $roleHierarchy[$level] ?? ['name' => 'User', 'color' => 'gray'];
                                         @endphp
                                         <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
-                                                     bg-{{ $hierarchyInfo['color'] }}-100 text-{{ $hierarchyInfo['color'] }}-800
-                                                     dark:bg-{{ $hierarchyInfo['color'] }}-900/30 dark:text-{{ $hierarchyInfo['color'] }}-400">
+                                                     bg-{{ $hierarchyInfo['color'] }}-900/30 text-{{ $hierarchyInfo['color'] }}-400">
                                             {{ $level }} - {{ $hierarchyInfo['name'] }}
                                         </span>
                                     </td>
@@ -387,8 +386,8 @@
                                             $roleColor = $role->color ?? 'gray';
                                         @endphp
                                         <span class="inline-flex items-center justify-center w-6 h-6 rounded-full mb-1
-                                                     bg-{{ $roleColor }}-100 dark:bg-{{ $roleColor }}-900/30">
-                                            <span class="text-{{ $roleColor }}-600 dark:text-{{ $roleColor }}-400 font-bold text-xs">
+                                                     bg-{{ $roleColor }}-900/30">
+                                            <span class="text-{{ $roleColor }}-400 font-bold text-xs">
                                                 {{ $role->level ?? 7 }}
                                             </span>
                                         </span>
@@ -451,8 +450,8 @@
                         {{-- Level indicator --}}
                         <div class="flex-shrink-0 w-24 text-center">
                             <div class="inline-flex items-center justify-center w-12 h-12 rounded-full
-                                        bg-{{ $hierarchyInfo['color'] }}-100 dark:bg-{{ $hierarchyInfo['color'] }}-900/30">
-                                <span class="text-{{ $hierarchyInfo['color'] }}-600 dark:text-{{ $hierarchyInfo['color'] }}-400 font-bold text-lg">
+                                        bg-{{ $hierarchyInfo['color'] }}-900/30">
+                                <span class="text-{{ $hierarchyInfo['color'] }}-400 font-bold text-lg">
                                     {{ $level }}
                                 </span>
                             </div>
@@ -668,8 +667,8 @@
                 <div class="inline-block align-bottom bg-gray-800 rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
                     <div class="bg-gray-800 px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
                         <div class="sm:flex sm:items-start">
-                            <div class="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-red-100 dark:bg-red-900/30 sm:mx-0 sm:h-10 sm:w-10">
-                                <svg class="h-6 w-6 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <div class="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-red-900/30 sm:mx-0 sm:h-10 sm:w-10">
+                                <svg class="h-6 w-6 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
                                 </svg>
                             </div>
@@ -735,8 +734,7 @@
                                                     $roleColor = $roleData['role']->color ?? 'gray';
                                                 @endphp
                                                 <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
-                                                             bg-{{ $roleColor }}-100 text-{{ $roleColor }}-800
-                                                             dark:bg-{{ $roleColor }}-900/30 dark:text-{{ $roleColor }}-400">
+                                                             bg-{{ $roleColor }}-900/30 text-{{ $roleColor }}-400">
                                                     {{ $roleData['role']->name }}
                                                 </span>
                                             </th>

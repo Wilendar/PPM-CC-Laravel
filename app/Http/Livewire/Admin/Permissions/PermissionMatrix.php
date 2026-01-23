@@ -6,6 +6,7 @@ use Livewire\Component;
 use Spatie\Permission\Models\Role;
 use Spatie\Permission\Models\Permission;
 use App\Models\User;
+use App\Services\Permissions\PermissionModuleLoader;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Collection;
 
@@ -613,52 +614,51 @@ class PermissionMatrix extends Component
 
     public function getPermissionModules()
     {
-        $permissions = Permission::orderBy('name')->get();
-        $modules = [];
-        
-        foreach ($permissions as $permission) {
-            $parts = explode('.', $permission->name);
-            $module = $parts[0] ?? 'other';
-            
-            if (!isset($modules[$module])) {
-                $modules[$module] = collect();
+        // Use PermissionModuleLoader for auto-discovery from config/permissions/*.php
+        $moduleLoader = app(PermissionModuleLoader::class);
+        $configModules = $moduleLoader->getPermissionsByModule();
+
+        // Get actual permissions from database
+        $dbPermissions = Permission::orderBy('name')->get()->keyBy('name');
+
+        // Build result with DB permission objects (needed for UI toggling)
+        $result = [];
+
+        foreach ($configModules as $moduleName => $moduleData) {
+            $modulePermissions = collect();
+
+            foreach ($moduleData['permissions'] as $permConfig) {
+                $permName = $permConfig['name'];
+
+                if ($dbPermissions->has($permName)) {
+                    // Add extra metadata from config to the permission object
+                    $permission = $dbPermissions->get($permName);
+                    $permission->label = $permConfig['label'] ?? $permName;
+                    $permission->description = $permConfig['description'] ?? '';
+                    $permission->dangerous = $permConfig['dangerous'] ?? false;
+                    $modulePermissions->push($permission);
+                }
             }
-            
-            $modules[$module]->push($permission);
-        }
-        
-        // Define module order and display names
-        $moduleOrder = [
-            'product' => 'Produkty',
-            'category' => 'Kategorie',
-            'media' => 'Media',
-            'price' => 'Ceny',
-            'stock' => 'Magazyn',
-            'warehouse' => 'Magazyny',
-            'user' => 'Użytkownicy',
-            'role' => 'Role',
-            'integration' => 'Integracje',
-            'order' => 'Zamówienia',
-            'claim' => 'Reklamacje',
-            'admin' => 'Administracja',
-            'system' => 'System'
-        ];
-        
-        $orderedModules = [];
-        foreach ($moduleOrder as $key => $name) {
-            if (isset($modules[$key])) {
-                $orderedModules[$name] = $modules[$key];
+
+            if ($modulePermissions->isNotEmpty()) {
+                $result[$moduleName] = $modulePermissions;
             }
         }
-        
-        // Add any remaining modules
-        foreach ($modules as $key => $permissions) {
-            if (!in_array($key, array_keys($moduleOrder))) {
-                $orderedModules[ucfirst($key)] = $permissions;
-            }
+
+        // Add any orphan permissions (in DB but not in config files)
+        $configuredPermNames = collect($configModules)
+            ->flatMap(fn($m) => collect($m['permissions'])->pluck('name'))
+            ->all();
+
+        $orphanPermissions = $dbPermissions->filter(
+            fn($p) => !in_array($p->name, $configuredPermNames)
+        );
+
+        if ($orphanPermissions->isNotEmpty()) {
+            $result['Inne'] = $orphanPermissions->values();
         }
-        
-        return $orderedModules;
+
+        return $result;
     }
 
     public function getPermissionsByModuleProperty()

@@ -9965,8 +9965,10 @@ class ProductForm extends Component
 
         try {
             // Get all ERP connections this product is linked to
+            // FIX: Removed whereNotNull('external_id') - sync ALL connected ERPs
+            // Products manually added to PPM may not have external_id yet
+            // but still need to be synced when prices/stock change
             $linkedErpData = \App\Models\ProductErpData::where('product_id', $this->product->id)
-                ->whereNotNull('external_id')  // Only sync products already mapped to ERP
                 ->get();
 
             if ($linkedErpData->isEmpty()) {

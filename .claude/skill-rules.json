@@ -1,14 +1,15 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "description": "PPM Project - Skills Auto-Activation Configuration",
-  "version": "1.3.0",
-  "lastUpdated": "2025-12-05",
+  "version": "1.4.0",
+  "lastUpdated": "2026-01-23",
 
   "skills": {
-    "ppm-styling-guidelines": {
+    "ppm-style-book": {
       "type": "domain",
       "enforcement": "require",
       "priority": "critical",
+      "skillLocation": ".claude/skills/ppm-style-book/SKILL.md",
       "promptTriggers": {
         "keywords": [
           "style",
@@ -1286,6 +1287,78 @@
         ".claude/skills/subiekt-gt-integration/SQL_EXAMPLES.md",
         ".claude/skills/subiekt-gt-integration/resources/table-schema.md",
         ".claude/skills/subiekt-gt-integration/resources/sfera-api.md"
+      ]
+    },
+    "permission-management": {
+      "type": "domain",
+      "enforcement": "require",
+      "priority": "high",
+      "description": "PPM Permission Management: Modular permissions architecture, Spatie Laravel Permission, role/permission CRUD, AI-friendly module templates.",
+      "promptTriggers": {
+        "keywords": [
+          "permission",
+          "permissions",
+          "role",
+          "roles",
+          "uprawnienie",
+          "uprawnienia",
+          "rola",
+          "role",
+          "spatie",
+          "authorize",
+          "autoryzacja",
+          "access control",
+          "kontrola dostepu",
+          "permission module",
+          "modul uprawnien",
+          "permission matrix",
+          "macierz uprawnien",
+          "admin/permissions",
+          "admin/roles"
+        ],
+        "intentPatterns": [
+          "(add|create|dodaj|stworz|utwórz).*?(permission|uprawnienie|modul)",
+          "(permission|uprawnienie).*?(module|modul)",
+          "(role|rola).*?(permission|uprawnienie|create|assign)",
+          "(admin|panel).*?(permission|role|uprawnienie|rola)",
+          "spatie.*?(permission|role)",
+          "(authorize|autoryzuj|sprawdz).*?(permission|uprawnienie)",
+          "(macierz|matrix).*?(uprawnien|permission)",
+          "(modul|module).*?(permission|uprawnienie)"
+        ]
+      },
+      "fileTriggers": {
+        "pathPatterns": [
+          "app/Http/Livewire/Admin/Permissions/**/*.php",
+          "app/Http/Livewire/Admin/Roles/**/*.php",
+          "app/Policies/**/*.php",
+          "config/permissions/*.php",
+          "app/Services/Permissions/**/*.php",
+          "database/seeders/*Permission*.php"
+        ],
+        "contentPatterns": [
+          "PermissionMatrix",
+          "RoleList",
+          "hasPermissionTo",
+          "givePermissionTo",
+          "revokePermissionTo",
+          "Spatie\\\\Permission",
+          "Permission::create",
+          "Role::create",
+          "config/permissions/",
+          "PermissionModuleLoader"
+        ]
+      },
+      "criticalRules": [
+        "ZAKAZ: withCount('users') na Role - uzyj raw SQL subquery",
+        "WYMAGANE: Module template z config/permissions/_template.php",
+        "WYMAGANE: php artisan db:seed --class=RolePermissionSeeder po zmianach",
+        "WYMAGANE: php artisan cache:clear po zmianach permissions",
+        "WYMAGANE: guard_name => 'web' dla wszystkich permissions"
+      ],
+      "skillLocation": ".claude/skills/permission-management/SKILL.md",
+      "resources": [
+        ".claude/skills/permission-management/resources/_template.php"
       ]
     }
   }

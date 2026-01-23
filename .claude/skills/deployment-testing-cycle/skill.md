@@ -105,8 +105,8 @@ TIME READINESS:
 - [ ] Can fix issues if found (not end of day!)
 
 ENVIRONMENT:
-- [ ] Working directory: D:\OneDrive - MPP TRADE\Skrypty\PPM-CC-Laravel
-- [ ] SSH key: D:\OneDrive - MPP TRADE\SSH\Hostido\HostidoSSHNoPass.ppk exists
+- [ ] Working directory: D:\Skrypty\PPM-CC-Laravel
+- [ ] SSH key: D:\SSH\Hostido\HostidoSSHNoPass.ppk exists
 - [ ] Production URL accessible: https://ppm.mpptrade.pl
 ```
 
@@ -151,41 +151,41 @@ npm run build
 
 **Single PHP File:**
 ```bash
-pwsh -NoProfile -Command "pscp -i 'D:\OneDrive - MPP TRADE\SSH\Hostido\HostidoSSHNoPass.ppk' -P 64321 'LOCAL_PATH\File.php' 'host379076@host379076.hostido.net.pl:domains/ppm.mpptrade.pl/public_html/REMOTE_PATH/File.php'"
+pwsh -NoProfile -Command "pscp -i 'D:\SSH\Hostido\HostidoSSHNoPass.ppk' -P 64321 'LOCAL_PATH\File.php' 'host379076@host379076.hostido.net.pl:domains/ppm.mpptrade.pl/public_html/REMOTE_PATH/File.php'"
 ```
 
 **Examples:**
 ```bash
 # Livewire Component
-pwsh -NoProfile -Command "pscp -i 'D:\OneDrive - MPP TRADE\SSH\Hostido\HostidoSSHNoPass.ppk' -P 64321 'app\Http\Livewire\Admin\MyComponent.php' 'host379076@host379076.hostido.net.pl:domains/ppm.mpptrade.pl/public_html/app/Http/Livewire/Admin/MyComponent.php'"
+pwsh -NoProfile -Command "pscp -i 'D:\SSH\Hostido\HostidoSSHNoPass.ppk' -P 64321 'app\Http\Livewire\Admin\MyComponent.php' 'host379076@host379076.hostido.net.pl:domains/ppm.mpptrade.pl/public_html/app/Http/Livewire/Admin/MyComponent.php'"
 
 # Model
-pwsh -NoProfile -Command "pscp -i 'D:\OneDrive - MPP TRADE\SSH\Hostido\HostidoSSHNoPass.ppk' -P 64321 'app\Models\Product.php' 'host379076@host379076.hostido.net.pl:domains/ppm.mpptrade.pl/public_html/app/Models/Product.php'"
+pwsh -NoProfile -Command "pscp -i 'D:\SSH\Hostido\HostidoSSHNoPass.ppk' -P 64321 'app\Models\Product.php' 'host379076@host379076.hostido.net.pl:domains/ppm.mpptrade.pl/public_html/app/Models/Product.php'"
 
 # Service
-pwsh -NoProfile -Command "pscp -i 'D:\OneDrive - MPP TRADE\SSH\Hostido\HostidoSSHNoPass.ppk' -P 64321 'app\Services\MyService.php' 'host379076@host379076.hostido.net.pl:domains/ppm.mpptrade.pl/public_html/app/Services/MyService.php'"
+pwsh -NoProfile -Command "pscp -i 'D:\SSH\Hostido\HostidoSSHNoPass.ppk' -P 64321 'app\Services\MyService.php' 'host379076@host379076.hostido.net.pl:domains/ppm.mpptrade.pl/public_html/app/Services/MyService.php'"
 
 # Trait
-pwsh -NoProfile -Command "pscp -i 'D:\OneDrive - MPP TRADE\SSH\Hostido\HostidoSSHNoPass.ppk' -P 64321 'app\Http\Livewire\Admin\Traits\MyTrait.php' 'host379076@host379076.hostido.net.pl:domains/ppm.mpptrade.pl/public_html/app/Http/Livewire/Admin/Traits/MyTrait.php'"
+pwsh -NoProfile -Command "pscp -i 'D:\SSH\Hostido\HostidoSSHNoPass.ppk' -P 64321 'app\Http\Livewire\Admin\Traits\MyTrait.php' 'host379076@host379076.hostido.net.pl:domains/ppm.mpptrade.pl/public_html/app/Http/Livewire/Admin/Traits/MyTrait.php'"
 ```
 
 **Multiple PHP Files in Directory:**
 ```bash
 # Upload entire directory (recursive)
-pwsh -NoProfile -Command "pscp -i 'D:\OneDrive - MPP TRADE\SSH\Hostido\HostidoSSHNoPass.ppk' -P 64321 -r 'app\Http\Livewire\Admin\MyModule\*' 'host379076@host379076.hostido.net.pl:domains/ppm.mpptrade.pl/public_html/app/Http/Livewire/Admin/MyModule/'"
+pwsh -NoProfile -Command "pscp -i 'D:\SSH\Hostido\HostidoSSHNoPass.ppk' -P 64321 -r 'app\Http\Livewire\Admin\MyModule\*' 'host379076@host379076.hostido.net.pl:domains/ppm.mpptrade.pl/public_html/app/Http/Livewire/Admin/MyModule/'"
 ```
 
 #### 1.4. Upload Blade Files
 
 **Single Blade View:**
 ```bash
-pwsh -NoProfile -Command "pscp -i 'D:\OneDrive - MPP TRADE\SSH\Hostido\HostidoSSHNoPass.ppk' -P 64321 'resources\views\livewire\admin\my-component.blade.php' 'host379076@host379076.hostido.net.pl:domains/ppm.mpptrade.pl/public_html/resources/views/livewire/admin/my-component.blade.php'"
+pwsh -NoProfile -Command "pscp -i 'D:\SSH\Hostido\HostidoSSHNoPass.ppk' -P 64321 'resources\views\livewire\admin\my-component.blade.php' 'host379076@host379076.hostido.net.pl:domains/ppm.mpptrade.pl/public_html/resources/views/livewire/admin/my-component.blade.php'"
 ```
 
 **Multiple Blade Partials:**
 ```bash
 # Upload all partials in directory
-pwsh -NoProfile -Command "pscp -i 'D:\OneDrive - MPP TRADE\SSH\Hostido\HostidoSSHNoPass.ppk' -P 64321 -r 'resources\views\livewire\admin\partials\*' 'host379076@host379076.hostido.net.pl:domains/ppm.mpptrade.pl/public_html/resources/views/livewire/admin/partials/'"
+pwsh -NoProfile -Command "pscp -i 'D:\SSH\Hostido\HostidoSSHNoPass.ppk' -P 64321 -r 'resources\views\livewire\admin\partials\*' 'host379076@host379076.hostido.net.pl:domains/ppm.mpptrade.pl/public_html/resources/views/livewire/admin/partials/'"
 ```
 
 #### 1.5. Upload CSS/JS Assets (if changed)
@@ -196,10 +196,10 @@ pwsh -NoProfile -Command "pscp -i 'D:\OneDrive - MPP TRADE\SSH\Hostido\HostidoSS
 
 ```bash
 # 1. Upload ALL hashed assets
-pwsh -NoProfile -Command "pscp -i 'D:\OneDrive - MPP TRADE\SSH\Hostido\HostidoSSHNoPass.ppk' -P 64321 -r 'public\build\assets\*' 'host379076@host379076.hostido.net.pl:domains/ppm.mpptrade.pl/public_html/public/build/assets/'"
+pwsh -NoProfile -Command "pscp -i 'D:\SSH\Hostido\HostidoSSHNoPass.ppk' -P 64321 -r 'public\build\assets\*' 'host379076@host379076.hostido.net.pl:domains/ppm.mpptrade.pl/public_html/public/build/assets/'"
 
 # 2. Upload manifest.json to ROOT location (MANDATORY!)
-pwsh -NoProfile -Command "pscp -i 'D:\OneDrive - MPP TRADE\SSH\Hostido\HostidoSSHNoPass.ppk' -P 64321 'public\build\.vite\manifest.json' 'host379076@host379076.hostido.net.pl:domains/ppm.mpptrade.pl/public_html/public/build/manifest.json'"
+pwsh -NoProfile -Command "pscp -i 'D:\SSH\Hostido\HostidoSSHNoPass.ppk' -P 64321 'public\build\.vite\manifest.json' 'host379076@host379076.hostido.net.pl:domains/ppm.mpptrade.pl/public_html/public/build/manifest.json'"
 ```
 
 **⚠️ DOUBLE CHECK:** Manifest MUST go to ROOT (`public/build/manifest.json`), NOT subdirectory!
@@ -210,13 +210,13 @@ pwsh -NoProfile -Command "pscp -i 'D:\OneDrive - MPP TRADE\SSH\Hostido\HostidoSS
 
 ```bash
 # Upload migration file
-pwsh -NoProfile -Command "pscp -i 'D:\OneDrive - MPP TRADE\SSH\Hostido\HostidoSSHNoPass.ppk' -P 64321 'database\migrations\2025_XX_XX_XXXXXX_migration_name.php' 'host379076@host379076.hostido.net.pl:domains/ppm.mpptrade.pl/public_html/database/migrations/'"
+pwsh -NoProfile -Command "pscp -i 'D:\SSH\Hostido\HostidoSSHNoPass.ppk' -P 64321 'database\migrations\2025_XX_XX_XXXXXX_migration_name.php' 'host379076@host379076.hostido.net.pl:domains/ppm.mpptrade.pl/public_html/database/migrations/'"
 ```
 
 #### 1.7. Clear Caches (MANDATORY!)
 
 ```bash
-pwsh -NoProfile -Command "plink -ssh host379076@host379076.hostido.net.pl -P 64321 -i 'D:\OneDrive - MPP TRADE\SSH\Hostido\HostidoSSHNoPass.ppk' -batch 'cd domains/ppm.mpptrade.pl/public_html && php artisan view:clear && php artisan cache:clear && php artisan config:clear'"
+pwsh -NoProfile -Command "plink -ssh host379076@host379076.hostido.net.pl -P 64321 -i 'D:\SSH\Hostido\HostidoSSHNoPass.ppk' -batch 'cd domains/ppm.mpptrade.pl/public_html && php artisan view:clear && php artisan cache:clear && php artisan config:clear'"
 ```
 
 **Expected:** Commands execute without errors (exit code 0)
@@ -229,7 +229,7 @@ pwsh -NoProfile -Command "plink -ssh host379076@host379076.hostido.net.pl -P 643
 #### 1.8. Run Migrations (if DB changes)
 
 ```bash
-pwsh -NoProfile -Command "plink -ssh host379076@host379076.hostido.net.pl -P 64321 -i 'D:\OneDrive - MPP TRADE\SSH\Hostido\HostidoSSHNoPass.ppk' -batch 'cd domains/ppm.mpptrade.pl/public_html && php artisan migrate --force'"
+pwsh -NoProfile -Command "plink -ssh host379076@host379076.hostido.net.pl -P 64321 -i 'D:\SSH\Hostido\HostidoSSHNoPass.ppk' -batch 'cd domains/ppm.mpptrade.pl/public_html && php artisan migrate --force'"
 ```
 
 **Verify migration success:**
@@ -390,7 +390,7 @@ PERFORMANCE:
 
 ```bash
 # Connect to server
-pwsh -NoProfile -Command "plink -ssh host379076@host379076.hostido.net.pl -P 64321 -i 'D:\OneDrive - MPP TRADE\SSH\Hostido\HostidoSSHNoPass.ppk'"
+pwsh -NoProfile -Command "plink -ssh host379076@host379076.hostido.net.pl -P 64321 -i 'D:\SSH\Hostido\HostidoSSHNoPass.ppk'"
 
 # Navigate to Laravel root
 cd domains/ppm.mpptrade.pl/public_html
@@ -834,7 +834,7 @@ What would you like to do? (1/2/3 or describe)
 **Diagnosis:**
 ```bash
 # Test SSH connection
-pwsh -NoProfile -Command "plink -ssh host379076@host379076.hostido.net.pl -P 64321 -i 'D:\OneDrive - MPP TRADE\SSH\Hostido\HostidoSSHNoPass.ppk' -batch 'pwd'"
+pwsh -NoProfile -Command "plink -ssh host379076@host379076.hostido.net.pl -P 64321 -i 'D:\SSH\Hostido\HostidoSSHNoPass.ppk' -batch 'pwd'"
 
 # Expected: /home/host379076
 ```

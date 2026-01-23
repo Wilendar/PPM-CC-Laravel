@@ -7,6 +7,7 @@ use Livewire\WithFileUploads;
 use App\Models\User;
 use Spatie\Permission\Models\Role;
 use Spatie\Permission\Models\Permission;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Validation\Rules\Password;
@@ -28,13 +29,13 @@ use Illuminate\Support\Facades\Storage;
  */
 class UserForm extends Component
 {
-    use WithFileUploads;
+    use WithFileUploads, AuthorizesRequests;
 
     // ==========================================
     // FORM PROPERTIES
     // ==========================================
 
-    public User $user;
+    public ?User $user = null;
     public $isEditing = false;
     
     // Basic user information
@@ -637,6 +638,8 @@ class UserForm extends Component
 
     public function render()
     {
+        // Note: Layout is handled by wrapper views (admin/users/create.blade.php, edit.blade.php)
+        // to work around Livewire 3 full-page component routing issues
         return view('livewire.admin.users.user-form', [
             'roles' => $this->roles,
             'permissions' => $this->permissions,
@@ -647,9 +650,6 @@ class UserForm extends Component
             'dateFormatOptions' => $this->dateFormatOptions,
             'inheritedPermissions' => $this->getInheritedPermissions(),
             'allUserPermissions' => $this->getAllUserPermissions(),
-        ])->layout('layouts.admin', [
-            'title' => ($this->isEditing ? 'Edytuj uzytkownika: ' . $this->user->full_name : 'Dodaj nowego uzytkownika') . ' - Admin PPM',
-            'breadcrumb' => $this->isEditing ? 'Edycja uzytkownika' : 'Nowy uzytkownik'
         ]);
     }
 }

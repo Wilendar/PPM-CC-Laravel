@@ -6,7 +6,7 @@
 | Domain | ppm.mpptrade.pl |
 | SSH Host | host379076@host379076.hostido.net.pl |
 | SSH Port | 64321 |
-| SSH Key | `D:\OneDrive - MPP TRADE\SSH\Hostido\HostidoSSHNoPass.ppk` |
+| SSH Key | `D:\SSH\Hostido\HostidoSSHNoPass.ppk` |
 | Laravel Root | `domains/ppm.mpptrade.pl/public_html/` |
 | PHP | 8.3.23 |
 | **Node.js** | NOT AVAILABLE - Build locally only! |
@@ -22,7 +22,7 @@
 
 ### PowerShell Setup
 ```powershell
-$HostidoKey = "D:\OneDrive - MPP TRADE\SSH\Hostido\HostidoSSHNoPass.ppk"
+$HostidoKey = "D:\SSH\Hostido\HostidoSSHNoPass.ppk"
 ```
 
 ### Upload Single File

@@ -262,22 +262,24 @@ public class SubiektRepository : ISubiektRepository
 
         var names = await conn.QueryFirstOrDefaultAsync<dynamic>(nameSql);
 
-        // Default names if tw_Parametr is empty
+        // CORRECT MAPPING: twp_NazwaCeny[N] → Level N (tc_CenaNetto[N])
+        // Level 0 (tc_CenaNetto0) is UNUSED when price groups are active - always 0.0000
         var levelNames = new Dictionary<int, string>
         {
-            { 0, names?.Name1 ?? "Detaliczna" },
-            { 1, names?.Name2 ?? "Cena 1" },
-            { 2, names?.Name3 ?? "Cena 2" },
-            { 3, names?.Name4 ?? "Cena 3" },
-            { 4, names?.Name5 ?? "Cena 4" },
-            { 5, names?.Name6 ?? "Cena 5" },
-            { 6, names?.Name7 ?? "Cena 6" },
-            { 7, names?.Name8 ?? "Cena 7" },
-            { 8, names?.Name9 ?? "Cena 8" },
-            { 9, names?.Name10 ?? "Cena 9" }
+            { 0, "(Nieużywany)" },                   // tc_CenaNetto0 - unused with price groups
+            { 1, names?.Name1 ?? "Cena 1" },         // twp_NazwaCeny1 → tc_CenaNetto1
+            { 2, names?.Name2 ?? "Cena 2" },         // twp_NazwaCeny2 → tc_CenaNetto2
+            { 3, names?.Name3 ?? "Cena 3" },         // twp_NazwaCeny3 → tc_CenaNetto3
+            { 4, names?.Name4 ?? "Cena 4" },         // twp_NazwaCeny4 → tc_CenaNetto4
+            { 5, names?.Name5 ?? "Cena 5" },         // twp_NazwaCeny5 → tc_CenaNetto5
+            { 6, names?.Name6 ?? "Cena 6" },         // twp_NazwaCeny6 → tc_CenaNetto6
+            { 7, names?.Name7 ?? "Cena 7" },         // twp_NazwaCeny7 → tc_CenaNetto7
+            { 8, names?.Name8 ?? "Cena 8" },         // twp_NazwaCeny8 → tc_CenaNetto8
+            { 9, names?.Name9 ?? "Cena 9" },         // twp_NazwaCeny9 → tc_CenaNetto9
+            { 10, names?.Name10 ?? "Cena 10" }       // twp_NazwaCeny10 → tc_CenaNetto10
         };
 
-        // Get all 10 price levels for the product
+        // Get all 11 price levels (0-10) for the product
         var priceSql = @"
             SELECT
                 c.tc_IdTowar AS ProductId,
@@ -291,7 +293,8 @@ public class SubiektRepository : ISubiektRepository
                 c.tc_CenaNetto6 AS Net6, c.tc_CenaBrutto6 AS Gross6,
                 c.tc_CenaNetto7 AS Net7, c.tc_CenaBrutto7 AS Gross7,
                 c.tc_CenaNetto8 AS Net8, c.tc_CenaBrutto8 AS Gross8,
-                c.tc_CenaNetto9 AS Net9, c.tc_CenaBrutto9 AS Gross9
+                c.tc_CenaNetto9 AS Net9, c.tc_CenaBrutto9 AS Gross9,
+                c.tc_CenaNetto10 AS Net10, c.tc_CenaBrutto10 AS Gross10
             FROM tw_Cena c
             JOIN tw__Towar t ON c.tc_IdTowar = t.tw_Id
             WHERE c.tc_IdTowar = @productId";
@@ -302,7 +305,8 @@ public class SubiektRepository : ISubiektRepository
             return Enumerable.Empty<ProductPrice>();
 
         var prices = new List<ProductPrice>();
-        for (int i = 0; i < 10; i++)
+        // Loop through levels 0-10 (11 total) - level 0 is unused but included for completeness
+        for (int i = 0; i <= 10; i++)
         {
             var netProp = $"Net{i}";
             var grossProp = $"Gross{i}";
@@ -346,7 +350,11 @@ public class SubiektRepository : ISubiektRepository
     public async Task<IEnumerable<PriceLevel>> GetPriceLevelsAsync()
     {
         // Price level names are stored in tw_Parametr table (columns twp_NazwaCeny1..10)
-        // twp_NazwaCeny1 = tc_CenaNetto0 (Id=0), twp_NazwaCeny2 = tc_CenaNetto1 (Id=1), etc.
+        // IMPORTANT: When using Subiekt GT with price groups for contractors:
+        // - tc_CenaNetto0 (Level 0) is UNUSED (always 0.0000) - base price placeholder
+        // - twp_NazwaCeny1 = tc_CenaNetto1 (Level 1) = First actual price group (e.g., "Detaliczna")
+        // - twp_NazwaCeny2 = tc_CenaNetto2 (Level 2) = Second price group (e.g., "MRF-MPP")
+        // - etc. up to twp_NazwaCeny10 = tc_CenaNetto10 (Level 10)
         using var conn = GetConnection();
 
         var sql = @"
@@ -367,10 +375,10 @@ public class SubiektRepository : ISubiektRepository
 
         if (result == null)
         {
-            // Fallback if tw_Parametr is empty
+            // Fallback if tw_Parametr is empty - still use correct mapping
             return new List<PriceLevel>
             {
-                new PriceLevel { Id = 0, Name = "Cena bazowa" },
+                // Level 0 is UNUSED when price groups are active
                 new PriceLevel { Id = 1, Name = "Cena 1" },
                 new PriceLevel { Id = 2, Name = "Cena 2" },
                 new PriceLevel { Id = 3, Name = "Cena 3" },
@@ -384,18 +392,20 @@ public class SubiektRepository : ISubiektRepository
             };
         }
 
+        // CORRECT MAPPING: twp_NazwaCeny[N] → Level N (tc_CenaNetto[N])
+        // Level 0 is intentionally omitted - it's unused with price groups
         return new List<PriceLevel>
         {
-            new PriceLevel { Id = 0, Name = result.Name1 ?? "Cena bazowa" },
-            new PriceLevel { Id = 1, Name = result.Name2 ?? "Cena 1" },
-            new PriceLevel { Id = 2, Name = result.Name3 ?? "Cena 2" },
-            new PriceLevel { Id = 3, Name = result.Name4 ?? "Cena 3" },
-            new PriceLevel { Id = 4, Name = result.Name5 ?? "Cena 4" },
-            new PriceLevel { Id = 5, Name = result.Name6 ?? "Cena 5" },
-            new PriceLevel { Id = 6, Name = result.Name7 ?? "Cena 6" },
-            new PriceLevel { Id = 7, Name = result.Name8 ?? "Cena 7" },
-            new PriceLevel { Id = 8, Name = result.Name9 ?? "Cena 8" },
-            new PriceLevel { Id = 9, Name = result.Name10 ?? "Cena 9" }
+            new PriceLevel { Id = 1, Name = result.Name1 ?? "Cena 1" },    // twp_NazwaCeny1 → tc_CenaNetto1
+            new PriceLevel { Id = 2, Name = result.Name2 ?? "Cena 2" },    // twp_NazwaCeny2 → tc_CenaNetto2
+            new PriceLevel { Id = 3, Name = result.Name3 ?? "Cena 3" },    // twp_NazwaCeny3 → tc_CenaNetto3
+            new PriceLevel { Id = 4, Name = result.Name4 ?? "Cena 4" },    // twp_NazwaCeny4 → tc_CenaNetto4
+            new PriceLevel { Id = 5, Name = result.Name5 ?? "Cena 5" },    // twp_NazwaCeny5 → tc_CenaNetto5
+            new PriceLevel { Id = 6, Name = result.Name6 ?? "Cena 6" },    // twp_NazwaCeny6 → tc_CenaNetto6
+            new PriceLevel { Id = 7, Name = result.Name7 ?? "Cena 7" },    // twp_NazwaCeny7 → tc_CenaNetto7
+            new PriceLevel { Id = 8, Name = result.Name8 ?? "Cena 8" },    // twp_NazwaCeny8 → tc_CenaNetto8
+            new PriceLevel { Id = 9, Name = result.Name9 ?? "Cena 9" },    // twp_NazwaCeny9 → tc_CenaNetto9
+            new PriceLevel { Id = 10, Name = result.Name10 ?? "Cena 10" }  // twp_NazwaCeny10 → tc_CenaNetto10
         };
     }
 
