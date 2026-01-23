@@ -422,15 +422,15 @@ class AuditLogs extends Component
                 return $item['user'] !== null;
             });
         
-        // Top actions
-        $this->topActions = $query->select('action', DB::raw('count(*) as action_count'))
-            ->groupBy('action')
+        // Top actions (event column in DB, 'action' alias for display)
+        $this->topActions = $query->select('event', DB::raw('count(*) as action_count'))
+            ->groupBy('event')
             ->orderBy('action_count', 'desc')
             ->limit(10)
             ->get()
             ->map(function ($item) {
                 return [
-                    'action' => $item->action,
+                    'action' => $item->event,
                     'count' => $item->action_count
                 ];
             });
@@ -445,7 +445,7 @@ class AuditLogs extends Component
         $this->suspiciousActivities = [];
         
         // Detect multiple failed login attempts
-        $failedLogins = AuditLog::where('action', 'login_failed')
+        $failedLogins = AuditLog::where('event', 'login_failed')
             ->where('created_at', '>=', now()->subHours(24))
             ->select('ip_address', DB::raw('count(*) as attempts'))
             ->groupBy('ip_address')
@@ -463,7 +463,7 @@ class AuditLogs extends Component
         }
         
         // Detect unusual login times (outside business hours)
-        $unusualLogins = AuditLog::where('action', 'login')
+        $unusualLogins = AuditLog::where('event', 'login')
             ->where('created_at', '>=', now()->subDays(7))
             ->get()
             ->filter(function ($log) {
@@ -481,7 +481,7 @@ class AuditLogs extends Component
         }
         
         // Detect bulk operations
-        $bulkOperations = AuditLog::whereIn('action', ['bulk_delete', 'bulk_update', 'bulk_export'])
+        $bulkOperations = AuditLog::whereIn('event', ['bulk_delete', 'bulk_update', 'bulk_export'])
             ->where('created_at', '>=', now()->subDays(7))
             ->with('user')
             ->get()
@@ -540,8 +540,8 @@ class AuditLogs extends Component
         $query = AuditLog::with('user')
             ->when($this->search, function ($query) {
                 $query->where(function ($q) {
-                    $q->where('action', 'like', '%' . $this->search . '%')
-                      ->orWhere('model_type', 'like', '%' . $this->search . '%')
+                    $q->where('event', 'like', '%' . $this->search . '%')
+                      ->orWhere('auditable_type', 'like', '%' . $this->search . '%')
                       ->orWhere('ip_address', 'like', '%' . $this->search . '%')
                       ->orWhereHas('user', function ($userQuery) {
                           $userQuery->where('first_name', 'like', '%' . $this->search . '%')
@@ -561,10 +561,10 @@ class AuditLogs extends Component
                 }
             })
             ->when($this->actionFilter !== 'all', function ($query) {
-                $query->where('action', $this->actionFilter);
+                $query->where('event', $this->actionFilter);
             })
             ->when($this->modelFilter !== 'all', function ($query) {
-                $query->where('model_type', 'like', '%' . $this->modelFilter);
+                $query->where('auditable_type', 'like', '%' . $this->modelFilter);
             })
             ->when($this->dateFromFilter, function ($query) {
                 $query->where('created_at', '>=', Carbon::parse($this->dateFromFilter)->startOfDay());
@@ -577,8 +577,8 @@ class AuditLogs extends Component
             })
             ->when($this->suspiciousOnly, function ($query) {
                 $query->where(function ($q) {
-                    $q->where('action', 'like', '%failed%')
-                      ->orWhere('action', 'like', '%bulk_%')
+                    $q->where('event', 'like', '%failed%')
+                      ->orWhere('event', 'like', '%bulk_%')
                       ->orWhereRaw('HOUR(created_at) < 6 OR HOUR(created_at) > 22');
                 });
             })
@@ -594,22 +594,22 @@ class AuditLogs extends Component
 
     public function getActionsProperty()
     {
-        return AuditLog::select('action')
+        return AuditLog::select('event')
             ->distinct()
-            ->orderBy('action')
-            ->pluck('action');
+            ->orderBy('event')
+            ->pluck('event');
     }
 
     public function getModelsProperty()
     {
-        return AuditLog::select('model_type')
+        return AuditLog::select('auditable_type')
             ->distinct()
-            ->orderBy('model_type')
+            ->orderBy('auditable_type')
             ->get()
             ->map(function ($item) {
                 return [
-                    'full' => $item->model_type,
-                    'short' => class_basename($item->model_type)
+                    'full' => $item->auditable_type,
+                    'short' => class_basename($item->auditable_type)
                 ];
             })
             ->unique('short')
