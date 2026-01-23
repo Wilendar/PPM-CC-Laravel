@@ -8280,6 +8280,10 @@ class ProductForm extends Component
                 // User expects jobs to appear automatically when changing prices
                 $this->dispatchSyncJobsForAllShops();
 
+                // FIX (2026-01-23): Auto-dispatch sync jobs for all connected ERP systems after price/stock change
+                // This was MISSING - prices were saved to PPM but NOT synced to BaseLinker/Subiekt GT
+                $this->dispatchSyncJobsForAllErp();
+
             } catch (\Exception $e) {
                 Log::error('Failed to save prices/stock in savePendingChangesToProduct', [
                     'product_id' => $this->product->id,
@@ -9846,6 +9850,121 @@ class ProductForm extends Component
             Log::error('Failed to auto-dispatch sync jobs after price/stock change', [
                 'product_id' => $this->product->id,
                 'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    /**
+     * Dispatch sync jobs for all connected ERP systems (2026-01-23)
+     *
+     * Called automatically after price/stock changes to trigger ERP sync.
+     * Only dispatches for ERP connections that:
+     * - Are connected and active
+     * - Already have ProductErpData for this product
+     * - Have sync_direction as 'push' or 'bidirectional'
+     *
+     * FIX: Tab Ceny nie aktualizuje ERP przy zapisie
+     *
+     * @return void
+     */
+    private function dispatchSyncJobsForAllErp(): void
+    {
+        if (!$this->product || !$this->product->exists) {
+            return;
+        }
+
+        try {
+            // Get all ERP connections this product is linked to
+            $linkedErpData = \App\Models\ProductErpData::where('product_id', $this->product->id)
+                ->whereNotNull('external_id')  // Only sync products already mapped to ERP
+                ->get();
+
+            if ($linkedErpData->isEmpty()) {
+                Log::debug('[ERP SYNC] No ERP connections to sync - product not exported anywhere', [
+                    'product_id' => $this->product->id,
+                ]);
+                return;
+            }
+
+            // Refresh product prices from database before sync
+            // This ensures the Job gets the latest saved prices
+            $this->product->load('prices');
+
+            $dispatchedCount = 0;
+            $skippedCount = 0;
+
+            foreach ($linkedErpData as $erpData) {
+                $connection = \App\Models\ERPConnection::find($erpData->erp_connection_id);
+
+                if (!$connection) {
+                    Log::warning('[ERP SYNC] Connection not found', [
+                        'erp_connection_id' => $erpData->erp_connection_id,
+                    ]);
+                    continue;
+                }
+
+                // Skip if connection is not active
+                if (!$connection->is_active || $connection->connection_status !== 'connected') {
+                    Log::debug('[ERP SYNC] Skipping inactive/disconnected ERP', [
+                        'connection_id' => $connection->id,
+                        'connection_name' => $connection->instance_name,
+                        'is_active' => $connection->is_active,
+                        'status' => $connection->connection_status,
+                    ]);
+                    $skippedCount++;
+                    continue;
+                }
+
+                // Check sync direction - only push if configured for push/bidirectional
+                $config = $connection->connection_config ?? [];
+                $syncDirection = $config['sync_direction'] ?? 'pull';
+
+                if (!in_array($syncDirection, ['push', 'bidirectional'])) {
+                    Log::debug('[ERP SYNC] Skipping pull-only ERP connection', [
+                        'connection_id' => $connection->id,
+                        'connection_name' => $connection->instance_name,
+                        'sync_direction' => $syncDirection,
+                    ]);
+                    $skippedCount++;
+                    continue;
+                }
+
+                // Mark as pending sync
+                $erpData->update([
+                    'sync_status' => \App\Models\ProductErpData::STATUS_PENDING,
+                ]);
+
+                // Dispatch sync job (synchronous for Hostido without queue worker)
+                // FIX: Use dispatchSync() like in syncToErp() method
+                \App\Jobs\ERP\SyncProductToERP::dispatchSync($this->product, $connection);
+
+                $dispatchedCount++;
+
+                Log::info('[ERP SYNC] Dispatched sync job after price/stock change', [
+                    'product_id' => $this->product->id,
+                    'product_sku' => $this->product->sku,
+                    'connection_id' => $connection->id,
+                    'connection_name' => $connection->instance_name,
+                    'erp_type' => $connection->erp_type,
+                ]);
+            }
+
+            if ($dispatchedCount > 0) {
+                Log::info('[ERP SYNC] Auto-dispatched ERP sync jobs after price/stock change', [
+                    'product_id' => $this->product->id,
+                    'product_sku' => $this->product->sku,
+                    'dispatched_count' => $dispatchedCount,
+                    'skipped_count' => $skippedCount,
+                    'user_id' => auth()->id(),
+                ]);
+            }
+
+        } catch (\Exception $e) {
+            // Non-blocking error - data is saved, sync can be triggered manually
+            Log::error('[ERP SYNC] Failed to auto-dispatch ERP sync jobs after price/stock change', [
+                'product_id' => $this->product->id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
             ]);
         }
     }
