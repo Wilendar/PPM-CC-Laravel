@@ -672,22 +672,18 @@ trait ProductFormERPTabs
      */
     protected function shouldPullFromErp(ProductErpData $erpData): bool
     {
-        // Never pulled
-        if (!$erpData->last_pull_at) {
-            return (bool) $erpData->external_id; // Only if has external_id
+        // ETAP D.1: Use model's needsRePull() for change detection
+        // Must have external_id to pull
+        if (!$erpData->external_id) {
+            Log::debug('shouldPullFromErp: No external_id, skip pull', [
+                'erp_data_id' => $erpData->id,
+            ]);
+            return false;
         }
 
-        // Pulled > 5 min ago
-        if ($erpData->last_pull_at->lt(now()->subMinutes(5))) {
-            return true;
-        }
-
-        // Has external_id but no data
-        if ($erpData->external_id && empty($erpData->external_data)) {
-            return true;
-        }
-
-        return false;
+        // Use new needsRePull() method from ProductErpData model
+        // Passing null triggers time-based fallback (5 min stale threshold)
+        return $erpData->needsRePull(null);
     }
 
     /**

@@ -386,7 +386,18 @@ class SubiektRestApiClient
     {
         $body = $this->buildProductWriteBody($data);
 
+        // DEBUG: Log request body before sending
+        Log::debug('SubiektRestApiClient::updateProductBySku - request', [
+            'sku' => $sku,
+            'input_data' => $data,
+            'request_body' => $body,
+            'body_fields' => array_keys($body),
+        ]);
+
         if (empty($body)) {
+            Log::debug('SubiektRestApiClient::updateProductBySku - no fields to update', [
+                'sku' => $sku,
+            ]);
             return [
                 'success' => true,
                 'message' => 'No fields to update',
@@ -400,7 +411,15 @@ class SubiektRestApiClient
         ]);
 
         $encodedSku = rawurlencode($sku);
-        return $this->request('PUT', "/api/products/sku/{$encodedSku}", $body);
+        $response = $this->request('PUT', "/api/products/sku/{$encodedSku}", $body);
+
+        // DEBUG: Log API response
+        Log::debug('SubiektRestApiClient::updateProductBySku - response', [
+            'sku' => $sku,
+            'response' => $response,
+        ]);
+
+        return $response;
     }
 
     /**

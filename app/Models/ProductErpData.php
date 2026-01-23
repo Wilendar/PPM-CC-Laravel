@@ -85,6 +85,7 @@ class ProductErpData extends Model
         'last_sync_at',
         'last_push_at',
         'last_pull_at',
+        'erp_updated_at',
         'last_sync_hash',
 
         // Error handling
@@ -112,6 +113,7 @@ class ProductErpData extends Model
         'last_sync_at' => 'datetime',
         'last_push_at' => 'datetime',
         'last_pull_at' => 'datetime',
+        'erp_updated_at' => 'datetime',
         'conflicts_detected_at' => 'datetime',
 
         // Boolean fields
@@ -627,6 +629,95 @@ class ProductErpData extends Model
         }
 
         return $this->last_push_at->diffForHumans();
+    }
+
+    // ==========================================
+    // AUTO SYNC HELPERS (ETAP_08.X)
+    // ==========================================
+
+    /**
+     * Check if data needs to be re-pulled from ERP
+     *
+     * ETAP_08.X: Auto Sync - ERP Change Detection
+     *
+     * Logic:
+     * 1. Never pulled before -> always needs pull
+     * 2. No erp_updated_at cached -> fallback to time-based (5 min)
+     * 3. ERP timestamp provided -> compare with cached erp_updated_at
+     *
+     * @param mixed $erpDateUpd ERP source timestamp (string, int, or null)
+     * @return bool True if re-pull is needed
+     */
+    public function needsRePull($erpDateUpd = null): bool
+    {
+        // Case 1: Never pulled - always needs pull
+        if (!$this->last_pull_at) {
+            Log::debug('needsRePull: Never pulled, needs pull', [
+                'product_erp_data_id' => $this->id,
+            ]);
+            return true;
+        }
+
+        // Case 2: Has external_id but no external_data -> needs pull
+        if ($this->external_id && empty($this->external_data)) {
+            Log::debug('needsRePull: Has external_id but no external_data, needs pull', [
+                'product_erp_data_id' => $this->id,
+                'external_id' => $this->external_id,
+            ]);
+            return true;
+        }
+
+        // Case 3: No ERP timestamp provided -> fallback to time-based (5 min)
+        if ($erpDateUpd === null) {
+            $stalePeriodMinutes = 5;
+            $isStale = $this->last_pull_at->lt(now()->subMinutes($stalePeriodMinutes));
+
+            Log::debug('needsRePull: No ERP timestamp, using time-based check', [
+                'product_erp_data_id' => $this->id,
+                'last_pull_at' => $this->last_pull_at->toIso8601String(),
+                'stale_threshold_minutes' => $stalePeriodMinutes,
+                'is_stale' => $isStale,
+            ]);
+
+            return $isStale;
+        }
+
+        // Case 4: No cached erp_updated_at -> needs pull to get baseline
+        if (!$this->erp_updated_at) {
+            Log::debug('needsRePull: No cached erp_updated_at, needs pull for baseline', [
+                'product_erp_data_id' => $this->id,
+            ]);
+            return true;
+        }
+
+        // Case 5: Compare ERP timestamp with cached erp_updated_at
+        $erpTimestamp = is_numeric($erpDateUpd)
+            ? (int) $erpDateUpd
+            : strtotime($erpDateUpd);
+
+        $cachedTimestamp = $this->erp_updated_at->timestamp;
+        $needsPull = $erpTimestamp > $cachedTimestamp;
+
+        Log::debug('needsRePull: Comparing timestamps', [
+            'product_erp_data_id' => $this->id,
+            'erp_timestamp' => $erpTimestamp,
+            'cached_timestamp' => $cachedTimestamp,
+            'needs_pull' => $needsPull,
+        ]);
+
+        return $needsPull;
+    }
+
+    /**
+     * Get time since ERP source was updated
+     */
+    public function getTimeSinceErpUpdate(): string
+    {
+        if (!$this->erp_updated_at) {
+            return 'Nieznany';
+        }
+
+        return $this->erp_updated_at->diffForHumans();
     }
 
     // ==========================================

@@ -237,11 +237,33 @@ class ERPConnection extends Model
 
     /**
      * Get the decrypted connection config.
+     * Supports both encrypted and plain JSON formats for backwards compatibility.
      */
     protected function connectionConfig(): Attribute
     {
         return Attribute::make(
-            get: fn (?string $value) => $value ? json_decode(decrypt($value), true) : null,
+            get: function (?string $value) {
+                if (!$value) {
+                    return null;
+                }
+
+                // Try plain JSON first (backwards compatibility)
+                $decoded = json_decode($value, true);
+                if ($decoded !== null && is_array($decoded)) {
+                    return $decoded;
+                }
+
+                // If not valid JSON, try to decrypt
+                try {
+                    return json_decode(decrypt($value), true);
+                } catch (\Illuminate\Contracts\Encryption\DecryptException $e) {
+                    // Log warning and return empty array
+                    \Log::warning('ERPConnection: Failed to decrypt connection_config', [
+                        'id' => $this->id ?? 'unknown',
+                    ]);
+                    return [];
+                }
+            },
             set: fn (?array $value) => $value ? encrypt(json_encode($value)) : null,
         );
     }

@@ -163,6 +163,13 @@ class SyncProductToERP implements ShouldQueue, ShouldBeUnique
                     $this->syncJob->complete([
                         'external_id' => $result['external_id'] ?? null,
                         'message' => $result['message'],
+                        'action' => $result['action'] ?? 'synced',
+                        'sku' => $result['sku'] ?? $this->product->sku,
+                        'rows_affected' => $result['rows_affected'] ?? null,
+                        'updated_fields' => $result['updated_fields'] ?? [],
+                        'prices_updated' => $result['prices_updated'] ?? 0,
+                        'erp_type' => $this->erpConnection->erp_type,
+                        'connection_name' => $this->erpConnection->instance_name,
                     ]);
                 }
 

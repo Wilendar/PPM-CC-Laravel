@@ -1304,7 +1304,7 @@ class SubiektGTService implements ERPSyncServiceInterface
 
                 if ($shouldPush) {
                     // Try to update product in Subiekt GT
-                    $updateResult = $this->pushProductToSubiekt($client, $product, $externalId, $config);
+                    $updateResult = $this->pushProductToSubiekt($client, $product, $externalId, $config, $connection->id);
 
                     if ($updateResult['success']) {
                         // Update mapping
@@ -1328,6 +1328,10 @@ class SubiektGTService implements ERPSyncServiceInterface
                             'message' => $updateResult['message'] ?? 'Produkt zaktualizowany w Subiekt GT',
                             'external_id' => $externalId,
                             'action' => $updateResult['action'] ?? 'updated',
+                            'rows_affected' => $updateResult['rows_affected'] ?? null,
+                            'updated_fields' => $updateResult['updated_fields'] ?? [],
+                            'prices_updated' => $updateResult['prices_updated'] ?? 0,
+                            'sku' => $product->sku,
                         ];
                     }
 
@@ -1367,7 +1371,7 @@ class SubiektGTService implements ERPSyncServiceInterface
                 && ($config['create_in_erp'] ?? false);
 
             if ($shouldCreate) {
-                $createResult = $this->createProductInSubiekt($client, $product, $config);
+                $createResult = $this->createProductInSubiekt($client, $product, $config, $connection->id);
 
                 if ($createResult['success']) {
                     $externalId = (string) ($createResult['external_id'] ?? $createResult['product_id'] ?? null);
@@ -1465,13 +1469,25 @@ class SubiektGTService implements ERPSyncServiceInterface
      * @param array $config Connection config
      * @return array
      */
-    protected function pushProductToSubiekt(SubiektRestApiClient $client, Product $product, string $externalId, array $config): array
+    protected function pushProductToSubiekt(SubiektRestApiClient $client, Product $product, string $externalId, array $config, ?int $connectionId = null): array
     {
         try {
-            // Build update data from PPM product
-            $updateData = $this->mapPpmProductToSubiekt($product, $config);
+            // Build update data from PPM product (using ERP data if available)
+            $updateData = $this->mapPpmProductToSubiekt($product, $config, false, $connectionId);
+
+            // DEBUG: Log mapped data before sending to API
+            Log::debug('pushProductToSubiekt: Mapped data for Subiekt GT', [
+                'sku' => $product->sku,
+                'external_id' => $externalId,
+                'mapped_fields' => array_keys($updateData),
+                'mapped_data' => $updateData,
+                'config_keys' => array_keys($config),
+            ]);
 
             if (empty($updateData)) {
+                Log::debug('pushProductToSubiekt: No data to send', [
+                    'sku' => $product->sku,
+                ]);
                 return [
                     'success' => true,
                     'message' => 'Brak zmian do wyslania',
@@ -1488,11 +1504,21 @@ class SubiektGTService implements ERPSyncServiceInterface
             // Use PUT endpoint
             $result = $client->updateProductBySku($product->sku, $updateData);
 
+            // DEBUG: Log API response
+            Log::debug('pushProductToSubiekt: API response', [
+                'sku' => $product->sku,
+                'success' => $result['success'] ?? false,
+                'result' => $result,
+            ]);
+
             if ($result['success'] ?? false) {
                 return [
                     'success' => true,
                     'message' => $result['data']['message'] ?? 'Produkt zaktualizowany',
                     'action' => $result['data']['action'] ?? 'updated',
+                    'rows_affected' => $result['data']['rows_affected'] ?? null,
+                    'updated_fields' => array_keys($updateData),
+                    'prices_updated' => count($updateData['prices'] ?? []),
                 ];
             }
 
@@ -1535,7 +1561,7 @@ class SubiektGTService implements ERPSyncServiceInterface
      * @param array $config Connection config
      * @return array
      */
-    protected function createProductInSubiekt(SubiektRestApiClient $client, Product $product, array $config): array
+    protected function createProductInSubiekt(SubiektRestApiClient $client, Product $product, array $config, ?int $connectionId = null): array
     {
         try {
             // First check if Sfera is available (required for create)
@@ -1557,8 +1583,8 @@ class SubiektGTService implements ERPSyncServiceInterface
                 // Continue anyway - the create endpoint will return proper error
             }
 
-            // Build create data from PPM product
-            $createData = $this->mapPpmProductToSubiekt($product, $config, true);
+            // Build create data from PPM product (using ERP data if available)
+            $createData = $this->mapPpmProductToSubiekt($product, $config, true, $connectionId);
 
             if (empty($createData['sku'])) {
                 return [
@@ -1614,30 +1640,79 @@ class SubiektGTService implements ERPSyncServiceInterface
      * @param bool $isCreate Whether this is for create (include SKU)
      * @return array Data for Subiekt GT API
      */
-    protected function mapPpmProductToSubiekt(Product $product, array $config, bool $isCreate = false): array
+    protected function mapPpmProductToSubiekt(Product $product, array $config, bool $isCreate = false, ?int $connectionId = null): array
     {
         $data = [];
+
+        // FIX: Load ProductErpData to get ERP-specific field values (edited in ERP TAB)
+        $erpData = null;
+        if ($connectionId) {
+            $erpData = $product->erpData()
+                ->where('erp_connection_id', $connectionId)
+                ->first();
+        }
+
+        // Helper function to get value from ERP data or fallback to product
+        $getValue = function(string $erpField, ?string $productField = null) use ($erpData, $product) {
+            $productField = $productField ?? $erpField;
+            // Prefer ERP data value if exists and not empty
+            if ($erpData && !empty($erpData->$erpField)) {
+                return $erpData->$erpField;
+            }
+            return $product->$productField ?? null;
+        };
+
+        // DEBUG: Log input data
+        Log::debug('mapPpmProductToSubiekt: Starting mapping', [
+            'product_id' => $product->id,
+            'sku' => $product->sku,
+            'product_name' => $product->name,
+            'erp_data_name' => $erpData?->name ?? 'NO_ERP_DATA',
+            'using_erp_data' => $erpData !== null,
+            'is_create' => $isCreate,
+            'config_price_mappings' => $config['price_group_mappings'] ?? [],
+            'config_warehouse_mappings' => $config['warehouse_mappings'] ?? [],
+        ]);
 
         // SKU (only for create)
         if ($isCreate) {
             $data['sku'] = $product->sku;
         }
 
-        // Basic fields
-        if (!empty($product->name)) {
-            $data['name'] = mb_substr($product->name, 0, 50); // Subiekt limit
+        // Basic fields - USE ERP DATA IF AVAILABLE
+        $name = $getValue('name');
+        if (!empty($name)) {
+            $data['name'] = mb_substr($name, 0, 50); // Subiekt limit
         }
 
-        if ($product->description !== null) {
-            $data['description'] = $product->description;
+        $description = $getValue('long_description', 'description');
+        if ($description !== null) {
+            // Subiekt GT tw_Opis = varchar(255), strip HTML and truncate
+            $plainDescription = strip_tags($description);
+            $plainDescription = html_entity_decode($plainDescription, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+            $plainDescription = preg_replace('/\s+/', ' ', $plainDescription); // Normalize whitespace
+            $plainDescription = trim($plainDescription);
+
+            if (mb_strlen($plainDescription) > 255) {
+                Log::debug('mapPpmProductToSubiekt: Description truncated', [
+                    'sku' => $product->sku,
+                    'original_length' => mb_strlen($plainDescription),
+                    'truncated_to' => 255,
+                ]);
+                $plainDescription = mb_substr($plainDescription, 0, 252) . '...';
+            }
+
+            $data['description'] = $plainDescription;
         }
 
-        if (!empty($product->ean)) {
-            $data['ean'] = mb_substr($product->ean, 0, 20);
+        $ean = $getValue('ean');
+        if (!empty($ean)) {
+            $data['ean'] = mb_substr($ean, 0, 20);
         }
 
-        if ($product->weight !== null && $product->weight > 0) {
-            $data['weight'] = (float) $product->weight;
+        $weight = $getValue('weight');
+        if ($weight !== null && $weight > 0) {
+            $data['weight'] = (float) $weight;
         }
 
         // Unit mapping
@@ -1692,6 +1767,15 @@ class SubiektGTService implements ERPSyncServiceInterface
         if (isset($product->is_active)) {
             $data['is_active'] = (bool) $product->is_active;
         }
+
+        // DEBUG: Log final mapped data
+        Log::debug('mapPpmProductToSubiekt: Final mapped data', [
+            'product_id' => $product->id,
+            'sku' => $product->sku,
+            'mapped_fields' => array_keys($data),
+            'prices_count' => count($data['prices'] ?? []),
+            'data' => $data,
+        ]);
 
         return $data;
     }
@@ -1812,11 +1896,15 @@ class SubiektGTService implements ERPSyncServiceInterface
             'stock_fetched_at' => !empty($allStock) ? now()->toIso8601String() : null,
         ];
 
+        // ETAP C.1: Generate hash for change detection
+        $syncHash = $this->generateExternalDataHash($externalData);
+
         Log::debug('updateProductErpDataFromRestApi: Saving external_data', [
             'product_id' => $product->id,
             'subiekt_id' => $subiektId,
             'prices_count' => count($allPrices),
             'stock_count' => count($allStock),
+            'sync_hash' => $syncHash,
         ]);
 
         return ProductErpData::updateOrCreate(
@@ -1830,9 +1918,37 @@ class SubiektGTService implements ERPSyncServiceInterface
                 'sync_status' => ProductErpData::STATUS_SYNCED,
                 'last_sync_at' => now(),
                 'last_pull_at' => now(),
+                'erp_updated_at' => now(),  // ETAP C.1: Track ERP source timestamp
+                'last_sync_hash' => $syncHash,  // ETAP C.1: Track data hash
                 'external_data' => $externalData,
             ]
         );
+    }
+
+    /**
+     * Generate hash from external data for change detection.
+     *
+     * ETAP C.1: Auto Sync - Hash Generation
+     *
+     * Uses key fields that indicate actual product changes:
+     * - name, sku (identity)
+     * - prices (all levels)
+     * - stock (all warehouses)
+     *
+     * @param array $externalData
+     * @return string MD5 hash
+     */
+    protected function generateExternalDataHash(array $externalData): string
+    {
+        $keyData = [
+            'name' => $externalData['name'] ?? null,
+            'sku' => $externalData['sku'] ?? null,
+            'ean' => $externalData['ean'] ?? null,
+            'prices' => $externalData['prices'] ?? [],
+            'stock' => $externalData['stock'] ?? [],
+        ];
+
+        return md5(json_encode($keyData));
     }
 
     /**
