@@ -743,15 +743,30 @@ class ProductFormSaver
     private function saveStock(): void
     {
         if (!$this->component->product || !$this->component->product->exists) {
-            Log::debug('saveStock: No product to save stock for');
+            Log::debug('[STOCK SAVE] No product to save stock for');
             return;
         }
 
         $savedCount = 0;
 
+        // DEBUG: Log incoming stock data
+        Log::debug('[STOCK SAVE] Starting stock save', [
+            'product_id' => $this->component->product->id,
+            'stock_data' => $this->component->stock,
+            'stock_count' => count($this->component->stock),
+        ]);
+
         try {
             foreach ($this->component->stock as $warehouseId => $stockData) {
-                ProductStock::updateOrCreate(
+                // DEBUG: Log each warehouse stock
+                Log::debug('[STOCK SAVE] Processing warehouse', [
+                    'warehouse_id' => $warehouseId,
+                    'quantity' => $stockData['quantity'] ?? 'null',
+                    'reserved' => $stockData['reserved'] ?? 'null',
+                    'minimum' => $stockData['minimum'] ?? 'null',
+                ]);
+
+                $stock = ProductStock::updateOrCreate(
                     [
                         'product_id' => $this->component->product->id,
                         'product_variant_id' => null, // Master product stock (not variant)
@@ -760,22 +775,30 @@ class ProductFormSaver
                     [
                         'quantity' => $stockData['quantity'] ?? 0,
                         'reserved_quantity' => $stockData['reserved'] ?? 0,
-                        'minimum_stock_level' => $stockData['minimum'] ?? 0,
+                        'minimum_stock' => $stockData['minimum'] ?? 0, // FIX: was minimum_stock_level
                         'is_active' => true,
                         'track_stock' => true,
                     ]
                 );
 
+                // DEBUG: Log result
+                Log::debug('[STOCK SAVE] Warehouse stock saved', [
+                    'warehouse_id' => $warehouseId,
+                    'stock_id' => $stock->id,
+                    'was_created' => $stock->wasRecentlyCreated,
+                    'saved_quantity' => $stock->quantity,
+                ]);
+
                 $savedCount++;
             }
 
-            Log::info('Product stock saved', [
+            Log::info('[STOCK SAVE] Product stock saved successfully', [
                 'product_id' => $this->component->product->id,
                 'saved_count' => $savedCount,
             ]);
 
         } catch (\Exception $e) {
-            Log::error('Failed to save product stock', [
+            Log::error('[STOCK SAVE] Failed to save product stock', [
                 'product_id' => $this->component->product->id,
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),

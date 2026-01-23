@@ -1113,7 +1113,7 @@ class ProductForm extends Component
                     $this->stock[$warehouseId] = [
                         'quantity' => $stock->quantity,
                         'reserved' => $stock->reserved_quantity,
-                        'minimum' => $stock->minimum_stock_level,
+                        'minimum' => $stock->minimum_stock, // FIX: was minimum_stock_level
                     ];
                 } else {
                     // Keep initialized zero values for warehouses without data
@@ -4475,6 +4475,12 @@ class ProductForm extends Component
             // FIX 2025-12-03: Save features per context to prevent cross-contamination
             // Each shop tab should have its own feature values
             'productFeatures' => $this->productFeatures,
+
+            // === PRICES & STOCK (FIX 2026-01-23) ===
+            // FIX: Save prices and stock to pending changes for default context
+            // These were missing, causing stock/prices not to save on saveAndClose()
+            'prices' => $this->activeShopId === null ? $this->prices : [],
+            'stock' => $this->activeShopId === null ? $this->stock : [],
         ];
 
         // DIAGNOSIS 2025-11-21: Debug category data flow
@@ -9738,7 +9744,15 @@ class ProductForm extends Component
             ]);
 
             foreach ($this->stock as $warehouseId => $stockData) {
-                \App\Models\ProductStock::updateOrCreate(
+                // DEBUG: Log each warehouse stock save
+                Log::debug('[STOCK SAVE INTERNAL] Processing warehouse', [
+                    'warehouse_id' => $warehouseId,
+                    'quantity' => $stockData['quantity'] ?? 'null',
+                    'reserved' => $stockData['reserved'] ?? 'null',
+                    'minimum' => $stockData['minimum'] ?? 'null',
+                ]);
+
+                $stock = \App\Models\ProductStock::updateOrCreate(
                     [
                         'product_id' => $this->product->id,
                         'product_variant_id' => null,
@@ -9747,11 +9761,19 @@ class ProductForm extends Component
                     [
                         'quantity' => $stockData['quantity'] ?? 0,
                         'reserved_quantity' => $stockData['reserved'] ?? 0,
-                        'minimum_stock_level' => $stockData['minimum'] ?? 0,
+                        'minimum_stock' => $stockData['minimum'] ?? 0, // FIX: was minimum_stock_level
                         'is_active' => true,
                         'track_stock' => true,
                     ]
                 );
+
+                // DEBUG: Log result
+                Log::debug('[STOCK SAVE INTERNAL] Warehouse stock saved', [
+                    'warehouse_id' => $warehouseId,
+                    'stock_id' => $stock->id,
+                    'was_created' => $stock->wasRecentlyCreated,
+                    'saved_quantity' => $stock->quantity,
+                ]);
 
                 $savedCount++;
             }
