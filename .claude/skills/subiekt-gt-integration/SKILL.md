@@ -1,11 +1,11 @@
 ---
 name: subiekt-gt-integration
 description: Integracja z ERP Subiekt GT (InsERT) - SQL Server, Sfera API, REST wrapper. Uzyj przy synchronizacji produktow, kontrahentow, zamowien z systemem ERP.
-version: 1.0.0
+version: 1.2.0
 author: Kamil Wilinski
 created: 2026-01-19
-updated: 2026-01-19
-tags: [subiekt, insert, erp, sql-server, sfera, integracja, magazyn]
+updated: 2026-01-23
+tags: [subiekt, insert, erp, sql-server, sfera, integracja, magazyn, ceny, sync]
 category: integration
 status: active
 ---
@@ -130,22 +130,30 @@ tw_Parametr     - NAZWY POZIOMOW CENOWYCH (KRYTYCZNE!)
   twp_NazwaCeny1..10 - Nazwy poziomow cen
 ```
 
-#### MAPOWANIE POZIOMOW CENOWYCH (tw_Parametr)
+#### MAPOWANIE POZIOMOW CENOWYCH (tw_Parametr) - KRYTYCZNE!
 
-| Kolumna tw_Parametr | ID | Kolumna tw_Cena | Przyklad nazwy |
-|--------------------|----|-----------------|----------------|
-| twp_NazwaCeny1 | 0 | tc_CenaNetto0 | Detaliczna |
-| twp_NazwaCeny2 | 1 | tc_CenaNetto1 | MRF-MPP |
-| twp_NazwaCeny3 | 2 | tc_CenaNetto2 | Szkółka-Komis-Drop |
-| twp_NazwaCeny4 | 3 | tc_CenaNetto3 | z magazynu |
-| twp_NazwaCeny5 | 4 | tc_CenaNetto4 | Warsztat |
-| twp_NazwaCeny6 | 5 | tc_CenaNetto5 | Standard |
-| twp_NazwaCeny7 | 6 | tc_CenaNetto6 | Premium |
-| twp_NazwaCeny8 | 7 | tc_CenaNetto7 | HuHa |
-| twp_NazwaCeny9 | 8 | tc_CenaNetto8 | Warsztat Premium |
-| twp_NazwaCeny10 | 9 | tc_CenaNetto9 | Pracownik |
+⚠️ **POZIOM 0 (tc_CenaNetto0) JEST NIEUZYWANY** przy konfiguracji z grupami cenowymi!
 
-**UWAGA:** `twp_NazwaCeny[N]` odpowiada `tc_CenaNetto[N-1]` (offset by 1!)
+| Kolumna tw_Parametr | Level API | Kolumna tw_Cena | Przyklad nazwy |
+|--------------------|-----------|-----------------|----------------|
+| - | 0 | tc_CenaNetto0 | **(Nieuzywany)** |
+| twp_NazwaCeny1 | 1 | tc_CenaNetto1 | Detaliczna |
+| twp_NazwaCeny2 | 2 | tc_CenaNetto2 | MRF-MPP |
+| twp_NazwaCeny3 | 3 | tc_CenaNetto3 | Szkółka-Komis-Drop |
+| twp_NazwaCeny4 | 4 | tc_CenaNetto4 | z magazynu |
+| twp_NazwaCeny5 | 5 | tc_CenaNetto5 | Warsztat |
+| twp_NazwaCeny6 | 6 | tc_CenaNetto6 | Standard |
+| twp_NazwaCeny7 | 7 | tc_CenaNetto7 | Premium |
+| twp_NazwaCeny8 | 8 | tc_CenaNetto8 | HuHa |
+| twp_NazwaCeny9 | 9 | tc_CenaNetto9 | Warsztat Premium |
+| twp_NazwaCeny10 | 10 | tc_CenaNetto10 | Pracownik |
+
+**PRAWIDLOWE MAPOWANIE:** `twp_NazwaCeny[N]` → `tc_CenaNetto[N]` → API Level N
+
+**KRYTYCZNE:**
+- Poziom 0 zawsze pomijaj przy synchronizacji cen z PPM
+- REST API `/api/price-levels` zwraca TYLKO poziomy 1-10 (bez 0)
+- Przy PUT/UPDATE cen wysylaj klucze 1-10, NIE 0-9
 
 #### KONTRAHENCI
 ```
@@ -324,6 +332,7 @@ echo "Utworzono: " . $faktura->NumerPelny;
 
 ### Dostepne Endpointy
 
+#### Odczyty (GET)
 | Endpoint | Metoda | Opis |
 |----------|--------|------|
 | `/api/health` | GET | Connection test + DB stats |
@@ -334,14 +343,46 @@ echo "Utworzono: " . $faktura->NumerPelny;
 | `/api/stock` | GET | Stany magazynowe |
 | `/api/stock/{productId}` | GET | Stan produktu |
 | `/api/stock/sku/{sku}` | GET | Stan po SKU |
-| `/api/prices/{productId}` | GET | Ceny produktu |
+| `/api/prices/{productId}` | GET | Ceny produktu (wszystkie 11 poziomow) |
 | `/api/prices/sku/{sku}` | GET | Ceny po SKU |
 | `/api/warehouses` | GET | Lista magazynow |
-| `/api/price-levels` | GET | Nazwy poziomow cenowych (z tw_Parametr!) |
+| `/api/price-levels` | GET | Nazwy poziomow cenowych 1-10 (BEZ poziomu 0!) |
 | `/api/vat-rates` | GET | Stawki VAT |
 | `/api/manufacturers` | GET | Producenci |
 | `/api/product-groups` | GET | Grupy produktow |
 | `/api/units` | GET | Jednostki miary |
+
+#### Zapisy (PUT) - DirectSQL
+| Endpoint | Metoda | Opis |
+|----------|--------|------|
+| `/api/products/sku/{sku}` | PUT | Aktualizacja produktu przez SKU |
+
+**PUT Request Body:**
+```json
+{
+  "Name": "Nazwa produktu",
+  "Description": "Opis",
+  "IsActive": true,
+  "PricesNet": {"1": 100.00, "2": 99.19, "3": 180.49},
+  "PricesGross": {"1": 123.00, "2": 122.00, "3": 222.00}
+}
+```
+
+**PUT Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "product_id": 23228,
+    "sku": "BL-22652-176692083",
+    "action": "updated",
+    "rows_affected": 3,
+    "message": "Product updated successfully"
+  }
+}
+```
+
+⚠️ **WAZNE:** Klucze w PricesNet/PricesGross to poziomy 1-10, NIE 0-9!
 
 ### Query Parameters (/api/products)
 
@@ -388,20 +429,55 @@ $client = new SubiektRestApiClient([
 $products = $client->getProducts(['page' => 1, 'pageSize' => 100]);
 
 // Poziomy cenowe z prawdziwymi nazwami (z tw_Parametr)
+// UWAGA: Poziom 0 jest NIEUZYWANY - zwracane sa tylko 1-10!
 $priceLevels = $client->getPriceLevels();
 // [
-//   {id: 0, name: "Detaliczna"},
-//   {id: 1, name: "MRF-MPP"},
-//   {id: 2, name: "Szkółka-Komis-Drop"},
-//   {id: 3, name: "z magazynu"},
-//   {id: 4, name: "Warsztat"},
-//   {id: 5, name: "Standard"},
-//   {id: 6, name: "Premium"},
-//   {id: 7, name: "HuHa"},
-//   {id: 8, name: "Warsztat Premium"},
-//   {id: 9, name: "Pracownik"}
+//   {id: 1, name: "Detaliczna"},      // tc_CenaNetto1
+//   {id: 2, name: "MRF-MPP"},         // tc_CenaNetto2
+//   {id: 3, name: "Szkółka-Komis-Drop"}, // tc_CenaNetto3
+//   {id: 4, name: "z magazynu"},      // tc_CenaNetto4
+//   {id: 5, name: "Warsztat"},        // tc_CenaNetto5
+//   {id: 6, name: "Standard"},        // tc_CenaNetto6
+//   {id: 7, name: "Premium"},         // tc_CenaNetto7
+//   {id: 8, name: "HuHa"},            // tc_CenaNetto8
+//   {id: 9, name: "Warsztat Premium"}, // tc_CenaNetto9
+//   {id: 10, name: "Pracownik"}       // tc_CenaNetto10
 // ]
+
+// Aktualizacja produktu (PUT)
+$result = $client->updateProductBySku('SKU-001', [
+    'name' => 'Nowa nazwa',
+    'prices' => [
+        1 => ['net' => 100.00, 'gross' => 123.00],  // Poziom 1 (Detaliczna)
+        2 => ['net' => 99.19, 'gross' => 122.00],   // Poziom 2 (MRF-MPP)
+    ],
+]);
 ```
+
+### ERPConnection Config (PPM-CC-Laravel)
+
+⚠️ **KRYTYCZNE dla synchronizacji PUSH (PPM → Subiekt):**
+
+```php
+// ERPConnection model - connection_config (encrypted JSON)
+[
+    'connection_mode' => 'rest_api',
+    'rest_api_url' => 'https://sapi.mpptrade.pl',
+    'rest_api_key' => 'YOUR_API_KEY',
+    'rest_api_verify_ssl' => false,
+    'sync_direction' => 'bidirectional',  // WYMAGANE dla PUSH!
+    'default_price_type_id' => '1',       // Domyslny poziom ceny (1-10, NIE 0!)
+    'warehouse_mappings' => [...],
+    'price_group_mappings' => [...],
+]
+```
+
+**sync_direction opcje:**
+- `pull` - tylko pobieranie z Subiekt (domyslne)
+- `push` - tylko wysylanie do Subiekt
+- `bidirectional` - obie strony
+
+**UWAGA:** Jesli sync_direction = 'pull', operacje PUSH beda pomijane!
 
 ### Kod zrodlowy REST API (.NET 8)
 
@@ -518,10 +594,12 @@ class SubiektService
 
 ### KRYTYCZNE
 
-1. **NIGDY nie modyfikuj danych przez SQL INSERT/UPDATE bez Sfera** - mozesz uszkodzic integralnosc bazy
-2. **Uzywaj spIdentyfikator do generowania ID** - nie MAX(id)+1
-3. **Zawsze testuj na kopii bazy** - nigdy na produkcji bez backup
-4. **Sprawdzaj wersje Subiekt** - struktura moze sie roznic miedzy wersjami
+1. **DirectSQL UPDATE dla cen jest BEZPIECZNY** - tabela tw_Cena moze byc aktualizowana przez SQL
+2. **DirectSQL INSERT wymaga Sfera** - tworzenie nowych produktow przez spIdentyfikator + INSERT moze nie dzialac bez licencji Sfera
+3. **Uzywaj spIdentyfikator do generowania ID** - nie MAX(id)+1
+4. **Zawsze testuj na kopii bazy** - nigdy na produkcji bez backup
+5. **Sprawdzaj wersje Subiekt** - struktura moze sie roznic miedzy wersjami
+6. **Poziom ceny 0 jest NIEUZYWANY** - przy konfiguracji z grupami cenowymi pomijaj tc_CenaNetto0
 
 ### ZALECANE
 
@@ -568,10 +646,22 @@ Ten skill automatycznie zbiera:
 - User satisfaction target: 4.5/5
 
 ### Historia Ulepszen
+
+#### v1.2.0 (2026-01-23) - KRYTYCZNA KOREKTA MAPOWANIA CEN
+- [BREAKING] **KOREKTA MAPOWANIA:** `twp_NazwaCeny[N]` → `tc_CenaNetto[N]` (NIE N-1!)
+- [BREAKING] **Poziom 0 (tc_CenaNetto0) jest NIEUZYWANY** - zawsze pomijaj przy sync
+- [FEATURE] Nowy endpoint `PUT /api/products/sku/{sku}` dla aktualizacji produktow
+- [FEATURE] DirectSQL UPDATE dla cen - bezpieczne bez Sfera
+- [FEATURE] Dokumentacja ERPConnection config z sync_direction
+- [FIX] REST API `/api/price-levels` zwraca poziomy 1-10 (bez 0)
+- [FIX] Ceny wysylane z kluczami 1-10 (nie 0-9)
+- [DOCS] Przyklad PUT request/response
+- [DOCS] Ostrzezenia o sync_direction = 'bidirectional' dla PUSH
+- [VERIFIED] Synchronizacja cen PPM → Subiekt GT dziala poprawnie
+
 #### v1.1.0 (2026-01-20)
 - [FEATURE] Dodano dokumentacje REST API MPP TRADE (sapi.mpptrade.pl)
 - [FEATURE] Odkryto tabele tw_Parametr z nazwami poziomow cenowych
-- [FEATURE] Mapowanie twp_NazwaCeny[N] -> tc_CenaNetto[N-1]
 - [FIX] REST API /api/price-levels zwraca prawdziwe nazwy z bazy
 - [DOCS] Dodano wszystkie endpointy REST API
 - [DOCS] Zaktualizowano strukture bazy o tw_Parametr

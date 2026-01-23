@@ -47,18 +47,20 @@ When working with Subiekt GT integration:
 | Column | Type | Description |
 |--------|------|-------------|
 | `tc_TowId` | INT | FK to tw__Towar |
-| `tc_CenaNetto0..10` | DECIMAL | Net prices (11 price levels) |
+| `tc_CenaNetto0` | DECIMAL | **UNUSED** with price groups! |
+| `tc_CenaNetto1..10` | DECIMAL | Net prices (levels 1-10) |
 | `tc_CenaBrutto0..10` | DECIMAL | Gross prices (11 price levels) |
 
-### Price Level Names (tw_Parametr) - IMPORTANT!
+### Price Level Names (tw_Parametr) - CRITICAL!
 | Column | Type | Description |
 |--------|------|-------------|
 | `twp_Id` | INT | Primary key (always 1) |
-| `twp_NazwaCeny1` | VARCHAR | Name for price level 0 (tc_CenaNetto0) |
-| `twp_NazwaCeny2` | VARCHAR | Name for price level 1 (tc_CenaNetto1) |
-| `twp_NazwaCeny3..10` | VARCHAR | Names for price levels 2-9 |
+| `twp_NazwaCeny1` | VARCHAR | Name for level 1 (tc_CenaNetto1) |
+| `twp_NazwaCeny2` | VARCHAR | Name for level 2 (tc_CenaNetto2) |
+| `twp_NazwaCeny3..10` | VARCHAR | Names for levels 3-10 |
 
-**MAPPING:** `twp_NazwaCeny[N]` → `tc_CenaNetto[N-1]` (offset by 1!)
+⚠️ **CORRECT MAPPING:** `twp_NazwaCeny[N]` → `tc_CenaNetto[N]` → API Level N
+⚠️ **CRITICAL:** Level 0 (tc_CenaNetto0) is UNUSED - always skip in price sync!
 
 ### Warehouses (sl_Magazyn)
 | Column | Type | Description |
@@ -109,8 +111,13 @@ WHERE mag_Aktywny = 1
 
 ### NEVER Do This
 - **NEVER** use `MAX(id)+1` for new IDs - use `spIdentyfikator` stored procedure
-- **NEVER** INSERT/UPDATE directly without Sfera API - breaks integrity
+- **NEVER** INSERT new products directly without Sfera API - breaks integrity
 - **NEVER** assume column names - always check schema docs
+- **NEVER** use price level 0 (tc_CenaNetto0) - it's UNUSED with price groups
+
+### SAFE to Do (DirectSQL)
+- **UPDATE tw_Cena** for existing products - safe without Sfera
+- **UPDATE tw__Towar** basic fields (Name, Description) - safe without Sfera
 
 ### ALWAYS Do This
 - **ALWAYS** check `*_Aktywny` flag for active records
