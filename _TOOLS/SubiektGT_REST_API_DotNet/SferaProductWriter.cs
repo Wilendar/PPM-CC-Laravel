@@ -16,8 +16,57 @@ public interface ISferaProductWriter
     Task<ProductWriteResponse> CreateProductAsync(ProductWriteRequest request);
     Task<ProductWriteResponse> UpdateProductAsync(int productId, ProductWriteRequest request);
     Task<ProductWriteResponse> UpdateProductBySkuAsync(string sku, ProductWriteRequest request);
+    Task<StockWriteResponse> UpdateStockAsync(int productId, StockWriteRequest request);
+    Task<StockWriteResponse> UpdateStockBySkuAsync(string sku, StockWriteRequest request);
     Task<bool> ProductExistsAsync(string sku);
     Task<int?> GetProductIdBySkuAsync(string sku);
+}
+
+/// <summary>
+/// Request model for stock update operations.
+/// Keys are warehouse IDs, values are stock data objects.
+/// </summary>
+public class StockWriteRequest
+{
+    /// <summary>
+    /// Stock data per warehouse. Key = WarehouseId, Value = StockData.
+    /// Example: { "1": { "quantity": 100.0, "min": 10.0, "max": 500.0 }, "4": { "quantity": 50.0 } }
+    /// </summary>
+    public Dictionary<int, StockData>? Stock { get; set; }
+}
+
+/// <summary>
+/// Stock data for a single warehouse.
+/// </summary>
+public class StockData
+{
+    /// <summary>Current stock quantity (st_Stan)</summary>
+    public decimal? Quantity { get; set; }
+
+    /// <summary>Minimum stock level (st_StanMin)</summary>
+    public decimal? Min { get; set; }
+
+    /// <summary>Maximum stock level (st_StanMax)</summary>
+    public decimal? Max { get; set; }
+
+    /// <summary>Reserved quantity (st_StanRez) - usually read-only, but can be set</summary>
+    public decimal? Reserved { get; set; }
+}
+
+/// <summary>
+/// Response model for stock write operations.
+/// </summary>
+public class StockWriteResponse
+{
+    public bool Success { get; set; }
+    public DateTime Timestamp { get; set; } = DateTime.Now;
+    public int? ProductId { get; set; }
+    public string? Sku { get; set; }
+    public string? Action { get; set; }
+    public string? Message { get; set; }
+    public int RowsAffected { get; set; }
+    public string? Error { get; set; }
+    public string? ErrorCode { get; set; }
 }
 
 // ==================== SFERA PRODUCT WRITER (COM) ====================
@@ -79,6 +128,28 @@ public class SferaProductWriter : ISferaProductWriter
             Error = "Sfera COM interop not implemented",
             ErrorCode = "SFERA_NOT_IMPLEMENTED"
         };
+    }
+
+    public Task<StockWriteResponse> UpdateStockAsync(int productId, StockWriteRequest request)
+    {
+        return Task.FromResult(new StockWriteResponse
+        {
+            Success = false,
+            Timestamp = DateTime.Now,
+            Error = "Sfera COM interop not implemented",
+            ErrorCode = "SFERA_NOT_IMPLEMENTED"
+        });
+    }
+
+    public Task<StockWriteResponse> UpdateStockBySkuAsync(string sku, StockWriteRequest request)
+    {
+        return Task.FromResult(new StockWriteResponse
+        {
+            Success = false,
+            Timestamp = DateTime.Now,
+            Error = "Sfera COM interop not implemented",
+            ErrorCode = "SFERA_NOT_IMPLEMENTED"
+        });
     }
 
     public Task<bool> ProductExistsAsync(string sku) => Task.FromResult(false);
@@ -753,6 +824,182 @@ public class DirectSqlProductWriter : ISferaProductWriter
         }
 
         return await UpdateProductAsync(productId.Value, request);
+    }
+
+    /// <summary>
+    /// Updates stock quantities for a product by product ID.
+    /// Uses DirectSQL UPDATE on tw_Stan table.
+    /// If warehouse record doesn't exist, INSERT is used.
+    /// </summary>
+    public async Task<StockWriteResponse> UpdateStockAsync(int productId, StockWriteRequest request)
+    {
+        if (request.Stock == null || request.Stock.Count == 0)
+        {
+            return new StockWriteResponse
+            {
+                Success = false,
+                Timestamp = DateTime.Now,
+                ProductId = productId,
+                Error = "No stock data provided",
+                ErrorCode = "VALIDATION_ERROR"
+            };
+        }
+
+        using var conn = GetConnection();
+        await conn.OpenAsync();
+
+        // Check if product exists
+        var existingSku = await conn.ExecuteScalarAsync<string?>(
+            "SELECT tw_Symbol FROM tw__Towar WHERE tw_Id = @id AND tw_Usuniety = 0",
+            new { id = productId });
+
+        if (existingSku == null)
+        {
+            return new StockWriteResponse
+            {
+                Success = false,
+                Timestamp = DateTime.Now,
+                ProductId = productId,
+                Error = $"Product with ID {productId} not found",
+                ErrorCode = "PRODUCT_NOT_FOUND"
+            };
+        }
+
+        using var transaction = conn.BeginTransaction();
+
+        try
+        {
+            var rowsAffected = 0;
+            var updatedWarehouses = new List<int>();
+            var insertedWarehouses = new List<int>();
+
+            foreach (var kvp in request.Stock)
+            {
+                var warehouseId = kvp.Key;
+                var stockData = kvp.Value;
+
+                // Check if record exists
+                var existingCount = await conn.ExecuteScalarAsync<int>(
+                    "SELECT COUNT(*) FROM tw_Stan WHERE st_TowId = @productId AND st_MagId = @warehouseId",
+                    new { productId, warehouseId }, transaction);
+
+                if (existingCount > 0)
+                {
+                    // Build dynamic UPDATE for existing record
+                    var updates = new List<string>();
+                    var parameters = new DynamicParameters();
+                    parameters.Add("@productId", productId);
+                    parameters.Add("@warehouseId", warehouseId);
+
+                    if (stockData.Quantity.HasValue)
+                    {
+                        updates.Add("st_Stan = @quantity");
+                        parameters.Add("@quantity", stockData.Quantity.Value);
+                    }
+                    if (stockData.Min.HasValue)
+                    {
+                        updates.Add("st_StanMin = @min");
+                        parameters.Add("@min", stockData.Min.Value);
+                    }
+                    if (stockData.Max.HasValue)
+                    {
+                        updates.Add("st_StanMax = @max");
+                        parameters.Add("@max", stockData.Max.Value);
+                    }
+                    if (stockData.Reserved.HasValue)
+                    {
+                        updates.Add("st_StanRez = @reserved");
+                        parameters.Add("@reserved", stockData.Reserved.Value);
+                    }
+
+                    if (updates.Count > 0)
+                    {
+                        var updateSql = $@"
+                            UPDATE tw_Stan
+                            SET {string.Join(", ", updates)}
+                            WHERE st_TowId = @productId AND st_MagId = @warehouseId";
+
+                        rowsAffected += await conn.ExecuteAsync(updateSql, parameters, transaction);
+                        updatedWarehouses.Add(warehouseId);
+                    }
+                }
+                else
+                {
+                    // INSERT new record with all values
+                    var insertSql = @"
+                        INSERT INTO tw_Stan (st_TowId, st_MagId, st_Stan, st_StanMin, st_StanRez, st_StanMax)
+                        VALUES (@productId, @warehouseId, @quantity, @min, @reserved, @max)";
+
+                    rowsAffected += await conn.ExecuteAsync(insertSql, new
+                    {
+                        productId,
+                        warehouseId,
+                        quantity = stockData.Quantity ?? 0,
+                        min = stockData.Min ?? 0,
+                        max = stockData.Max ?? 0,
+                        reserved = stockData.Reserved ?? 0
+                    }, transaction);
+
+                    insertedWarehouses.Add(warehouseId);
+                }
+            }
+
+            transaction.Commit();
+
+            _logger.LogInformation(
+                "Updated stock for product ID={Id} (SKU={Sku}): Updated warehouses: [{Updated}], Inserted warehouses: [{Inserted}]",
+                productId, existingSku, string.Join(", ", updatedWarehouses), string.Join(", ", insertedWarehouses));
+
+            return new StockWriteResponse
+            {
+                Success = true,
+                Timestamp = DateTime.Now,
+                ProductId = productId,
+                Sku = existingSku,
+                Action = "stock_updated",
+                Message = $"Stock updated for {request.Stock.Count} warehouse(s). Updated: [{string.Join(", ", updatedWarehouses)}], Inserted: [{string.Join(", ", insertedWarehouses)}]",
+                RowsAffected = rowsAffected
+            };
+        }
+        catch (Exception ex)
+        {
+            transaction.Rollback();
+
+            _logger.LogError(ex,
+                "Error updating stock for product ID={Id}: {Message}",
+                productId, ex.Message);
+
+            return new StockWriteResponse
+            {
+                Success = false,
+                Timestamp = DateTime.Now,
+                ProductId = productId,
+                Error = ex.Message,
+                ErrorCode = "STOCK_UPDATE_ERROR"
+            };
+        }
+    }
+
+    /// <summary>
+    /// Updates stock quantities for a product by SKU.
+    /// </summary>
+    public async Task<StockWriteResponse> UpdateStockBySkuAsync(string sku, StockWriteRequest request)
+    {
+        var productId = await GetProductIdBySkuAsync(sku);
+
+        if (!productId.HasValue)
+        {
+            return new StockWriteResponse
+            {
+                Success = false,
+                Timestamp = DateTime.Now,
+                Sku = sku,
+                Error = $"Product with SKU '{sku}' not found",
+                ErrorCode = "PRODUCT_NOT_FOUND"
+            };
+        }
+
+        return await UpdateStockAsync(productId.Value, request);
     }
 
     public async Task<bool> ProductExistsAsync(string sku)

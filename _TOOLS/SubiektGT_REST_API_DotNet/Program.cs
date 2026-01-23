@@ -582,6 +582,114 @@ app.MapPost("/api/products/{id:int}/fix-visibility", async (int id, ISubiektRepo
     }
 });
 
+// ==================== STOCK WRITE ENDPOINTS ====================
+
+// Update stock by product ID
+// PUT /api/stock/{id}
+// Body: StockWriteRequest JSON { "Stock": { "1": 100.0, "4": 50.0 } }
+app.MapPut("/api/stock/{id:int}", async (int id, StockWriteRequest request, ISferaProductWriter writer) =>
+{
+    try
+    {
+        var result = await writer.UpdateStockAsync(id, request);
+
+        if (result.Success)
+        {
+            return Results.Ok(new
+            {
+                success = true,
+                timestamp = result.Timestamp.ToString("o"),
+                data = new
+                {
+                    product_id = result.ProductId,
+                    sku = result.Sku,
+                    action = result.Action,
+                    rows_affected = result.RowsAffected,
+                    message = result.Message
+                }
+            });
+        }
+
+        var statusCode = result.ErrorCode switch
+        {
+            "PRODUCT_NOT_FOUND" => 404,
+            "VALIDATION_ERROR" => 400,
+            _ => 400
+        };
+
+        return Results.Json(new
+        {
+            success = false,
+            timestamp = result.Timestamp.ToString("o"),
+            error = result.Error,
+            error_code = result.ErrorCode
+        }, statusCode: statusCode);
+    }
+    catch (Exception ex)
+    {
+        return Results.Json(new
+        {
+            success = false,
+            timestamp = DateTime.Now.ToString("o"),
+            error = ex.Message,
+            error_code = "INTERNAL_ERROR"
+        }, statusCode: 500);
+    }
+});
+
+// Update stock by SKU
+// PUT /api/stock/sku/{sku}
+// Body: StockWriteRequest JSON { "Stock": { "1": 100.0, "4": 50.0 } }
+app.MapPut("/api/stock/sku/{sku}", async (string sku, StockWriteRequest request, ISferaProductWriter writer) =>
+{
+    try
+    {
+        var result = await writer.UpdateStockBySkuAsync(sku, request);
+
+        if (result.Success)
+        {
+            return Results.Ok(new
+            {
+                success = true,
+                timestamp = result.Timestamp.ToString("o"),
+                data = new
+                {
+                    product_id = result.ProductId,
+                    sku = result.Sku ?? sku,
+                    action = result.Action,
+                    rows_affected = result.RowsAffected,
+                    message = result.Message
+                }
+            });
+        }
+
+        var statusCode = result.ErrorCode switch
+        {
+            "PRODUCT_NOT_FOUND" => 404,
+            "VALIDATION_ERROR" => 400,
+            _ => 400
+        };
+
+        return Results.Json(new
+        {
+            success = false,
+            timestamp = result.Timestamp.ToString("o"),
+            error = result.Error,
+            error_code = result.ErrorCode
+        }, statusCode: statusCode);
+    }
+    catch (Exception ex)
+    {
+        return Results.Json(new
+        {
+            success = false,
+            timestamp = DateTime.Now.ToString("o"),
+            error = ex.Message,
+            error_code = "INTERNAL_ERROR"
+        }, statusCode: 500);
+    }
+});
+
 // Check if product exists by SKU
 // HEAD /api/products/sku/{sku}
 app.MapMethods("/api/products/sku/{sku}/exists", new[] { "HEAD", "GET" }, async (string sku, ISferaProductWriter writer) =>

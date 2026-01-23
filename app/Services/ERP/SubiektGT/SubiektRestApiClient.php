@@ -638,6 +638,129 @@ class SubiektRestApiClient
         return $this->request('GET', "/api/stock/sku/{$encodedSku}");
     }
 
+    /**
+     * Update stock for a product by ID
+     *
+     * Stock data format:
+     * [
+     *     warehouseId => [
+     *         'quantity' => 100.0,   // Current stock (st_Stan)
+     *         'min' => 10.0,         // Minimum level (st_StanMin) - optional
+     *         'max' => 500.0,        // Maximum level (st_StanMax) - optional
+     *         'reserved' => 0.0,     // Reserved (st_StanRez) - optional
+     *     ],
+     * ]
+     *
+     * @param int $productId Subiekt GT product ID
+     * @param array $stockData Stock data per warehouse
+     * @return array Update result
+     */
+    public function updateProductStock(int $productId, array $stockData): array
+    {
+        $body = $this->buildStockWriteBody($stockData);
+
+        if (empty($body['Stock'])) {
+            return [
+                'success' => true,
+                'message' => 'No stock data to update',
+                'rows_affected' => 0,
+            ];
+        }
+
+        Log::info('SubiektRestApiClient::updateProductStock', [
+            'product_id' => $productId,
+            'warehouses' => array_keys($body['Stock']),
+        ]);
+
+        return $this->request('PUT', "/api/stock/{$productId}", $body);
+    }
+
+    /**
+     * Update stock for a product by SKU
+     *
+     * @param string $sku Product SKU
+     * @param array $stockData Stock data per warehouse
+     * @return array Update result
+     */
+    public function updateProductStockBySku(string $sku, array $stockData): array
+    {
+        $body = $this->buildStockWriteBody($stockData);
+
+        Log::debug('SubiektRestApiClient::updateProductStockBySku - request', [
+            'sku' => $sku,
+            'input_data' => $stockData,
+            'request_body' => $body,
+        ]);
+
+        if (empty($body['Stock'])) {
+            return [
+                'success' => true,
+                'message' => 'No stock data to update',
+                'rows_affected' => 0,
+            ];
+        }
+
+        Log::info('SubiektRestApiClient::updateProductStockBySku', [
+            'sku' => $sku,
+            'warehouses' => array_keys($body['Stock']),
+        ]);
+
+        $encodedSku = rawurlencode($sku);
+        $response = $this->request('PUT', "/api/stock/sku/{$encodedSku}", $body);
+
+        Log::debug('SubiektRestApiClient::updateProductStockBySku - response', [
+            'sku' => $sku,
+            'response' => $response,
+        ]);
+
+        return $response;
+    }
+
+    /**
+     * Build request body for stock update
+     *
+     * @param array $stockData Stock data per warehouse
+     * @return array Request body for PUT /api/stock
+     */
+    protected function buildStockWriteBody(array $stockData): array
+    {
+        $stock = [];
+
+        foreach ($stockData as $warehouseId => $data) {
+            if (!is_numeric($warehouseId)) {
+                continue;
+            }
+
+            $stockEntry = [];
+
+            // Quantity (st_Stan)
+            if (isset($data['quantity'])) {
+                $stockEntry['Quantity'] = (float) $data['quantity'];
+            }
+
+            // Minimum level (st_StanMin)
+            if (isset($data['min'])) {
+                $stockEntry['Min'] = (float) $data['min'];
+            }
+
+            // Maximum level (st_StanMax)
+            if (isset($data['max'])) {
+                $stockEntry['Max'] = (float) $data['max'];
+            }
+
+            // Reserved (st_StanRez)
+            if (isset($data['reserved'])) {
+                $stockEntry['Reserved'] = (float) $data['reserved'];
+            }
+
+            if (!empty($stockEntry)) {
+                $stock[(int) $warehouseId] = $stockEntry;
+            }
+        }
+
+        return ['Stock' => $stock];
+    }
+
     // ==========================================
     // PRICES
     // ==========================================

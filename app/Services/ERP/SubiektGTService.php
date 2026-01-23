@@ -1506,40 +1506,83 @@ class SubiektGTService implements ERPSyncServiceInterface
                 'fields' => array_keys($updateData),
             ]);
 
-            // Use PUT endpoint
-            $result = $client->updateProductBySku($product->sku, $updateData);
+            // ====== UPDATE PRODUCT (name, description, prices, etc.) ======
+            // Extract stock from updateData - it goes to separate API endpoint
+            $stockData = $updateData['stock'] ?? [];
+            unset($updateData['stock']); // Don't send stock to product update endpoint
 
-            // DEBUG: Log API response
-            Log::debug('pushProductToSubiekt: API response', [
-                'sku' => $product->sku,
-                'success' => $result['success'] ?? false,
-                'result' => $result,
-            ]);
+            $productResult = null;
+            $stockResult = null;
 
-            if ($result['success'] ?? false) {
+            // 1. Update product basic fields and prices
+            if (!empty($updateData)) {
+                $productResult = $client->updateProductBySku($product->sku, $updateData);
+
+                Log::debug('pushProductToSubiekt: Product update API response', [
+                    'sku' => $product->sku,
+                    'success' => $productResult['success'] ?? false,
+                    'result' => $productResult,
+                ]);
+            }
+
+            // 2. Update stock (separate endpoint)
+            if (!empty($stockData)) {
+                $stockResult = $client->updateProductStockBySku($product->sku, $stockData);
+
+                Log::debug('pushProductToSubiekt: Stock update API response', [
+                    'sku' => $product->sku,
+                    'success' => $stockResult['success'] ?? false,
+                    'result' => $stockResult,
+                ]);
+            }
+
+            // Combine results
+            $productSuccess = empty($updateData) || ($productResult['success'] ?? false);
+            $stockSuccess = empty($stockData) || ($stockResult['success'] ?? false);
+
+            if ($productSuccess && $stockSuccess) {
+                $rowsAffected = ($productResult['data']['rows_affected'] ?? 0) + ($stockResult['data']['rows_affected'] ?? 0);
+                $messages = [];
+
+                if (!empty($updateData)) {
+                    $messages[] = $productResult['data']['message'] ?? 'Produkt zaktualizowany';
+                }
+                if (!empty($stockData)) {
+                    $messages[] = $stockResult['data']['message'] ?? 'Stany zaktualizowane';
+                }
+
                 return [
                     'success' => true,
-                    'message' => $result['data']['message'] ?? 'Produkt zaktualizowany',
-                    'action' => $result['data']['action'] ?? 'updated',
-                    'rows_affected' => $result['data']['rows_affected'] ?? null,
+                    'message' => implode('. ', $messages) ?: 'Zaktualizowano',
+                    'action' => 'updated',
+                    'rows_affected' => $rowsAffected,
                     'updated_fields' => array_keys($updateData),
                     'prices_updated' => count($updateData['prices'] ?? []),
+                    'stock_updated' => count($stockData),
                 ];
             }
 
+            // Error handling - combine errors from both operations
+            $errors = [];
+
+            if (!$productSuccess && $productResult) {
+                $errors[] = $productResult['error'] ?? 'Blad aktualizacji produktu';
+            }
+            if (!$stockSuccess && $stockResult) {
+                $errors[] = $stockResult['error'] ?? 'Blad aktualizacji stanow';
+            }
+
             // Check for specific error codes
-            $errorCode = $result['error_code'] ?? null;
+            $errorCode = $productResult['error_code'] ?? $stockResult['error_code'] ?? null;
 
             // SFERA_REQUIRED means server doesn't have Sfera enabled
-            // We can still do basic field updates in DirectSQL mode
             if ($errorCode === 'SFERA_REQUIRED') {
                 Log::info('SubiektGTService: Sfera not available, using DirectSQL fallback');
-                // The API will use DirectSQL fallback automatically
             }
 
             return [
                 'success' => false,
-                'message' => $result['error'] ?? 'Blad aktualizacji produktu',
+                'message' => implode('. ', $errors) ?: 'Blad aktualizacji',
                 'error_code' => $errorCode,
             ];
 
@@ -1771,12 +1814,66 @@ class SubiektGTService implements ERPSyncServiceInterface
             $data['is_active'] = (bool) $product->is_active;
         }
 
+        // ====== STOCK MAPPING ======
+        // Maps PPM warehouse IDs to Subiekt GT warehouse IDs
+        // Config stores: ERP_WAREHOUSE_ID => PPM_WAREHOUSE_ID (for PULL)
+        // For PUSH we need: PPM_WAREHOUSE_ID => ERP_WAREHOUSE_ID (inverted)
+        $erpToPpmWarehouseMapping = $config['warehouse_mappings'] ?? [];
+        $ppmToErpWarehouseMapping = array_flip($erpToPpmWarehouseMapping);
+        $stock = [];
+
+        // Get product stock from relationship (via ProductStock model)
+        // FIX: Use $product->stock instead of $product->warehouses
+        $productStock = $product->stock ?? collect();
+        if ($productStock instanceof \Illuminate\Database\Eloquent\Collection) {
+            $productStock = $productStock->toArray();
+        }
+
+        Log::debug('mapPpmProductToSubiekt: Stock mapping', [
+            'erpToPpmWarehouseMapping' => $erpToPpmWarehouseMapping,
+            'ppmToErpWarehouseMapping' => $ppmToErpWarehouseMapping,
+            'productStock_count' => count($productStock),
+        ]);
+
+        foreach ($productStock as $stockData) {
+            // ProductStock model data
+            $ppmWarehouseId = $stockData['warehouse_id'] ?? null;
+
+            if ($ppmWarehouseId && isset($ppmToErpWarehouseMapping[$ppmWarehouseId])) {
+                $erpWarehouseId = (int) $ppmToErpWarehouseMapping[$ppmWarehouseId];
+
+                // Get stock values from ProductStock model fields
+                $quantity = (float) ($stockData['quantity'] ?? 0);
+                $minimum = (float) ($stockData['minimum_stock'] ?? $stockData['minimum'] ?? 0);
+                $maximum = (float) ($stockData['maximum_stock'] ?? $stockData['maximum'] ?? 0);
+
+                $stock[$erpWarehouseId] = [
+                    'quantity' => $quantity,
+                    'min' => $minimum,
+                    'max' => $maximum,
+                ];
+
+                Log::debug('mapPpmProductToSubiekt: Mapped stock', [
+                    'ppmWarehouseId' => $ppmWarehouseId,
+                    'erpWarehouseId' => $erpWarehouseId,
+                    'quantity' => $quantity,
+                    'min' => $minimum,
+                    'max' => $maximum,
+                ]);
+            }
+        }
+
+        if (!empty($stock)) {
+            $data['stock'] = $stock;
+        }
+
         // DEBUG: Log final mapped data
         Log::debug('mapPpmProductToSubiekt: Final mapped data', [
             'product_id' => $product->id,
             'sku' => $product->sku,
             'mapped_fields' => array_keys($data),
             'prices_count' => count($data['prices'] ?? []),
+            'stock_count' => count($data['stock'] ?? []),
             'data' => $data,
         ]);
 

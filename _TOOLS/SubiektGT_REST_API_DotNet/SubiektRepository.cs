@@ -215,7 +215,9 @@ public class SubiektRepository : ISubiektRepository
                 s.st_MagId AS WarehouseId,
                 m.mag_Nazwa AS WarehouseName,
                 s.st_Stan AS Quantity,
-                s.st_StanRez AS Reserved
+                s.st_StanRez AS Reserved,
+                s.st_StanMin AS Min,
+                s.st_StanMax AS Max
             FROM tw_Stan s
             JOIN tw__Towar t ON s.st_TowId = t.tw_Id
             JOIN sl_Magazyn m ON s.st_MagId = m.mag_Id
@@ -238,7 +240,9 @@ public class SubiektRepository : ISubiektRepository
                 s.st_MagId AS WarehouseId,
                 m.mag_Nazwa AS WarehouseName,
                 s.st_Stan AS Quantity,
-                s.st_StanRez AS Reserved
+                s.st_StanRez AS Reserved,
+                s.st_StanMin AS Min,
+                s.st_StanMax AS Max
             FROM tw_Stan s
             JOIN tw__Towar t ON s.st_TowId = t.tw_Id
             JOIN sl_Magazyn m ON s.st_MagId = m.mag_Id
@@ -513,6 +517,8 @@ public class Stock
     public string WarehouseName { get; set; } = "";
     public decimal Quantity { get; set; }
     public decimal Reserved { get; set; }
+    public decimal Min { get; set; }
+    public decimal Max { get; set; }
 }
 
 public class ProductPrice
