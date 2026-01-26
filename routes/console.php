@@ -111,7 +111,7 @@ Schedule::command('db:health-check --alert')
 // 2026-01-19: Auto-process queue jobs every minute (shared hosting compatible)
 // On shared hosting we can't run `queue:work` as daemon, so we use scheduler
 
-Schedule::command('queue:work database --queue=erp_default,erp_high,default,sync --once --max-time=55')
+Schedule::command('queue:work database --queue=erp-sync,erp_default,erp_high,default,sync --once --max-time=55')
     ->everyMinute()
     ->name('queue-worker-erp')
     ->withoutOverlapping()
@@ -290,21 +290,24 @@ $dispatchSyncJob = function (ERPConnection $connection, string $syncType, string
         'status' => 'pending',
         'status_message' => "Scheduled {$syncType} sync",
         'trigger_type' => 'scheduled',
-        'queue_name' => 'erp_default',
+        'queue_name' => 'erp-sync',
         'metadata' => [
             'mode' => $syncType, // 'prices', 'stock', 'basic_data'
             'triggered_by' => 'dynamic_scheduler',
             'frequency' => $frequency,
+            'optimized' => true, // ETAP_08: Uses pullLinkedProducts() - only linked products
         ],
     ]);
 
-    // Dispatch job z odpowiednim mode
+    // ETAP_08 FAZA 7: Dispatch job with syncType mode
+    // Job will use pullLinkedProducts() for optimized sync (only linked products)
+    // No hardcoded limit - linked products determine count automatically
     PullProductsFromSubiektGT::dispatch(
         $connection->id,
-        $syncType, // mode: 'prices', 'stock', 'basic_data'
-        null,
-        5000,
-        100,
+        $syncType, // mode: 'prices', 'stock', 'basic_data' - now uses optimized path!
+        null,      // since: not needed for linked_only modes
+        5000,      // limit: ignored for optimized modes (pullLinkedProducts determines count)
+        100,       // batchSize
         $syncJob->id
     );
 

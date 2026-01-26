@@ -21,7 +21,25 @@ use Carbon\Carbon;
  * ETAP: Subiekt GT ERP Integration
  *
  * Batch job for pulling products from Subiekt GT database.
- * Supports full and incremental sync modes with progress tracking.
+ * Supports multiple sync modes with progress tracking.
+ *
+ * SYNC MODES:
+ * - 'linked_only' (DEFAULT): Only pull products already linked to PPM (optimized)
+ *   Uses pullLinkedProducts() - fetches only products with ProductErpData records.
+ *   Compares tw_DataMod timestamps to skip unchanged products.
+ *   Typical: 13 products processed in <5s instead of 5000+ in minutes.
+ *
+ * - 'prices', 'stock', 'basic_data': Scheduled sync modes (ETAP_08 FAZA 7)
+ *   Uses pullLinkedProducts() - same optimized path as linked_only.
+ *   Dynamic scheduler dispatches these modes every 15min-daily based on config.
+ *   Only linked products are processed (not full Subiekt database).
+ *
+ * - 'full': Pull ALL products from Subiekt GT (up to limit)
+ *   Uses pullAllProducts() - fetches from entire Subiekt database.
+ *   Use for initial sync or when discovering new products. SLOW!
+ *
+ * - 'incremental': Pull products modified since timestamp
+ *   Uses pullAllProducts() with 'since' filter.
  *
  * Features:
  * - ShouldBeUnique: prevents duplicate job execution
@@ -30,7 +48,7 @@ use Carbon\Carbon;
  * - Configurable batch size (chunking)
  *
  * @package App\Jobs\ERP
- * @version 1.0
+ * @version 2.0 (2026-01-26: Added linked_only mode as default)
  */
 class PullProductsFromSubiektGT implements ShouldQueue, ShouldBeUnique
 {
@@ -62,7 +80,12 @@ class PullProductsFromSubiektGT implements ShouldQueue, ShouldBeUnique
     protected int $connectionId;
 
     /**
-     * Sync mode: 'full', 'incremental', 'stock_only'
+     * Sync mode: 'linked_only' (default), 'full', 'incremental', 'stock_only'
+     *
+     * - linked_only: Only products with ProductErpData (optimized, default)
+     * - full: All products from Subiekt GT (up to limit)
+     * - incremental: Products modified since timestamp
+     * - stock_only: Only sync stock data
      */
     protected string $mode;
 
@@ -90,17 +113,17 @@ class PullProductsFromSubiektGT implements ShouldQueue, ShouldBeUnique
      * Create a new job instance.
      *
      * @param int $connectionId ERP connection ID
-     * @param string $mode Sync mode: 'full', 'incremental', 'stock_only'
+     * @param string $mode Sync mode: 'linked_only' (default), 'full', 'incremental', 'stock_only'
      * @param string|null $since Timestamp for incremental (optional)
-     * @param int $limit Max products to process
+     * @param int $limit Max products to process (only for 'full' mode)
      * @param int $batchSize Chunk size for processing
      * @param int|null $syncJobId SyncJob ID for progress tracking
      */
     public function __construct(
         int $connectionId,
-        string $mode = 'full',
+        string $mode = 'linked_only',  // CHANGED: Default to optimized mode
         ?string $since = null,
-        int $limit = 5000,
+        int $limit = 5000,  // Only used for 'full' mode
         int $batchSize = 100,
         ?int $syncJobId = null
     ) {
@@ -164,22 +187,41 @@ class PullProductsFromSubiektGT implements ShouldQueue, ShouldBeUnique
         $this->updateSyncJobStatus('running', 'Starting product pull');
 
         try {
-            // Prepare filters based on mode
-            $filters = [
-                'mode' => $this->mode,
-                'limit' => $this->limit,
-            ];
+            // Execute pull operation based on mode
+            // ETAP_08 FAZA 7: Scheduled modes (prices, stock, basic_data) use optimized linked_only
+            // This ensures scheduled jobs only process linked products (like PrestaShop jobs)
+            $optimizedModes = ['linked_only', 'prices', 'stock', 'basic_data', 'stock_only'];
 
-            if ($this->mode === 'incremental' && $this->since) {
-                $filters['since'] = $this->since;
-            } elseif ($this->mode === 'incremental' && !$this->since) {
-                // Use last sync timestamp from connection
-                $filters['since'] = $connection->last_sync_at?->toDateTimeString()
-                    ?? Carbon::now()->subDay()->toDateTimeString();
+            if (in_array($this->mode, $optimizedModes)) {
+                // OPTIMIZED: Pull only products already linked to this ERP connection
+                // This compares tw_DataMod with last_pull_at and skips unchanged products
+                Log::info('PullProductsFromSubiektGT: Using optimized linked_only mode', [
+                    'sync_type' => $this->mode,
+                ]);
+                $results = $service->pullLinkedProducts($connection, [
+                    'sync_type' => $this->mode, // Pass sync type for future filtering
+                ]);
+            } else {
+                // LEGACY: Pull all/incremental from Subiekt GT (full database scan)
+                // Used for 'full' mode or manual sync operations
+                $filters = [
+                    'mode' => $this->mode,
+                    'limit' => $this->limit,
+                ];
+
+                if ($this->mode === 'incremental' && $this->since) {
+                    $filters['since'] = $this->since;
+                } elseif ($this->mode === 'incremental' && !$this->since) {
+                    // Use last sync timestamp from connection
+                    $filters['since'] = $connection->last_sync_at?->toDateTimeString()
+                        ?? Carbon::now()->subDay()->toDateTimeString();
+                }
+
+                Log::info('PullProductsFromSubiektGT: Using full/incremental mode', [
+                    'filters' => $filters,
+                ]);
+                $results = $service->pullAllProducts($connection, $filters);
             }
-
-            // Execute pull operation
-            $results = $service->pullAllProducts($connection, $filters);
 
             $duration = $startTime->diffInSeconds(Carbon::now());
 
@@ -199,20 +241,46 @@ class PullProductsFromSubiektGT implements ShouldQueue, ShouldBeUnique
 
             // Update sync job status
             if ($results['success']) {
-                $message = sprintf(
-                    'Pobrano %d produktow (nowe: %d, zaktualizowane: %d, pominięte: %d)',
-                    $results['total'],
-                    $results['imported'] ?? 0,
-                    $results['updated'] ?? 0,
-                    $results['skipped'] ?? 0
-                );
+                // Build message based on mode
+                $notFound = $results['not_found'] ?? 0;
+                if ($this->mode === 'linked_only' && $notFound > 0) {
+                    $message = sprintf(
+                        'Pobrano %d produktow (nowe: %d, zaktualizowane: %d, pominiete: %d, nie znaleziono w Subiekt: %d)',
+                        $results['total'],
+                        $results['imported'] ?? 0,
+                        $results['updated'] ?? 0,
+                        $results['skipped'] ?? 0,
+                        $notFound
+                    );
+                } else {
+                    $message = sprintf(
+                        'Pobrano %d produktow (nowe: %d, zaktualizowane: %d, pominiete: %d)',
+                        $results['total'],
+                        $results['imported'] ?? 0,
+                        $results['updated'] ?? 0,
+                        $results['skipped'] ?? 0
+                    );
+                }
+
+                // ETAP_08: Build result_summary with product details
+                $resultSummary = [
+                    'imported_count' => $results['imported'] ?? 0,
+                    'updated_count' => $results['updated'] ?? 0,
+                    'skipped' => $results['skipped'] ?? 0,
+                    'not_found' => $notFound,
+                    'mode' => $this->mode,
+                    'imported_products' => $results['imported_products'] ?? [],
+                    'updated_products' => $results['updated_products'] ?? [],
+                ];
 
                 $this->updateSyncJobStatus('completed', $message, [
                     'total' => $results['total'],
                     'imported' => $results['imported'] ?? 0,
                     'updated' => $results['updated'] ?? 0,
                     'skipped' => $results['skipped'] ?? 0,
+                    'not_found' => $notFound,
                     'duration_seconds' => $duration,
+                    'result_summary' => $resultSummary,
                 ]);
             } else {
                 $this->updateSyncJobStatus('failed', 'Pull completed with errors', [
@@ -347,6 +415,10 @@ class PullProductsFromSubiektGT implements ShouldQueue, ShouldBeUnique
                     ($updateData['processed_items'] ?? 0) / $updateData['total_items'] * 100,
                     2
                 ));
+            }
+            // ETAP_08: Save result_summary with product details
+            if (isset($metadata['result_summary'])) {
+                $updateData['result_summary'] = json_encode($metadata['result_summary']);
             }
         }
 

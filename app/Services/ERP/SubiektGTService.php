@@ -597,6 +597,8 @@ class SubiektGTService implements ERPSyncServiceInterface
                 'skipped' => 0,
                 'errors' => [],
                 'mode' => $mode,
+                'updated_products' => [],  // ETAP_08: Track which products were updated
+                'imported_products' => [], // ETAP_08: Track which products were imported
             ];
 
             $connectionMode = $config['connection_mode'] ?? 'rest_api';
@@ -739,8 +741,24 @@ class SubiektGTService implements ERPSyncServiceInterface
 
                 if ($result['created']) {
                     $results['imported']++;
+                    // ETAP_08: Track imported products (limit to 50 for performance)
+                    if (count($results['imported_products']) < 50) {
+                        $results['imported_products'][] = [
+                            'sku' => $result['sku'] ?? $ppmData['sku'] ?? 'unknown',
+                            'name' => $result['name'] ?? $ppmData['name'] ?? '',
+                            'product_id' => $result['product_id'] ?? null,
+                        ];
+                    }
                 } elseif ($result['updated']) {
                     $results['updated']++;
+                    // ETAP_08: Track updated products (limit to 50 for performance)
+                    if (count($results['updated_products']) < 50) {
+                        $results['updated_products'][] = [
+                            'sku' => $result['sku'] ?? $ppmData['sku'] ?? 'unknown',
+                            'name' => $result['name'] ?? $ppmData['name'] ?? '',
+                            'product_id' => $result['product_id'] ?? null,
+                        ];
+                    }
                 } else {
                     $results['skipped']++;
                 }
@@ -832,8 +850,24 @@ class SubiektGTService implements ERPSyncServiceInterface
 
                 if ($result['created']) {
                     $results['imported']++;
+                    // ETAP_08: Track imported products (limit to 50 for performance)
+                    if (count($results['imported_products']) < 50) {
+                        $results['imported_products'][] = [
+                            'sku' => $result['sku'] ?? $ppmData['sku'] ?? 'unknown',
+                            'name' => $result['name'] ?? $ppmData['name'] ?? '',
+                            'product_id' => $result['product_id'] ?? null,
+                        ];
+                    }
                 } elseif ($result['updated']) {
                     $results['updated']++;
+                    // ETAP_08: Track updated products (limit to 50 for performance)
+                    if (count($results['updated_products']) < 50) {
+                        $results['updated_products'][] = [
+                            'sku' => $result['sku'] ?? $ppmData['sku'] ?? 'unknown',
+                            'name' => $result['name'] ?? $ppmData['name'] ?? '',
+                            'product_id' => $result['product_id'] ?? null,
+                        ];
+                    }
                 } else {
                     $results['skipped']++;
                 }
@@ -848,6 +882,288 @@ class SubiektGTService implements ERPSyncServiceInterface
         }
 
         return $results;
+    }
+
+    /**
+     * Pull only products linked to this ERP connection (OPTIMIZED).
+     *
+     * PERFORMANCE OPTIMIZATION (2026-01-26):
+     * Instead of fetching ALL products from Subiekt GT (12717+), this method:
+     * 1. Gets only products with ProductErpData linked to this connection
+     * 2. Fetches their data from Subiekt by SKU (batch)
+     * 3. Compares tw_DataMod with last_pull_at to skip unchanged products
+     * 4. Updates only products that have changed in Subiekt
+     *
+     * Expected result:
+     * - Total: 13 (linked products in PPM)
+     * - Skipped: 11 (no changes since last pull)
+     * - Updated: 2 (actually changed in Subiekt)
+     * - Duration: <5s (instead of minutes for full sync)
+     *
+     * @param ERPConnection $connection Active ERP connection
+     * @param array $filters Optional filters
+     * @return array Results with counts
+     */
+    public function pullLinkedProducts(ERPConnection $connection, array $filters = []): array
+    {
+        $startTime = Carbon::now();
+
+        try {
+            $this->initializeForConnection($connection);
+
+            $config = $connection->connection_config;
+            $defaultPriceTypeId = $config['default_price_type_id'] ?? 1;
+            $defaultWarehouseId = $config['default_warehouse_id'] ?? 1;
+            $connectionMode = $config['connection_mode'] ?? 'rest_api';
+
+            $results = [
+                'success' => true,
+                'total' => 0,
+                'imported' => 0,
+                'updated' => 0,
+                'skipped' => 0,
+                'not_found' => 0,
+                'errors' => [],
+                'mode' => 'linked_only',
+                'updated_products' => [],
+                'imported_products' => [],
+            ];
+
+            // STEP 1: Get all products linked to this ERP connection
+            $linkedProducts = Product::whereHas('erpData', function($query) use ($connection) {
+                $query->where('erp_connection_id', $connection->id);
+            })
+            ->with(['erpData' => function($query) use ($connection) {
+                $query->where('erp_connection_id', $connection->id);
+            }])
+            ->get();
+
+            $results['total'] = $linkedProducts->count();
+
+            Log::info('pullLinkedProducts: Starting optimized pull', [
+                'connection_id' => $connection->id,
+                'linked_products_count' => $results['total'],
+                'connection_mode' => $connectionMode,
+            ]);
+
+            if ($results['total'] === 0) {
+                Log::info('pullLinkedProducts: No linked products found');
+                return $results;
+            }
+
+            // STEP 2: Collect SKUs for batch fetch
+            $skuToProduct = [];
+            $skuToErpData = [];
+
+            foreach ($linkedProducts as $product) {
+                $sku = $product->sku;
+                if (empty($sku)) {
+                    Log::warning('pullLinkedProducts: Product without SKU', [
+                        'product_id' => $product->id,
+                    ]);
+                    $results['errors'][] = [
+                        'product_id' => $product->id,
+                        'error' => 'Product has no SKU',
+                    ];
+                    continue;
+                }
+
+                $skuToProduct[$sku] = $product;
+                $skuToErpData[$sku] = $product->erpData->first();
+            }
+
+            $skus = array_keys($skuToProduct);
+
+            Log::debug('pullLinkedProducts: SKUs to fetch', [
+                'count' => count($skus),
+                'sample' => array_slice($skus, 0, 5),
+            ]);
+
+            // STEP 3: Fetch products from Subiekt by SKUs
+            if ($connectionMode === 'rest_api' && $this->restApiClient !== null) {
+                $subiektProducts = $this->restApiClient->getProductsBySkus(
+                    $skus,
+                    $defaultPriceTypeId,
+                    $defaultWarehouseId
+                );
+            } else {
+                // SQL Direct mode - fetch one by one (less efficient but works)
+                $subiektProducts = [];
+                foreach ($skus as $sku) {
+                    try {
+                        $product = $this->queryBuilder->getProductBySku(
+                            $sku,
+                            $defaultPriceTypeId,
+                            $defaultWarehouseId
+                        );
+                        if ($product) {
+                            $subiektProducts[$sku] = (array) $product;
+                        }
+                    } catch (\Exception $e) {
+                        Log::debug('pullLinkedProducts: Product not found in Subiekt', [
+                            'sku' => $sku,
+                        ]);
+                    }
+                }
+            }
+
+            Log::info('pullLinkedProducts: Fetched from Subiekt', [
+                'requested' => count($skus),
+                'found' => count($subiektProducts),
+            ]);
+
+            // STEP 4: Process each product - compare timestamps, update if changed
+            foreach ($skuToProduct as $sku => $ppmProduct) {
+                $erpData = $skuToErpData[$sku] ?? null;
+
+                // Check if product exists in Subiekt
+                if (!isset($subiektProducts[$sku])) {
+                    $results['not_found']++;
+                    Log::debug('pullLinkedProducts: SKU not found in Subiekt', [
+                        'sku' => $sku,
+                        'product_id' => $ppmProduct->id,
+                    ]);
+                    continue;
+                }
+
+                $subiektData = $subiektProducts[$sku];
+
+                // Check if product has changed (compare tw_DataMod with last_pull_at)
+                $subiektModified = $subiektData['date_modified'] ?? $subiektData['tw_DataMod'] ?? null;
+
+                if ($erpData && $erpData->last_pull_at && $subiektModified) {
+                    $subiektTimestamp = is_numeric($subiektModified)
+                        ? $subiektModified
+                        : strtotime($subiektModified);
+                    $lastPullTimestamp = $erpData->last_pull_at->timestamp;
+
+                    // Skip if Subiekt hasn't changed since last pull
+                    if ($subiektTimestamp <= $lastPullTimestamp) {
+                        $results['skipped']++;
+                        Log::debug('pullLinkedProducts: No changes, skipping', [
+                            'sku' => $sku,
+                            'subiekt_modified' => $subiektModified,
+                            'last_pull_at' => $erpData->last_pull_at->toDateTimeString(),
+                        ]);
+                        continue;
+                    }
+                }
+
+                // STEP 5: Product has changed - import/update
+                try {
+                    $subiektProduct = (object) $subiektData;
+                    $prices = $subiektData['prices'] ?? [];
+                    $stock = $subiektData['stock'] ?? [];
+
+                    // Transform to PPM format
+                    $ppmData = $this->transformer->subiektToPPM(
+                        $subiektProduct,
+                        $prices,
+                        is_array($stock) ? $stock : [$stock]
+                    );
+
+                    // Update existing product
+                    $result = $this->importProduct($ppmData, $connection, $subiektProduct);
+
+                    if ($result['created']) {
+                        $results['imported']++;
+                        if (count($results['imported_products']) < 50) {
+                            $results['imported_products'][] = [
+                                'sku' => $sku,
+                                'name' => $ppmData['name'] ?? '',
+                                'product_id' => $ppmProduct->id,
+                            ];
+                        }
+                    } elseif ($result['updated']) {
+                        $results['updated']++;
+                        if (count($results['updated_products']) < 50) {
+                            $results['updated_products'][] = [
+                                'sku' => $sku,
+                                'name' => $ppmData['name'] ?? '',
+                                'product_id' => $ppmProduct->id,
+                            ];
+                        }
+                    } else {
+                        $results['skipped']++;
+                    }
+
+                    // Update last_pull_at timestamp
+                    if ($erpData) {
+                        $erpData->markPulled();
+                        if ($subiektModified) {
+                            $erpData->update([
+                                'erp_updated_at' => Carbon::parse($subiektModified),
+                            ]);
+                        }
+                    }
+
+                } catch (\Exception $e) {
+                    $results['errors'][] = [
+                        'sku' => $sku,
+                        'product_id' => $ppmProduct->id,
+                        'error' => $e->getMessage(),
+                    ];
+                    Log::warning('pullLinkedProducts: Error processing product', [
+                        'sku' => $sku,
+                        'error' => $e->getMessage(),
+                    ]);
+                }
+            }
+
+            $duration = $startTime->diffInSeconds(Carbon::now());
+
+            Log::info('pullLinkedProducts: Completed', [
+                'duration_seconds' => $duration,
+                'total' => $results['total'],
+                'updated' => $results['updated'],
+                'imported' => $results['imported'],
+                'skipped' => $results['skipped'],
+                'not_found' => $results['not_found'],
+                'errors_count' => count($results['errors']),
+            ]);
+
+            // Update connection stats
+            $connection->updateSyncStats(
+                true,
+                $results['imported'] + $results['updated'],
+                $duration
+            );
+
+            IntegrationLog::info(
+                'products_pull_linked',
+                'Optimized linked products pull from Subiekt GT completed',
+                [
+                    'results' => $results,
+                    'duration_seconds' => $duration,
+                ],
+                IntegrationLog::INTEGRATION_SUBIEKT_GT,
+                (string) $connection->id
+            );
+
+            return $results;
+
+        } catch (\Exception $e) {
+            IntegrationLog::error(
+                'products_pull_linked',
+                'Optimized linked products pull failed',
+                [
+                    'error' => $e->getMessage(),
+                ],
+                IntegrationLog::INTEGRATION_SUBIEKT_GT,
+                (string) $connection->id,
+                $e
+            );
+
+            return [
+                'success' => false,
+                'total' => 0,
+                'imported' => 0,
+                'updated' => 0,
+                'skipped' => 0,
+                'not_found' => 0,
+                'errors' => ['Exception: ' . $e->getMessage()],
+            ];
+        }
     }
 
     /**
@@ -1270,6 +1586,8 @@ class SubiektGTService implements ERPSyncServiceInterface
             'updated' => !$wasCreated,
             'skipped' => false,
             'product_id' => $product->id,
+            'sku' => $product->sku,
+            'name' => $product->name,
         ];
     }
 

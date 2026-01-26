@@ -622,6 +622,82 @@ class SubiektRestApiClient
     }
 
     /**
+     * Get multiple products by their SKUs (batch fetch)
+     *
+     * OPTIMIZATION: Instead of fetching all 12717 products, fetch only
+     * products linked to PPM by their SKUs.
+     *
+     * @param array $skus Array of SKUs to fetch
+     * @param int|null $priceLevel Price level (1-10)
+     * @param int|null $warehouseId Warehouse ID
+     * @param int $batchSize Max SKUs per API request (to avoid URL limits)
+     * @return array Products keyed by SKU ['SKU123' => [...product data...], ...]
+     */
+    public function getProductsBySkus(
+        array $skus,
+        ?int $priceLevel = null,
+        ?int $warehouseId = null,
+        int $batchSize = 50
+    ): array {
+        if (empty($skus)) {
+            return [];
+        }
+
+        $results = [];
+        $uniqueSkus = array_unique($skus);
+        $batches = array_chunk($uniqueSkus, $batchSize);
+
+        Log::info('SubiektRestApiClient::getProductsBySkus', [
+            'total_skus' => count($uniqueSkus),
+            'batch_count' => count($batches),
+            'batch_size' => $batchSize,
+        ]);
+
+        foreach ($batches as $batchIndex => $batch) {
+            foreach ($batch as $sku) {
+                try {
+                    $response = $this->getProductBySku($sku, $priceLevel, $warehouseId);
+
+                    // API returns single product in 'data' or directly
+                    $productData = $response['data'] ?? $response;
+
+                    if (!empty($productData)) {
+                        // Key by SKU for easy lookup
+                        $productSku = $productData['sku'] ?? $productData['symbol'] ?? $sku;
+                        $results[$productSku] = $productData;
+                    }
+                } catch (SubiektApiException $e) {
+                    // Product not found is expected for some SKUs
+                    if ($e->getCode() === 404) {
+                        Log::debug('SubiektRestApiClient::getProductsBySkus - SKU not found', [
+                            'sku' => $sku,
+                        ]);
+                        continue;
+                    }
+                    // Log other errors but continue processing
+                    Log::warning('SubiektRestApiClient::getProductsBySkus - Error fetching SKU', [
+                        'sku' => $sku,
+                        'error' => $e->getMessage(),
+                        'code' => $e->getCode(),
+                    ]);
+                }
+            }
+
+            // Small delay between batches to avoid rate limiting
+            if ($batchIndex < count($batches) - 1) {
+                usleep(100000); // 100ms delay
+            }
+        }
+
+        Log::info('SubiektRestApiClient::getProductsBySkus completed', [
+            'requested_skus' => count($uniqueSkus),
+            'found_products' => count($results),
+        ]);
+
+        return $results;
+    }
+
+    /**
      * Get all products (handles pagination automatically)
      *
      * @param array $filters Filters (sku, name, modified_since, etc.)
