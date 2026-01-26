@@ -431,6 +431,17 @@ trait ProductFormERPTabs
         $externalData = $erpData->external_data ?? [];
         $erpStock = $externalData['stock'] ?? [];
 
+        // Ensure $erpStock is array (could be int/scalar from some API responses)
+        if (!is_array($erpStock)) {
+            Log::debug('overrideFormStockWithErpData: Stock is not array, skipping', [
+                'product_id' => $this->product?->id,
+                'erp_data_id' => $erpData->id,
+                'stock_type' => gettype($erpStock),
+                'stock_value' => $erpStock,
+            ]);
+            return;
+        }
+
         if (empty($erpStock)) {
             Log::debug('overrideFormStockWithErpData: No stock in external_data', [
                 'product_id' => $this->product?->id,

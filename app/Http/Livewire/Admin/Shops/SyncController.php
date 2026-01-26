@@ -123,6 +123,15 @@ class SyncController extends Component
     public $backupOnlyOnMajorChanges = true;
     public $backupCompressionEnabled = true;
 
+    // ERP Sync Configuration (FAZA 5) - 3 niezalezne czestotliwosci
+    public ?int $selectedErpConnectionId = null;
+    public string $erpSyncFrequency = '6_hours';  // Legacy fallback
+    public string $erpPriceSyncFrequency = '6_hours';
+    public string $erpStockSyncFrequency = '6_hours';
+    public string $erpBasicDataSyncFrequency = 'daily';
+    public bool $erpIsPriceSource = false;
+    public bool $erpIsStockSource = false;
+
     // Listeners for real-time updates
     protected $listeners = [
         'syncJobUpdated' => 'handleSyncJobUpdate',
@@ -2456,5 +2465,111 @@ class SyncController extends Component
     protected function refreshData(): void
     {
         $this->loadActiveSyncJobs();
+    }
+
+    // ========================================
+    // ERP SYNC CONFIGURATION (FAZA 5)
+    // ========================================
+
+    /**
+     * Get ERP connections for sync configuration dropdown (computed property).
+     *
+     * @return \Illuminate\Database\Eloquent\Collection
+     */
+    public function getErpConnectionsListProperty()
+    {
+        return ERPConnection::where('is_active', true)
+            ->orderBy('priority', 'asc')
+            ->orderBy('instance_name', 'asc')
+            ->get();
+    }
+
+    /**
+     * Load ERP configuration when connection is selected.
+     */
+    public function loadErpConfig(): void
+    {
+        if ($this->selectedErpConnectionId) {
+            $connection = ERPConnection::find($this->selectedErpConnectionId);
+            if ($connection) {
+                // Load 3 separate frequencies (with fallback to legacy sync_frequency)
+                $legacyFreq = $connection->sync_frequency ?? '6_hours';
+                $this->erpSyncFrequency = $legacyFreq;
+                $this->erpPriceSyncFrequency = $connection->price_sync_frequency ?? $legacyFreq;
+                $this->erpStockSyncFrequency = $connection->stock_sync_frequency ?? $legacyFreq;
+                $this->erpBasicDataSyncFrequency = $connection->basic_data_sync_frequency ?? 'daily';
+                $this->erpIsPriceSource = $connection->is_price_source ?? false;
+                $this->erpIsStockSource = $connection->is_stock_source ?? false;
+
+                Log::debug('ERP config loaded', [
+                    'connection_id' => $this->selectedErpConnectionId,
+                    'price_sync_frequency' => $this->erpPriceSyncFrequency,
+                    'stock_sync_frequency' => $this->erpStockSyncFrequency,
+                    'basic_data_sync_frequency' => $this->erpBasicDataSyncFrequency,
+                    'is_price_source' => $this->erpIsPriceSource,
+                    'is_stock_source' => $this->erpIsStockSource,
+                ]);
+            }
+        } else {
+            // Reset to defaults when no connection selected
+            $this->erpSyncFrequency = '6_hours';
+            $this->erpPriceSyncFrequency = '6_hours';
+            $this->erpStockSyncFrequency = '6_hours';
+            $this->erpBasicDataSyncFrequency = 'daily';
+            $this->erpIsPriceSource = false;
+            $this->erpIsStockSource = false;
+        }
+    }
+
+    /**
+     * Save ERP sync configuration.
+     */
+    public function saveErpSyncConfig(): void
+    {
+        $connection = ERPConnection::find($this->selectedErpConnectionId);
+        if (!$connection) {
+            $this->dispatch('notification', [
+                'type' => 'error',
+                'message' => 'Nie znaleziono polaczenia ERP',
+            ]);
+            return;
+        }
+
+        try {
+            $connection->update([
+                'sync_frequency' => $this->erpPriceSyncFrequency,  // Legacy field uses price as default
+                'price_sync_frequency' => $this->erpPriceSyncFrequency,
+                'stock_sync_frequency' => $this->erpStockSyncFrequency,
+                'basic_data_sync_frequency' => $this->erpBasicDataSyncFrequency,
+                'is_price_source' => $this->erpIsPriceSource,
+                'is_stock_source' => $this->erpIsStockSource,
+            ]);
+
+            Log::info('ERP sync config saved', [
+                'connection_id' => $this->selectedErpConnectionId,
+                'connection_name' => $connection->instance_name,
+                'price_sync_frequency' => $this->erpPriceSyncFrequency,
+                'stock_sync_frequency' => $this->erpStockSyncFrequency,
+                'basic_data_sync_frequency' => $this->erpBasicDataSyncFrequency,
+                'is_price_source' => $this->erpIsPriceSource,
+                'is_stock_source' => $this->erpIsStockSource,
+                'user_id' => auth()->id(),
+            ]);
+
+            $this->dispatch('notification', [
+                'type' => 'success',
+                'message' => 'Konfiguracja ERP zapisana pomyslnie',
+            ]);
+        } catch (\Exception $e) {
+            Log::error('ERP sync config save failed', [
+                'connection_id' => $this->selectedErpConnectionId,
+                'error' => $e->getMessage(),
+            ]);
+
+            $this->dispatch('notification', [
+                'type' => 'error',
+                'message' => 'Blad zapisu konfiguracji: ' . $e->getMessage(),
+            ]);
+        }
     }
 }

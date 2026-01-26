@@ -171,6 +171,9 @@
                                 </div>
                             </th>
 
+                            {{-- Lokalizacja - always editable --}}
+                            <th scope="col" class="px-4 py-3">Lokalizacja</th>
+
                             <th scope="col" class="px-4 py-3 text-center w-24">Status</th>
                         </tr>
                     </thead>
@@ -283,6 +286,17 @@
                                     </div>
                                 </td>
 
+                                {{-- Location (always editable) --}}
+                                <td class="px-4 py-3">
+                                    <div class="relative">
+                                        <input type="text"
+                                               wire:model.live="stock.{{ $warehouseId }}.location"
+                                               class="form-input-enterprise w-full text-sm"
+                                               maxlength="50"
+                                               placeholder="Kod lokalizacji">
+                                    </div>
+                                </td>
+
                                 {{-- Stock Status --}}
                                 <td class="px-4 py-3 text-center">
                                     <span class="inline-flex items-center px-2 py-1 text-xs font-medium rounded-full border {{ $statusClass }}">
@@ -292,7 +306,7 @@
                             </tr>
                         @empty
                             <tr class="border-b border-gray-700">
-                                <td colspan="5" class="px-4 py-8 text-center text-gray-500">
+                                <td colspan="6" class="px-4 py-8 text-center text-gray-500">
                                     <p class="text-sm">Brak magazynow w systemie.</p>
                                 </td>
                             </tr>

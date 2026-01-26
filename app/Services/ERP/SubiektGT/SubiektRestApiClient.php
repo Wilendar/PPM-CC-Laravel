@@ -541,6 +541,42 @@ class SubiektRestApiClient
             ]);
         }
 
+        // ====== EXTENDED FIELDS (ETAP_08 FAZA 3.4) ======
+        // Boolean fields
+        if (isset($data['shop_internet'])) {
+            $body['ShopInternet'] = (bool)$data['shop_internet'];
+        }
+        if (isset($data['split_payment'])) {
+            $body['SplitPayment'] = (bool)$data['split_payment'];
+        }
+
+        // Custom fields (tw_Pole1-5)
+        if (isset($data['pole1'])) {
+            $body['Pole1'] = $data['pole1'];  // Material
+        }
+        if (isset($data['pole2'])) {
+            $body['Pole2'] = $data['pole2'];  // Reserved for stock location
+        }
+        if (isset($data['pole3'])) {
+            $body['Pole3'] = $data['pole3'];  // Defect symbol
+        }
+        if (isset($data['pole4'])) {
+            $body['Pole4'] = $data['pole4'];  // Application
+        }
+        if (isset($data['pole5'])) {
+            $body['Pole5'] = $data['pole5'];  // CN Code
+        }
+
+        // Supplier code (tw_DostSymbol)
+        if (isset($data['supplier_code'])) {
+            $body['SupplierCode'] = $data['supplier_code'];
+        }
+
+        // Stock location as CSV (stored in tw_Pole2)
+        if (isset($data['stock_location'])) {
+            $body['Pole2'] = $data['stock_location'];
+        }
+
         // Prices (array of price levels)
         // Format: ['prices' => [0 => ['net' => 100.00, 'gross' => 123.00], 1 => ['net' => 90.00]]]
         // IMPORTANT: API expects PricesNet and PricesGross as Dictionary<int, decimal>

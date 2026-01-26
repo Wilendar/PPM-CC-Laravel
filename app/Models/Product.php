@@ -124,6 +124,13 @@ class Product extends Model
         'sort_order',
         'meta_title',
         'meta_description',
+        // Subiekt GT Extended Fields (ETAP_08 FAZA 3.1-3.2)
+        'application',
+        'cn_code',
+        'defect_symbol',
+        'material',
+        'shop_internet',
+        'split_payment',
     ];
 
     /**
@@ -141,6 +148,9 @@ class Product extends Model
         'width' => 'decimal:2',
         'length' => 'decimal:2',
         'tax_rate' => 'decimal:2',
+        // Subiekt GT Extended Fields (ETAP_08 FAZA 3.1-3.2)
+        'shop_internet' => 'boolean',
+        'split_payment' => 'boolean',
     ];
 
     /**

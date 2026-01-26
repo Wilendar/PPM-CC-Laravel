@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Exceptions\PrestaShopAPIException;
+use App\Models\ERPConnection;
 use App\Models\PrestaShopShop;
 use App\Models\Product;
 use App\Models\SyncJob;
@@ -187,6 +188,64 @@ class PullProductsFromPrestaShop implements ShouldQueue, ShouldBeUnique
         $startTime = now();
         $syncJob = $this->getSyncJob();
 
+        // =================================================================
+        // ETAP_08 FAZA 6: ERP Source Fallback Logic
+        // =================================================================
+        // Check if any ERP is configured as price/stock source
+        // If ERP sync is active, defer this job to avoid conflicts
+
+        $erpAsSource = ERPConnection::where('is_active', true)
+            ->where(function ($q) {
+                $q->where('is_price_source', true)
+                  ->orWhere('is_stock_source', true);
+            })
+            ->exists();
+
+        if ($erpAsSource) {
+            // Check if ERP sync is currently active (within last 10 minutes)
+            $activeErpJob = SyncJob::where('target_type', 'subiekt_gt')
+                ->whereIn('status', ['pending', 'processing', 'running'])
+                ->where('updated_at', '>', now()->subMinutes(10))
+                ->exists();
+
+            if ($activeErpJob) {
+                Log::info('PullProductsFromPrestaShop: ERP sync active, deferring...', [
+                    'shop_id' => $this->shop->id,
+                    'shop_name' => $this->shop->name,
+                    'action' => 'deferred_5_minutes',
+                ]);
+
+                // Release job back to queue - retry in 5 minutes
+                $this->release(300);
+                return;
+            }
+        }
+
+        // Determine which data to skip based on ERP source configuration
+        $skipPrices = ERPConnection::where('is_active', true)
+            ->where('is_price_source', true)
+            ->exists();
+
+        $skipStock = ERPConnection::where('is_active', true)
+            ->where('is_stock_source', true)
+            ->exists();
+
+        if ($skipPrices) {
+            Log::debug('PullProductsFromPrestaShop: Skipping prices (ERP is source)', [
+                'shop_id' => $this->shop->id,
+            ]);
+        }
+
+        if ($skipStock) {
+            Log::debug('PullProductsFromPrestaShop: Skipping stock (ERP is source)', [
+                'shop_id' => $this->shop->id,
+            ]);
+        }
+
+        // =================================================================
+        // END ETAP_08 FAZA 6
+        // =================================================================
+
         try {
             // Update status to running (FIX #1 - BUG #7)
             $syncJob?->start();
@@ -195,6 +254,8 @@ class PullProductsFromPrestaShop implements ShouldQueue, ShouldBeUnique
                 'shop_id' => $this->shop->id,
                 'shop_name' => $this->shop->name,
                 'sync_job_id' => $syncJob?->id,
+                'skip_prices' => $skipPrices,
+                'skip_stock' => $skipStock,
             ]);
 
             $client = PrestaShopClientFactory::create($this->shop);
@@ -403,76 +464,82 @@ class PullProductsFromPrestaShop implements ShouldQueue, ShouldBeUnique
                 ];
 
                 // PROBLEM #4 - Task 16c: Import prices from PrestaShop
-                try {
-                    $importedPrices = $priceImporter->importPricesForProduct($product, $this->shop);
-                    $pricesImported += count($importedPrices);
+                // ETAP_08 FAZA 6: Skip if ERP is price source
+                if (!$skipPrices) {
+                    try {
+                        $importedPrices = $priceImporter->importPricesForProduct($product, $this->shop);
+                        $pricesImported += count($importedPrices);
 
-                    Log::debug('Prices imported for product', [
-                        'product_id' => $product->id,
-                        'sku' => $product->sku,
-                        'prices_count' => count($importedPrices),
-                    ]);
-                } catch (PrestaShopAPIException $priceError) {
-                    // BUG #8 FIX #1: 404 = product deleted, re-throw to trigger unlinking
-                    if ($priceError->isNotFound()) {
-                        Log::debug('Product prices not found (404), will unlink product', [
+                        Log::debug('Prices imported for product', [
                             'product_id' => $product->id,
                             'sku' => $product->sku,
-                            'prestashop_product_id' => $shopData->prestashop_product_id,
+                            'prices_count' => count($importedPrices),
                         ]);
-                        throw $priceError; // Re-throw to outer catch
-                    }
+                    } catch (PrestaShopAPIException $priceError) {
+                        // BUG #8 FIX #1: 404 = product deleted, re-throw to trigger unlinking
+                        if ($priceError->isNotFound()) {
+                            Log::debug('Product prices not found (404), will unlink product', [
+                                'product_id' => $product->id,
+                                'sku' => $product->sku,
+                                'prestashop_product_id' => $shopData->prestashop_product_id,
+                            ]);
+                            throw $priceError; // Re-throw to outer catch
+                        }
 
-                    // Other PrestaShop API errors - log but continue
-                    Log::warning('Failed to import prices for product (non-404)', [
-                        'product_id' => $product->id,
-                        'sku' => $product->sku,
-                        'error_code' => $priceError->getHttpStatusCode(),
-                        'error' => $priceError->getMessage(),
-                    ]);
-                } catch (\Exception $priceError) {
-                    // Generic errors - log and continue
-                    Log::warning('Failed to import prices for product', [
-                        'product_id' => $product->id,
-                        'sku' => $product->sku,
-                        'error' => $priceError->getMessage(),
-                    ]);
+                        // Other PrestaShop API errors - log but continue
+                        Log::warning('Failed to import prices for product (non-404)', [
+                            'product_id' => $product->id,
+                            'sku' => $product->sku,
+                            'error_code' => $priceError->getHttpStatusCode(),
+                            'error' => $priceError->getMessage(),
+                        ]);
+                    } catch (\Exception $priceError) {
+                        // Generic errors - log and continue
+                        Log::warning('Failed to import prices for product', [
+                            'product_id' => $product->id,
+                            'sku' => $product->sku,
+                            'error' => $priceError->getMessage(),
+                        ]);
+                    }
                 }
 
                 // PROBLEM #4 - Task 17b: Import stock from PrestaShop
-                try {
-                    $importedStock = $stockImporter->importStockForProduct($product, $this->shop);
-                    $stockImported += count($importedStock);
+                // ETAP_08 FAZA 6: Skip if ERP is stock source
+                if (!$skipStock) {
+                    try {
+                        $importedStock = $stockImporter->importStockForProduct($product, $this->shop);
+                        $stockImported += count($importedStock);
 
-                    Log::debug('Stock imported for product', [
-                        'product_id' => $product->id,
-                        'sku' => $product->sku,
-                        'stock_records_count' => count($importedStock),
-                    ]);
-                } catch (PrestaShopAPIException $stockError) {
-                    // BUG #8 FIX #1: 404 already handled by getProduct() above, but log if happens here
-                    if ($stockError->isNotFound()) {
-                        Log::debug('Product stock not found (404)', [
+                        Log::debug('Stock imported for product', [
                             'product_id' => $product->id,
                             'sku' => $product->sku,
+                            'stock_records_count' => count($importedStock),
                         ]);
-                        throw $stockError; // Re-throw to outer catch
-                    }
+                    } catch (PrestaShopAPIException $stockError) {
+                        // BUG #8 FIX #1: 404 already handled by getProduct() above, but log if happens here
+                        if ($stockError->isNotFound()) {
+                            Log::debug('Product stock not found (404)', [
+                                'product_id' => $product->id,
+                                'sku' => $product->sku,
+                            ]);
+                            throw $stockError; // Re-throw to outer catch
+                        }
 
-                    // Other PrestaShop API errors - log but continue
-                    Log::warning('Failed to import stock for product (non-404)', [
-                        'product_id' => $product->id,
-                        'sku' => $product->sku,
-                        'error_code' => $stockError->getHttpStatusCode(),
-                        'error' => $stockError->getMessage(),
-                    ]);
-                } catch (\Exception $stockError) {
-                    // Generic errors - log and continue
-                    Log::warning('Failed to import stock for product', [
-                        'product_id' => $product->id,
-                        'sku' => $product->sku,
-                        'error' => $stockError->getMessage(),
-                    ]);
+                        // Other PrestaShop API errors - log but continue
+                        Log::warning('Failed to import stock for product (non-404)', [
+                            'product_id' => $product->id,
+                            'sku' => $product->sku,
+                            'error_code' => $stockError->getHttpStatusCode(),
+                            'error' => $stockError->getMessage(),
+                        ]);
+                    } catch (\Exception $stockError) {
+                        // Generic errors - log and continue
+                        Log::warning('Failed to import stock for product', [
+                            'product_id' => $product->id,
+                            'sku' => $product->sku,
+                            'error' => $stockError->getMessage(),
+                        ]);
+                    }
                 }
 
                 $synced++;
@@ -550,12 +617,15 @@ class PullProductsFromPrestaShop implements ShouldQueue, ShouldBeUnique
 
             // ENHANCEMENT 2025-12-22: Extended result_summary for validation
             // OPTIMIZATION 2026-01-19: Added skipped counter for date_upd optimization
+            // ETAP_08 FAZA 6: Added ERP source flags
             $syncJob?->complete([
                 'synced' => $synced,
                 'skipped' => $skipped,  // 2026-01-19: Unchanged products (date_upd optimization)
                 'conflicts' => $conflicts,
                 'prices_imported' => $pricesImported,
+                'prices_skipped_erp_source' => $skipPrices,  // ETAP_08 FAZA 6
                 'stock_imported' => $stockImported,
+                'stock_skipped_erp_source' => $skipStock,    // ETAP_08 FAZA 6
                 'errors' => $errors,
                 // Extended data for cykliczny job
                 'fields_updated' => $fieldsUpdated,
@@ -573,7 +643,9 @@ class PullProductsFromPrestaShop implements ShouldQueue, ShouldBeUnique
                 'skipped' => $skipped,  // 2026-01-19: date_upd optimization
                 'conflicts' => $conflicts,
                 'prices_imported' => $pricesImported,
+                'prices_skipped_erp_source' => $skipPrices,  // ETAP_08 FAZA 6
                 'stock_imported' => $stockImported,
+                'stock_skipped_erp_source' => $skipStock,    // ETAP_08 FAZA 6
                 'errors' => $errors,
                 'duration_seconds' => $duration,
                 // ENHANCEMENT 2025-12-22: Extended statistics

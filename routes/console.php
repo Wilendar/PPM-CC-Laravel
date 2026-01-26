@@ -234,57 +234,121 @@ Schedule::call(function () {
   ->everyFifteenMinutes()
   ->withoutOverlapping();
 
-// Subiekt GT Full Sync (every 6 hours)
-// Full product pull for active Subiekt GT connections
-Schedule::call(function () {
+// ==========================================
+// ETAP_08 FAZA 6: Dynamic ERP Sync Scheduler
+// ==========================================
+// Dynamiczne schedulowanie z 3 niezaleznymi czestotliwosciami:
+// - price_sync_frequency - Sync cen
+// - stock_sync_frequency - Sync stanow magazynowych
+// - basic_data_sync_frequency - Sync danych podstawowych (nazwa, opis)
+// Scheduler uruchamia sie co 15 minut i sprawdza ktore typy sync powinny byc uruchomione
+
+/**
+ * Helper: Sprawdz czy dana czestotliwosc powinna sie uruchomic teraz
+ */
+$shouldSyncNow = function (string $frequency): bool {
+    return match($frequency) {
+        ERPConnection::FREQ_15_MIN => true, // Co 15 min - zawsze
+        ERPConnection::FREQ_30_MIN => now()->minute % 30 === 0,
+        ERPConnection::FREQ_HOURLY => now()->minute === 0,
+        ERPConnection::FREQ_6_HOURS => now()->hour % 6 === 0 && now()->minute === 0,
+        ERPConnection::FREQ_DAILY => now()->hour === 2 && now()->minute === 0, // 2:00 AM
+        default => now()->hour % 6 === 0 && now()->minute === 0, // Fallback to 6 hours
+    };
+};
+
+/**
+ * Helper: Dispatch sync job dla konkretnego typu
+ */
+$dispatchSyncJob = function (ERPConnection $connection, string $syncType, string $frequency): void {
+    // Skip if already has pending/running sync job for this type
+    $existingJob = SyncJob::where('target_type', 'subiekt_gt')
+        ->where('target_id', $connection->id)
+        ->where('job_type', 'pull_' . $syncType)
+        ->whereIn('status', ['pending', 'running'])
+        ->exists();
+
+    if ($existingJob) {
+        \Log::debug("ERP {$syncType} sync skipped - job already pending", [
+            'connection_id' => $connection->id,
+            'connection_name' => $connection->instance_name,
+            'sync_type' => $syncType,
+            'frequency' => $frequency,
+        ]);
+        return;
+    }
+
+    // Create SyncJob for tracking
+    $syncJob = SyncJob::create([
+        'job_id' => \Str::uuid()->toString(),
+        'job_type' => 'pull_' . $syncType,
+        'job_name' => "ERP {$syncType} sync: {$connection->instance_name}",
+        'source_type' => 'subiekt_gt',
+        'source_id' => $connection->id,
+        'target_type' => 'ppm',
+        'target_id' => null,
+        'status' => 'pending',
+        'status_message' => "Scheduled {$syncType} sync",
+        'trigger_type' => 'scheduled',
+        'queue_name' => 'erp_default',
+        'metadata' => [
+            'mode' => $syncType, // 'prices', 'stock', 'basic_data'
+            'triggered_by' => 'dynamic_scheduler',
+            'frequency' => $frequency,
+        ],
+    ]);
+
+    // Dispatch job z odpowiednim mode
+    PullProductsFromSubiektGT::dispatch(
+        $connection->id,
+        $syncType, // mode: 'prices', 'stock', 'basic_data'
+        null,
+        5000,
+        100,
+        $syncJob->id
+    );
+
+    \Log::info("ERP {$syncType} sync scheduled", [
+        'connection_id' => $connection->id,
+        'connection_name' => $connection->instance_name,
+        'sync_type' => $syncType,
+        'frequency' => $frequency,
+        'sync_job_id' => $syncJob->id,
+    ]);
+};
+
+Schedule::call(function () use ($shouldSyncNow, $dispatchSyncJob) {
     try {
-        $subiektConnections = ERPConnection::where('erp_type', ERPConnection::ERP_SUBIEKT_GT)
+        // Get all active Subiekt GT connections with auto-sync enabled
+        $connections = ERPConnection::where('erp_type', ERPConnection::ERP_SUBIEKT_GT)
             ->where('is_active', true)
             ->where('auto_sync_products', true)
             ->get();
 
-        foreach ($subiektConnections as $connection) {
-            // Skip if already has pending/running sync job
-            $existingJob = SyncJob::where('target_type', 'subiekt_gt')
-                ->where('target_id', $connection->id)
-                ->where('job_type', 'pull_products')
-                ->whereIn('status', ['pending', 'processing'])
-                ->exists();
-
-            if ($existingJob) {
-                \Log::info('Subiekt GT full sync skipped - job already pending', [
-                    'connection_id' => $connection->id,
-                ]);
-                continue;
+        foreach ($connections as $connection) {
+            // === SYNC CEN ===
+            $priceFreq = $connection->price_sync_frequency ?? ERPConnection::FREQ_6_HOURS;
+            if ($shouldSyncNow($priceFreq)) {
+                $dispatchSyncJob($connection, 'prices', $priceFreq);
             }
 
-            // Create SyncJob for tracking
-            $syncJob = SyncJob::create([
-                'target_type' => 'subiekt_gt',
-                'target_id' => $connection->id,
-                'job_type' => 'pull_products',
-                'status' => 'pending',
-                'status_message' => 'Scheduled full sync',
-                'metadata' => [
-                    'mode' => 'full',
-                    'triggered_by' => 'scheduler',
-                ],
-            ]);
+            // === SYNC STANOW MAGAZYNOWYCH ===
+            $stockFreq = $connection->stock_sync_frequency ?? ERPConnection::FREQ_6_HOURS;
+            if ($shouldSyncNow($stockFreq)) {
+                $dispatchSyncJob($connection, 'stock', $stockFreq);
+            }
 
-            PullProductsFromSubiektGT::dispatch(
-                $connection->id,
-                'full',
-                null,
-                5000,
-                100,
-                $syncJob->id
-            );
+            // === SYNC DANYCH PODSTAWOWYCH ===
+            $basicFreq = $connection->basic_data_sync_frequency ?? ERPConnection::FREQ_DAILY;
+            if ($shouldSyncNow($basicFreq)) {
+                $dispatchSyncJob($connection, 'basic_data', $basicFreq);
+            }
         }
     } catch (\Exception $e) {
-        \Log::warning('Subiekt GT full sync scheduler failed: ' . $e->getMessage());
+        \Log::warning('ERP dynamic sync scheduler failed: ' . $e->getMessage());
     }
-})->name('subiekt-gt:full-sync')
-  ->everySixHours()
+})->name('erp:dynamic-sync')
+  ->everyFifteenMinutes()
   ->withoutOverlapping();
 
 // ==========================================

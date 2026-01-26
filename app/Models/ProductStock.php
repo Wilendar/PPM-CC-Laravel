@@ -135,6 +135,7 @@ class ProductStock extends Model
         'reorder_quantity',
         'warehouse_location',
         'bin_location',
+        'location',  // Subiekt GT location field (ETAP_08 FAZA 3.1-3.2)
         'location_notes',
         'last_delivery_date',
         'container_number',

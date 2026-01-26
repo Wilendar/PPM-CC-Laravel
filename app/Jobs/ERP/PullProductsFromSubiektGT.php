@@ -161,7 +161,7 @@ class PullProductsFromSubiektGT implements ShouldQueue, ShouldBeUnique
         ]);
 
         // Update sync job status
-        $this->updateSyncJobStatus('processing', 'Starting product pull');
+        $this->updateSyncJobStatus('running', 'Starting product pull');
 
         try {
             // Prepare filters based on mode
@@ -322,13 +322,41 @@ class PullProductsFromSubiektGT implements ShouldQueue, ShouldBeUnique
             $updateData['status_message'] = $message;
         }
 
+        // Extract stats from metadata for proper SyncJob fields
         if (!empty($metadata)) {
             $existing = $syncJob->metadata ?? [];
             $updateData['metadata'] = array_merge($existing, $metadata);
+
+            // Map metadata to SyncJob columns for UI display
+            if (isset($metadata['total'])) {
+                $updateData['total_items'] = (int) $metadata['total'];
+            }
+            if (isset($metadata['imported']) || isset($metadata['updated'])) {
+                $updateData['successful_items'] = (int) ($metadata['imported'] ?? 0) + (int) ($metadata['updated'] ?? 0);
+                $updateData['processed_items'] = $updateData['successful_items'] + (int) ($metadata['skipped'] ?? 0);
+            }
+            if (isset($metadata['skipped'])) {
+                $updateData['failed_items'] = 0; // skipped != failed
+            }
+            if (isset($metadata['duration_seconds'])) {
+                $updateData['duration_seconds'] = (int) $metadata['duration_seconds'];
+            }
+            // Calculate progress
+            if (isset($updateData['total_items']) && $updateData['total_items'] > 0) {
+                $updateData['progress_percentage'] = min(100, round(
+                    ($updateData['processed_items'] ?? 0) / $updateData['total_items'] * 100,
+                    2
+                ));
+            }
+        }
+
+        if ($status === 'running' && !$syncJob->started_at) {
+            $updateData['started_at'] = Carbon::now();
         }
 
         if ($status === 'completed' || $status === 'failed') {
             $updateData['completed_at'] = Carbon::now();
+            $updateData['progress_percentage'] = 100.00;
         }
 
         $syncJob->update($updateData);

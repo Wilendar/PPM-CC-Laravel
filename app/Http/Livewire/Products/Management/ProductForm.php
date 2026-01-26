@@ -242,6 +242,15 @@ class ProductForm extends Component
     public int $shortDescriptionCount = 0;
     public int $longDescriptionCount = 0;
 
+    // === EXTENDED INFO (Subiekt GT / ERP) - FAZA 4.1-4.2 ===
+    public bool $shopInternet = false;
+    public bool $splitPayment = false;
+    public ?string $cnCode = null;
+    public ?string $material = null;
+    public ?string $defectSymbol = null;
+    public ?string $application = null;
+    public bool $extendedInfoExpanded = false;
+
     // === CREATE CATEGORY MODAL (ETAP_07b FAZA 4.2.3) ===
     public bool $showCreateCategoryModal = false;
     public ?int $createCategoryShopId = null;
@@ -1206,6 +1215,14 @@ class ProductForm extends Component
         $this->length = $this->product->length;
         $this->tax_rate = $this->product->tax_rate;
 
+        // Extended Info (Subiekt GT / ERP) - FAZA 4.1-4.2
+        $this->shopInternet = (bool) $this->product->shop_internet;
+        $this->splitPayment = (bool) $this->product->split_payment;
+        $this->cnCode = $this->product->cn_code;
+        $this->material = $this->product->material;
+        $this->defectSymbol = $this->product->defect_symbol;
+        $this->application = $this->product->application;
+
         // Publishing Schedule
         $this->available_from = $this->product->available_from?->format('Y-m-d\TH:i');
         $this->available_to = $this->product->available_to?->format('Y-m-d\TH:i');
@@ -1272,6 +1289,13 @@ class ProductForm extends Component
                 'sort_order' => $this->product->sort_order,
                 'available_from' => $this->product->available_from?->format('Y-m-d H:i:s'),
                 'available_to' => $this->product->available_to?->format('Y-m-d H:i:s'),
+                // Extended Info (Subiekt GT / ERP) - FAZA 4.1-4.2
+                'shop_internet' => $this->product->shop_internet,
+                'split_payment' => $this->product->split_payment,
+                'cn_code' => $this->product->cn_code,
+                'material' => $this->product->material,
+                'defect_symbol' => $this->product->defect_symbol,
+                'application' => $this->product->application,
 
                 // === CATEGORIES (NEW CONTEXT-AWARE SYSTEM) ===
                 'defaultCategories' => $this->defaultCategories,
@@ -1301,6 +1325,13 @@ class ProductForm extends Component
                 'sort_order' => $this->sort_order,
                 'available_from' => $this->available_from,
                 'available_to' => $this->available_to,
+                // Extended Info (Subiekt GT / ERP) - FAZA 4.1-4.2
+                'shop_internet' => $this->shopInternet,
+                'split_payment' => $this->splitPayment,
+                'cn_code' => $this->cnCode,
+                'material' => $this->material,
+                'defect_symbol' => $this->defectSymbol,
+                'application' => $this->application,
 
                 // === CATEGORIES (NEW CONTEXT-AWARE SYSTEM) ===
                 'defaultCategories' => $this->defaultCategories,
@@ -2107,6 +2138,15 @@ class ProductForm extends Component
     public function toggleSlugField(): void
     {
         $this->showSlugField = !$this->showSlugField;
+    }
+
+    /**
+     * Toggle extended info section visibility (Subiekt GT / ERP fields)
+     * FAZA 4.1-4.2
+     */
+    public function toggleExtendedInfo(): void
+    {
+        $this->extendedInfoExpanded = !$this->extendedInfoExpanded;
     }
 
     /*
@@ -5914,6 +5954,13 @@ class ProductForm extends Component
                         'is_variant_master' => $this->is_variant_master,
                         'is_featured' => $this->is_featured,
                         'sort_order' => $this->sort_order,
+                        // Extended Info (Subiekt GT / ERP) - FAZA 4.1-4.2
+                        'shop_internet' => $this->shopInternet,
+                        'split_payment' => $this->splitPayment,
+                        'cn_code' => $this->cnCode,
+                        'material' => $this->material,
+                        'defect_symbol' => $this->defectSymbol,
+                        'application' => $this->application,
                     ]);
 
                     // CRITICAL FIX (Bug 2): Mark all associated shops as 'pending' after updating default data
@@ -5955,6 +6002,13 @@ class ProductForm extends Component
                         'is_variant_master' => $this->is_variant_master,
                         'is_featured' => $this->is_featured,
                         'sort_order' => $this->sort_order,
+                        // Extended Info (Subiekt GT / ERP) - FAZA 4.1-4.2
+                        'shop_internet' => $this->shopInternet,
+                        'split_payment' => $this->splitPayment,
+                        'cn_code' => $this->cnCode,
+                        'material' => $this->material,
+                        'defect_symbol' => $this->defectSymbol,
+                        'application' => $this->application,
                     ]);
                     $this->isEditMode = true;
 

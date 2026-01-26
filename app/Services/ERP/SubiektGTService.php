@@ -599,60 +599,33 @@ class SubiektGTService implements ERPSyncServiceInterface
                 'mode' => $mode,
             ];
 
-            // Get products based on mode
-            if ($mode === 'incremental' && $since) {
-                $subiektProducts = $this->queryBuilder->getModifiedProducts(
+            $connectionMode = $config['connection_mode'] ?? 'rest_api';
+
+            // === REST API MODE ===
+            if ($connectionMode === 'rest_api' && $this->restApiClient !== null) {
+                $results = $this->pullAllProductsViaRestApi(
+                    $connection,
+                    $results,
+                    $mode,
                     $since,
-                    $defaultPriceTypeId,
-                    $defaultWarehouseId,
-                    $limit
-                );
-            } else {
-                $subiektProducts = $this->queryBuilder->getAllProducts(
-                    $defaultPriceTypeId,
-                    $defaultWarehouseId,
                     $limit,
-                    0
+                    $defaultPriceTypeId,
+                    $defaultWarehouseId
                 );
             }
-
-            $results['total'] = $subiektProducts->count();
-
-            // Batch fetch prices and stock for efficiency
-            $productIds = $subiektProducts->pluck('id')->toArray();
-            $allPrices = $this->queryBuilder->getBatchProductPrices($productIds)->groupBy('product_id')->toArray();
-            $allStock = $this->queryBuilder->getBatchProductStock($productIds)->groupBy('product_id')->toArray();
-
-            foreach ($subiektProducts as $subiektProduct) {
-                try {
-                    $prices = $allPrices[$subiektProduct->id] ?? [];
-                    $stock = $allStock[$subiektProduct->id] ?? [];
-
-                    // Transform to PPM format
-                    $ppmData = $this->transformer->subiektToPPM(
-                        $subiektProduct,
-                        is_array($prices) ? $prices : $prices->toArray(),
-                        is_array($stock) ? $stock : $stock->toArray()
-                    );
-
-                    // Find or create PPM product
-                    $result = $this->importProduct($ppmData, $connection, $subiektProduct);
-
-                    if ($result['created']) {
-                        $results['imported']++;
-                    } elseif ($result['updated']) {
-                        $results['updated']++;
-                    } else {
-                        $results['skipped']++;
-                    }
-
-                } catch (\Exception $e) {
-                    $results['errors'][] = [
-                        'subiekt_id' => $subiektProduct->id,
-                        'sku' => $subiektProduct->sku ?? 'unknown',
-                        'error' => $e->getMessage(),
-                    ];
-                }
+            // === SQL DIRECT MODE ===
+            elseif ($this->queryBuilder !== null) {
+                $results = $this->pullAllProductsViaSqlDirect(
+                    $connection,
+                    $results,
+                    $mode,
+                    $since,
+                    $limit,
+                    $defaultPriceTypeId,
+                    $defaultWarehouseId
+                );
+            } else {
+                throw new \RuntimeException('No valid connection method available (REST API client and Query Builder are both null)');
             }
 
             $duration = $startTime->diffInSeconds(Carbon::now());
@@ -702,6 +675,182 @@ class SubiektGTService implements ERPSyncServiceInterface
     }
 
     /**
+     * Pull products via REST API mode.
+     *
+     * @param ERPConnection $connection
+     * @param array $results Initial results array
+     * @param string $mode Sync mode (full, incremental, prices, stock, basic_data)
+     * @param string|null $since Timestamp for incremental
+     * @param int $limit Max products to fetch
+     * @param int $defaultPriceTypeId Default price level
+     * @param int $defaultWarehouseId Default warehouse
+     * @return array Updated results
+     */
+    protected function pullAllProductsViaRestApi(
+        ERPConnection $connection,
+        array $results,
+        string $mode,
+        ?string $since,
+        int $limit,
+        int $defaultPriceTypeId,
+        int $defaultWarehouseId
+    ): array {
+        $processed = 0;
+
+        // Build filters for REST API
+        $apiFilters = [
+            'priceLevel' => $defaultPriceTypeId,
+            'warehouseId' => $defaultWarehouseId,
+        ];
+
+        if ($mode === 'incremental' && $since) {
+            $apiFilters['modified_since'] = $since;
+        }
+
+        Log::info('pullAllProductsViaRestApi: Starting REST API pull', [
+            'mode' => $mode,
+            'filters' => $apiFilters,
+            'limit' => $limit,
+        ]);
+
+        // Use generator to iterate over all products
+        foreach ($this->restApiClient->getAllProducts($apiFilters, 100) as $productData) {
+            if ($processed >= $limit) {
+                break;
+            }
+
+            try {
+                // REST API returns array, convert to object for transformer
+                $subiektProduct = (object) $productData;
+
+                // For REST API, prices and stock are included in product response
+                $prices = $productData['prices'] ?? [];
+                $stock = $productData['stock'] ?? [];
+
+                // Transform to PPM format
+                $ppmData = $this->transformer->subiektToPPM(
+                    $subiektProduct,
+                    $prices,
+                    is_array($stock) ? $stock : [$stock]
+                );
+
+                // Find or create PPM product
+                $result = $this->importProduct($ppmData, $connection, $subiektProduct);
+
+                if ($result['created']) {
+                    $results['imported']++;
+                } elseif ($result['updated']) {
+                    $results['updated']++;
+                } else {
+                    $results['skipped']++;
+                }
+
+                $processed++;
+                $results['total']++;
+
+            } catch (\Exception $e) {
+                $results['errors'][] = [
+                    'subiekt_id' => $productData['id'] ?? 'unknown',
+                    'sku' => $productData['sku'] ?? $productData['symbol'] ?? 'unknown',
+                    'error' => $e->getMessage(),
+                ];
+                $processed++;
+                $results['total']++;
+            }
+        }
+
+        Log::info('pullAllProductsViaRestApi: Completed', [
+            'total' => $results['total'],
+            'imported' => $results['imported'],
+            'updated' => $results['updated'],
+            'skipped' => $results['skipped'],
+            'errors_count' => count($results['errors']),
+        ]);
+
+        return $results;
+    }
+
+    /**
+     * Pull products via SQL Direct mode.
+     *
+     * @param ERPConnection $connection
+     * @param array $results Initial results array
+     * @param string $mode Sync mode
+     * @param string|null $since Timestamp for incremental
+     * @param int $limit Max products to fetch
+     * @param int $defaultPriceTypeId Default price level
+     * @param int $defaultWarehouseId Default warehouse
+     * @return array Updated results
+     */
+    protected function pullAllProductsViaSqlDirect(
+        ERPConnection $connection,
+        array $results,
+        string $mode,
+        ?string $since,
+        int $limit,
+        int $defaultPriceTypeId,
+        int $defaultWarehouseId
+    ): array {
+        // Get products based on mode
+        if ($mode === 'incremental' && $since) {
+            $subiektProducts = $this->queryBuilder->getModifiedProducts(
+                $since,
+                $defaultPriceTypeId,
+                $defaultWarehouseId,
+                $limit
+            );
+        } else {
+            $subiektProducts = $this->queryBuilder->getAllProducts(
+                $defaultPriceTypeId,
+                $defaultWarehouseId,
+                $limit,
+                0
+            );
+        }
+
+        $results['total'] = $subiektProducts->count();
+
+        // Batch fetch prices and stock for efficiency
+        $productIds = $subiektProducts->pluck('id')->toArray();
+        $allPrices = $this->queryBuilder->getBatchProductPrices($productIds)->groupBy('product_id')->toArray();
+        $allStock = $this->queryBuilder->getBatchProductStock($productIds)->groupBy('product_id')->toArray();
+
+        foreach ($subiektProducts as $subiektProduct) {
+            try {
+                $prices = $allPrices[$subiektProduct->id] ?? [];
+                $stock = $allStock[$subiektProduct->id] ?? [];
+
+                // Transform to PPM format
+                $ppmData = $this->transformer->subiektToPPM(
+                    $subiektProduct,
+                    is_array($prices) ? $prices : $prices->toArray(),
+                    is_array($stock) ? $stock : $stock->toArray()
+                );
+
+                // Find or create PPM product
+                $result = $this->importProduct($ppmData, $connection, $subiektProduct);
+
+                if ($result['created']) {
+                    $results['imported']++;
+                } elseif ($result['updated']) {
+                    $results['updated']++;
+                } else {
+                    $results['skipped']++;
+                }
+
+            } catch (\Exception $e) {
+                $results['errors'][] = [
+                    'subiekt_id' => $subiektProduct->id,
+                    'sku' => $subiektProduct->sku ?? 'unknown',
+                    'error' => $e->getMessage(),
+                ];
+            }
+        }
+
+        return $results;
+    }
+
+    /**
      * Sync product stock to Subiekt GT.
      *
      * NOTE: In sql_direct mode, this is read-only - fetches stock FROM Subiekt.
@@ -726,9 +875,18 @@ class SubiektGTService implements ERPSyncServiceInterface
             }
 
             $subiektId = (int) $mapping->external_id;
+            $config = $connection->connection_config;
+            $connectionMode = $config['connection_mode'] ?? 'rest_api';
 
-            // Fetch stock from Subiekt GT
-            $stockData = $this->queryBuilder->getProductStock($subiektId);
+            // Fetch stock from Subiekt GT based on connection mode
+            if ($connectionMode === 'rest_api' && $this->restApiClient !== null) {
+                $response = $this->restApiClient->getProductStock($subiektId);
+                $stockData = collect($response['data'] ?? $response);
+            } elseif ($this->queryBuilder !== null) {
+                $stockData = $this->queryBuilder->getProductStock($subiektId);
+            } else {
+                throw new \RuntimeException('No valid connection method available');
+            }
 
             // Transform and return
             $transformedStock = $this->transformer->transformStock($stockData->toArray());
@@ -784,9 +942,18 @@ class SubiektGTService implements ERPSyncServiceInterface
             }
 
             $subiektId = (int) $mapping->external_id;
+            $config = $connection->connection_config;
+            $connectionMode = $config['connection_mode'] ?? 'rest_api';
 
-            // Fetch prices from Subiekt GT
-            $priceData = $this->queryBuilder->getProductPrices($subiektId);
+            // Fetch prices from Subiekt GT based on connection mode
+            if ($connectionMode === 'rest_api' && $this->restApiClient !== null) {
+                $response = $this->restApiClient->getProductPrices($subiektId);
+                $priceData = collect($response['data'] ?? $response);
+            } elseif ($this->queryBuilder !== null) {
+                $priceData = $this->queryBuilder->getProductPrices($subiektId);
+            } else {
+                throw new \RuntimeException('No valid connection method available');
+            }
 
             // Transform and return
             $transformedPrices = $this->transformer->transformPrices($priceData->toArray());
@@ -1937,6 +2104,30 @@ class SubiektGTService implements ERPSyncServiceInterface
             }
         }
 
+        // ====== EXTENDED FIELDS MAPPING (ETAP_08 FAZA 3.4) ======
+        // Map Subiekt GT extended fields: tw_SklepInternet, tw_MechanizmPodzielonejPlatnosci,
+        // tw_Pole1-5, tw_DostSymbol, tw_IdPodstDostawca
+        $extendedFields = $this->mapExtendedFields($product, $config);
+        if (!empty($extendedFields)) {
+            $data = array_merge($data, $extendedFields);
+
+            Log::debug('mapPpmProductToSubiekt: Extended fields mapped', [
+                'sku' => $product->sku,
+                'extended_fields' => array_keys($extendedFields),
+            ]);
+        }
+
+        // ====== STOCK LOCATIONS MAPPING (tw_Pole2 = CSV of locations) ======
+        $stockLocations = $this->mapStockLocations($product, $config);
+        if (!empty($stockLocations)) {
+            $data['stock_location'] = $stockLocations;
+
+            Log::debug('mapPpmProductToSubiekt: Stock locations mapped', [
+                'sku' => $product->sku,
+                'locations' => $stockLocations,
+            ]);
+        }
+
         // DEBUG: Log final mapped data
         Log::debug('mapPpmProductToSubiekt: Final mapped data', [
             'product_id' => $product->id,
@@ -1944,10 +2135,236 @@ class SubiektGTService implements ERPSyncServiceInterface
             'mapped_fields' => array_keys($data),
             'prices_count' => count($data['prices'] ?? []),
             'stock_count' => count($data['stock'] ?? []),
+            'has_extended_fields' => !empty($extendedFields),
             'data' => $data,
         ]);
 
         return $data;
+    }
+
+    /**
+     * Map extended fields from PPM Product to Subiekt GT format.
+     *
+     * ETAP_08 FAZA 3.4: New field mappings
+     *
+     * | PPM Field       | Subiekt GT Field                  | Type    |
+     * |-----------------|-----------------------------------|---------|
+     * | shop_internet   | tw_SklepInternet                 | bit     |
+     * | split_payment   | tw_MechanizmPodzielonejPlatnosci | bit     |
+     * | material        | tw_Pole1                         | varchar |
+     * | defect_symbol   | tw_Pole3                         | varchar |
+     * | application     | tw_Pole4                         | varchar |
+     * | cn_code         | tw_Pole5                         | varchar |
+     * | supplier_code   | tw_DostSymbol                    | varchar |
+     * | manufacturer    | tw_IdPodstDostawca               | int FK  |
+     *
+     * @param Product $product
+     * @param array $config Connection config (for manufacturer mappings)
+     * @return array Extended fields data for Subiekt GT API
+     */
+    protected function mapExtendedFields(Product $product, array $config): array
+    {
+        $data = [];
+
+        // Boolean flags
+        // tw_SklepInternet - Internet shop visibility
+        if ($product->shop_internet !== null) {
+            $data['shop_internet'] = $product->shop_internet ? 1 : 0;
+        }
+
+        // tw_MechanizmPodzielonejPlatnosci - Split payment mechanism (MPP)
+        if ($product->split_payment !== null) {
+            $data['split_payment'] = $product->split_payment ? 1 : 0;
+        }
+
+        // Custom fields (tw_Pole1-5) - max 50 chars each
+        // tw_Pole1 = Material
+        if (!empty($product->material)) {
+            $data['pole1'] = mb_substr($product->material, 0, 50);
+        }
+
+        // tw_Pole3 = Defect symbol
+        if (!empty($product->defect_symbol)) {
+            $data['pole3'] = mb_substr($product->defect_symbol, 0, 50);
+        }
+
+        // tw_Pole4 = Application
+        if (!empty($product->application)) {
+            $data['pole4'] = mb_substr($product->application, 0, 50);
+        }
+
+        // tw_Pole5 = CN Code (Combined Nomenclature for customs)
+        if (!empty($product->cn_code)) {
+            $data['pole5'] = mb_substr($product->cn_code, 0, 50);
+        }
+
+        // tw_DostSymbol = Supplier code (max 20 chars)
+        if (!empty($product->supplier_code)) {
+            $data['supplier_code'] = mb_substr($product->supplier_code, 0, 20);
+        }
+
+        // tw_IdPodstDostawca = Manufacturer ID (FK to kh__Kontrahent)
+        // Try to resolve manufacturer by name
+        if (!empty($product->manufacturer)) {
+            $manufacturerId = $this->findManufacturerIdByName($product->manufacturer, $config);
+            if ($manufacturerId !== null) {
+                $data['manufacturer_id'] = $manufacturerId;
+
+                Log::debug('mapExtendedFields: Manufacturer resolved', [
+                    'sku' => $product->sku,
+                    'manufacturer_name' => $product->manufacturer,
+                    'manufacturer_id' => $manufacturerId,
+                ]);
+            } else {
+                Log::debug('mapExtendedFields: Manufacturer not found in Subiekt', [
+                    'sku' => $product->sku,
+                    'manufacturer_name' => $product->manufacturer,
+                ]);
+            }
+        }
+
+        return $data;
+    }
+
+    /**
+     * Find manufacturer ID in Subiekt GT by name.
+     *
+     * Searches kh__Kontrahent table for matching name.
+     * Results are cached for 1 hour to avoid repeated API calls.
+     *
+     * @param string $name Manufacturer name to search
+     * @param array $config Connection config (for REST API client)
+     * @return int|null Manufacturer ID (kh_Id) or null if not found
+     */
+    protected function findManufacturerIdByName(string $name, array $config): ?int
+    {
+        if (empty($name)) {
+            return null;
+        }
+
+        // Normalize name for comparison
+        $normalizedName = mb_strtolower(trim($name));
+        $cacheKey = "subiekt_manufacturer_map_" . md5($normalizedName);
+
+        // Check cache first
+        $cached = \Illuminate\Support\Facades\Cache::get($cacheKey);
+        if ($cached !== null) {
+            return $cached === 0 ? null : $cached;
+        }
+
+        try {
+            // Try REST API client if available
+            if ($this->restApiClient) {
+                $response = $this->restApiClient->getManufacturers();
+                $manufacturers = $response['data'] ?? [];
+
+                foreach ($manufacturers as $manufacturer) {
+                    $mfName = $manufacturer['name'] ?? $manufacturer['Name'] ?? $manufacturer['kh_Nazwa'] ?? '';
+                    if (mb_strtolower(trim($mfName)) === $normalizedName) {
+                        $mfId = (int) ($manufacturer['id'] ?? $manufacturer['Id'] ?? $manufacturer['kh_Id']);
+
+                        // Cache for 1 hour
+                        \Illuminate\Support\Facades\Cache::put($cacheKey, $mfId, now()->addHour());
+
+                        return $mfId;
+                    }
+                }
+
+                // Not found - cache as 0 to avoid repeated lookups
+                \Illuminate\Support\Facades\Cache::put($cacheKey, 0, now()->addHour());
+                return null;
+            }
+
+            // SQL Direct mode fallback (if queryBuilder available)
+            if ($this->queryBuilder) {
+                $result = \Illuminate\Support\Facades\DB::connection($this->connectionName)
+                    ->table('kh__Kontrahent')
+                    ->where('kh_Nazwa', 'LIKE', '%' . $name . '%')
+                    ->where('kh_Aktywny', 1)
+                    ->orderByRaw("CASE WHEN kh_Nazwa = ? THEN 0 ELSE 1 END", [$name])
+                    ->first(['kh_Id', 'kh_Nazwa']);
+
+                if ($result) {
+                    $mfId = (int) $result->kh_Id;
+                    \Illuminate\Support\Facades\Cache::put($cacheKey, $mfId, now()->addHour());
+                    return $mfId;
+                }
+            }
+
+            // Not found
+            \Illuminate\Support\Facades\Cache::put($cacheKey, 0, now()->addHour());
+            return null;
+
+        } catch (\Exception $e) {
+            Log::warning('findManufacturerIdByName: Error searching manufacturer', [
+                'name' => $name,
+                'error' => $e->getMessage(),
+            ]);
+            return null;
+        }
+    }
+
+    /**
+     * Map stock locations from PPM to Subiekt GT format.
+     *
+     * In Subiekt GT, tw_Pole2 is used to store location information.
+     * This method aggregates locations from all warehouses into a CSV string.
+     *
+     * Format: "WAREHOUSE1:LOCATION1,WAREHOUSE2:LOCATION2"
+     * Example: "MPPTRADE:A-12-3,PITBIKE:B-05-1"
+     *
+     * @param Product $product
+     * @param array $config Connection config (for warehouse mappings)
+     * @return string|null CSV of warehouse:location pairs or null if no locations
+     */
+    protected function mapStockLocations(Product $product, array $config): ?string
+    {
+        $locations = [];
+
+        // Get warehouse mappings (PPM_ID => ERP_ID)
+        $erpToPpmWarehouseMapping = $config['warehouse_mappings'] ?? [];
+        $ppmToErpWarehouseMapping = array_flip($erpToPpmWarehouseMapping);
+
+        // Get product stock entries
+        $productStock = $product->stock ?? collect();
+        if ($productStock instanceof \Illuminate\Database\Eloquent\Collection) {
+            $productStock = $productStock->toArray();
+        }
+
+        foreach ($productStock as $stockData) {
+            $ppmWarehouseId = $stockData['warehouse_id'] ?? null;
+            $location = $stockData['location'] ?? null;
+
+            if ($ppmWarehouseId && !empty($location)) {
+                // Try to get warehouse name for better readability
+                $warehouseName = $stockData['warehouse_name'] ?? null;
+
+                // Get ERP warehouse ID if mapped
+                $erpWarehouseId = $ppmToErpWarehouseMapping[$ppmWarehouseId] ?? null;
+
+                // Use warehouse name if available, otherwise use ERP ID or PPM ID
+                $warehouseKey = $warehouseName ?? "WH{$erpWarehouseId}" ?? "PPM{$ppmWarehouseId}";
+
+                $locations[] = "{$warehouseKey}:" . mb_substr($location, 0, 30);
+            }
+        }
+
+        if (empty($locations)) {
+            return null;
+        }
+
+        // Join locations into CSV, max 50 chars for tw_Pole2
+        $csvLocations = implode(',', $locations);
+        if (mb_strlen($csvLocations) > 50) {
+            // Truncate intelligently at last comma before limit
+            $csvLocations = mb_substr($csvLocations, 0, 50);
+            $lastComma = mb_strrpos($csvLocations, ',');
+            if ($lastComma !== false && $lastComma > 10) {
+                $csvLocations = mb_substr($csvLocations, 0, $lastComma);
+            }
+        }
+
+        return $csvLocations;
     }
 
     /**

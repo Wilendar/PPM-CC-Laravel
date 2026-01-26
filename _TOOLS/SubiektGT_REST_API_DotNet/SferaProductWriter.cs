@@ -745,6 +745,64 @@ public class DirectSqlProductWriter : ISferaProductWriter
                     request.MinimumStock.Value, minUnit);
             }
 
+            // ====== EXTENDED FIELDS (ETAP_08 FAZA 3.4) ======
+
+            // tw_SklepInternet - Internet shop visibility
+            if (request.ShopInternet.HasValue)
+            {
+                updates.Add("tw_SklepInternet = @shopInternet");
+                parameters.Add("@shopInternet", request.ShopInternet.Value);
+            }
+
+            // tw_MechanizmPodzielonejPlatnosci - Split payment mechanism
+            if (request.SplitPayment.HasValue)
+            {
+                updates.Add("tw_MechanizmPodzielonejPlatnosci = @splitPayment");
+                parameters.Add("@splitPayment", request.SplitPayment.Value);
+            }
+
+            // tw_Pole1 - Material (max 50 chars)
+            if (!string.IsNullOrEmpty(request.Pole1))
+            {
+                updates.Add("tw_Pole1 = @pole1");
+                parameters.Add("@pole1", request.Pole1.Length > 50 ? request.Pole1.Substring(0, 50) : request.Pole1);
+            }
+
+            // tw_Pole2 - Stock location CSV (max 50 chars)
+            if (!string.IsNullOrEmpty(request.Pole2))
+            {
+                updates.Add("tw_Pole2 = @pole2");
+                parameters.Add("@pole2", request.Pole2.Length > 50 ? request.Pole2.Substring(0, 50) : request.Pole2);
+            }
+
+            // tw_Pole3 - Defect symbol (max 50 chars)
+            if (!string.IsNullOrEmpty(request.Pole3))
+            {
+                updates.Add("tw_Pole3 = @pole3");
+                parameters.Add("@pole3", request.Pole3.Length > 50 ? request.Pole3.Substring(0, 50) : request.Pole3);
+            }
+
+            // tw_Pole4 - Application (max 50 chars)
+            if (!string.IsNullOrEmpty(request.Pole4))
+            {
+                updates.Add("tw_Pole4 = @pole4");
+                parameters.Add("@pole4", request.Pole4.Length > 50 ? request.Pole4.Substring(0, 50) : request.Pole4);
+            }
+
+            // tw_Pole5 - CN Code (max 50 chars)
+            if (!string.IsNullOrEmpty(request.Pole5))
+            {
+                updates.Add("tw_Pole5 = @pole5");
+                parameters.Add("@pole5", request.Pole5.Length > 50 ? request.Pole5.Substring(0, 50) : request.Pole5);
+            }
+
+            // tw_DostSymbol - Supplier code (max 20 chars)
+            if (!string.IsNullOrEmpty(request.SupplierCode))
+            {
+                updates.Add("tw_DostSymbol = @supplierCode");
+                parameters.Add("@supplierCode", request.SupplierCode.Length > 20 ? request.SupplierCode.Substring(0, 20) : request.SupplierCode);
+            }
+
             var rowsAffected = 0;
 
             if (updates.Count > 0)

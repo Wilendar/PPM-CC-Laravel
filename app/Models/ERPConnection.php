@@ -105,11 +105,17 @@ class ERPConnection extends Model
         'current_api_usage',
         'rate_limit_reset_at',
         'sync_mode',
+        'sync_frequency',  // ETAP_08 FAZA 3.1-3.2 (legacy fallback)
+        'price_sync_frequency',  // Czestotliwosc sync cen
+        'stock_sync_frequency',  // Czestotliwosc sync stanow
+        'basic_data_sync_frequency',  // Czestotliwosc sync danych podstawowych
         'sync_settings',
         'auto_sync_products',
         'auto_sync_stock',
         'auto_sync_prices',
         'auto_sync_orders',
+        'is_price_source',  // ETAP_08 FAZA 3.1-3.2
+        'is_stock_source',  // ETAP_08 FAZA 3.1-3.2
         'field_mappings',
         'transformation_rules',
         'validation_rules',
@@ -148,6 +154,8 @@ class ERPConnection extends Model
         'notify_on_errors' => 'boolean',
         'notify_on_sync_complete' => 'boolean',
         'notify_on_auth_expire' => 'boolean',
+        'is_price_source' => 'boolean',  // ETAP_08 FAZA 3.1-3.2
+        'is_stock_source' => 'boolean',  // ETAP_08 FAZA 3.1-3.2
         'connection_config' => 'array',
         'sync_settings' => 'array',
         'field_mappings' => 'array',
@@ -206,6 +214,42 @@ class ERPConnection extends Model
     public const SYNC_PUSH_ONLY = 'push_only';
     public const SYNC_PULL_ONLY = 'pull_only';
     public const SYNC_DISABLED = 'disabled';
+
+    /**
+     * Sync Frequency Constants (ETAP_08 FAZA 3.1-3.2)
+     */
+    public const FREQ_15_MIN = 'every_15_min';
+    public const FREQ_30_MIN = 'every_30_min';
+    public const FREQ_HOURLY = 'hourly';
+    public const FREQ_6_HOURS = '6_hours';
+    public const FREQ_DAILY = 'daily';
+
+    /**
+     * Get available sync frequency options (ETAP_08 FAZA 3.1-3.2)
+     *
+     * @return array<string, string>
+     */
+    public static function getFrequencyOptions(): array
+    {
+        return [
+            self::FREQ_15_MIN => 'Co 15 minut',
+            self::FREQ_30_MIN => 'Co 30 minut',
+            self::FREQ_HOURLY => 'Co godzine',
+            self::FREQ_6_HOURS => 'Co 6 godzin',
+            self::FREQ_DAILY => 'Raz dziennie',
+        ];
+    }
+
+    /**
+     * Get frequency label for display
+     *
+     * @param string $frequency
+     * @return string
+     */
+    public static function getFrequencyLabel(string $frequency): string
+    {
+        return self::getFrequencyOptions()[$frequency] ?? $frequency;
+    }
 
     /**
      * Get the integration mappings for this ERP connection.

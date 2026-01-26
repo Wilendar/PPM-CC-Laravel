@@ -485,6 +485,141 @@
             </div>
         </div>
 
+        {{-- ========== ERP Sync Configuration Card (FAZA 5) ========== --}}
+        <div class="relative backdrop-blur-xl shadow-2xl rounded-xl border p-6 mb-8"
+             style="background: linear-gradient(135deg, rgba(31, 41, 55, 0.95), rgba(17, 24, 39, 0.95)); border: 1px solid rgba(16, 185, 129, 0.3);">
+
+            <h3 class="text-lg font-semibold text-white mb-6 flex items-center">
+                <svg class="w-6 h-6 text-green-500 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
+                </svg>
+                Konfiguracja Synchronizacji ERP
+                <span class="ml-3 text-xs px-2 py-1 rounded-full bg-green-500/20 text-green-400">Subiekt GT / Baselinker</span>
+            </h3>
+
+            {{-- Row 1: Connection + Data Sources --}}
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+                {{-- ERP Connection Select --}}
+                <div>
+                    <label class="block text-sm font-medium text-white mb-2">Polaczenie ERP</label>
+                    <select wire:model.live="selectedErpConnectionId"
+                            wire:change="loadErpConfig"
+                            class="w-full px-4 py-3 bg-gray-800 bg-opacity-60 border border-gray-600 text-white rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all duration-200">
+                        <option value="">-- Wybierz polaczenie --</option>
+                        @foreach($this->erpConnectionsList as $conn)
+                            <option value="{{ $conn->id }}">{{ $conn->instance_name }} ({{ ucfirst(str_replace('_', ' ', $conn->erp_type)) }})</option>
+                        @endforeach
+                    </select>
+                    @if(!$this->erpConnectionsList->count())
+                        <p class="text-xs text-gray-500 mt-1">Brak aktywnych polaczen ERP. Dodaj polaczenie w panelu ERP Manager.</p>
+                    @endif
+                </div>
+
+                {{-- Source Flags --}}
+                <div class="lg:col-span-2">
+                    <label class="block text-sm font-medium text-white mb-2">Zrodlo danych</label>
+                    <div class="flex flex-wrap gap-6 mt-1">
+                        <label class="flex items-center gap-3 cursor-pointer {{ !$selectedErpConnectionId ? 'opacity-50' : '' }}">
+                            <input type="checkbox"
+                                   wire:model="erpIsPriceSource"
+                                   class="rounded border-gray-600 bg-gray-800 bg-opacity-60 text-green-500 focus:ring-green-500"
+                                   {{ !$selectedErpConnectionId ? 'disabled' : '' }}>
+                            <div>
+                                <span class="text-sm font-medium text-white">ERP jest zrodlem cen</span>
+                                <p class="text-xs text-gray-400">Ceny z ERP nadpisuja ceny w PPM</p>
+                            </div>
+                        </label>
+
+                        <label class="flex items-center gap-3 cursor-pointer {{ !$selectedErpConnectionId ? 'opacity-50' : '' }}">
+                            <input type="checkbox"
+                                   wire:model="erpIsStockSource"
+                                   class="rounded border-gray-600 bg-gray-800 bg-opacity-60 text-green-500 focus:ring-green-500"
+                                   {{ !$selectedErpConnectionId ? 'disabled' : '' }}>
+                            <div>
+                                <span class="text-sm font-medium text-white">ERP jest zrodlem stanow</span>
+                                <p class="text-xs text-gray-400">Stany z ERP nadpisuja stany w PPM</p>
+                            </div>
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            {{-- Row 2: 3 Independent Sync Frequencies --}}
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                {{-- Price Sync Frequency --}}
+                <div>
+                    <label class="block text-sm font-medium text-white mb-2 flex items-center">
+                        <svg class="w-4 h-4 text-yellow-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                        Sync cen
+                    </label>
+                    <select wire:model="erpPriceSyncFrequency"
+                            class="w-full px-4 py-3 bg-gray-800 bg-opacity-60 border border-gray-600 text-white rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all duration-200"
+                            {{ !$selectedErpConnectionId ? 'disabled' : '' }}>
+                        @foreach(\App\Models\ERPConnection::getFrequencyOptions() as $value => $label)
+                            <option value="{{ $value }}">{{ $label }}</option>
+                        @endforeach
+                    </select>
+                    <p class="text-xs text-gray-400 mt-1">Aktualizacja cen produktow</p>
+                </div>
+
+                {{-- Stock Sync Frequency --}}
+                <div>
+                    <label class="block text-sm font-medium text-white mb-2 flex items-center">
+                        <svg class="w-4 h-4 text-blue-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
+                        </svg>
+                        Sync stanow
+                    </label>
+                    <select wire:model="erpStockSyncFrequency"
+                            class="w-full px-4 py-3 bg-gray-800 bg-opacity-60 border border-gray-600 text-white rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all duration-200"
+                            {{ !$selectedErpConnectionId ? 'disabled' : '' }}>
+                        @foreach(\App\Models\ERPConnection::getFrequencyOptions() as $value => $label)
+                            <option value="{{ $value }}">{{ $label }}</option>
+                        @endforeach
+                    </select>
+                    <p class="text-xs text-gray-400 mt-1">Aktualizacja stanow magazynowych</p>
+                </div>
+
+                {{-- Basic Data Sync Frequency --}}
+                <div>
+                    <label class="block text-sm font-medium text-white mb-2 flex items-center">
+                        <svg class="w-4 h-4 text-purple-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                        </svg>
+                        Sync danych podstawowych
+                    </label>
+                    <select wire:model="erpBasicDataSyncFrequency"
+                            class="w-full px-4 py-3 bg-gray-800 bg-opacity-60 border border-gray-600 text-white rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all duration-200"
+                            {{ !$selectedErpConnectionId ? 'disabled' : '' }}>
+                        @foreach(\App\Models\ERPConnection::getFrequencyOptions() as $value => $label)
+                            <option value="{{ $value }}">{{ $label }}</option>
+                        @endforeach
+                    </select>
+                    <p class="text-xs text-gray-400 mt-1">Nazwa, opis, parametry (ERP Tab)</p>
+                </div>
+            </div>
+
+            {{-- Save Button --}}
+            <div class="flex items-center justify-end pt-4 border-t border-gray-600">
+                <button wire:click="saveErpSyncConfig"
+                        wire:loading.attr="disabled"
+                        class="px-6 py-3 text-white font-medium rounded-lg transition-all duration-200 flex items-center hover:scale-105"
+                        style="background: linear-gradient(45deg, #10b981, #059669);"
+                        {{ !$selectedErpConnectionId ? 'disabled' : '' }}>
+                    <svg wire:loading.remove wire:target="saveErpSyncConfig" class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                    </svg>
+                    <svg wire:loading wire:target="saveErpSyncConfig" class="w-5 h-5 mr-2 animate-spin" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                    </svg>
+                    Zapisz konfiguracje ERP
+                </button>
+            </div>
+        </div>
+
         <!-- Advanced Sync Configuration Panel - SEKCJA 2.2.1.2 -->
         @if($showSyncConfig)
         <div class="relative backdrop-blur-xl shadow-2xl rounded-xl border p-6 mb-8"
@@ -2132,32 +2267,54 @@
                                 <div class="flex-1">
                                     <div class="flex items-center gap-2">
                                         {{-- BUG #9 FIX #3: Job Type Badge --}}
-                                        {{-- ETAP_08.5: Added ERP/Baselinker badge --}}
-                                        @if($job->target_type === 'baselinker')
-                                            <span class="sync-job-type-badge inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-orange-900 bg-opacity-40 text-orange-300 border border-orange-700">
-                                                <svg class="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
-                                                </svg>
-                                                ERP →
-                                            </span>
-                                        @elseif($job->job_type === 'bulk_import' || $job->job_type === 'import_products')
-                                            <span class="sync-job-type-badge inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-900 bg-opacity-40 text-blue-300 border border-blue-700">
-                                                <svg class="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10"/>
-                                                </svg>
+                                        {{-- ETAP_08.5 + FAZA 5: Target Type Badges (ERP systems) --}}
+                                        @switch($job->target_type ?? 'prestashop')
+                                            @case('prestashop')
+                                                <span class="sync-job-type-badge inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-900 bg-opacity-40 text-blue-300 border border-blue-700">
+                                                    <svg class="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"/>
+                                                    </svg>
+                                                    PrestaShop
+                                                </span>
+                                                @break
+                                            @case('subiekt_gt')
+                                                <span class="sync-job-type-badge inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-green-900 bg-opacity-40 text-green-300 border border-green-700">
+                                                    <svg class="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                                                    </svg>
+                                                    Subiekt GT
+                                                </span>
+                                                @break
+                                            @case('baselinker')
+                                                <span class="sync-job-type-badge inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-orange-900 bg-opacity-40 text-orange-300 border border-orange-700">
+                                                    <svg class="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
+                                                    </svg>
+                                                    Baselinker
+                                                </span>
+                                                @break
+                                            @case('dynamics')
+                                                <span class="sync-job-type-badge inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-purple-900 bg-opacity-40 text-purple-300 border border-purple-700">
+                                                    <svg class="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9"/>
+                                                    </svg>
+                                                    Dynamics
+                                                </span>
+                                                @break
+                                            @default
+                                                <span class="sync-job-type-badge inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-gray-700 bg-opacity-40 text-gray-300 border border-gray-600">
+                                                    {{ strtoupper($job->target_type ?? 'unknown') === 'PPM' ? 'PPM' : ucfirst(str_replace('_', ' ', $job->target_type ?? 'unknown')) }}
+                                                </span>
+                                        @endswitch
+
+                                        {{-- Job Type Badge (Import/Sync direction) --}}
+                                        @if($job->job_type === 'bulk_import' || $job->job_type === 'import_products' || str_starts_with($job->job_type ?? '', 'pull_'))
+                                            <span class="sync-job-type-badge inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-cyan-900 bg-opacity-30 text-cyan-300 border border-cyan-700">
                                                 ← Import
                                             </span>
-                                        @elseif($job->job_type === 'product_sync')
-                                            <span class="sync-job-type-badge inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-purple-900 bg-opacity-40 text-purple-300 border border-purple-700">
-                                                <svg class="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
-                                                </svg>
+                                        @elseif($job->job_type === 'product_sync' || $job->job_type === 'erp_sync' || str_starts_with($job->job_type ?? '', 'push_'))
+                                            <span class="sync-job-type-badge inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-amber-900 bg-opacity-30 text-amber-300 border border-amber-700">
                                                 Sync →
-                                            </span>
-                                        @else
-                                            {{-- Fallback dla innych typów --}}
-                                            <span class="sync-job-type-badge inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-gray-700 bg-opacity-40 text-gray-300 border border-gray-600">
-                                                {{ ucfirst(str_replace('_', ' ', $job->job_type)) }}
                                             </span>
                                         @endif
 
@@ -2572,6 +2729,9 @@
                 @endif
             </div>
         </div>
+
+        {{-- ERP Sync Configuration Card (FAZA 5) - Przeniesione pod sekcje PrestaShop --}}
+        {{-- UWAGA: Ta sekcja jest duplikatem - glowna sekcja ERP jest teraz wyzej, pod Konfiguracja Synchronizacji --}}
 
         <!-- FAZA 9 Phase 2: Queue Infrastructure Panel -->
         <div class="mt-8 relative backdrop-blur-xl shadow-lg rounded-lg border"

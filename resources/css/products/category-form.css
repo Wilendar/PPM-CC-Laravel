@@ -173,6 +173,38 @@ select.form-input-enterprise::-ms-expand {
 }
 
 /* ========================================
+   ENTERPRISE CHECKBOX (FAZA 4.1-4.2)
+   Dark theme checkbox with brand accent
+   ======================================== */
+
+.checkbox-enterprise {
+    width: 1rem;
+    height: 1rem;
+    border-radius: 0.25rem;
+    border: 1px solid rgba(75, 85, 99, 0.6);
+    background: linear-gradient(145deg, rgba(55, 65, 81, 0.8), rgba(31, 41, 55, 0.8));
+    cursor: pointer;
+    transition: all 0.15s ease;
+    accent-color: #e0ac7e;
+}
+
+.checkbox-enterprise:hover {
+    border-color: rgba(224, 172, 126, 0.5);
+    background: linear-gradient(145deg, rgba(55, 65, 81, 0.9), rgba(31, 41, 55, 0.9));
+}
+
+.checkbox-enterprise:focus {
+    outline: none;
+    border-color: rgba(224, 172, 126, 0.6);
+    box-shadow: 0 0 0 2px rgba(224, 172, 126, 0.2);
+}
+
+.checkbox-enterprise:checked {
+    background: linear-gradient(135deg, #e0ac7e 0%, #d1975a 100%);
+    border-color: #e0ac7e;
+}
+
+/* ========================================
    ENTERPRISE TABS SYSTEM
    ======================================== */
 

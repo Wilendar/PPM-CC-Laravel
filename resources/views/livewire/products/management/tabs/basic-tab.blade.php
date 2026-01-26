@@ -319,44 +319,128 @@
             @enderror
         </div>
 
-        {{-- Slug Field (Optional, Toggleable) --}}
-        <div class="md:col-span-2">
-            <div class="flex items-center justify-between mb-2">
-                <label for="slug" class="block text-sm font-medium text-gray-300">
-                    Slug URL (opcjonalne)
-                </label>
-                <button wire:click="toggleSlugField"
-                        type="button"
-                        class="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-500">
-                    {{ $showSlugField ? 'Ukryj' : 'Pokaż' }} slug
-                </button>
-            </div>
-            @if($showSlugField)
-                <div class="space-y-1">
-                    {{-- Status indicator for slug --}}
-                    @php
-                            $slugIndicator = $this->getFieldStatusIndicator('slug');
-                        @endphp
-                    @if($slugIndicator['show'])
-                        <div class="flex items-center space-x-2">
-                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium {{ $slugIndicator['class'] }}">
-                                {{ $slugIndicator['text'] }}
-                            </span>
+        {{-- Sekcja "Informacje rozszerzone (ERP)" - domyslnie zwinieta (FAZA 4.1-4.2) --}}
+        <div class="md:col-span-2 mt-2 border border-gray-700 rounded-lg overflow-hidden">
+            {{-- Header kliknij aby zwinac/rozwinac --}}
+            <button type="button"
+                    wire:click="toggleExtendedInfo"
+                    class="w-full flex items-center justify-between px-4 py-3 bg-gray-800/50 hover:bg-gray-800 transition-colors">
+                <span class="text-sm font-medium text-gray-300">
+                    Informacje rozszerzone (ERP)
+                </span>
+                <svg class="w-5 h-5 text-gray-400 transition-transform duration-200 {{ $extendedInfoExpanded ? 'rotate-180' : '' }}"
+                     fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                </svg>
+            </button>
+
+            {{-- Content --}}
+            @if($extendedInfoExpanded)
+            <div class="px-4 py-4 bg-gray-900/30 border-t border-gray-700">
+
+                {{-- Slug URL (przeniesiony tutaj) --}}
+                <div class="mb-4">
+                    <div class="flex items-center justify-between mb-2">
+                        <label for="slug" class="block text-sm font-medium text-gray-300">
+                            Slug URL (opcjonalne)
+                        </label>
+                        <button wire:click="toggleSlugField"
+                                type="button"
+                                class="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-500">
+                            {{ $showSlugField ? 'Ukryj' : 'Pokaz' }} slug
+                        </button>
+                    </div>
+                    @if($showSlugField)
+                        <div class="space-y-1">
+                            @php
+                                $slugIndicator = $this->getFieldStatusIndicator('slug');
+                            @endphp
+                            @if($slugIndicator['show'])
+                                <div class="flex items-center space-x-2">
+                                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium {{ $slugIndicator['class'] }}">
+                                        {{ $slugIndicator['text'] }}
+                                    </span>
+                                </div>
+                            @endif
+                            <input wire:model.live="slug"
+                                   type="text"
+                                   id="slug"
+                                   placeholder="automatycznie-generowany-slug"
+                                   class="{{ $this->getFieldClasses('slug') }} @error('slug') !border-red-500 @enderror">
+                            @error('slug')
+                                <p class="mt-1 text-sm text-red-600 dark:text-red-400">{{ $message }}</p>
+                            @enderror
                         </div>
+                    @else
+                        <p class="text-sm text-gray-500 dark:text-gray-400">
+                            Automatycznie: <code class="bg-gray-700 px-2 py-1 rounded">{{ $slug ?: 'automatycznie-generowany-slug' }}</code>
+                        </p>
                     @endif
-                    <input wire:model.live="slug"
-                           type="text"
-                           id="slug"
-                           placeholder="automatycznie-generowany-slug"
-                           class="{{ $this->getFieldClasses('slug') }} @error('slug') !border-red-500 @enderror">
-                    @error('slug')
-                        <p class="mt-1 text-sm text-red-600 dark:text-red-400">{{ $message }}</p>
-                    @enderror
                 </div>
-            @else
-                <p class="text-sm text-gray-500 dark:text-gray-400">
-                    Automatycznie: <code class="bg-gray-700 px-2 py-1 rounded">{{ $slug ?: 'automatycznie-generowany-slug' }}</code>
-                </p>
+
+                <div class="grid grid-cols-2 gap-4">
+                    {{-- Kod CN --}}
+                    <div>
+                        <label for="cnCode" class="block text-sm font-medium text-gray-300 mb-1">Kod CN</label>
+                        <input type="text"
+                               wire:model="cnCode"
+                               id="cnCode"
+                               maxlength="50"
+                               placeholder="np. 8714 91 30"
+                               class="form-input-enterprise w-full">
+                    </div>
+
+                    {{-- Material --}}
+                    <div>
+                        <label for="material" class="block text-sm font-medium text-gray-300 mb-1">Material</label>
+                        <input type="text"
+                               wire:model="material"
+                               id="material"
+                               maxlength="50"
+                               placeholder="np. stal, aluminium"
+                               class="form-input-enterprise w-full">
+                    </div>
+
+                    {{-- Symbol z wada --}}
+                    <div>
+                        <label for="defectSymbol" class="block text-sm font-medium text-gray-300 mb-1">Symbol z wada</label>
+                        <input type="text"
+                               wire:model="defectSymbol"
+                               id="defectSymbol"
+                               maxlength="50"
+                               placeholder="np. DEFECT-001"
+                               class="form-input-enterprise w-full">
+                    </div>
+
+                    {{-- Zastosowanie --}}
+                    <div class="col-span-2">
+                        <label for="application" class="block text-sm font-medium text-gray-300 mb-1">Zastosowanie</label>
+                        <input type="text"
+                               wire:model="application"
+                               id="application"
+                               maxlength="255"
+                               placeholder="np. Motocykle, Rowery, ATV"
+                               class="form-input-enterprise w-full">
+                    </div>
+                </div>
+
+                {{-- Switche --}}
+                <div class="mt-4 flex flex-wrap gap-6">
+                    <label class="flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox"
+                               wire:model="shopInternet"
+                               class="checkbox-enterprise">
+                        <span class="text-sm text-gray-300">Sklep internetowy</span>
+                    </label>
+
+                    <label class="flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox"
+                               wire:model="splitPayment"
+                               class="checkbox-enterprise">
+                        <span class="text-sm text-gray-300">Mechanizm podzielonej platnosci</span>
+                    </label>
+                </div>
+            </div>
             @endif
         </div>
 

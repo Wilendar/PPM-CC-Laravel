@@ -1,10 +1,10 @@
 ---
 name: subiekt-gt-integration
 description: Integracja z ERP Subiekt GT (InsERT) - SQL Server, Sfera API, REST wrapper. Uzyj przy synchronizacji produktow, kontrahentow, zamowien z systemem ERP.
-version: 1.3.0
+version: 1.4.0
 author: Kamil Wilinski
 created: 2026-01-19
-updated: 2026-01-23
+updated: 2026-01-26
 tags: [subiekt, insert, erp, sql-server, sfera, integracja, magazyn, ceny, sync]
 category: integration
 status: active
@@ -116,6 +116,18 @@ tw__Towar       - Glowna tabela produktow
   tw_Aktywny    - Czy aktywny (BIT)
   tw_StanMin    - MINIMALNY STAN (DECIMAL) - GLOBALNY dla produktu!
   tw_JednStanMin- Jednostka min. stanu (VARCHAR, max 10 znakow)
+  tw_EAN        - Kod EAN (VARCHAR)
+
+  # EXTENDED FIELDS (ETAP_08 FAZA 3.4)
+  tw_SklepInternet - Widocznosc w sklepie internetowym (BIT)
+  tw_MechanizmPodzielonejPlatnosci - Split payment / MPP (BIT)
+  tw_IdPodstDostawca - ID producenta (FK do kh__Kontrahent)
+  tw_DostSymbol  - Kod dostawcy (VARCHAR 20)
+  tw_Pole1       - Material produktu (VARCHAR 50)
+  tw_Pole2       - Lokalizacja magazynowa CSV (VARCHAR 50)
+  tw_Pole3       - Symbol produktu z wada (VARCHAR 50)
+  tw_Pole4       - Zastosowanie produktu (VARCHAR 50)
+  tw_Pole5       - Kod CN (VARCHAR 50)
 
 tw_Stan         - Stany magazynowe (per magazyn)
   st_TowId      - ID produktu (FK)
@@ -700,6 +712,25 @@ Ten skill automatycznie zbiera:
 - User satisfaction target: 4.5/5
 
 ### Historia Ulepszen
+
+#### v1.4.0 (2026-01-26) - EXTENDED FIELDS MAPPING (FAZA 3.4)
+- [FEATURE] Nowe mapowania pol rozszerzonych PPM → Subiekt GT:
+  - `shop_internet` → `tw_SklepInternet` (bit)
+  - `split_payment` → `tw_MechanizmPodzielonejPlatnosci` (bit)
+  - `material` → `tw_Pole1` (varchar 50)
+  - `stock.location` → `tw_Pole2` (varchar 50, CSV format)
+  - `defect_symbol` → `tw_Pole3` (varchar 50)
+  - `application` → `tw_Pole4` (varchar 50)
+  - `cn_code` → `tw_Pole5` (varchar 50)
+  - `supplier_code` → `tw_DostSymbol` (varchar 20)
+  - `manufacturer` → `tw_IdPodstDostawca` (FK lookup)
+- [FEATURE] Nowe metody w SubiektGTService:
+  - `mapExtendedFields()` - mapowanie rozszerzonych pol
+  - `findManufacturerIdByName()` - wyszukiwanie producenta po nazwie
+  - `mapStockLocations()` - agregacja lokalizacji magazynowych
+- [FEATURE] Rozszerzony REST API o nowe pola w ProductWriteRequest
+- [FEATURE] DirectSQL UPDATE dla nowych pol w SferaProductWriter.cs
+- [DOCS] Dokumentacja nowych mapowan w SKILL.md
 
 #### v1.3.0 (2026-01-23) - MINIMUM STOCK SYNC
 - [FEATURE] Synchronizacja minimalnego stanu magazynowego do Subiekt GT
