@@ -14,6 +14,7 @@ use App\Models\Warehouse;
 use App\Models\ProductPrice;
 use App\Models\ProductStock;
 use App\Models\ProductShopData;  // ETAP_13: Bulk sync status tracking
+use App\Models\StockEditLog;     // Granular stock column audit logging
 use App\Services\PrestaShop\PrestaShopClientFactory;
 use App\Services\CategoryMappingsConverter;  // FIX #12: Category mappings Option A
 use App\Http\Livewire\Products\Management\Traits\ProductFormValidation;
@@ -209,7 +210,28 @@ class ProductForm extends Component
     // Security feature: Prices and Stock tabs are LOCKED by default (readonly)
     // Users with products.prices.unlock / products.stock.unlock permissions can toggle
     public bool $pricesUnlocked = false;  // false = locked (readonly), true = editable
-    public bool $stockUnlocked = false;   // false = locked (readonly), true = editable
+    public bool $stockUnlocked = false;   // DEPRECATED - kept for backward compatibility
+
+    // === PRICES DIRTY TRACKING (2026-01-24) ===
+    // Track if prices have been edited (for selective ERP sync)
+    public array $pricesOriginalValues = [];  // Snapshot of prices at load time
+    public bool $pricesDirty = false;          // Flag set when any price is edited
+
+    // === GRANULAR STOCK COLUMN LOCKS (2026-01-24) ===
+    // Each column can be locked/unlocked independently
+    // Requires products.stock.unlock_quantity / unlock_reserved / unlock_minimum permissions
+    public array $stockColumnLocks = [
+        'quantity' => false,  // false = locked (readonly), true = unlocked (editable)
+        'reserved' => false,
+        'minimum' => false,
+    ];
+
+    // Original stock values snapshot (for dirty detection)
+    public array $stockOriginalValues = [];
+    // Dirty flags per warehouse per column
+    public array $stockDirtyFlags = [];
+    // Pending column unlock (for modal confirmation)
+    public ?string $pendingStockColumnUnlock = null;
 
     // === UI STATE ===
     public bool $isSaving = false;
@@ -1077,6 +1099,10 @@ class ProductForm extends Component
                 }
             }
 
+            // Snapshot original prices for dirty detection (ERP sync optimization)
+            $this->pricesOriginalValues = $this->prices;
+            $this->pricesDirty = false;
+
             Log::info('Product prices loaded', [
                 'product_id' => $this->product->id,
                 'loaded_prices_count' => $existingPrices->count(),
@@ -1136,6 +1162,9 @@ class ProductForm extends Component
                 'loaded_stock_count' => $existingStock->count(),
                 'total_warehouses' => count($this->warehouses),
             ]);
+
+            // Capture original values for dirty tracking (2026-01-24)
+            $this->captureStockOriginals();
 
         } catch (\Exception $e) {
             Log::error('Failed to load product stock', [
@@ -1638,25 +1667,19 @@ class ProductForm extends Component
 
     /**
      * Toggle stock tab lock/unlock state
-     * Requires products.stock.unlock permission
+     * DEPRECATED: Use granular column locks instead
+     * Kept for backward compatibility
      */
     public function toggleStockLock(): void
     {
-        if (!auth()->user()?->can('products.stock.unlock')) {
-            Log::warning('[Lock/Unlock] User attempted to unlock stock without permission', [
-                'user_id' => auth()->id(),
-                'product_id' => $this->product?->id,
-            ]);
-            return;
+        // DEPRECATED - redirect to unlock all columns that user has permission for
+        Log::warning('[Lock/Unlock] DEPRECATED toggleStockLock called, use granular column locks');
+
+        foreach (['quantity', 'reserved', 'minimum'] as $column) {
+            if ($this->canUnlockStockColumn($column)) {
+                $this->stockColumnLocks[$column] = !$this->stockColumnLocks[$column];
+            }
         }
-
-        $this->stockUnlocked = !$this->stockUnlocked;
-
-        Log::info('[Lock/Unlock] Stock tab state changed', [
-            'unlocked' => $this->stockUnlocked,
-            'user_id' => auth()->id(),
-            'product_id' => $this->product?->id,
-        ]);
     }
 
     /**
@@ -1669,10 +1692,324 @@ class ProductForm extends Component
 
     /**
      * Check if user can unlock stock tab
+     * DEPRECATED: Use canUnlockStockColumn() instead
      */
     public function canUnlockStock(): bool
     {
-        return auth()->user()?->can('products.stock.unlock') ?? false;
+        // Return true if user can unlock ANY column
+        return $this->canUnlockStockColumn('quantity')
+            || $this->canUnlockStockColumn('reserved')
+            || $this->canUnlockStockColumn('minimum');
+    }
+
+    // =========================================================================
+    // GRANULAR STOCK COLUMN LOCKS (2026-01-24)
+    // =========================================================================
+
+    /**
+     * Check if user can unlock specific stock column
+     */
+    public function canUnlockStockColumn(string $column): bool
+    {
+        return match ($column) {
+            'quantity' => auth()->user()?->can('products.stock.unlock_quantity') ?? false,
+            'reserved' => auth()->user()?->can('products.stock.unlock_reserved') ?? false,
+            'minimum' => auth()->user()?->can('products.stock.unlock_minimum') ?? false,
+            default => false,
+        };
+    }
+
+    /**
+     * Check if specific stock column is unlocked
+     */
+    public function isStockColumnUnlocked(string $column): bool
+    {
+        return $this->stockColumnLocks[$column] ?? false;
+    }
+
+    /**
+     * Request unlock for stock column (shows confirmation modal)
+     */
+    public function requestStockColumnUnlock(string $column): void
+    {
+        if (!$this->canUnlockStockColumn($column)) {
+            $this->dispatch('notification', [
+                'type' => 'error',
+                'message' => 'Brak uprawnien do odblokowania tej kolumny',
+            ]);
+            Log::warning('[Stock Lock] User lacks permission to unlock column', [
+                'user_id' => auth()->id(),
+                'column' => $column,
+                'product_id' => $this->product?->id,
+            ]);
+            return;
+        }
+
+        $this->pendingStockColumnUnlock = $column;
+        $this->dispatch('show-stock-unlock-modal');
+    }
+
+    /**
+     * Confirm stock column unlock (from modal)
+     */
+    public function confirmStockColumnUnlock(): void
+    {
+        if (!$this->pendingStockColumnUnlock) {
+            return;
+        }
+
+        $column = $this->pendingStockColumnUnlock;
+
+        if (!$this->canUnlockStockColumn($column)) {
+            $this->pendingStockColumnUnlock = null;
+            return;
+        }
+
+        $this->stockColumnLocks[$column] = true;
+
+        // Audit log
+        if ($this->product?->id) {
+            StockEditLog::logUnlock(
+                auth()->id(),
+                $this->product->id,
+                $column,
+                [
+                    'ip_address' => request()->ip(),
+                    'user_agent' => request()->userAgent(),
+                ]
+            );
+        }
+
+        Log::info('[Stock Lock] Column unlocked', [
+            'column' => $column,
+            'user_id' => auth()->id(),
+            'product_id' => $this->product?->id,
+        ]);
+
+        $this->pendingStockColumnUnlock = null;
+        $this->dispatch('close-stock-unlock-modal');
+        $this->dispatch('notification', [
+            'type' => 'success',
+            'message' => 'Kolumna odblokowana. Mozesz teraz edytowac wartosci.',
+        ]);
+    }
+
+    /**
+     * Cancel stock column unlock (close modal)
+     */
+    public function cancelStockColumnUnlock(): void
+    {
+        $this->pendingStockColumnUnlock = null;
+        $this->dispatch('close-stock-unlock-modal');
+    }
+
+    /**
+     * Lock stock column
+     */
+    public function lockStockColumn(string $column): void
+    {
+        $this->stockColumnLocks[$column] = false;
+
+        // Audit log
+        if ($this->product?->id) {
+            StockEditLog::logLock(
+                auth()->id(),
+                $this->product->id,
+                $column,
+                [
+                    'ip_address' => request()->ip(),
+                    'user_agent' => request()->userAgent(),
+                ]
+            );
+        }
+
+        Log::info('[Stock Lock] Column locked', [
+            'column' => $column,
+            'user_id' => auth()->id(),
+            'product_id' => $this->product?->id,
+        ]);
+    }
+
+    /**
+     * Capture original stock values for dirty detection
+     * Called on mount and after successful save
+     */
+    public function captureStockOriginals(): void
+    {
+        $this->stockOriginalValues = [];
+        $this->stockDirtyFlags = [];
+
+        foreach ($this->stock as $warehouseId => $data) {
+            $this->stockOriginalValues[$warehouseId] = [
+                'quantity' => (float) ($data['quantity'] ?? 0),
+                'reserved' => (float) ($data['reserved'] ?? 0),
+                'minimum' => (float) ($data['minimum'] ?? 0),
+            ];
+            $this->stockDirtyFlags[$warehouseId] = [
+                'quantity' => false,
+                'reserved' => false,
+                'minimum' => false,
+            ];
+        }
+    }
+
+    /**
+     * Mark stock cell as dirty (called via wire:change or Alpine)
+     */
+    public function markStockDirty(int $warehouseId, string $column): void
+    {
+        $original = $this->stockOriginalValues[$warehouseId][$column] ?? 0;
+        $current = $this->stock[$warehouseId][$column] ?? 0;
+
+        $isDirty = ((float) $original !== (float) $current);
+        $this->stockDirtyFlags[$warehouseId][$column] = $isDirty;
+
+        Log::debug('[Stock Dirty] Cell marked', [
+            'warehouse_id' => $warehouseId,
+            'column' => $column,
+            'original' => $original,
+            'current' => $current,
+            'is_dirty' => $isDirty,
+        ]);
+    }
+
+    /**
+     * Check if specific stock cell is dirty
+     */
+    public function isStockCellDirty(int $warehouseId, string $column): bool
+    {
+        return $this->stockDirtyFlags[$warehouseId][$column] ?? false;
+    }
+
+    /**
+     * Check if any stock cell is dirty
+     */
+    public function hasAnyStockDirty(): bool
+    {
+        foreach ($this->stockDirtyFlags as $warehouseId => $columns) {
+            foreach ($columns as $column => $isDirty) {
+                if ($isDirty && $this->stockColumnLocks[$column]) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Get dirty stock data for sync to ERP
+     * Returns ONLY columns that are both: unlocked AND dirty
+     */
+    public function getDirtyStockForSync(): array
+    {
+        $result = [];
+
+        foreach ($this->stock as $warehouseId => $data) {
+            $dirtyColumns = [];
+
+            foreach (['quantity', 'reserved', 'minimum'] as $col) {
+                // Column must be: unlocked AND dirty
+                if ($this->stockColumnLocks[$col]
+                    && ($this->stockDirtyFlags[$warehouseId][$col] ?? false)) {
+                    $dirtyColumns[$col] = $data[$col];
+                }
+            }
+
+            if (!empty($dirtyColumns)) {
+                $result[$warehouseId] = $dirtyColumns;
+            }
+        }
+
+        return $result;
+    }
+
+    /**
+     * Get list of all dirty stock columns (across all warehouses).
+     * Used to pass to ERP sync job to filter which columns should be synced.
+     *
+     * @return array List of column names that have been modified ['quantity', 'minimum', etc.]
+     */
+    public function getDirtyStockColumns(): array
+    {
+        $dirtyColumns = [];
+
+        foreach ($this->stock as $warehouseId => $data) {
+            foreach (['quantity', 'reserved', 'minimum'] as $col) {
+                // Column must be: unlocked AND dirty
+                if ($this->stockColumnLocks[$col]
+                    && ($this->stockDirtyFlags[$warehouseId][$col] ?? false)) {
+                    $dirtyColumns[$col] = true;
+                }
+            }
+        }
+
+        return array_keys($dirtyColumns);
+    }
+
+    /**
+     * Check if any prices have been modified (for selective ERP sync)
+     *
+     * CRITICAL: Returns true ONLY if:
+     * 1. Prices tab was unlocked AND
+     * 2. Prices were actually changed from original values
+     *
+     * @return bool
+     */
+    public function hasDirtyPrices(): bool
+    {
+        // If prices are not unlocked, no changes possible
+        if (!$this->pricesUnlocked) {
+            return false;
+        }
+
+        // Check if dirty flag was set by price input change
+        if ($this->pricesDirty) {
+            return true;
+        }
+
+        // Fallback: Compare current prices with original snapshot
+        if (empty($this->pricesOriginalValues)) {
+            return false;
+        }
+
+        foreach ($this->prices as $groupId => $priceData) {
+            $original = $this->pricesOriginalValues[$groupId] ?? null;
+            if (!$original) {
+                // New price group added
+                return true;
+            }
+
+            // Compare net and gross values
+            if (abs(($priceData['net'] ?? 0) - ($original['net'] ?? 0)) > 0.001 ||
+                abs(($priceData['gross'] ?? 0) - ($original['gross'] ?? 0)) > 0.001) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Mark prices as dirty (called on price input change)
+     */
+    public function markPricesDirty(): void
+    {
+        if ($this->pricesUnlocked) {
+            $this->pricesDirty = true;
+        }
+    }
+
+    /**
+     * Get column label for display
+     */
+    public function getStockColumnLabel(string $column): string
+    {
+        return match ($column) {
+            'quantity' => 'Stan dostepny',
+            'reserved' => 'Zarezerwowane',
+            'minimum' => 'Minimum',
+            default => $column,
+        };
     }
 
     /**
@@ -8347,6 +8684,18 @@ class ProductForm extends Component
         // PROBLEM #4 (2025-11-07): Save prices and stock after product save
         if ($this->product && $this->product->exists) {
             try {
+                // FIX (2026-01-23): Capture dirty columns BEFORE save resets them!
+                // saveStockInternal() calls captureStockOriginals() which resets stockDirtyFlags
+                // So we MUST capture the dirty columns BEFORE saving
+                $dirtyStockColumnsBeforeSave = $this->getDirtyStockColumns();
+                $hasDirtyPricesBeforeSave = $this->hasDirtyPrices();
+
+                Log::debug('[ERP SYNC] Captured dirty state BEFORE save', [
+                    'product_id' => $this->product->id,
+                    'dirty_stock_columns' => $dirtyStockColumnsBeforeSave,
+                    'has_dirty_prices' => $hasDirtyPricesBeforeSave,
+                ]);
+
                 $this->savePricesInternal();
                 $this->saveStockInternal();
 
@@ -8356,7 +8705,8 @@ class ProductForm extends Component
 
                 // FIX (2026-01-23): Auto-dispatch sync jobs for all connected ERP systems after price/stock change
                 // This was MISSING - prices were saved to PPM but NOT synced to BaseLinker/Subiekt GT
-                $this->dispatchSyncJobsForAllErp();
+                // CRITICAL: Pass the captured dirty state (captured BEFORE save reset the flags)
+                $this->dispatchSyncJobsForAllErp($dirtyStockColumnsBeforeSave, $hasDirtyPricesBeforeSave);
 
             } catch (\Exception $e) {
                 Log::error('Failed to save prices/stock in savePendingChangesToProduct', [
@@ -9795,6 +10145,12 @@ class ProductForm extends Component
     /**
      * Save product stock to database
      * Called from savePendingChangesToProduct()
+     *
+     * IMPORTANT (2026-01-24): Only saves columns that are:
+     * 1. UNLOCKED (user explicitly unlocked the column)
+     * 2. DIRTY (value was actually changed)
+     *
+     * This prevents accidental overwrites when user didn't intend to change stock.
      */
     private function saveStockInternal(): void
     {
@@ -9803,56 +10159,120 @@ class ProductForm extends Component
             return;
         }
 
+        // Get only dirty data from unlocked columns
+        $dirtyData = $this->getDirtyStockForSync();
+
+        // If no dirty columns - skip entire save!
+        if (empty($dirtyData)) {
+            Log::info('[STOCK SAVE] No dirty columns detected, skipping stock save', [
+                'product_id' => $this->product->id,
+                'column_locks' => $this->stockColumnLocks,
+            ]);
+            return;
+        }
+
         $savedCount = 0;
+        $editLogs = [];
 
         try {
-            Log::debug('BEFORE saveStockInternal', [
-                'stock_array' => $this->stock,
-                'stock_count' => count($this->stock),
+            Log::debug('[STOCK SAVE] Starting selective save', [
+                'product_id' => $this->product->id,
+                'dirty_data' => $dirtyData,
+                'column_locks' => $this->stockColumnLocks,
             ]);
 
             foreach ($this->stock as $warehouseId => $stockData) {
-                // DEBUG: Log each warehouse stock save
-                Log::debug('[STOCK SAVE INTERNAL] Processing warehouse', [
+                $dirtyColumns = $dirtyData[$warehouseId] ?? [];
+
+                // Skip this warehouse if no dirty columns
+                if (empty($dirtyColumns)) {
+                    continue;
+                }
+
+                // Get existing stock record or create new
+                $stock = ProductStock::firstOrNew([
+                    'product_id' => $this->product->id,
+                    'product_variant_id' => null,
                     'warehouse_id' => $warehouseId,
-                    'quantity' => $stockData['quantity'] ?? 'null',
-                    'reserved' => $stockData['reserved'] ?? 'null',
-                    'minimum' => $stockData['minimum'] ?? 'null',
                 ]);
 
-                $stock = \App\Models\ProductStock::updateOrCreate(
-                    [
-                        'product_id' => $this->product->id,
-                        'product_variant_id' => null,
-                        'warehouse_id' => $warehouseId,
-                    ],
-                    [
-                        'quantity' => $stockData['quantity'] ?? 0,
-                        'reserved_quantity' => $stockData['reserved'] ?? 0,
-                        'minimum_stock' => $stockData['minimum'] ?? 0, // FIX: was minimum_stock_level
-                        'is_active' => true,
-                        'track_stock' => true,
-                    ]
-                );
+                // Capture old values for audit log
+                $oldValues = [
+                    'quantity' => $stock->quantity,
+                    'reserved' => $stock->reserved_quantity,
+                    'minimum' => $stock->minimum_stock,
+                ];
 
-                // DEBUG: Log result
-                Log::debug('[STOCK SAVE INTERNAL] Warehouse stock saved', [
+                // Update ONLY dirty columns
+                if (isset($dirtyColumns['quantity'])) {
+                    $stock->quantity = $dirtyColumns['quantity'];
+                    $editLogs[] = [
+                        'column' => 'quantity',
+                        'warehouse_id' => $warehouseId,
+                        'old' => $oldValues['quantity'],
+                        'new' => $dirtyColumns['quantity'],
+                    ];
+                }
+                if (isset($dirtyColumns['reserved'])) {
+                    $stock->reserved_quantity = $dirtyColumns['reserved'];
+                    $editLogs[] = [
+                        'column' => 'reserved',
+                        'warehouse_id' => $warehouseId,
+                        'old' => $oldValues['reserved'],
+                        'new' => $dirtyColumns['reserved'],
+                    ];
+                }
+                if (isset($dirtyColumns['minimum'])) {
+                    $stock->minimum_stock = $dirtyColumns['minimum'];
+                    $editLogs[] = [
+                        'column' => 'minimum',
+                        'warehouse_id' => $warehouseId,
+                        'old' => $oldValues['minimum'],
+                        'new' => $dirtyColumns['minimum'],
+                    ];
+                }
+
+                // Ensure stock record is active
+                $stock->is_active = true;
+                $stock->track_stock = true;
+                $stock->save();
+
+                Log::debug('[STOCK SAVE] Warehouse stock updated (selective)', [
                     'warehouse_id' => $warehouseId,
                     'stock_id' => $stock->id,
-                    'was_created' => $stock->wasRecentlyCreated,
-                    'saved_quantity' => $stock->quantity,
+                    'updated_columns' => array_keys($dirtyColumns),
                 ]);
 
                 $savedCount++;
             }
 
-            Log::info('Product stock saved', [
+            // Create audit logs for all edits
+            foreach ($editLogs as $logData) {
+                StockEditLog::logEdit(
+                    auth()->id(),
+                    $this->product->id,
+                    $logData['warehouse_id'],
+                    $logData['column'],
+                    $logData['old'],
+                    $logData['new'],
+                    [
+                        'ip_address' => request()->ip(),
+                        'user_agent' => request()->userAgent(),
+                    ]
+                );
+            }
+
+            // Reset dirty flags and capture new originals
+            $this->captureStockOriginals();
+
+            Log::info('[STOCK SAVE] Selective save completed', [
                 'product_id' => $this->product->id,
-                'saved_count' => $savedCount,
+                'warehouses_updated' => $savedCount,
+                'edits_logged' => count($editLogs),
             ]);
 
         } catch (\Exception $e) {
-            Log::error('Failed to save product stock', [
+            Log::error('[STOCK SAVE] Failed', [
                 'product_id' => $this->product->id,
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
@@ -9955,9 +10375,15 @@ class ProductForm extends Component
      *
      * FIX: Tab Ceny nie aktualizuje ERP przy zapisie
      *
+     * CRITICAL FIX (2026-01-23): Accept pre-captured dirty state as parameters
+     * because saveStockInternal() resets stockDirtyFlags via captureStockOriginals()
+     * BEFORE this method is called!
+     *
+     * @param array $dirtyStockColumns Dirty stock columns captured BEFORE save
+     * @param bool $hasDirtyPrices Whether prices were dirty BEFORE save
      * @return void
      */
-    private function dispatchSyncJobsForAllErp(): void
+    private function dispatchSyncJobsForAllErp(array $dirtyStockColumns = [], bool $hasDirtyPrices = false): void
     {
         if (!$this->product || !$this->product->exists) {
             return;
@@ -10026,9 +10452,39 @@ class ProductForm extends Component
                     'sync_status' => \App\Models\ProductErpData::STATUS_PENDING,
                 ]);
 
+                // Build sync options for selective field synchronization
+                // CRITICAL: Use the PRE-CAPTURED dirty state (passed as parameters)
+                // because saveStockInternal() resets stockDirtyFlags via captureStockOriginals()
+                // BEFORE this method is called!
+                $syncOptions = [];
+                if (!empty($dirtyStockColumns)) {
+                    $syncOptions['stock_columns'] = $dirtyStockColumns;
+                    $syncOptions['sync_stock'] = true;
+                } else {
+                    // No dirty stock columns means no stock changes to sync
+                    $syncOptions['sync_stock'] = false;
+                }
+
+                // CRITICAL FIX: Use the PRE-CAPTURED dirty prices state
+                // (also passed as parameter because savePricesInternal() may reset it)
+                $syncOptions['sync_prices'] = $hasDirtyPrices;
+
+                Log::debug('[ERP SYNC] Building sync options (using pre-captured dirty state)', [
+                    'product_id' => $this->product->id,
+                    'dirty_stock_columns' => $dirtyStockColumns,
+                    'sync_stock' => $syncOptions['sync_stock'],
+                    'sync_prices' => $syncOptions['sync_prices'],
+                ]);
+
                 // Dispatch sync job (synchronous for Hostido without queue worker)
                 // FIX: Use dispatchSync() like in syncToErp() method
-                \App\Jobs\ERP\SyncProductToERP::dispatchSync($this->product, $connection);
+                // Pass syncOptions as 4th parameter to enable selective sync
+                \App\Jobs\ERP\SyncProductToERP::dispatchSync(
+                    $this->product,
+                    $connection,
+                    null, // syncJob - will be created by job
+                    $syncOptions
+                );
 
                 $dispatchedCount++;
 
@@ -10038,6 +10494,8 @@ class ProductForm extends Component
                     'connection_id' => $connection->id,
                     'connection_name' => $connection->instance_name,
                     'erp_type' => $connection->erp_type,
+                    'sync_options' => $syncOptions,
+                    'dirty_stock_columns' => $dirtyStockColumns,
                 ]);
             }
 

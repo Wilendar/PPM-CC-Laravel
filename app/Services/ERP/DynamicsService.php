@@ -44,8 +44,12 @@ class DynamicsService implements ERPSyncServiceInterface
 
     /**
      * Sync product TO Microsoft Dynamics.
+     *
+     * @param ERPConnection $connection ERP connection
+     * @param Product $product Product to sync
+     * @param array $syncOptions Optional sync options (stock_columns, sync_prices, sync_stock)
      */
-    public function syncProductToERP(ERPConnection $connection, Product $product): array
+    public function syncProductToERP(ERPConnection $connection, Product $product, array $syncOptions = []): array
     {
         return [
             'success' => false,

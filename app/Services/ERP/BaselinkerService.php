@@ -1508,10 +1508,17 @@ class BaselinkerService implements ERPSyncServiceInterface
     /**
      * Sync single product TO Baselinker (PUSH).
      * Wrapper for syncSingleProduct with ERPConnection context.
+     *
+     * @param ERPConnection $connection ERP connection
+     * @param Product $product Product to sync
+     * @param array $syncOptions Optional sync options (stock_columns, sync_prices, sync_stock)
      */
-    public function syncProductToERP(ERPConnection $connection, Product $product): array
+    public function syncProductToERP(ERPConnection $connection, Product $product, array $syncOptions = []): array
     {
         $startTime = microtime(true);
+
+        // TODO: Implement syncOptions filtering for Baselinker (stock_columns, sync_prices, sync_stock)
+        // For now, all fields are synced. Future implementation should filter based on $syncOptions.
 
         try {
             $inventoryId = $connection->connection_config['inventory_id'] ?? null;

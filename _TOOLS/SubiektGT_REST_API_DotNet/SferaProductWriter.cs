@@ -723,6 +723,28 @@ public class DirectSqlProductWriter : ISferaProductWriter
                 parameters.Add("@manufacturerId", request.ManufacturerId.Value);
             }
 
+            // Product-level minimum stock (tw_StanMin) - NOT per-warehouse!
+            // In Subiekt GT, tw__Towar.tw_StanMin is global for all warehouses.
+            // PPM sends the lowest minimum from all its warehouses.
+            if (request.MinimumStock.HasValue)
+            {
+                updates.Add("tw_StanMin = @minimumStock");
+                parameters.Add("@minimumStock", request.MinimumStock.Value);
+
+                // Also set the unit for minimum stock display
+                var minUnit = request.MinimumStockUnit ?? request.Unit ?? "szt.";
+                if (!minUnit.EndsWith(".") && minUnit.Length < 10)
+                {
+                    minUnit += ".";
+                }
+                updates.Add("tw_JednStanMin = @minimumStockUnit");
+                parameters.Add("@minimumStockUnit", minUnit.Length > 10 ? minUnit.Substring(0, 10) : minUnit);
+
+                _logger.LogInformation(
+                    "Setting product-level minimum stock: tw_StanMin={Min}, tw_JednStanMin={Unit}",
+                    request.MinimumStock.Value, minUnit);
+            }
+
             var rowsAffected = 0;
 
             if (updates.Count > 0)

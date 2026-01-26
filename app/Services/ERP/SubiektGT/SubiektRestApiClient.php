@@ -525,6 +525,22 @@ class SubiektRestApiClient
             $body['IsActive'] = (bool)$data['is_active'];
         }
 
+        // Product-level minimum stock (tw_StanMin in tw__Towar table)
+        // This is a GLOBAL minimum for all warehouses in Subiekt GT
+        // PPM sends the LOWEST minimum from all its warehouses
+        if (isset($data['minimum_stock'])) {
+            $body['MinimumStock'] = (float)$data['minimum_stock'];
+
+            if (isset($data['minimum_stock_unit'])) {
+                $body['MinimumStockUnit'] = $data['minimum_stock_unit'];
+            }
+
+            Log::debug('buildProductWriteBody: Adding product-level minimum stock', [
+                'minimum_stock' => $body['MinimumStock'],
+                'minimum_stock_unit' => $body['MinimumStockUnit'] ?? 'not_set',
+            ]);
+        }
+
         // Prices (array of price levels)
         // Format: ['prices' => [0 => ['net' => 100.00, 'gross' => 123.00], 1 => ['net' => 90.00]]]
         // IMPORTANT: API expects PricesNet and PricesGross as Dictionary<int, decimal>

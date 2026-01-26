@@ -54,16 +54,33 @@ class SyncProductToERP implements ShouldQueue, ShouldBeUnique
     }
 
     /**
+     * Sync options for selective field synchronization.
+     *
+     * Supported options:
+     * - 'stock_columns' => ['quantity', 'minimum'] - only sync specified stock columns
+     * - 'sync_prices' => true/false - whether to sync prices
+     * - 'sync_stock' => true/false - whether to sync stock at all
+     */
+    public array $syncOptions = [];
+
+    /**
      * Create a new job instance.
      *
      * ETAP_08.5: Capture userId during dispatch (web context) because
      * auth()->id() returns NULL in queue worker context.
+     *
+     * @param Product $product Product to sync
+     * @param ERPConnection $erpConnection ERP connection to use
+     * @param SyncJob|null $syncJob Optional SyncJob for tracking
+     * @param array $syncOptions Selective sync options (stock_columns, sync_prices, sync_stock)
      */
     public function __construct(
         public Product $product,
         public ERPConnection $erpConnection,
-        public ?SyncJob $syncJob = null
+        public ?SyncJob $syncJob = null,
+        array $syncOptions = []
     ) {
+        $this->syncOptions = $syncOptions;
         $this->onQueue($this->determineQueue());
 
         // Capture user ID from web context (null in queue = SYSTEM)
@@ -130,8 +147,9 @@ class SyncProductToERP implements ShouldQueue, ShouldBeUnique
             // Get appropriate ERP service
             $service = $erpManager->getService($this->erpConnection);
 
-            // Sync product
-            $result = $service->syncProductToERP($this->erpConnection, $this->product);
+            // Sync product with optional sync options
+            // Pass syncOptions to enable selective field synchronization (e.g., only dirty stock columns)
+            $result = $service->syncProductToERP($this->erpConnection, $this->product, $this->syncOptions);
 
             $duration = round((microtime(true) - $startTime) * 1000, 2);
 

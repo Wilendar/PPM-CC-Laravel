@@ -65,11 +65,13 @@
                      if (!netValue || netValue === '') return;
                      const gross = parseFloat(netValue) * (1 + this.taxRate / 100);
                      $wire.set('prices.' + groupId + '.gross', gross.toFixed(2));
+                     $wire.call('markPricesDirty');
                  },
                  calculateNet(grossValue, groupId) {
                      if (!grossValue || grossValue === '') return;
                      const net = parseFloat(grossValue) / (1 + this.taxRate / 100);
                      $wire.set('prices.' + groupId + '.net', net.toFixed(2));
+                     $wire.call('markPricesDirty');
                  }
              }">
             <div class="flex items-center justify-between mb-4">

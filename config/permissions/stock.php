@@ -45,11 +45,31 @@ return [
             'description' => 'Zarzadzanie lokalizacjami magazynowymi',
             'dangerous' => false,
         ],
+
+        // Granularne uprawnienia do odblokowywania kolumn stanów magazynowych
+        'unlock_quantity' => [
+            'name' => 'products.stock.unlock_quantity',
+            'label' => 'Odblokuj stan dostepny',
+            'description' => 'Mozliwosc odblokowania i edycji kolumny "Stan dostepny". Zmiany beda synchronizowane do ERP.',
+            'dangerous' => true,
+        ],
+        'unlock_reserved' => [
+            'name' => 'products.stock.unlock_reserved',
+            'label' => 'Odblokuj rezerwacje',
+            'description' => 'Mozliwosc odblokowania i edycji kolumny "Zarezerwowane".',
+            'dangerous' => true,
+        ],
+        'unlock_minimum' => [
+            'name' => 'products.stock.unlock_minimum',
+            'label' => 'Odblokuj minimum',
+            'description' => 'Mozliwosc odblokowania i edycji kolumny "Minimum". Zmiany beda synchronizowane do ERP.',
+            'dangerous' => false,
+        ],
     ],
 
     'role_defaults' => [
-        'Admin' => ['read', 'update', 'reservations', 'delivery', 'locations'],
-        'Manager' => ['read', 'update', 'reservations', 'delivery', 'locations'],
+        'Admin' => ['read', 'update', 'reservations', 'delivery', 'locations', 'unlock_quantity', 'unlock_reserved', 'unlock_minimum'],
+        'Manager' => ['read', 'update', 'reservations', 'delivery', 'locations', 'unlock_minimum'],
         'Editor' => ['read'],
         'Warehouseman' => ['read', 'update', 'delivery', 'locations'],
         'Salesperson' => ['read', 'reservations'],

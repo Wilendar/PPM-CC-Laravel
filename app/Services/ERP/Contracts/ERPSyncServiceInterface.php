@@ -38,9 +38,13 @@ interface ERPSyncServiceInterface
      *
      * @param ERPConnection $connection Active ERP connection
      * @param Product $product Product to sync
+     * @param array $syncOptions Optional sync options for selective field synchronization:
+     *                           - 'stock_columns' => ['quantity', 'minimum'] - only sync specified stock columns
+     *                           - 'sync_prices' => true/false - whether to sync prices
+     *                           - 'sync_stock' => true/false - whether to sync stock at all
      * @return array{success: bool, message: string, external_id: ?string}
      */
-    public function syncProductToERP(ERPConnection $connection, Product $product): array;
+    public function syncProductToERP(ERPConnection $connection, Product $product, array $syncOptions = []): array;
 
     /**
      * Sync single product FROM external ERP system (PULL).

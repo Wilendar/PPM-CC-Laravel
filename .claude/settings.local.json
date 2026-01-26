@@ -104,7 +104,7 @@
       "mcp__claude-in-chrome__shortcuts_list",
       "mcp__claude-in-chrome__shortcuts_execute",
       "mcp__claude-in-chrome__:*",
-      "Skill(ppm-styling-guidelines)",
+      "Skill(ppm-style-book)",
       "Skill(frontend-dev-guidelines)",
       "Bash(claude mcp remove:*)",
       "Skill(livewire-dev-guidelines)",
@@ -171,7 +171,18 @@
       "Bash(subtask diff --stat fix/stock-save-sync)",
       "Bash(subtask diff --stat feature/lock-unlock-tabs)",
       "Bash(subtask merge:*)",
-      "Bash(git stash:*)"
+      "Bash(git stash:*)",
+      "Bash(Remove-Item -Recurse -Force \"D:\\\\Skrypty\\\\PPM-CC-Laravel\\\\.claude\\\\skills\\\\ppm-styling-guidelines\")",
+      "Bash(git fetch:*)",
+      "Bash(git pull:*)",
+      "Bash(git checkout:*)",
+      "Bash(certutil:*)",
+      "Bash(\"C:\\\\Users\\\\kamil\\\\AppData\\\\Local\\\\Microsoft\\\\dotnet\\\\dotnet.exe\" publish -c Release -o ./publish)",
+      "Skill(sequential-thinking)",
+      "Bash(if not exist \"D:\\\\Skrypty\\\\PPM-CC-Laravel\\\\.claude\\\\skills\\\\permission-management\" mkdir \"D:\\\\Skrypty\\\\PPM-CC-Laravel\\\\.claude\\\\skills\\\\permission-management\")",
+      "Bash(dotnet build:*)",
+      "Bash(dotnet publish:*)",
+      "Bash(Select-String -Pattern \"ERP SYNC|sync_stock|sync_prices|dirty_stock|Building sync|syncOptions\")"
     ],
     "deny": [],
     "ask": []
@@ -266,5 +277,6 @@
       }
     ]
   },
-  "plansDirectory": "Plan_Projektu"
+  "plansDirectory": "Plan_Projektu",
+  "spinnerTipsEnabled": true
 }

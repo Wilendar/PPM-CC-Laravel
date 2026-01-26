@@ -1,7 +1,7 @@
 ---
 name: subiekt-gt-integration
 description: Integracja z ERP Subiekt GT (InsERT) - SQL Server, Sfera API, REST wrapper. Uzyj przy synchronizacji produktow, kontrahentow, zamowien z systemem ERP.
-version: 1.2.0
+version: 1.3.0
 author: Kamil Wilinski
 created: 2026-01-19
 updated: 2026-01-23
@@ -114,11 +114,14 @@ tw__Towar       - Glowna tabela produktow
   tw_Nazwa      - Nazwa produktu (VARCHAR)
   tw_Opis       - Opis (TEXT)
   tw_Aktywny    - Czy aktywny (BIT)
+  tw_StanMin    - MINIMALNY STAN (DECIMAL) - GLOBALNY dla produktu!
+  tw_JednStanMin- Jednostka min. stanu (VARCHAR, max 10 znakow)
 
-tw_Stan         - Stany magazynowe
+tw_Stan         - Stany magazynowe (per magazyn)
   st_TowId      - ID produktu (FK)
   st_Stan       - Ilosc na stanie (DECIMAL)
   st_MagId      - ID magazynu (FK)
+  st_StanMin    - Min. stan per magazyn (NIEUZYWANE w sync do Subiekt!)
 
 tw_Cena         - Ceny produktow (11 poziomow cenowych!)
   tc_TowId      - ID produktu (FK)
@@ -154,6 +157,44 @@ tw_Parametr     - NAZWY POZIOMOW CENOWYCH (KRYTYCZNE!)
 - Poziom 0 zawsze pomijaj przy synchronizacji cen z PPM
 - REST API `/api/price-levels` zwraca TYLKO poziomy 1-10 (bez 0)
 - Przy PUT/UPDATE cen wysylaj klucze 1-10, NIE 0-9
+
+#### MINIMALNY STAN MAGAZYNOWY - KRYTYCZNE!
+
+⚠️ **Subiekt GT ma GLOBALNY minimalny stan na poziomie produktu (tw__Towar.tw_StanMin), NIE per magazyn!**
+
+| Tabela | Kolumna | Opis |
+|--------|---------|------|
+| `tw__Towar` | `tw_StanMin` | Minimalny stan - GLOBALNY dla produktu |
+| `tw__Towar` | `tw_JednStanMin` | Jednostka min. stanu (np. "szt.") |
+| `tw_Stan` | `st_StanMin` | Per-magazyn min. (NIEUZYWANE w sync!) |
+
+**LOGIKA SYNCHRONIZACJI PPM → Subiekt:**
+
+PPM przechowuje minimum per magazyn, ale Subiekt ma tylko jedno pole globalne.
+Dlatego PPM wysyla **NAJNIZSZA WARTOSC** ze wszystkich magazynow:
+
+```php
+// SubiektGTService.php - mapPpmProductToSubiekt()
+$allMinimums = array_filter(array_column($stock, 'min'), fn($v) => $v > 0);
+if (!empty($allMinimums)) {
+    $lowestMinimum = min($allMinimums);
+    $data['minimum_stock'] = $lowestMinimum;
+    $data['minimum_stock_unit'] = $product->unit ?? 'szt.';
+}
+```
+
+**Przyklad:**
+- Magazyn "Sprzedaz": min = 7
+- Magazyn "Stany": min = 12
+- Subiekt dostanie: `tw_StanMin = 7` (najnizsza wartosc)
+
+**REST API Fields:**
+```json
+{
+  "MinimumStock": 7.0,
+  "MinimumStockUnit": "szt."
+}
+```
 
 #### KONTRAHENCI
 ```
@@ -364,9 +405,22 @@ echo "Utworzono: " . $faktura->NumerPelny;
   "Description": "Opis",
   "IsActive": true,
   "PricesNet": {"1": 100.00, "2": 99.19, "3": 180.49},
-  "PricesGross": {"1": 123.00, "2": 122.00, "3": 222.00}
+  "PricesGross": {"1": 123.00, "2": 122.00, "3": 222.00},
+  "MinimumStock": 7.0,
+  "MinimumStockUnit": "szt."
 }
 ```
+
+**PUT Request Fields:**
+| Pole | Typ | Opis |
+|------|-----|------|
+| `Name` | string | Nazwa produktu (tw_Nazwa) |
+| `Description` | string | Opis (tw_Opis) |
+| `IsActive` | bool | Czy aktywny (tw_Aktywny) |
+| `PricesNet` | object | Ceny netto poziomy 1-10 |
+| `PricesGross` | object | Ceny brutto poziomy 1-10 |
+| `MinimumStock` | decimal | Globalny min. stan (tw_StanMin) |
+| `MinimumStockUnit` | string | Jednostka min. stanu (tw_JednStanMin) |
 
 **PUT Response:**
 ```json
@@ -646,6 +700,14 @@ Ten skill automatycznie zbiera:
 - User satisfaction target: 4.5/5
 
 ### Historia Ulepszen
+
+#### v1.3.0 (2026-01-23) - MINIMUM STOCK SYNC
+- [FEATURE] Synchronizacja minimalnego stanu magazynowego do Subiekt GT
+- [FEATURE] Nowe pola REST API: `MinimumStock`, `MinimumStockUnit`
+- [FEATURE] DirectSQL UPDATE dla `tw_StanMin`, `tw_JednStanMin` w tw__Towar
+- [DOCS] Dokumentacja roznic: globalny min (Subiekt) vs per-magazyn (PPM)
+- [DOCS] Logika wysylania najnizszej wartosci minimum ze wszystkich magazynow
+- [VERIFIED] Synchronizacja minimum stock PPM → Subiekt GT dziala poprawnie
 
 #### v1.2.0 (2026-01-23) - KRYTYCZNA KOREKTA MAPOWANIA CEN
 - [BREAKING] **KOREKTA MAPOWANIA:** `twp_NazwaCeny[N]` → `tc_CenaNetto[N]` (NIE N-1!)

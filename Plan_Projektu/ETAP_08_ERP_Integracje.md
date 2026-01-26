@@ -16,6 +16,18 @@
 
 ---
 
+## 🔗 POWIĄZANE FEATURE BRANCHES
+
+| Feature | Status | Plik planu | Opis |
+|---------|--------|------------|------|
+| **STOCK_TAB_GRANULAR_LOCKS** | ❌ Do implementacji | [STOCK_TAB_GRANULAR_LOCKS.md](STOCK_TAB_GRANULAR_LOCKS.md) | System granularnych blokad kolumn w zakładce "Stany magazynowe" - zapobiega przypadkowej synchronizacji do ERP |
+
+**Zależności:**
+- STOCK_TAB_GRANULAR_LOCKS wymaga działających integracji ERP (8.3, 8.4, 8.5)
+- Implementuje dirty tracking dla selektywnej synchronizacji stock data do ERP
+
+---
+
 
 ## 🔍 INSTRUKCJE PRZED ROZPOCZĘCIEM ETAPU
 

@@ -383,9 +383,10 @@ class SubiektGTService implements ERPSyncServiceInterface
      *
      * @param ERPConnection $connection Active ERP connection
      * @param Product $product Product to sync
+     * @param array $syncOptions Optional sync options for selective field synchronization
      * @return array Sync result
      */
-    public function syncProductToERP(ERPConnection $connection, Product $product): array
+    public function syncProductToERP(ERPConnection $connection, Product $product, array $syncOptions = []): array
     {
         $config = $connection->connection_config;
         $connectionMode = $config['connection_mode'] ?? 'rest_api';
@@ -397,12 +398,12 @@ class SubiektGTService implements ERPSyncServiceInterface
 
         // REST API mode - would require external endpoint
         if ($connectionMode === 'rest_api') {
-            return $this->syncProductViaRestApi($connection, $product);
+            return $this->syncProductViaRestApi($connection, $product, $syncOptions);
         }
 
         // Sfera API mode - would require COM bridge
         if ($connectionMode === 'sfera_api') {
-            return $this->syncProductViaSferaApi($connection, $product);
+            return $this->syncProductViaSferaApi($connection, $product, $syncOptions);
         }
 
         return [
@@ -1269,9 +1270,10 @@ class SubiektGTService implements ERPSyncServiceInterface
      *
      * @param ERPConnection $connection
      * @param Product $product
+     * @param array $syncOptions Optional sync options for selective field synchronization
      * @return array
      */
-    protected function syncProductViaRestApi(ERPConnection $connection, Product $product): array
+    protected function syncProductViaRestApi(ERPConnection $connection, Product $product, array $syncOptions = []): array
     {
         try {
             $config = $connection->connection_config;
@@ -1279,6 +1281,9 @@ class SubiektGTService implements ERPSyncServiceInterface
             // CRITICAL FIX: Reconstruct mappings from PriceGroup/Warehouse models
             // because connection_config may not have them (they're stored in model.erp_mapping)
             $config = $this->enrichConfigWithMappingsFromModels($config, $connection->erp_type);
+
+            // Merge syncOptions into config for downstream methods
+            $config['_sync_options'] = $syncOptions;
 
             $client = $this->createRestApiClient($config);
             $syncDirection = $config['sync_direction'] ?? 'pull'; // pull, push, bidirectional
@@ -1477,8 +1482,55 @@ class SubiektGTService implements ERPSyncServiceInterface
     protected function pushProductToSubiekt(SubiektRestApiClient $client, Product $product, string $externalId, array $config, ?int $connectionId = null): array
     {
         try {
+            // Get sync options from config (passed from syncProductViaRestApi)
+            $syncOptions = $config['_sync_options'] ?? [];
+
             // Build update data from PPM product (using ERP data if available)
             $updateData = $this->mapPpmProductToSubiekt($product, $config, false, $connectionId);
+
+            // ====== SELECTIVE SYNC: Filter based on syncOptions ======
+            // If sync_stock is explicitly false, don't sync stock at all
+            if (isset($syncOptions['sync_stock']) && $syncOptions['sync_stock'] === false) {
+                unset($updateData['stock']);
+                Log::debug('pushProductToSubiekt: Stock sync disabled by syncOptions');
+            }
+
+            // If sync_prices is explicitly false, don't sync prices at all
+            if (isset($syncOptions['sync_prices']) && $syncOptions['sync_prices'] === false) {
+                unset($updateData['prices']);
+                Log::debug('pushProductToSubiekt: Price sync disabled by syncOptions');
+            }
+
+            // If stock_columns are specified, filter stock data to only include those columns
+            if (!empty($syncOptions['stock_columns']) && isset($updateData['stock'])) {
+                $allowedColumns = $syncOptions['stock_columns'];
+                $columnMapping = [
+                    'quantity' => 'quantity',
+                    'minimum' => 'min',
+                    'reserved' => 'reserved',
+                ];
+
+                foreach ($updateData['stock'] as $warehouseId => &$stockEntry) {
+                    foreach (array_keys($stockEntry) as $key) {
+                        // Find if this key corresponds to an allowed column
+                        $isAllowed = false;
+                        foreach ($allowedColumns as $allowedCol) {
+                            if (isset($columnMapping[$allowedCol]) && $columnMapping[$allowedCol] === $key) {
+                                $isAllowed = true;
+                                break;
+                            }
+                        }
+                        if (!$isAllowed && $key !== 'max') {
+                            unset($stockEntry[$key]);
+                        }
+                    }
+                }
+
+                Log::debug('pushProductToSubiekt: Stock columns filtered by syncOptions', [
+                    'allowed_columns' => $allowedColumns,
+                    'filtered_stock' => $updateData['stock'],
+                ]);
+            }
 
             // DEBUG: Log mapped data before sending to API
             Log::debug('pushProductToSubiekt: Mapped data for Subiekt GT', [
@@ -1486,7 +1538,7 @@ class SubiektGTService implements ERPSyncServiceInterface
                 'external_id' => $externalId,
                 'mapped_fields' => array_keys($updateData),
                 'mapped_data' => $updateData,
-                'config_keys' => array_keys($config),
+                'sync_options' => $syncOptions,
             ]);
 
             if (empty($updateData)) {
@@ -1504,6 +1556,7 @@ class SubiektGTService implements ERPSyncServiceInterface
                 'sku' => $product->sku,
                 'external_id' => $externalId,
                 'fields' => array_keys($updateData),
+                'sync_options' => $syncOptions,
             ]);
 
             // ====== UPDATE PRODUCT (name, description, prices, etc.) ======
@@ -1525,7 +1578,7 @@ class SubiektGTService implements ERPSyncServiceInterface
                 ]);
             }
 
-            // 2. Update stock (separate endpoint)
+            // 2. Update stock (separate endpoint) - ONLY if we have stock data after filtering
             if (!empty($stockData)) {
                 $stockResult = $client->updateProductStockBySku($product->sku, $stockData);
 
@@ -1865,6 +1918,23 @@ class SubiektGTService implements ERPSyncServiceInterface
 
         if (!empty($stock)) {
             $data['stock'] = $stock;
+
+            // ====== PRODUCT-LEVEL MINIMUM STOCK (tw_StanMin) ======
+            // In Subiekt GT, tw__Towar.tw_StanMin is GLOBAL for all warehouses.
+            // PPM stores minimum per warehouse, so we send the LOWEST value.
+            // This ensures Subiekt GT alerts when ANY warehouse falls below minimum.
+            $allMinimums = array_filter(array_column($stock, 'min'), fn($v) => $v > 0);
+            if (!empty($allMinimums)) {
+                $lowestMinimum = min($allMinimums);
+                $data['minimum_stock'] = $lowestMinimum;
+                $data['minimum_stock_unit'] = $product->unit ?? 'szt.';
+
+                Log::debug('mapPpmProductToSubiekt: Product-level minimum stock', [
+                    'all_warehouse_minimums' => $allMinimums,
+                    'lowest_minimum' => $lowestMinimum,
+                    'unit' => $data['minimum_stock_unit'],
+                ]);
+            }
         }
 
         // DEBUG: Log final mapped data
@@ -2058,7 +2128,7 @@ class SubiektGTService implements ERPSyncServiceInterface
      * @param Product $product
      * @return array
      */
-    protected function syncProductViaSferaApi(ERPConnection $connection, Product $product): array
+    protected function syncProductViaSferaApi(ERPConnection $connection, Product $product, array $syncOptions = []): array
     {
         // TODO: Implement Sfera COM bridge
         return [
