@@ -803,6 +803,13 @@ public class DirectSqlProductWriter : ISferaProductWriter
                 parameters.Add("@supplierCode", request.SupplierCode.Length > 20 ? request.SupplierCode.Substring(0, 20) : request.SupplierCode);
             }
 
+            // tw_Pole8 - Parent SKU for variants (max 50 chars)
+            if (!string.IsNullOrEmpty(request.Pole8))
+            {
+                updates.Add("tw_Pole8 = @pole8");
+                parameters.Add("@pole8", request.Pole8.Length > 50 ? request.Pole8.Substring(0, 50) : request.Pole8);
+            }
+
             var rowsAffected = 0;
 
             if (updates.Count > 0)
