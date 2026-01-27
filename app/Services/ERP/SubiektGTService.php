@@ -13,6 +13,8 @@ use App\Services\ERP\Contracts\ERPSyncServiceInterface;
 use App\Services\ERP\SubiektGT\SubiektQueryBuilder;
 use App\Services\ERP\SubiektGT\SubiektDataTransformer;
 use App\Services\ERP\SubiektGT\SubiektRestApiClient;
+use App\Services\ERP\SubiektGT\SubiektVariantResolver;
+use App\Models\ProductVariant;
 use App\Exceptions\SubiektApiException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -51,7 +53,21 @@ class SubiektGTService implements ERPSyncServiceInterface
     protected ?SubiektQueryBuilder $queryBuilder = null;
     protected ?SubiektDataTransformer $transformer = null;
     protected ?SubiektRestApiClient $restApiClient = null;
+    protected ?SubiektVariantResolver $variantResolver = null;
     protected string $connectionName = 'subiekt';
+
+    /**
+     * Get or create SubiektVariantResolver instance.
+     *
+     * @return SubiektVariantResolver
+     */
+    protected function getVariantResolver(): SubiektVariantResolver
+    {
+        if ($this->variantResolver === null) {
+            $this->variantResolver = new SubiektVariantResolver();
+        }
+        return $this->variantResolver;
+    }
 
     /**
      * Test connection to Subiekt GT database.
@@ -3913,5 +3929,125 @@ class SubiektGTService implements ERPSyncServiceInterface
             ]);
             return 0;
         }
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | VARIANT SYNC METHODS
+    |--------------------------------------------------------------------------
+    | Subiekt GT does not have native variant support - each variant is
+    | a separate product. We use tw_Pole8 to store parent_sku, creating
+    | a parent-child relationship.
+    */
+
+    /**
+     * Sync product variants to Subiekt GT.
+     *
+     * Each PPM variant becomes a separate product in Subiekt with Pole8 = parent_sku.
+     * This allows grouping variants by parent while maintaining separate stock/prices.
+     *
+     * @param ERPConnection $connection The ERP connection to use
+     * @param Product $product The parent product (must be variant master)
+     * @return array Sync result with counts and errors
+     */
+    public function syncProductVariantsToSubiekt(ERPConnection $connection, Product $product): array
+    {
+        if (!$product->is_variant_master) {
+            return [
+                'success' => false,
+                'message' => 'Product is not a variant master',
+                'synced' => 0,
+                'failed' => 0,
+                'errors' => [],
+            ];
+        }
+
+        $this->initializeForConnection($connection);
+
+        $results = [
+            'success' => true,
+            'synced' => 0,
+            'failed' => 0,
+            'errors' => [],
+        ];
+
+        $parentSku = $product->sku;
+        $variants = $product->variants()->with(['prices', 'stock'])->get();
+
+        Log::info('SubiektGTService: syncing variants to Subiekt', [
+            'parent_sku' => $parentSku,
+            'variant_count' => $variants->count(),
+            'connection_id' => $connection->id,
+        ]);
+
+        foreach ($variants as $variant) {
+            try {
+                $variantData = $this->buildVariantSyncData($variant, $parentSku);
+
+                // Check if variant already exists in Subiekt
+                $existsResult = $this->restApiClient->productExists($variant->sku);
+
+                if ($existsResult['exists']) {
+                    // Update existing product
+                    $this->restApiClient->updateProductBySku($variant->sku, $variantData);
+                    Log::debug('SubiektGTService: variant updated', [
+                        'variant_sku' => $variant->sku,
+                        'parent_sku' => $parentSku,
+                    ]);
+                } else {
+                    // Create new product with SKU
+                    $variantData['sku'] = $variant->sku;
+                    $this->restApiClient->createProduct($variantData);
+                    Log::debug('SubiektGTService: variant created', [
+                        'variant_sku' => $variant->sku,
+                        'parent_sku' => $parentSku,
+                    ]);
+                }
+
+                $results['synced']++;
+
+            } catch (\Exception $e) {
+                $results['failed']++;
+                $results['errors'][] = [
+                    'variant_sku' => $variant->sku,
+                    'error' => $e->getMessage(),
+                ];
+                Log::error('SubiektGTService: variant sync failed', [
+                    'variant_sku' => $variant->sku,
+                    'parent_sku' => $parentSku,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        $results['success'] = $results['failed'] === 0;
+
+        Log::info('SubiektGTService: variant sync completed', [
+            'parent_sku' => $parentSku,
+            'synced' => $results['synced'],
+            'failed' => $results['failed'],
+        ]);
+
+        return $results;
+    }
+
+    /**
+     * Builds sync data for a variant product.
+     *
+     * Uses ONLY tw_Pole8 for parent_sku (no Pole6/Pole7 references).
+     *
+     * @param ProductVariant $variant The variant to sync
+     * @param string $parentSku Parent product SKU
+     * @return array Data to send to Subiekt API
+     */
+    protected function buildVariantSyncData(ProductVariant $variant, string $parentSku): array
+    {
+        $resolver = $this->getVariantResolver();
+
+        return [
+            'name' => $variant->name,
+            'pole8' => $resolver->buildPole8Value($parentSku),  // TYLKO Pole8!
+            'is_active' => $variant->is_active,
+        ];
     }
 }
