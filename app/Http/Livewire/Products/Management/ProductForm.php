@@ -10317,6 +10317,7 @@ class ProductForm extends Component
                     'quantity' => $stock->quantity,
                     'reserved' => $stock->reserved_quantity,
                     'minimum' => $stock->minimum_stock,
+                    'location' => $stock->location ?? '',  // ETAP_08 FAZA 8
                 ];
 
                 // Update ONLY dirty columns
@@ -10346,6 +10347,17 @@ class ProductForm extends Component
                         'old' => $oldValues['minimum'],
                         'new' => $dirtyColumns['minimum'],
                     ];
+                }
+                // ETAP_08 FAZA 8: Save location column
+                // NOTE: Location is NOT added to editLogs because StockEditLog::logEdit()
+                // expects float values for old/new, and location is a string.
+                if (isset($dirtyColumns['location'])) {
+                    $stock->location = $dirtyColumns['location'];
+                    Log::info('[STOCK SAVE] Location updated', [
+                        'warehouse_id' => $warehouseId,
+                        'old_location' => $oldValues['location'] ?? '',
+                        'new_location' => $dirtyColumns['location'],
+                    ]);
                 }
 
                 // Ensure stock record is active

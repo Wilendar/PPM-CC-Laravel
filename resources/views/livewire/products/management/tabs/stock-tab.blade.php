@@ -292,6 +292,7 @@
 
                                 {{-- Location Labels (ETAP_08 FAZA 8) - Alpine component --}}
                                 <td class="px-4 py-3"
+                                    wire:ignore.self
                                     x-data="locationLabels(@js($stock[$warehouseId]['location'] ?? ''), {{ $warehouseId }})"
                                     x-init="$watch('rawValue', val => $wire.set('stock.{{ $warehouseId }}.location', val))"
                                 >

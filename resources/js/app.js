@@ -2198,6 +2198,25 @@ function registerAlpineComponents(Alpine) {
                     });
                 }
             }
+        },
+
+        // Init: Listen for Livewire updates to sync location from server
+        init() {
+            const self = this;
+
+            // Listen for stock-locations-updated event (dispatched after ERP pull)
+            Livewire.on('stock-locations-updated', (data) => {
+                const locations = data?.locations || data[0]?.locations;
+                if (locations && locations[self.warehouseId] !== undefined) {
+                    const newValue = locations[self.warehouseId] || '';
+                    if (newValue !== self.rawValue) {
+                        console.log('[LocationLabels] Updated from Livewire event:', self.warehouseId, newValue);
+                        self.rawValue = newValue;
+                    }
+                }
+            });
+
+            console.log('[LocationLabels] Initialized for warehouse:', this.warehouseId, 'value:', this.rawValue);
         }
     }));
 
