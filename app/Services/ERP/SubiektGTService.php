@@ -2082,6 +2082,19 @@ class SubiektGTService implements ERPSyncServiceInterface
             $updated = true;
         }
 
+        // ETAP_08 FAZA 8: Parse warehouse locations from tw_Pole2
+        // Format: "MAGAZYN1:A-12-3, MAGAZYN2:B-05-1"
+        $pole2Value = $subiektProduct->Pole2 ?? $subiektProduct->pole2 ?? null;
+        if (!empty($pole2Value)) {
+            $warehouseMappings = $config['warehouse_mappings'] ?? [];
+            $updatedWarehouses = $this->updateStockLocationsFromErp($product, $pole2Value, $warehouseMappings);
+
+            if (!empty($updatedWarehouses)) {
+                $fields[] = 'stock_locations';
+                $updated = true;
+            }
+        }
+
         Log::debug('updateProductBasicDataFromErp: Updated', [
             'product_id' => $product->id,
             'sku' => $product->sku,
@@ -2093,6 +2106,152 @@ class SubiektGTService implements ERPSyncServiceInterface
 
     // ========================================================================
     // End of ETAP_08 FAZA 7 selective update methods
+    // ========================================================================
+
+    // ========================================================================
+    // ETAP_08 FAZA 8: Warehouse Location Parsing
+    // ========================================================================
+
+    /**
+     * Parse stock locations from Subiekt GT tw_Pole2 field.
+     *
+     * Input format: "MAGAZYN1:A-12-3, MAGAZYN2:B-05-1"
+     * Output: [ppm_warehouse_id => 'location', ...]
+     *
+     * @param string|null $pole2Csv The tw_Pole2 value from Subiekt GT
+     * @param array $warehouseMappings PPM warehouse mappings from ERP config
+     * @return array Parsed locations keyed by PPM warehouse ID
+     */
+    protected function parseStockLocationsFromErp(?string $pole2Csv, array $warehouseMappings): array
+    {
+        if (empty($pole2Csv)) {
+            return [];
+        }
+
+        $locations = [];
+        $pairs = explode(',', $pole2Csv);
+
+        foreach ($pairs as $pair) {
+            $parts = explode(':', trim($pair), 2);
+            if (count($parts) !== 2) {
+                continue;
+            }
+
+            $warehouseName = strtoupper(trim($parts[0]));
+            $location = trim($parts[1]);
+
+            if (empty($warehouseName) || empty($location)) {
+                continue;
+            }
+
+            // Find PPM warehouse ID by Subiekt warehouse name
+            $ppmWarehouseId = $this->findPpmWarehouseIdByErpName($warehouseName, $warehouseMappings);
+
+            if ($ppmWarehouseId !== null) {
+                $locations[$ppmWarehouseId] = $location;
+            }
+        }
+
+        Log::debug('[Subiekt] Parsed stock locations from Pole2', [
+            'raw' => $pole2Csv,
+            'parsed' => $locations,
+        ]);
+
+        return $locations;
+    }
+
+    /**
+     * Find PPM warehouse ID by ERP warehouse name/code.
+     *
+     * @param string $erpWarehouseName Name/code of warehouse in ERP (e.g., "MPPTRADE", "PITBIKE")
+     * @param array $warehouseMappings Warehouse mappings from ERP config
+     * @return int|null PPM warehouse ID or null if not found
+     */
+    protected function findPpmWarehouseIdByErpName(string $erpWarehouseName, array $warehouseMappings): ?int
+    {
+        // Normalize input
+        $erpWarehouseName = strtoupper(trim($erpWarehouseName));
+
+        // Search in warehouse mappings
+        foreach ($warehouseMappings as $mapping) {
+            // Check by ERP warehouse name/code
+            $mappedErpName = strtoupper(trim($mapping['erp_name'] ?? $mapping['subiekt_name'] ?? ''));
+            if ($mappedErpName === $erpWarehouseName) {
+                return (int) ($mapping['ppm_id'] ?? $mapping['warehouse_id'] ?? null);
+            }
+
+            // Check by ERP warehouse symbol
+            $mappedErpSymbol = strtoupper(trim($mapping['erp_symbol'] ?? $mapping['subiekt_symbol'] ?? ''));
+            if (!empty($mappedErpSymbol) && $mappedErpSymbol === $erpWarehouseName) {
+                return (int) ($mapping['ppm_id'] ?? $mapping['warehouse_id'] ?? null);
+            }
+        }
+
+        // Fallback: Try to match by PPM warehouse name (direct match)
+        $warehouse = \App\Models\Warehouse::whereRaw('UPPER(name) = ?', [$erpWarehouseName])
+            ->orWhereRaw('UPPER(code) = ?', [$erpWarehouseName])
+            ->first();
+
+        if ($warehouse) {
+            return $warehouse->id;
+        }
+
+        Log::warning('[Subiekt] Could not find PPM warehouse for ERP name', [
+            'erp_name' => $erpWarehouseName,
+            'available_mappings' => count($warehouseMappings),
+        ]);
+
+        return null;
+    }
+
+    /**
+     * Update product stock locations from Subiekt GT Pole2 field.
+     *
+     * @param Product $product
+     * @param string|null $pole2Value
+     * @param array $warehouseMappings
+     * @return array List of updated warehouse IDs
+     */
+    public function updateStockLocationsFromErp(Product $product, ?string $pole2Value, array $warehouseMappings = []): array
+    {
+        $locations = $this->parseStockLocationsFromErp($pole2Value, $warehouseMappings);
+
+        if (empty($locations)) {
+            return [];
+        }
+
+        $updatedWarehouses = [];
+
+        foreach ($locations as $ppmWarehouseId => $location) {
+            $updated = \App\Models\ProductStock::updateOrCreate(
+                [
+                    'product_id' => $product->id,
+                    'warehouse_id' => $ppmWarehouseId,
+                    'product_variant_id' => null, // Master product stock
+                ],
+                [
+                    'location' => $location,
+                    'is_active' => true,
+                ]
+            );
+
+            if ($updated->wasRecentlyCreated || $updated->wasChanged()) {
+                $updatedWarehouses[] = $ppmWarehouseId;
+            }
+        }
+
+        Log::info('[Subiekt] Updated stock locations from Pole2', [
+            'product_id' => $product->id,
+            'sku' => $product->sku,
+            'updated_warehouses' => $updatedWarehouses,
+            'locations' => $locations,
+        ]);
+
+        return $updatedWarehouses;
+    }
+
+    // ========================================================================
+    // End of ETAP_08 FAZA 8
     // ========================================================================
 
     /**

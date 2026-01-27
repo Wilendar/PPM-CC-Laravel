@@ -442,6 +442,79 @@
         @endif
     </div>
 
+    {{-- ETAP_08 FAZA 7: Extended ERP Information (tw_Pole1-5, tw_Uwagi) --}}
+    @if($connection->erp_type === 'subiekt_gt')
+    <div class="mt-6 pt-4 border-t border-gray-700">
+        <h5 class="text-lg font-medium text-white mb-4">Informacje rozszerzone (ERP)</h5>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {{-- Material (tw_Pole1) --}}
+            <div>
+                <label class="block text-sm font-medium text-gray-300 mb-2">
+                    Material (tw_Pole1)
+                    <span class="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium status-label-inherited">
+                        Tylko odczyt
+                    </span>
+                </label>
+                <div class="bg-gray-800 border border-gray-600 rounded-md px-4 py-2.5 text-white">
+                    {{ $this->material ?? '-' }}
+                </div>
+            </div>
+
+            {{-- Defect Symbol (tw_Pole3) --}}
+            <div>
+                <label class="block text-sm font-medium text-gray-300 mb-2">
+                    Symbol wady (tw_Pole3)
+                    <span class="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium status-label-inherited">
+                        Tylko odczyt
+                    </span>
+                </label>
+                <div class="bg-gray-800 border border-gray-600 rounded-md px-4 py-2.5 text-white">
+                    {{ $this->defectSymbol ?? '-' }}
+                </div>
+            </div>
+
+            {{-- Application (tw_Pole4) --}}
+            <div>
+                <label class="block text-sm font-medium text-gray-300 mb-2">
+                    Zastosowanie (tw_Pole4)
+                    <span class="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium status-label-inherited">
+                        Tylko odczyt
+                    </span>
+                </label>
+                <div class="bg-gray-800 border border-gray-600 rounded-md px-4 py-2.5 text-white">
+                    {{ $this->application ?? '-' }}
+                </div>
+            </div>
+
+            {{-- CN Code (tw_Pole5) --}}
+            <div>
+                <label class="block text-sm font-medium text-gray-300 mb-2">
+                    Kod CN (tw_Pole5)
+                    <span class="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium status-label-inherited">
+                        Tylko odczyt
+                    </span>
+                </label>
+                <div class="bg-gray-800 border border-gray-600 rounded-md px-4 py-2.5 text-white font-mono">
+                    {{ $this->cnCode ?? '-' }}
+                </div>
+            </div>
+
+            {{-- Notes (tw_Uwagi) - Full width --}}
+            <div class="md:col-span-2">
+                <label class="block text-sm font-medium text-gray-300 mb-2">
+                    Uwagi (tw_Uwagi)
+                    <span class="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium status-label-inherited">
+                        Tylko odczyt
+                    </span>
+                </label>
+                <div class="bg-gray-800 border border-gray-600 rounded-md px-4 py-2.5 text-white min-h-[4rem]">
+                    {{ $this->notes ?? '-' }}
+                </div>
+            </div>
+        </div>
+    </div>
+    @endif
+
     {{-- Action Bar (save/sync buttons at bottom) --}}
     <div class="mt-6 pt-4 border-t border-gray-700">
         <div class="flex flex-col lg:flex-row gap-4">

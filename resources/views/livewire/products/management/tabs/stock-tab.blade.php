@@ -171,8 +171,20 @@
                                 </div>
                             </th>
 
-                            {{-- Lokalizacja - always editable --}}
-                            <th scope="col" class="px-4 py-3">Lokalizacja</th>
+                            {{-- Lokalizacja - always editable with "Copy to all" button (ETAP_08 FAZA 8) --}}
+                            <th scope="col" class="px-4 py-3">
+                                <div class="flex items-center justify-between gap-2">
+                                    <span>Lokalizacja</span>
+                                    <button type="button"
+                                            wire:click="copyLocationToAllWarehouses"
+                                            class="p-1 rounded text-gray-500 hover:text-orange-400 hover:bg-orange-900/30 transition-colors"
+                                            title="Powiel lokalizacje z domyslnego magazynu na wszystkie">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+                                        </svg>
+                                    </button>
+                                </div>
+                            </th>
 
                             <th scope="col" class="px-4 py-3 text-center w-24">Status</th>
                         </tr>
@@ -185,8 +197,20 @@
                                 $minimum = isset($stock[$warehouseId]['minimum']) ? $stock[$warehouseId]['minimum'] : 0;
                                 $actualAvailable = $available - $reserved;
 
-                                // Stock status logic
-                                if ($actualAvailable <= 0) {
+                                // Column states
+                                $qtyUnlocked = $this->isStockColumnUnlocked('quantity');
+                                $qtyDirty = $this->isStockCellDirty($warehouseId, 'quantity');
+                                $resUnlocked = $this->isStockColumnUnlocked('reserved');
+                                $resDirty = $this->isStockCellDirty($warehouseId, 'reserved');
+                                $minUnlocked = $this->isStockColumnUnlocked('minimum');
+                                $minDirty = $this->isStockCellDirty($warehouseId, 'minimum');
+                                $locDirty = $this->isStockCellDirty($warehouseId, 'location');
+
+                                // Stock status logic - "Edytowano" has priority when any column is dirty
+                                if ($qtyDirty || $resDirty || $minDirty || $locDirty) {
+                                    $statusClass = 'bg-yellow-900/30 text-yellow-400 border-yellow-700/50';
+                                    $statusText = 'Edytowano';
+                                } elseif ($actualAvailable <= 0) {
                                     $statusClass = 'bg-red-900/30 text-red-400 border-red-700/50';
                                     $statusText = 'Brak';
                                 } elseif ($actualAvailable <= $minimum) {
@@ -196,14 +220,6 @@
                                     $statusClass = 'bg-green-900/30 text-green-400 border-green-700/50';
                                     $statusText = 'OK';
                                 }
-
-                                // Column states
-                                $qtyUnlocked = $this->isStockColumnUnlocked('quantity');
-                                $qtyDirty = $this->isStockCellDirty($warehouseId, 'quantity');
-                                $resUnlocked = $this->isStockColumnUnlocked('reserved');
-                                $resDirty = $this->isStockCellDirty($warehouseId, 'reserved');
-                                $minUnlocked = $this->isStockColumnUnlocked('minimum');
-                                $minDirty = $this->isStockCellDirty($warehouseId, 'minimum');
                             @endphp
                             <tr class="border-b border-gray-700 hover:bg-gray-750">
                                 {{-- Warehouse Name --}}
@@ -229,11 +245,7 @@
                                                ])
                                                placeholder="0"
                                                {{ $qtyUnlocked ? '' : 'readonly' }}>
-                                        @if($qtyDirty)
-                                            <span class="absolute -top-2.5 left-0 px-1.5 py-0.5 text-[9px] font-semibold bg-yellow-600 text-yellow-100 rounded whitespace-nowrap z-10">
-                                                Edytowano
-                                            </span>
-                                        @endif
+                                        {{-- Badge removed - status shown in STATUS column --}}
                                     </div>
                                     @if($actualAvailable != $available && $reserved > 0)
                                         <span class="text-xs text-gray-500 mt-1 block text-right">Dostepne: {{ $actualAvailable }}</span>
@@ -255,11 +267,7 @@
                                                ])
                                                placeholder="0"
                                                {{ $resUnlocked ? '' : 'readonly' }}>
-                                        @if($resDirty)
-                                            <span class="absolute -top-2.5 left-0 px-1.5 py-0.5 text-[9px] font-semibold bg-yellow-600 text-yellow-100 rounded whitespace-nowrap z-10">
-                                                Edytowano
-                                            </span>
-                                        @endif
+                                        {{-- Badge removed - status shown in STATUS column --}}
                                     </div>
                                 </td>
 
@@ -278,22 +286,50 @@
                                                ])
                                                placeholder="0"
                                                {{ $minUnlocked ? '' : 'readonly' }}>
-                                        @if($minDirty)
-                                            <span class="absolute -top-2.5 left-0 px-1.5 py-0.5 text-[9px] font-semibold bg-yellow-600 text-yellow-100 rounded whitespace-nowrap z-10">
-                                                Edytowano
-                                            </span>
-                                        @endif
+                                        {{-- Badge removed - status shown in STATUS column --}}
                                     </div>
                                 </td>
 
-                                {{-- Location (always editable) --}}
-                                <td class="px-4 py-3">
-                                    <div class="relative">
+                                {{-- Location Labels (ETAP_08 FAZA 8) - Alpine component --}}
+                                <td class="px-4 py-3"
+                                    x-data="locationLabels(@js($stock[$warehouseId]['location'] ?? ''), {{ $warehouseId }})"
+                                    x-init="$watch('rawValue', val => $wire.set('stock.{{ $warehouseId }}.location', val))"
+                                >
+                                    {{-- Location Labels Container - yellow border when dirty --}}
+                                    <div class="location-labels-container {{ $locDirty ? 'location-labels-edited' : '' }}">
+                                        <template x-for="(loc, index) in locations" :key="index">
+                                            <span class="location-label">
+                                                <span class="location-label__text"
+                                                      @click="copyToClipboard(loc)"
+                                                      x-text="loc"
+                                                      title="Kliknij aby skopiowac"></span>
+                                                <button type="button"
+                                                        @click="editLocation(index)"
+                                                        class="location-label__edit"
+                                                        title="Edytuj">
+                                                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/>
+                                                    </svg>
+                                                </button>
+                                                <button type="button"
+                                                        @click="removeLocation(index)"
+                                                        class="location-label__remove"
+                                                        title="Usun">
+                                                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                                                    </svg>
+                                                </button>
+                                            </span>
+                                        </template>
+
+                                        {{-- Input for adding new location --}}
                                         <input type="text"
-                                               wire:model.live="stock.{{ $warehouseId }}.location"
-                                               class="form-input-enterprise w-full text-sm"
-                                               maxlength="50"
-                                               placeholder="Kod lokalizacji">
+                                               x-ref="newLocationInput"
+                                               @keydown.enter.prevent="addLocation($el.value); $el.value=''"
+                                               @blur="addLocation($el.value); $el.value=''"
+                                               class="location-input"
+                                               maxlength="20"
+                                               placeholder="+ Dodaj lokalizacje...">
                                     </div>
                                 </td>
 

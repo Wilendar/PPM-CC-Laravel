@@ -960,3 +960,173 @@
    - border-green-600 focus:border-green-500 focus:ring-green-500 (matched)
    - border-yellow-600 focus:border-yellow-500 focus:ring-yellow-500 (override)
    ======================================== */
+
+/* ========================================
+   ETAP_08 FAZA 8: WAREHOUSE LOCATION LABELS
+   Klickable labels for stock locations with edit/remove/copy actions
+   ======================================== */
+
+/* Location label base style - orange brand theme */
+.location-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.25rem 0.5rem;
+    background: rgba(224, 172, 126, 0.15);
+    border: 1px solid rgba(224, 172, 126, 0.3);
+    border-radius: 0.375rem;
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: var(--mpp-primary);
+    transition: all 0.15s ease;
+    max-width: 100%;
+}
+
+.location-label:hover {
+    background: rgba(224, 172, 126, 0.25);
+    border-color: rgba(224, 172, 126, 0.5);
+}
+
+/* Location text - clickable for copy */
+.location-label__text {
+    cursor: pointer;
+    user-select: none;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 120px;
+}
+
+.location-label__text:hover {
+    text-decoration: underline;
+}
+
+/* Copy feedback animation */
+.location-label__text.copied {
+    color: #10b981; /* green-500 */
+}
+
+/* Edit button */
+.location-label__edit {
+    padding: 0.125rem;
+    border-radius: 0.25rem;
+    opacity: 0.6;
+    transition: opacity 0.15s, background-color 0.15s;
+    cursor: pointer;
+    background: transparent;
+    border: none;
+    color: inherit;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.location-label__edit:hover {
+    opacity: 1;
+    background: rgba(224, 172, 126, 0.2);
+}
+
+.location-label__edit svg {
+    width: 0.75rem;
+    height: 0.75rem;
+}
+
+/* Remove button */
+.location-label__remove {
+    padding: 0.125rem;
+    border-radius: 0.25rem;
+    opacity: 0.6;
+    transition: opacity 0.15s, background-color 0.15s, color 0.15s;
+    cursor: pointer;
+    background: transparent;
+    border: none;
+    color: inherit;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.location-label__remove:hover {
+    opacity: 1;
+    background: rgba(239, 68, 68, 0.2); /* red-500 with opacity */
+    color: #ef4444; /* red-500 */
+}
+
+.location-label__remove svg {
+    width: 0.75rem;
+    height: 0.75rem;
+}
+
+/* Location input field (add new) */
+.location-input {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.75rem;
+    background: rgba(55, 65, 81, 0.5); /* gray-700/50 */
+    border: 1px solid rgba(75, 85, 99, 0.5); /* gray-600/50 */
+    border-radius: 0.375rem;
+    color: white;
+    width: 100%;
+    transition: border-color 0.15s, background-color 0.15s;
+}
+
+.location-input:focus {
+    outline: none;
+    border-color: var(--mpp-primary);
+    background: rgba(55, 65, 81, 0.8);
+}
+
+.location-input::placeholder {
+    color: rgba(156, 163, 175, 0.6); /* gray-400/60 */
+}
+
+/* Location container wrapper */
+.location-labels-container {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    min-height: 2.25rem;
+}
+
+/* Location labels edited state - yellow border */
+.location-labels-edited .location-label {
+    border-color: #eab308;
+    background: rgba(234, 179, 8, 0.2);
+}
+
+.location-labels-edited .location-input {
+    border-color: #eab308;
+    background: rgba(234, 179, 8, 0.15);
+}
+
+/* Empty state */
+.location-empty {
+    font-size: 0.75rem;
+    color: rgba(156, 163, 175, 0.6); /* gray-400/60 */
+    font-style: italic;
+}
+
+/* Copy all button in header */
+.location-copy-all-btn {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.625rem;
+    font-weight: 500;
+    background: rgba(224, 172, 126, 0.15);
+    border: 1px solid rgba(224, 172, 126, 0.3);
+    border-radius: 0.25rem;
+    color: var(--mpp-primary);
+    cursor: pointer;
+    transition: all 0.15s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.location-copy-all-btn:hover {
+    background: rgba(224, 172, 126, 0.25);
+    border-color: rgba(224, 172, 126, 0.5);
+}
+
+.location-copy-all-btn svg {
+    width: 0.75rem;
+    height: 0.75rem;
+}

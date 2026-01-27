@@ -19,7 +19,6 @@ return new class extends Migration
     {
         Schema::table('products', function (Blueprint $table) {
             $table->text('notes')->nullable()
-                  ->after('application')
                   ->comment('tw_Uwagi - Uwagi/notatki z ERP Subiekt GT');
         });
     }

@@ -2078,6 +2078,130 @@ function registerAlpineComponents(Alpine) {
     }));
 
     // =====================================================
+    // ETAP_08 FAZA 8: LOCATION LABELS COMPONENT
+    // Stock Tab - Location management with clickable labels
+    // =====================================================
+    Alpine.data('locationLabels', (initialValue, warehouseId) => ({
+        rawValue: initialValue || '',
+        warehouseId: warehouseId,
+
+        // Parse comma-separated locations into array
+        get locations() {
+            if (!this.rawValue || typeof this.rawValue !== 'string') return [];
+            return this.rawValue
+                .split(',')
+                .map(l => l.trim())
+                .filter(l => l.length > 0);
+        },
+
+        // Join array back to comma-separated string
+        set locations(arr) {
+            this.rawValue = arr.join(', ');
+        },
+
+        // Add new location (from input)
+        addLocation(loc) {
+            const trimmed = (loc || '').trim();
+            if (!trimmed) return;
+
+            // Don't add duplicates
+            const current = this.locations;
+            if (current.includes(trimmed)) {
+                console.log('[LocationLabels] Duplicate location ignored:', trimmed);
+                return;
+            }
+
+            current.push(trimmed);
+            this.locations = current;
+
+            // Notify Livewire about dirty state
+            if (this.$wire) {
+                this.$wire.markStockDirty(this.warehouseId, 'location');
+            }
+
+            console.log('[LocationLabels] Added location:', trimmed, 'Warehouse:', this.warehouseId);
+        },
+
+        // Remove location by index
+        removeLocation(index) {
+            const current = [...this.locations];
+            const removed = current.splice(index, 1);
+            this.locations = current;
+
+            // Notify Livewire about dirty state
+            if (this.$wire) {
+                this.$wire.markStockDirty(this.warehouseId, 'location');
+            }
+
+            console.log('[LocationLabels] Removed location:', removed[0], 'Warehouse:', this.warehouseId);
+        },
+
+        // Edit location (simple prompt for now)
+        editLocation(index) {
+            const current = this.locations;
+            const oldValue = current[index];
+
+            const newValue = prompt('Edytuj lokalizacje:', oldValue);
+            if (newValue === null) return; // Cancelled
+
+            const trimmed = newValue.trim();
+            if (!trimmed) {
+                // Empty = remove
+                this.removeLocation(index);
+                return;
+            }
+
+            if (trimmed !== oldValue) {
+                current[index] = trimmed;
+                this.locations = current;
+
+                // Notify Livewire about dirty state
+                if (this.$wire) {
+                    this.$wire.markStockDirty(this.warehouseId, 'location');
+                }
+
+                console.log('[LocationLabels] Edited location:', oldValue, '->', trimmed, 'Warehouse:', this.warehouseId);
+            }
+        },
+
+        // Copy location to clipboard
+        async copyToClipboard(text) {
+            try {
+                await navigator.clipboard.writeText(text);
+
+                // Show notification via Livewire dispatch
+                if (this.$wire) {
+                    this.$wire.dispatch('notify', {
+                        type: 'info',
+                        message: `Skopiowano: ${text}`
+                    });
+                }
+
+                console.log('[LocationLabels] Copied to clipboard:', text);
+            } catch (err) {
+                console.error('[LocationLabels] Failed to copy:', err);
+
+                // Fallback: select text
+                const textarea = document.createElement('textarea');
+                textarea.value = text;
+                textarea.style.position = 'fixed';
+                textarea.style.opacity = '0';
+                document.body.appendChild(textarea);
+                textarea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textarea);
+
+                if (this.$wire) {
+                    this.$wire.dispatch('notify', {
+                        type: 'info',
+                        message: `Skopiowano: ${text}`
+                    });
+                }
+            }
+        }
+    }));
+
+    // =====================================================
     // MARKDOWN EDITOR TOOLBAR COMPONENT (Bug Reports)
     // =====================================================
     Alpine.data('markdownEditor', () => ({

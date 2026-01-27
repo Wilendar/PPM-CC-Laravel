@@ -224,6 +224,7 @@ class ProductForm extends Component
         'quantity' => false,  // false = locked (readonly), true = unlocked (editable)
         'reserved' => false,
         'minimum' => false,
+        'location' => true,   // ETAP_08 FAZA 8: Location is always editable
     ];
 
     // Original stock values snapshot (for dirty detection)
@@ -249,6 +250,7 @@ class ProductForm extends Component
     public ?string $material = null;
     public ?string $defectSymbol = null;
     public ?string $application = null;
+    public ?string $notes = null;  // tw_Uwagi - Notatki z ERP
     public bool $extendedInfoExpanded = false;
 
     // === CREATE CATEGORY MODAL (ETAP_07b FAZA 4.2.3) ===
@@ -1155,6 +1157,7 @@ class ProductForm extends Component
                         'quantity' => $stock->quantity,
                         'reserved' => $stock->reserved_quantity,
                         'minimum' => $stock->minimum_stock, // FIX: was minimum_stock_level
+                        'location' => $stock->location ?? '', // ETAP_08 FAZA 8: Warehouse location
                     ];
                 } else {
                     // Keep initialized zero values for warehouses without data
@@ -1162,6 +1165,7 @@ class ProductForm extends Component
                         'quantity' => 0,
                         'reserved' => 0,
                         'minimum' => 0,
+                        'location' => '', // ETAP_08 FAZA 8: Warehouse location
                     ];
                 }
             }
@@ -1222,6 +1226,7 @@ class ProductForm extends Component
         $this->material = $this->product->material;
         $this->defectSymbol = $this->product->defect_symbol;
         $this->application = $this->product->application;
+        $this->notes = $this->product->notes;
 
         // Publishing Schedule
         $this->available_from = $this->product->available_from?->format('Y-m-d\TH:i');
@@ -1296,6 +1301,7 @@ class ProductForm extends Component
                 'material' => $this->product->material,
                 'defect_symbol' => $this->product->defect_symbol,
                 'application' => $this->product->application,
+                'notes' => $this->product->notes,
 
                 // === CATEGORIES (NEW CONTEXT-AWARE SYSTEM) ===
                 'defaultCategories' => $this->defaultCategories,
@@ -1332,6 +1338,7 @@ class ProductForm extends Component
                 'material' => $this->material,
                 'defect_symbol' => $this->defectSymbol,
                 'application' => $this->application,
+                'notes' => $this->notes,
 
                 // === CATEGORIES (NEW CONTEXT-AWARE SYSTEM) ===
                 'defaultCategories' => $this->defaultCategories,
@@ -1875,11 +1882,13 @@ class ProductForm extends Component
                 'quantity' => (float) ($data['quantity'] ?? 0),
                 'reserved' => (float) ($data['reserved'] ?? 0),
                 'minimum' => (float) ($data['minimum'] ?? 0),
+                'location' => (string) ($data['location'] ?? ''), // ETAP_08 FAZA 8
             ];
             $this->stockDirtyFlags[$warehouseId] = [
                 'quantity' => false,
                 'reserved' => false,
                 'minimum' => false,
+                'location' => false, // ETAP_08 FAZA 8
             ];
         }
     }
@@ -1889,10 +1898,15 @@ class ProductForm extends Component
      */
     public function markStockDirty(int $warehouseId, string $column): void
     {
-        $original = $this->stockOriginalValues[$warehouseId][$column] ?? 0;
-        $current = $this->stock[$warehouseId][$column] ?? 0;
+        $original = $this->stockOriginalValues[$warehouseId][$column] ?? ($column === 'location' ? '' : 0);
+        $current = $this->stock[$warehouseId][$column] ?? ($column === 'location' ? '' : 0);
 
-        $isDirty = ((float) $original !== (float) $current);
+        // ETAP_08 FAZA 8: Location uses string comparison, others use float
+        if ($column === 'location') {
+            $isDirty = ((string) $original !== (string) $current);
+        } else {
+            $isDirty = ((float) $original !== (float) $current);
+        }
         $this->stockDirtyFlags[$warehouseId][$column] = $isDirty;
 
         Log::debug('[Stock Dirty] Cell marked', [
@@ -1938,7 +1952,8 @@ class ProductForm extends Component
         foreach ($this->stock as $warehouseId => $data) {
             $dirtyColumns = [];
 
-            foreach (['quantity', 'reserved', 'minimum'] as $col) {
+            // ETAP_08 FAZA 8: Include location column
+            foreach (['quantity', 'reserved', 'minimum', 'location'] as $col) {
                 // Column must be: unlocked AND dirty
                 if ($this->stockColumnLocks[$col]
                     && ($this->stockDirtyFlags[$warehouseId][$col] ?? false)) {
@@ -1955,6 +1970,50 @@ class ProductForm extends Component
     }
 
     /**
+     * ETAP_08 FAZA 8: Copy location from default warehouse to all other warehouses
+     *
+     * Triggered by "Powiel na wszystkie" button in Stock Tab header
+     */
+    public function copyLocationToAllWarehouses(): void
+    {
+        $defaultWarehouseId = $this->getDefaultWarehouseId();
+        $defaultLocation = $this->stock[$defaultWarehouseId]['location'] ?? '';
+
+        if (empty($defaultLocation)) {
+            $this->dispatch('notify', type: 'warning', message: 'Domyslny magazyn nie ma ustawionej lokalizacji');
+            return;
+        }
+
+        $updated = 0;
+        foreach ($this->stock as $warehouseId => $data) {
+            if ($warehouseId !== $defaultWarehouseId) {
+                $this->stock[$warehouseId]['location'] = $defaultLocation;
+                $this->markStockDirty($warehouseId, 'location');
+                $updated++;
+            }
+        }
+
+        $this->dispatch('notify', type: 'success', message: "Skopiowano lokalizacje '{$defaultLocation}' do {$updated} magazynow");
+
+        Log::info('[Stock] Location copied to all warehouses', [
+            'product_id' => $this->product?->id,
+            'default_warehouse' => $defaultWarehouseId,
+            'location' => $defaultLocation,
+            'updated_count' => $updated,
+        ]);
+    }
+
+    /**
+     * Get the default warehouse ID (first active warehouse or config setting)
+     */
+    protected function getDefaultWarehouseId(): int
+    {
+        // Return first warehouse ID from the list
+        $ids = array_keys($this->warehouses);
+        return !empty($ids) ? (int) $ids[0] : 1;
+    }
+
+    /**
      * Get list of all dirty stock columns (across all warehouses).
      * Used to pass to ERP sync job to filter which columns should be synced.
      *
@@ -1965,7 +2024,8 @@ class ProductForm extends Component
         $dirtyColumns = [];
 
         foreach ($this->stock as $warehouseId => $data) {
-            foreach (['quantity', 'reserved', 'minimum'] as $col) {
+            // ETAP_08 FAZA 8: Include location column
+            foreach (['quantity', 'reserved', 'minimum', 'location'] as $col) {
                 // Column must be: unlocked AND dirty
                 if ($this->stockColumnLocks[$col]
                     && ($this->stockDirtyFlags[$warehouseId][$col] ?? false)) {
@@ -5961,6 +6021,7 @@ class ProductForm extends Component
                         'material' => $this->material,
                         'defect_symbol' => $this->defectSymbol,
                         'application' => $this->application,
+                        'notes' => $this->notes,
                     ]);
 
                     // CRITICAL FIX (Bug 2): Mark all associated shops as 'pending' after updating default data
@@ -6009,6 +6070,7 @@ class ProductForm extends Component
                         'material' => $this->material,
                         'defect_symbol' => $this->defectSymbol,
                         'application' => $this->application,
+                        'notes' => $this->notes,
                     ]);
                     $this->isEditMode = true;
 

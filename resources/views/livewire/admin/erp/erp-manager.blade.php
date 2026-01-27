@@ -731,6 +731,41 @@
                                         <p class="text-xs text-gray-500 ml-6">If enabled, new products from Subiekt GT will be automatically created in PPM</p>
                                     </div>
 
+                                    {{-- ETAP_08 FAZA 8: Warehouse Location Settings --}}
+                                    <div class="pt-3 mt-3 border-t border-purple-700/30">
+                                        <h5 class="text-xs font-medium text-purple-300 mb-2 flex items-center gap-1.5">
+                                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
+                                            </svg>
+                                            Ustawienia lokalizacji magazynowych
+                                        </h5>
+                                        <div class="grid grid-cols-2 gap-4">
+                                            {{-- Default Location --}}
+                                            <div>
+                                                <label class="block text-xs font-medium text-gray-300 mb-1">Domyslna lokalizacja</label>
+                                                <input type="text"
+                                                       wire:model="subiektConfig.default_location"
+                                                       class="w-full px-3 py-2 text-sm bg-gray-700 border border-gray-600 rounded text-white placeholder-gray-500 focus:outline-none focus:border-orange-400"
+                                                       placeholder="np. A-12-3"
+                                                       maxlength="50">
+                                                <p class="text-xs text-gray-500 mt-1">Lokalizacja dla nowych produktow</p>
+                                            </div>
+                                            {{-- Copy to All Toggle --}}
+                                            <div class="flex items-center">
+                                                <label class="flex items-center gap-2 text-sm text-gray-300">
+                                                    <input type="checkbox"
+                                                           wire:model="subiektConfig.copy_location_to_all"
+                                                           class="rounded border-gray-600 bg-gray-700 text-orange-500 focus:ring-orange-500">
+                                                    Kopiuj na wszystkie magazyny
+                                                </label>
+                                            </div>
+                                        </div>
+                                        <p class="text-xs text-gray-500 mt-2">
+                                            Lokalizacje sa pobierane z pola tw_Pole2 (format: MAGAZYN:LOK, MAGAZYN2:LOK2)
+                                        </p>
+                                    </div>
+
                                     {{-- Sync Mode Note for SQL Direct --}}
                                     @if($subiektConfig['connection_mode'] === 'sql_direct')
                                         <div class="p-2 bg-yellow-900/30 border border-yellow-700/50 rounded text-xs text-yellow-300">
