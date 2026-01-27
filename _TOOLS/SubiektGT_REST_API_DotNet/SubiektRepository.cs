@@ -113,7 +113,13 @@ public class SubiektRepository : ISubiektRepository
                 v.vat_Stawka AS VatRate,
                 CASE WHEN t.tw_Usuniety = 0 AND t.tw_Zablokowany = 0 THEN 1 ELSE 0 END AS IsActive,
                 gr.grt_Nazwa AS GroupName,
-                kh.kh_Symbol AS ManufacturerName
+                kh.kh_Symbol AS ManufacturerName,
+                t.tw_Pole1 AS Pole1,
+                t.tw_Pole2 AS Pole2,
+                t.tw_Pole3 AS Pole3,
+                t.tw_Pole4 AS Pole4,
+                t.tw_Pole5 AS Pole5,
+                t.tw_Uwagi AS Notes
             FROM tw__Towar t
             LEFT JOIN tw_Cena c ON t.tw_Id = c.tc_IdTowar
             LEFT JOIN tw_Stan s ON t.tw_Id = s.st_TowId AND s.st_MagId = @warehouseId
@@ -153,7 +159,13 @@ public class SubiektRepository : ISubiektRepository
                 v.vat_Stawka AS VatRate,
                 CASE WHEN t.tw_Usuniety = 0 AND t.tw_Zablokowany = 0 THEN 1 ELSE 0 END AS IsActive,
                 gr.grt_Nazwa AS GroupName,
-                kh.kh_Symbol AS ManufacturerName
+                kh.kh_Symbol AS ManufacturerName,
+                t.tw_Pole1 AS Pole1,
+                t.tw_Pole2 AS Pole2,
+                t.tw_Pole3 AS Pole3,
+                t.tw_Pole4 AS Pole4,
+                t.tw_Pole5 AS Pole5,
+                t.tw_Uwagi AS Notes
             FROM tw__Towar t
             LEFT JOIN tw_Cena c ON t.tw_Id = c.tc_IdTowar
             LEFT JOIN tw_Stan s ON t.tw_Id = s.st_TowId AND s.st_MagId = @warehouseId
@@ -189,7 +201,13 @@ public class SubiektRepository : ISubiektRepository
                 v.vat_Stawka AS VatRate,
                 CASE WHEN t.tw_Usuniety = 0 AND t.tw_Zablokowany = 0 THEN 1 ELSE 0 END AS IsActive,
                 gr.grt_Nazwa AS GroupName,
-                kh.kh_Symbol AS ManufacturerName
+                kh.kh_Symbol AS ManufacturerName,
+                t.tw_Pole1 AS Pole1,
+                t.tw_Pole2 AS Pole2,
+                t.tw_Pole3 AS Pole3,
+                t.tw_Pole4 AS Pole4,
+                t.tw_Pole5 AS Pole5,
+                t.tw_Uwagi AS Notes
             FROM tw__Towar t
             LEFT JOIN tw_Cena c ON t.tw_Id = c.tc_IdTowar
             LEFT JOIN tw_Stan s ON t.tw_Id = s.st_TowId AND s.st_MagId = @warehouseId
@@ -507,6 +525,12 @@ public class Product
     public bool IsActive { get; set; }
     public string? GroupName { get; set; }
     public string? ManufacturerName { get; set; }
+    public string? Pole1 { get; set; }
+    public string? Pole2 { get; set; }
+    public string? Pole3 { get; set; }
+    public string? Pole4 { get; set; }
+    public string? Pole5 { get; set; }
+    public string? Notes { get; set; }
 }
 
 public class Stock
