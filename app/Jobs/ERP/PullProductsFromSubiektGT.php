@@ -417,8 +417,9 @@ class PullProductsFromSubiektGT implements ShouldQueue, ShouldBeUnique
                 ));
             }
             // ETAP_08: Save result_summary with product details
+            // UWAGA: SyncJob ma cast 'result_summary' => 'array', wiec NIE robic json_encode!
             if (isset($metadata['result_summary'])) {
-                $updateData['result_summary'] = json_encode($metadata['result_summary']);
+                $updateData['result_summary'] = $metadata['result_summary'];
             }
         }
 

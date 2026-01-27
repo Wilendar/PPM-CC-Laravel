@@ -5,6 +5,8 @@ namespace App\Services\ERP;
 use App\Models\ERPConnection;
 use App\Models\Product;
 use App\Models\ProductErpData;
+use App\Models\ProductPrice;
+use App\Models\ProductStock;
 use App\Models\IntegrationLog;
 use App\Models\IntegrationMapping;
 use App\Services\ERP\Contracts\ERPSyncServiceInterface;
@@ -916,6 +918,13 @@ class SubiektGTService implements ERPSyncServiceInterface
             $defaultWarehouseId = $config['default_warehouse_id'] ?? 1;
             $connectionMode = $config['connection_mode'] ?? 'rest_api';
 
+            // ETAP_08 FAZA 7: Support sync_type filter for selective updates
+            // - 'prices': Only update ProductGroupPrice records
+            // - 'stock': Only update ProductStock records
+            // - 'basic_data': Only update ProductErpData basic fields
+            // - 'linked_only'/default: Update everything
+            $syncType = $filters['sync_type'] ?? 'linked_only';
+
             $results = [
                 'success' => true,
                 'total' => 0,
@@ -924,7 +933,8 @@ class SubiektGTService implements ERPSyncServiceInterface
                 'skipped' => 0,
                 'not_found' => 0,
                 'errors' => [],
-                'mode' => 'linked_only',
+                'mode' => $syncType,
+                'sync_type' => $syncType,
                 'updated_products' => [],
                 'imported_products' => [],
             ];
@@ -1012,6 +1022,27 @@ class SubiektGTService implements ERPSyncServiceInterface
                 'found' => count($subiektProducts),
             ]);
 
+            // STEP 3.5: ETAP_08 FAZA 7.4 - Batch pre-fetch prices/stock for ALL SKUs
+            // This replaces individual API calls in the loop (92s -> ~7s for 13 products)
+            $batchPrices = [];
+            $batchStocks = [];
+
+            if ($syncType === 'prices' && $this->restApiClient) {
+                $batchPrices = $this->restApiClient->batchFetchPricesBySku($skus);
+                Log::info('pullLinkedProducts: Batch fetched prices', [
+                    'requested' => count($skus),
+                    'fetched' => count($batchPrices),
+                ]);
+            }
+
+            if ($syncType === 'stock' && $this->restApiClient) {
+                $batchStocks = $this->restApiClient->batchFetchStockBySku($skus);
+                Log::info('pullLinkedProducts: Batch fetched stock', [
+                    'requested' => count($skus),
+                    'fetched' => count($batchStocks),
+                ]);
+            }
+
             // STEP 4: Process each product - compare timestamps, update if changed
             foreach ($skuToProduct as $sku => $ppmProduct) {
                 $erpData = $skuToErpData[$sku] ?? null;
@@ -1029,15 +1060,19 @@ class SubiektGTService implements ERPSyncServiceInterface
                 $subiektData = $subiektProducts[$sku];
 
                 // Check if product has changed (compare tw_DataMod with last_pull_at)
+                // ETAP_08 FAZA 7: For selective sync_types (prices, stock, basic_data),
+                // skip timestamp check because tw_DataMod is global for ALL changes.
+                // E.g., name change updates tw_DataMod but doesn't mean prices changed.
                 $subiektModified = $subiektData['date_modified'] ?? $subiektData['tw_DataMod'] ?? null;
+                $isSelectiveSyncType = in_array($syncType, ['prices', 'stock', 'basic_data']);
 
-                if ($erpData && $erpData->last_pull_at && $subiektModified) {
+                if (!$isSelectiveSyncType && $erpData && $erpData->last_pull_at && $subiektModified) {
                     $subiektTimestamp = is_numeric($subiektModified)
                         ? $subiektModified
                         : strtotime($subiektModified);
                     $lastPullTimestamp = $erpData->last_pull_at->timestamp;
 
-                    // Skip if Subiekt hasn't changed since last pull
+                    // Skip if Subiekt hasn't changed since last pull (only for full sync)
                     if ($subiektTimestamp <= $lastPullTimestamp) {
                         $results['skipped']++;
                         Log::debug('pullLinkedProducts: No changes, skipping', [
@@ -1049,39 +1084,80 @@ class SubiektGTService implements ERPSyncServiceInterface
                     }
                 }
 
-                // STEP 5: Product has changed - import/update
+                // STEP 5: Product has changed - selective update based on syncType
+                // ETAP_08 FAZA 7: Only update specific data based on sync_type
                 try {
                     $subiektProduct = (object) $subiektData;
                     $prices = $subiektData['prices'] ?? [];
-                    $stock = $subiektData['stock'] ?? [];
+                    $stockData = $subiektData['stock'] ?? [];
 
-                    // Transform to PPM format
-                    $ppmData = $this->transformer->subiektToPPM(
-                        $subiektProduct,
-                        $prices,
-                        is_array($stock) ? $stock : [$stock]
-                    );
+                    $wasUpdated = false;
+                    $updateDetails = [];
 
-                    // Update existing product
-                    $result = $this->importProduct($ppmData, $connection, $subiektProduct);
-
-                    if ($result['created']) {
-                        $results['imported']++;
-                        if (count($results['imported_products']) < 50) {
-                            $results['imported_products'][] = [
-                                'sku' => $sku,
-                                'name' => $ppmData['name'] ?? '',
-                                'product_id' => $ppmProduct->id,
+                    switch ($syncType) {
+                        case 'prices':
+                            // ETAP_08 FAZA 7.4: Use batch pre-fetched prices (parallel requests)
+                            // Fallback to subiektData if batch not available
+                            if (empty($prices)) {
+                                $prices = $batchPrices[$sku] ?? [];
+                            }
+                            // ETAP_08 FAZA 7.3: Smart comparison - update only when PPM != Subiekt
+                            $priceResult = $this->updateProductPricesFromErp($ppmProduct, $prices, $connection);
+                            $wasUpdated = $priceResult['updated'] ?? false;
+                            $updateDetails = [
+                                'type' => 'prices',
+                                'prices_updated' => $priceResult['count'] ?? 0,
+                                'prices_skipped' => $priceResult['skipped'] ?? 0,
+                                'changes' => $priceResult['changes'] ?? [],
                             ];
-                        }
-                    } elseif ($result['updated']) {
+                            break;
+
+                        case 'stock':
+                            // ETAP_08 FAZA 7.4: Use batch pre-fetched stock (parallel requests)
+                            // Fallback to subiektData if batch not available
+                            if (empty($stockData)) {
+                                $stockData = $batchStocks[$sku] ?? [];
+                            }
+                            // ETAP_08 FAZA 7.3: Smart comparison - update only when PPM != Subiekt
+                            $stockResult = $this->updateProductStockFromErp($ppmProduct, $stockData, $connection);
+                            $wasUpdated = $stockResult['updated'] ?? false;
+                            $updateDetails = [
+                                'type' => 'stock',
+                                'stock_updated' => $stockResult['count'] ?? 0,
+                                'stock_skipped' => $stockResult['skipped'] ?? 0,
+                                'changes' => $stockResult['changes'] ?? [],
+                            ];
+                            break;
+
+                        case 'basic_data':
+                            // Only update basic data (name, description) in ProductErpData
+                            $basicResult = $this->updateProductBasicDataFromErp($ppmProduct, $subiektProduct, $connection);
+                            $wasUpdated = $basicResult['updated'] ?? false;
+                            $updateDetails = [
+                                'type' => 'basic_data',
+                                'fields_updated' => $basicResult['fields'] ?? [],
+                            ];
+                            break;
+
+                        default: // 'linked_only' or any other - full update
+                            $ppmData = $this->transformer->subiektToPPM(
+                                $subiektProduct,
+                                $prices,
+                                is_array($stockData) ? $stockData : [$stockData]
+                            );
+                            $result = $this->importProduct($ppmData, $connection, $subiektProduct);
+                            $wasUpdated = $result['updated'] ?? $result['created'] ?? false;
+                            $updateDetails = ['type' => 'full'];
+                    }
+
+                    if ($wasUpdated) {
                         $results['updated']++;
                         if (count($results['updated_products']) < 50) {
-                            $results['updated_products'][] = [
+                            $results['updated_products'][] = array_merge([
                                 'sku' => $sku,
-                                'name' => $ppmData['name'] ?? '',
+                                'name' => $subiektProduct->name ?? $ppmProduct->name,
                                 'product_id' => $ppmProduct->id,
-                            ];
+                            ], $updateDetails);
                         }
                     } else {
                         $results['skipped']++;
@@ -1637,6 +1713,318 @@ class SubiektGTService implements ERPSyncServiceInterface
             ]
         );
     }
+
+    // ========================================================================
+    // ETAP_08 FAZA 7: Selective Update Methods for sync_type filtering
+    // ========================================================================
+
+    /**
+     * Update only product prices from ERP data.
+     * Used when sync_type = 'prices'
+     *
+     * ETAP_08 FAZA 7.3: Smart comparison - update only when PPM != Subiekt
+     *
+     * @param Product $product PPM product
+     * @param array $prices Prices from Subiekt (level => [net, gross])
+     * @param ERPConnection $connection
+     * @return array ['updated' => bool, 'count' => int, 'skipped' => int, 'changes' => array]
+     */
+    protected function updateProductPricesFromErp(Product $product, array $prices, ERPConnection $connection): array
+    {
+        $updated = false;
+        $count = 0;
+        $skipped = 0;
+        $changes = [];
+
+        if (empty($prices)) {
+            Log::debug('updateProductPricesFromErp: No prices data', ['sku' => $product->sku]);
+            return ['updated' => false, 'count' => 0, 'skipped' => 0, 'changes' => []];
+        }
+
+        $config = $connection->connection_config;
+        $priceGroupMappings = $config['price_group_mappings'] ?? [];
+
+        if (empty($priceGroupMappings)) {
+            Log::debug('updateProductPricesFromErp: No price_group_mappings configured', [
+                'sku' => $product->sku,
+                'connection_id' => $connection->id,
+            ]);
+            return ['updated' => false, 'count' => 0, 'skipped' => 0, 'changes' => []];
+        }
+
+        // Get current PPM prices for comparison
+        $currentPrices = $product->prices()
+            ->whereIn('price_group_id', array_values($priceGroupMappings))
+            ->get()
+            ->keyBy('price_group_id');
+
+        // Update ProductPrice records based on price_group_mappings
+        // Only update when values differ!
+        foreach ($priceGroupMappings as $subiektLevel => $ppmPriceGroupId) {
+            if (!isset($prices[$subiektLevel])) continue;
+
+            $priceData = $prices[$subiektLevel];
+            $subiektNetPrice = (float) ($priceData['net'] ?? $priceData['netto'] ?? 0);
+            $subiektGrossPrice = (float) ($priceData['gross'] ?? $priceData['brutto'] ?? 0);
+
+            // Calculate missing values
+            if ($subiektNetPrice > 0 && $subiektGrossPrice <= 0) {
+                $subiektGrossPrice = round($subiektNetPrice * 1.23, 2);
+            } elseif ($subiektGrossPrice > 0 && $subiektNetPrice <= 0) {
+                $subiektNetPrice = round($subiektGrossPrice / 1.23, 2);
+            }
+
+            if ($subiektNetPrice <= 0 && $subiektGrossPrice <= 0) {
+                continue; // Skip zero prices
+            }
+
+            // Get current PPM price
+            $currentPrice = $currentPrices->get($ppmPriceGroupId);
+            $ppmNetPrice = $currentPrice ? (float) $currentPrice->price_net : 0;
+            $ppmGrossPrice = $currentPrice ? (float) $currentPrice->price_gross : 0;
+
+            // Compare with tolerance (0.01 PLN)
+            $netDiff = abs($subiektNetPrice - $ppmNetPrice);
+            $grossDiff = abs($subiektGrossPrice - $ppmGrossPrice);
+
+            if ($netDiff < 0.01 && $grossDiff < 0.01) {
+                // Prices are the same - skip update
+                $skipped++;
+                continue;
+            }
+
+            // Prices differ - update!
+            ProductPrice::updateOrCreate(
+                [
+                    'product_id' => $product->id,
+                    'price_group_id' => $ppmPriceGroupId,
+                    'product_variant_id' => null,
+                ],
+                [
+                    'price_net' => $subiektNetPrice,
+                    'price_gross' => $subiektGrossPrice,
+                    'currency' => 'PLN',
+                    'is_active' => true,
+                ]
+            );
+            $count++;
+            $updated = true;
+            $changes[] = [
+                'level' => $subiektLevel,
+                'ppm_net' => $ppmNetPrice,
+                'subiekt_net' => $subiektNetPrice,
+                'diff' => round($netDiff, 2),
+            ];
+        }
+
+        // Update ProductErpData.external_data.prices only if something changed
+        if ($updated) {
+            $erpData = $product->erpData()->where('erp_connection_id', $connection->id)->first();
+            if ($erpData) {
+                $externalData = $erpData->external_data ?? [];
+                $externalData['prices'] = $prices;
+                $erpData->update([
+                    'external_data' => $externalData,
+                    'last_pull_at' => now(),
+                ]);
+            }
+        }
+
+        Log::debug('updateProductPricesFromErp: Comparison result', [
+            'product_id' => $product->id,
+            'sku' => $product->sku,
+            'updated_count' => $count,
+            'skipped_same' => $skipped,
+            'changes' => $changes,
+        ]);
+
+        return ['updated' => $updated, 'count' => $count, 'skipped' => $skipped, 'changes' => $changes];
+    }
+
+    /**
+     * Update only product stock from ERP data.
+     * Used when sync_type = 'stock'
+     *
+     * ETAP_08 FAZA 7.3: Smart comparison - update only when PPM != Subiekt
+     *
+     * @param Product $product PPM product
+     * @param array $stockData Stock from Subiekt (warehouse_id => qty or single value)
+     * @param ERPConnection $connection
+     * @return array ['updated' => bool, 'count' => int, 'skipped' => int, 'changes' => array]
+     */
+    protected function updateProductStockFromErp(Product $product, $stockData, ERPConnection $connection): array
+    {
+        $updated = false;
+        $count = 0;
+        $skipped = 0;
+        $changes = [];
+
+        if (empty($stockData)) {
+            Log::debug('updateProductStockFromErp: No stock data', ['sku' => $product->sku]);
+            return ['updated' => false, 'count' => 0, 'skipped' => 0, 'changes' => []];
+        }
+
+        $config = $connection->connection_config;
+        $warehouseMappings = $config['warehouse_mappings'] ?? [];
+        $defaultWarehouseId = $config['default_warehouse_id'] ?? 1;
+
+        // Get current PPM stock for comparison
+        $currentStocks = $product->stocks()->get()->keyBy('warehouse_id');
+
+        // Helper function to compare and update stock
+        $compareAndUpdateStock = function ($ppmWarehouseId, $subiektQty) use (
+            $product, &$count, &$skipped, &$updated, &$changes, $currentStocks
+        ) {
+            $subiektQty = (float) $subiektQty;
+            $currentStock = $currentStocks->get($ppmWarehouseId);
+            $ppmQty = $currentStock ? (float) $currentStock->quantity : 0;
+
+            // Compare with tolerance (0.001 units)
+            if (abs($subiektQty - $ppmQty) < 0.001) {
+                // Stock is the same - skip update
+                $skipped++;
+                return;
+            }
+
+            // Stock differs - update!
+            ProductStock::updateOrCreate(
+                [
+                    'product_id' => $product->id,
+                    'warehouse_id' => $ppmWarehouseId,
+                ],
+                [
+                    'quantity' => $subiektQty,
+                    'reserved_quantity' => $currentStock ? $currentStock->reserved_quantity : 0,
+                ]
+            );
+            $count++;
+            $updated = true;
+            $changes[] = [
+                'warehouse_id' => $ppmWarehouseId,
+                'ppm_qty' => $ppmQty,
+                'subiekt_qty' => $subiektQty,
+                'diff' => round($subiektQty - $ppmQty, 2),
+            ];
+        };
+
+        // Handle simple stock value (single number or array with 'quantity')
+        if (is_numeric($stockData)) {
+            $ppmWarehouseId = $warehouseMappings[$defaultWarehouseId] ?? 1;
+            $compareAndUpdateStock($ppmWarehouseId, $stockData);
+        }
+        // Handle array with warehouse mappings
+        elseif (is_array($stockData)) {
+            foreach ($stockData as $warehouseId => $qty) {
+                $ppmWarehouseId = $warehouseMappings[$warehouseId] ?? $warehouseId;
+
+                // Extract quantity if it's an array
+                $quantity = is_array($qty) ? ($qty['quantity'] ?? $qty['qty'] ?? 0) : $qty;
+
+                $compareAndUpdateStock($ppmWarehouseId, $quantity);
+            }
+        }
+
+        // Update ProductErpData.external_data.stock only if something changed
+        if ($updated) {
+            $erpData = $product->erpData()->where('erp_connection_id', $connection->id)->first();
+            if ($erpData) {
+                $externalData = $erpData->external_data ?? [];
+                $externalData['stock'] = $stockData;
+                $erpData->update([
+                    'external_data' => $externalData,
+                    'last_pull_at' => now(),
+                ]);
+            }
+        }
+
+        Log::debug('updateProductStockFromErp: Comparison result', [
+            'product_id' => $product->id,
+            'sku' => $product->sku,
+            'updated_count' => $count,
+            'skipped_same' => $skipped,
+            'changes' => $changes,
+        ]);
+
+        return ['updated' => $updated, 'count' => $count, 'skipped' => $skipped, 'changes' => $changes];
+    }
+
+    /**
+     * Update only basic product data from ERP.
+     * Used when sync_type = 'basic_data'
+     *
+     * @param Product $product PPM product
+     * @param object $subiektProduct Subiekt product object
+     * @param ERPConnection $connection
+     * @return array ['updated' => bool, 'fields' => array]
+     */
+    protected function updateProductBasicDataFromErp(Product $product, object $subiektProduct, ERPConnection $connection): array
+    {
+        $updated = false;
+        $fields = [];
+
+        // Update ProductErpData with basic fields
+        $erpData = $product->erpData()->where('erp_connection_id', $connection->id)->first();
+        if ($erpData) {
+            $updateData = [];
+
+            // Name
+            if (!empty($subiektProduct->name) && $erpData->name !== $subiektProduct->name) {
+                $updateData['name'] = $subiektProduct->name;
+                $fields[] = 'name';
+            }
+
+            // Short description (fiscal name)
+            if (isset($subiektProduct->fiscal_name) && $erpData->short_description !== $subiektProduct->fiscal_name) {
+                $updateData['short_description'] = $subiektProduct->fiscal_name;
+                $fields[] = 'short_description';
+            }
+
+            // Long description
+            if (isset($subiektProduct->description) && $erpData->long_description !== $subiektProduct->description) {
+                $updateData['long_description'] = $subiektProduct->description;
+                $fields[] = 'long_description';
+            }
+
+            // Weight
+            if (isset($subiektProduct->weight) && $erpData->weight != $subiektProduct->weight) {
+                $updateData['weight'] = $subiektProduct->weight;
+                $fields[] = 'weight';
+            }
+
+            // EAN
+            if (!empty($subiektProduct->ean) && $erpData->ean !== $subiektProduct->ean) {
+                $updateData['ean'] = $subiektProduct->ean;
+                $fields[] = 'ean';
+            }
+
+            // Is active
+            if (isset($subiektProduct->is_active)) {
+                $isActive = (bool) $subiektProduct->is_active;
+                if ($erpData->is_active !== $isActive) {
+                    $updateData['is_active'] = $isActive;
+                    $fields[] = 'is_active';
+                }
+            }
+
+            if (!empty($updateData)) {
+                $updateData['last_pull_at'] = now();
+                $erpData->update($updateData);
+                $updated = true;
+            }
+        }
+
+        Log::debug('updateProductBasicDataFromErp: Updated', [
+            'product_id' => $product->id,
+            'sku' => $product->sku,
+            'fields' => $fields,
+        ]);
+
+        return ['updated' => $updated, 'fields' => $fields];
+    }
+
+    // ========================================================================
+    // End of ETAP_08 FAZA 7 selective update methods
+    // ========================================================================
 
     /**
      * Get product mapping for Subiekt GT.
@@ -3185,6 +3573,24 @@ class SubiektGTService implements ERPSyncServiceInterface
     {
         try {
             $this->initializeForConnection($connection);
+
+            // For REST API mode, use REST client or return 0 (not supported via REST)
+            $config = $connection->connection_config;
+            $connectionMode = $config['connection_mode'] ?? 'rest_api';
+
+            if ($connectionMode === 'rest_api') {
+                // REST API doesn't have a modified count endpoint
+                // Return 0 to indicate unknown count (will process all linked products)
+                Log::debug('SubiektGTService: getModifiedProductsCount not available in REST API mode');
+                return 0;
+            }
+
+            // SQL Direct mode - use queryBuilder
+            if ($this->queryBuilder === null) {
+                Log::warning('SubiektGTService: queryBuilder not initialized');
+                return 0;
+            }
+
             return $this->queryBuilder->getModifiedProductsCount($since);
         } catch (\Exception $e) {
             Log::error('SubiektGTService: Failed to get modified count', [

@@ -67,3 +67,6 @@ nul
 /Plan_Projektu
 /_TOOLS
 /_TOOLS/SubiektGT_REST_API_DotNet
+
+# PAOS Parallel Orchestration
+.parallel-work/

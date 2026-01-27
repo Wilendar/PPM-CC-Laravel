@@ -916,6 +916,185 @@ class SubiektRestApiClient
         return $this->request('GET', "/api/prices/sku/{$encodedSku}");
     }
 
+    /**
+     * ETAP_08 FAZA 7.4: Batch fetch prices for multiple SKUs using parallel HTTP requests
+     *
+     * Performance: 13 SKUs in ~7s instead of 92s (parallel vs sequential)
+     *
+     * @param array $skus List of SKU strings
+     * @return array SKU => prices array mapping
+     */
+    public function batchFetchPricesBySku(array $skus): array
+    {
+        if (empty($skus)) {
+            return [];
+        }
+
+        $results = [];
+        $baseUrl = $this->baseUrl;
+        $apiKey = $this->apiKey;
+        $timeout = $this->timeout;
+        $verifySsl = $this->verifySsl;
+
+        // Re-index SKUs to ensure numeric keys 0, 1, 2...
+        $skuList = array_values($skus);
+
+        Log::info('SubiektRestApiClient::batchFetchPricesBySku - Starting parallel fetch', [
+            'sku_count' => count($skuList),
+        ]);
+
+        $startTime = microtime(true);
+
+        // Use Laravel HTTP::pool() for parallel requests
+        // Pool returns responses indexed 0, 1, 2... matching the order of requests
+        $responses = Http::pool(function ($pool) use ($skuList, $baseUrl, $apiKey, $timeout, $verifySsl) {
+            foreach ($skuList as $sku) {
+                $encodedSku = rawurlencode($sku);
+                $pool->as($sku)
+                    ->withHeaders(['X-API-Key' => $apiKey])
+                    ->withOptions(['verify' => $verifySsl])
+                    ->timeout($timeout)
+                    ->get("{$baseUrl}/api/prices/sku/{$encodedSku}");
+            }
+        });
+
+        // Process responses - keyed by SKU using ->as($sku)
+        foreach ($skuList as $sku) {
+            try {
+                $response = $responses[$sku] ?? null;
+                if ($response && $response->successful()) {
+                    $data = $response->json();
+                    if ($data['success'] ?? false) {
+                        $rawPrices = $data['data'] ?? [];
+
+                        // Transform API format to expected format for updateProductPricesFromErp
+                        // API returns: [{"priceLevel":1,"priceNet":222.00,"priceGross":273.06}, ...]
+                        // Expected:    [1 => ['net' => 222.00, 'gross' => 273.06], ...]
+                        $transformedPrices = [];
+                        foreach ($rawPrices as $priceItem) {
+                            $level = (int) ($priceItem['priceLevel'] ?? 0);
+                            if ($level > 0) { // Skip level 0 (unused)
+                                $transformedPrices[$level] = [
+                                    'net' => (float) ($priceItem['priceNet'] ?? 0),
+                                    'gross' => (float) ($priceItem['priceGross'] ?? 0),
+                                ];
+                            }
+                        }
+                        $results[$sku] = $transformedPrices;
+                    }
+                } else {
+                    Log::debug('batchFetchPricesBySku: No response or failed', [
+                        'sku' => $sku,
+                        'status' => $response ? $response->status() : 'null',
+                    ]);
+                }
+            } catch (\Exception $e) {
+                Log::debug('batchFetchPricesBySku: Failed for SKU', [
+                    'sku' => $sku,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        $duration = round(microtime(true) - $startTime, 2);
+        Log::info('SubiektRestApiClient::batchFetchPricesBySku - Completed', [
+            'sku_count' => count($skuList),
+            'fetched_count' => count($results),
+            'duration_seconds' => $duration,
+        ]);
+
+        return $results;
+    }
+
+    /**
+     * ETAP_08 FAZA 7.4: Batch fetch stock for multiple SKUs using parallel HTTP requests
+     *
+     * @param array $skus List of SKU strings
+     * @return array SKU => stock data mapping
+     */
+    public function batchFetchStockBySku(array $skus): array
+    {
+        if (empty($skus)) {
+            return [];
+        }
+
+        $results = [];
+        $baseUrl = $this->baseUrl;
+        $apiKey = $this->apiKey;
+        $timeout = $this->timeout;
+        $verifySsl = $this->verifySsl;
+
+        // Re-index SKUs to ensure numeric keys
+        $skuList = array_values($skus);
+
+        Log::info('SubiektRestApiClient::batchFetchStockBySku - Starting parallel fetch', [
+            'sku_count' => count($skuList),
+        ]);
+
+        $startTime = microtime(true);
+
+        // Use Laravel HTTP::pool() for parallel requests
+        $responses = Http::pool(function ($pool) use ($skuList, $baseUrl, $apiKey, $timeout, $verifySsl) {
+            foreach ($skuList as $sku) {
+                $encodedSku = rawurlencode($sku);
+                $pool->as($sku)
+                    ->withHeaders(['X-API-Key' => $apiKey])
+                    ->withOptions(['verify' => $verifySsl])
+                    ->timeout($timeout)
+                    ->get("{$baseUrl}/api/stock/sku/{$encodedSku}");
+            }
+        });
+
+        // Process responses - keyed by SKU using ->as($sku)
+        foreach ($skuList as $sku) {
+            try {
+                $response = $responses[$sku] ?? null;
+                if ($response && $response->successful()) {
+                    $data = $response->json();
+                    if ($data['success'] ?? false) {
+                        $rawStock = $data['data'] ?? [];
+
+                        // Transform API format to expected format for updateProductStockFromErp
+                        // API returns: [{"warehouseId":1,"quantity":5.00}, ...]
+                        // Expected:    [1 => ['quantity' => 5], ...]
+                        $transformedStock = [];
+                        foreach ($rawStock as $stockItem) {
+                            $warehouseId = (int) ($stockItem['warehouseId'] ?? 0);
+                            if ($warehouseId > 0) {
+                                $transformedStock[$warehouseId] = [
+                                    'quantity' => (float) ($stockItem['quantity'] ?? 0),
+                                    'reserved' => (float) ($stockItem['reserved'] ?? 0),
+                                    'min' => (float) ($stockItem['min'] ?? 0),
+                                    'max' => (float) ($stockItem['max'] ?? 0),
+                                ];
+                            }
+                        }
+                        $results[$sku] = $transformedStock;
+                    }
+                } else {
+                    Log::debug('batchFetchStockBySku: No response or failed', [
+                        'sku' => $sku,
+                        'status' => $response ? $response->status() : 'null',
+                    ]);
+                }
+            } catch (\Exception $e) {
+                Log::debug('batchFetchStockBySku: Failed for SKU', [
+                    'sku' => $sku,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        $duration = round(microtime(true) - $startTime, 2);
+        Log::info('SubiektRestApiClient::batchFetchStockBySku - Completed', [
+            'sku_count' => count($skuList),
+            'fetched_count' => count($results),
+            'duration_seconds' => $duration,
+        ]);
+
+        return $results;
+    }
+
     // ==========================================
     // REFERENCE DATA
     // ==========================================

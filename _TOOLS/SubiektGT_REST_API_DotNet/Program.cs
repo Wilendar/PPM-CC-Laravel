@@ -192,12 +192,50 @@ app.MapGet("/api/stock/{id:int}", async (ISubiektRepository repo, int id) =>
     }
 });
 
+// ETAP_08 FAZA 7.4: Get stock by SKU
+app.MapGet("/api/stock/sku/{sku}", async (ISubiektRepository repo, string sku) =>
+{
+    try
+    {
+        // First get product ID by SKU
+        var product = await repo.GetProductBySkuAsync(sku, 0, 1);
+        if (product == null)
+            return Results.NotFound(new { success = false, error = "Product not found" });
+
+        var stock = await repo.GetStockByProductIdAsync(product.Id);
+        return Results.Ok(new { success = true, timestamp = DateTime.Now.ToString("o"), data = stock });
+    }
+    catch (Exception ex)
+    {
+        return Results.Ok(new { success = false, error = ex.Message });
+    }
+});
+
 // Get all prices by product ID (all 10 price levels)
 app.MapGet("/api/prices/{id:int}", async (ISubiektRepository repo, int id) =>
 {
     try
     {
         var prices = await repo.GetPricesByProductIdAsync(id);
+        return Results.Ok(new { success = true, timestamp = DateTime.Now.ToString("o"), data = prices });
+    }
+    catch (Exception ex)
+    {
+        return Results.Ok(new { success = false, error = ex.Message });
+    }
+});
+
+// ETAP_08 FAZA 7.4: Get all prices by SKU (all 10 price levels)
+app.MapGet("/api/prices/sku/{sku}", async (ISubiektRepository repo, string sku) =>
+{
+    try
+    {
+        // First get product ID by SKU
+        var product = await repo.GetProductBySkuAsync(sku, 0, 1);
+        if (product == null)
+            return Results.NotFound(new { success = false, error = "Product not found" });
+
+        var prices = await repo.GetPricesByProductIdAsync(product.Id);
         return Results.Ok(new { success = true, timestamp = DateTime.Now.ToString("o"), data = prices });
     }
     catch (Exception ex)

@@ -99,6 +99,12 @@ class ProductStock extends Model
     use HasFactory;
 
     /**
+     * The table associated with the model.
+     * Note: Using singular form as per existing database schema.
+     */
+    protected $table = 'product_stock';
+
+    /**
      * Delivery status enum values
      */
     public const DELIVERY_STATUSES = [
