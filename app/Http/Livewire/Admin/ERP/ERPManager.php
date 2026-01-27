@@ -88,8 +88,7 @@ class ERPManager extends Component
         'inventory_id' => '',
         'warehouse_mappings' => [],
         // ETAP_08 FAZA 8: Warehouse Location Settings
-        'default_location' => '',             // Default location for new products
-        'copy_location_to_all' => false,      // Copy location to all warehouses on sync
+        'copy_location_to_all' => false,      // Copy location from default warehouse to all
     ];
 
     public $subiektConfig = [
@@ -107,8 +106,7 @@ class ERPManager extends Component
         // Options
         'create_missing_products' => false,
         // ETAP_08 FAZA 8: Warehouse Location Settings
-        'default_location' => '',             // Default location for new products (e.g., "A-12-3")
-        'copy_location_to_all' => false,      // Copy location to all warehouses on sync
+        'copy_location_to_all' => false,      // Copy location from default warehouse to all
     ];
 
     public $dynamicsConfig = [
@@ -323,7 +321,6 @@ class ERPManager extends Component
             'inventory_id' => '',
             'warehouse_mappings' => [],
             // ETAP_08 FAZA 8: Warehouse Location Settings
-            'default_location' => '',
             'copy_location_to_all' => false,
         ];
 
@@ -338,7 +335,6 @@ class ERPManager extends Component
             'price_group_mappings' => [],
             'create_missing_products' => false,
             // ETAP_08 FAZA 8: Warehouse Location Settings
-            'default_location' => '',
             'copy_location_to_all' => false,
         ];
 
@@ -860,7 +856,6 @@ class ERPManager extends Component
                     'inventory_id' => $config['inventory_id'] ?? '',
                     'warehouse_mappings' => $config['warehouse_mappings'] ?? [],
                     // ETAP_08 FAZA 8: Warehouse Location Settings
-                    'default_location' => $config['default_location'] ?? '',
                     'copy_location_to_all' => $config['copy_location_to_all'] ?? false,
                 ]);
                 break;
@@ -878,7 +873,6 @@ class ERPManager extends Component
                     'price_group_mappings' => $config['price_group_mappings'] ?? [],
                     'create_missing_products' => $config['create_missing_products'] ?? false,
                     // ETAP_08 FAZA 8: Warehouse Location Settings
-                    'default_location' => $config['default_location'] ?? '',
                     'copy_location_to_all' => $config['copy_location_to_all'] ?? false,
                 ]);
                 break;

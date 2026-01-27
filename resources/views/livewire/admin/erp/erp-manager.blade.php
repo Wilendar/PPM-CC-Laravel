@@ -740,29 +740,27 @@
                                             </svg>
                                             Ustawienia lokalizacji magazynowych
                                         </h5>
-                                        <div class="grid grid-cols-2 gap-4">
-                                            {{-- Default Location --}}
-                                            <div>
-                                                <label class="block text-xs font-medium text-gray-300 mb-1">Domyslna lokalizacja</label>
-                                                <input type="text"
-                                                       wire:model="subiektConfig.default_location"
-                                                       class="w-full px-3 py-2 text-sm bg-gray-700 border border-gray-600 rounded text-white placeholder-gray-500 focus:outline-none focus:border-orange-400"
-                                                       placeholder="np. A-12-3"
-                                                       maxlength="50">
-                                                <p class="text-xs text-gray-500 mt-1">Lokalizacja dla nowych produktow</p>
-                                            </div>
+                                        <div class="space-y-3">
+                                            {{-- Info about Default Warehouse --}}
+                                            <p class="text-xs text-gray-400">
+                                                Lokalizacje z pola tw_Pole2 beda zapisywane do magazynu domyslnego
+                                                <span class="text-orange-400 font-medium">({{ $subiektConfig['default_warehouse_id'] ? 'ID: ' . $subiektConfig['default_warehouse_id'] : 'wybierz powyzej' }})</span>
+                                            </p>
                                             {{-- Copy to All Toggle --}}
                                             <div class="flex items-center">
                                                 <label class="flex items-center gap-2 text-sm text-gray-300">
                                                     <input type="checkbox"
                                                            wire:model="subiektConfig.copy_location_to_all"
                                                            class="rounded border-gray-600 bg-gray-700 text-orange-500 focus:ring-orange-500">
-                                                    Kopiuj na wszystkie magazyny
+                                                    Kopiuj lokalizacje na wszystkie magazyny
                                                 </label>
                                             </div>
+                                            <p class="text-xs text-gray-500">
+                                                Wlacz aby lokalizacja z magazynu domyslnego byla kopiowana na wszystkie pozostale magazyny
+                                            </p>
                                         </div>
                                         <p class="text-xs text-gray-500 mt-2">
-                                            Lokalizacje sa pobierane z pola tw_Pole2 (format: MAGAZYN:LOK, MAGAZYN2:LOK2)
+                                            Lokalizacje sa pobierane z pola tw_Pole2 (format: MAGAZYN:LOK lub prosta wartosc np. A-12-3)
                                         </p>
                                     </div>
 
