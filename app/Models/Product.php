@@ -129,6 +129,7 @@ class Product extends Model
         'cn_code',
         'defect_symbol',
         'material',
+        'notes',  // tw_Uwagi - product notes/remarks from ERP
         'shop_internet',
         'split_payment',
     ];
@@ -766,6 +767,30 @@ class Product extends Model
     {
         return $this->hasMany(\App\Models\ProductErpData::class, 'product_id', 'id')
                     ->orderBy('erp_connection_id', 'asc');
+    }
+
+    // ====================================================================
+    // STOCK RELATIONS (ETAP_08)
+    // ====================================================================
+
+    /**
+     * Get product stock records from all warehouses
+     *
+     * @return \Illuminate\Database\Eloquent\Relations\HasMany
+     */
+    public function stocks(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(\App\Models\ProductStock::class, 'product_id', 'id');
+    }
+
+    /**
+     * Alias for stocks() - singular form
+     *
+     * @return \Illuminate\Database\Eloquent\Relations\HasMany
+     */
+    public function stock(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->stocks();
     }
 
     /**
