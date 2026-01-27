@@ -533,12 +533,16 @@ trait ProductFormERPTabs
                 $res = (int) ($stockData['reserved'] ?? $stockData['Reserved'] ?? 0);
                 $avail = (int) ($stockData['available'] ?? $stockData['Available'] ?? ($qty - $res));
 
+                // ETAP_08 FAZA 8: Get location from stock data
+                $location = $stockData['location'] ?? $stockData['Location'] ?? null;
+
                 // Override form stock array
                 $this->stock[$ppmWarehouseId] = [
                     'quantity' => $qty,
                     'reserved' => $res,
                     'available' => $avail,
                     'minimum' => $this->stock[$ppmWarehouseId]['minimum'] ?? 0,  // Keep existing minimum
+                    'location' => $location,  // ETAP_08 FAZA 8: Warehouse location from ERP
                     'erp_source' => true,  // Mark as loaded from ERP
                     'erp_warehouse_id' => $erpWarehouseId,
                     'erp_warehouse_name' => $stockData['erp_warehouse_code'] ?? $stockData['warehouseName'] ?? $stockData['name'] ?? null,
@@ -550,6 +554,7 @@ trait ProductFormERPTabs
                     'quantity' => $qty,
                     'reserved' => $res,
                     'available' => $avail,
+                    'location' => $location,  // ETAP_08 FAZA 8
                 ]);
             }
         }

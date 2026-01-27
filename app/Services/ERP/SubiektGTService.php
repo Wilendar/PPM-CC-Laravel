@@ -507,6 +507,40 @@ class SubiektGTService implements ERPSyncServiceInterface
             // Transform to PPM format
             $ppmData = $this->transformer->subiektToPPM($subiektProduct, $prices, $stock);
 
+            // ETAP_08 FAZA 8: Enrich stock data with locations from Pole2
+            $pole2Value = $ppmData['Pole2'] ?? $subiektProduct->Pole2 ?? $subiektProduct->pole2 ?? null;
+            if (!empty($pole2Value) && !empty($ppmData['stock'])) {
+                $config = $connection->connection_config ?? [];
+                $warehouseMappings = $config['warehouse_mappings'] ?? [];
+                // Pass stock data for simple location format (assigns to warehouses with stock > 0)
+                $locations = $this->parseStockLocationsFromErp($pole2Value, $warehouseMappings, $ppmData['stock']);
+
+                // Handle '_default' location - assign to all warehouses with stock
+                if (isset($locations['_default'])) {
+                    $defaultLocation = $locations['_default'];
+                    unset($locations['_default']);
+                    foreach ($ppmData['stock'] as $warehouseId => $stockEntry) {
+                        $qty = $stockEntry['quantity'] ?? 0;
+                        if ($qty > 0) {
+                            $locations[$warehouseId] = $defaultLocation;
+                        }
+                    }
+                }
+
+                // Add location to each stock entry
+                foreach ($locations as $ppmWarehouseId => $location) {
+                    if (isset($ppmData['stock'][$ppmWarehouseId])) {
+                        $ppmData['stock'][$ppmWarehouseId]['location'] = $location;
+                    }
+                }
+
+                Log::debug('[Subiekt] Enriched stock with locations from Pole2', [
+                    'pole2' => $pole2Value,
+                    'locations' => $locations,
+                    'stock_keys' => array_keys($ppmData['stock'] ?? []),
+                ]);
+            }
+
             // Find or create PPM product by SKU
             $product = $this->findOrCreateProduct($ppmData, $connection);
 
@@ -2115,20 +2149,60 @@ class SubiektGTService implements ERPSyncServiceInterface
     /**
      * Parse stock locations from Subiekt GT tw_Pole2 field.
      *
-     * Input format: "MAGAZYN1:A-12-3, MAGAZYN2:B-05-1"
+     * Supported formats:
+     * 1. Multi-warehouse: "MAGAZYN1:A-12-3, MAGAZYN2:B-05-1"
+     * 2. Single location (no colon): "AH_02_04" - applies to all warehouses with stock
+     *
      * Output: [ppm_warehouse_id => 'location', ...]
      *
      * @param string|null $pole2Csv The tw_Pole2 value from Subiekt GT
      * @param array $warehouseMappings PPM warehouse mappings from ERP config
+     * @param array $stockData Optional stock data to determine which warehouses have stock
      * @return array Parsed locations keyed by PPM warehouse ID
      */
-    protected function parseStockLocationsFromErp(?string $pole2Csv, array $warehouseMappings): array
+    protected function parseStockLocationsFromErp(?string $pole2Csv, array $warehouseMappings, array $stockData = []): array
     {
         if (empty($pole2Csv)) {
             return [];
         }
 
         $locations = [];
+        $pole2Csv = trim($pole2Csv);
+
+        // Check if this is a simple location (no colon = applies to all warehouses with stock)
+        if (strpos($pole2Csv, ':') === false) {
+            // Simple format: "AH_02_04" - assign to all warehouses that have stock
+            Log::debug('[Subiekt] parseStockLocationsFromErp: Simple location format (no colon)', [
+                'location' => $pole2Csv,
+                'stock_data_count' => count($stockData),
+            ]);
+
+            // If we have stock data, assign location only to warehouses with stock > 0
+            if (!empty($stockData)) {
+                foreach ($stockData as $warehouseId => $stock) {
+                    $qty = is_array($stock) ? ($stock['quantity'] ?? 0) : 0;
+                    if ($qty > 0) {
+                        $locations[$warehouseId] = $pole2Csv;
+                    }
+                }
+            }
+
+            // Fallback: if no stock data or no warehouses with stock, return single location
+            // The caller should handle assigning it appropriately
+            if (empty($locations)) {
+                // Return special key '_default' to indicate this is a default location
+                $locations['_default'] = $pole2Csv;
+            }
+
+            Log::debug('[Subiekt] Parsed simple location from Pole2', [
+                'raw' => $pole2Csv,
+                'parsed' => $locations,
+            ]);
+
+            return $locations;
+        }
+
+        // Multi-warehouse format: "MAGAZYN1:A-12-3, MAGAZYN2:B-05-1"
         $pairs = explode(',', $pole2Csv);
 
         foreach ($pairs as $pair) {
