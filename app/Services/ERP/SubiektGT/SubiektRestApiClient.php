@@ -567,6 +567,11 @@ class SubiektRestApiClient
             $body['Pole5'] = $data['pole5'];  // CN Code
         }
 
+        // Pole8 for variant support (parent_sku)
+        if (isset($data['pole8'])) {
+            $body['Pole8'] = $data['pole8'];  // parent_sku for variants
+        }
+
         // Supplier code (tw_DostSymbol)
         if (isset($data['supplier_code'])) {
             $body['SupplierCode'] = $data['supplier_code'];
