@@ -906,6 +906,13 @@ trait ProductFormERPTabs
                 $this->overrideFormPricesWithErpData($erpData);
                 $this->overrideFormStockWithErpData($erpData);
 
+                // ETAP_08 FAZA 8: Dispatch event to update Alpine location components
+                $locations = [];
+                foreach ($this->stock as $warehouseId => $stockData) {
+                    $locations[$warehouseId] = $stockData['location'] ?? '';
+                }
+                $this->dispatch('stock-locations-updated', locations: $locations);
+
                 session()->flash('message', 'Dane pobrane z ERP: ' . $connection->instance_name);
 
                 Log::info('ERP data pulled successfully', [
@@ -1159,6 +1166,45 @@ trait ProductFormERPTabs
             'tax_rate' => $this->tax_rate,
             'is_active' => $this->is_active,
         ]);
+
+        // ETAP_08 FAZA 8: Save stock locations from form to ProductStock before ERP sync
+        // This ensures mapStockLocations() in SubiektGTService reads current data from DB
+        if (!empty($this->stock)) {
+            // DEBUG: Log full stock array from Livewire form
+            Log::debug('saveCurrentErpData: FULL $this->stock from Livewire form', [
+                'product_id' => $this->product->id,
+                'stock_count' => count($this->stock),
+                'stock_data' => $this->stock,
+            ]);
+
+            $locationsSaved = [];
+            foreach ($this->stock as $warehouseId => $stockData) {
+                $location = $stockData['location'] ?? '';
+
+                // Update or create ProductStock record with location
+                $stockRecord = \App\Models\ProductStock::updateOrCreate(
+                    [
+                        'product_id' => $this->product->id,
+                        'warehouse_id' => $warehouseId,
+                        'product_variant_id' => null,
+                    ],
+                    [
+                        'location' => $location,
+                    ]
+                );
+
+                if (!empty($location)) {
+                    $locationsSaved[$warehouseId] = $location;
+                }
+            }
+
+            if (!empty($locationsSaved)) {
+                Log::debug('saveCurrentErpData: Stock locations saved to ProductStock', [
+                    'product_id' => $this->product->id,
+                    'locations' => $locationsSaved,
+                ]);
+            }
+        }
 
         // Detect changed fields by comparing with defaults
         $changedFields = $this->detectChangedErpFields();

@@ -764,6 +764,7 @@ class ProductFormSaver
                     'quantity' => $stockData['quantity'] ?? 'null',
                     'reserved' => $stockData['reserved'] ?? 'null',
                     'minimum' => $stockData['minimum'] ?? 'null',
+                    'location' => $stockData['location'] ?? 'null', // ETAP_08 FAZA 8
                 ]);
 
                 $stock = ProductStock::updateOrCreate(
@@ -776,6 +777,7 @@ class ProductFormSaver
                         'quantity' => $stockData['quantity'] ?? 0,
                         'reserved_quantity' => $stockData['reserved'] ?? 0,
                         'minimum_stock' => $stockData['minimum'] ?? 0, // FIX: was minimum_stock_level
+                        'location' => $stockData['location'] ?? '', // ETAP_08 FAZA 8: Warehouse location
                         'is_active' => true,
                         'track_stock' => true,
                     ]
