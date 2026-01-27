@@ -2013,6 +2013,29 @@ class SubiektGTService implements ERPSyncServiceInterface
             }
         }
 
+        // Extended fields from Subiekt GT (tw_Pole1-5, tw_Uwagi) -> Product model
+        $extendedMappings = [
+            ['subiekt' => 'Pole1', 'alt' => 'pole1', 'ppm' => 'material'],
+            ['subiekt' => 'Pole3', 'alt' => 'pole3', 'ppm' => 'defect_symbol'],
+            ['subiekt' => 'Pole4', 'alt' => 'pole4', 'ppm' => 'application'],
+            ['subiekt' => 'Pole5', 'alt' => 'pole5', 'ppm' => 'cn_code'],
+            ['subiekt' => 'Notes', 'alt' => 'notes', 'ppm' => 'notes'],
+        ];
+
+        $productUpdateData = [];
+        foreach ($extendedMappings as $mapping) {
+            $value = $subiektProduct->{$mapping['subiekt']} ?? $subiektProduct->{$mapping['alt']} ?? null;
+            if ($value !== null && $product->{$mapping['ppm']} !== $value) {
+                $productUpdateData[$mapping['ppm']] = $value;
+                $fields[] = $mapping['ppm'];
+            }
+        }
+
+        if (!empty($productUpdateData)) {
+            $product->update($productUpdateData);
+            $updated = true;
+        }
+
         Log::debug('updateProductBasicDataFromErp: Updated', [
             'product_id' => $product->id,
             'sku' => $product->sku,
