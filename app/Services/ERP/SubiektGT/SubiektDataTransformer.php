@@ -124,6 +124,21 @@ class SubiektDataTransformer
 
             // Tax rate
             'tax_rate' => $this->getVatRateValue($subiektProduct->vat_rate_id ?? 1),
+
+            // === ETAP_08 FAZA 7: Extended fields from Subiekt GT ===
+            // Text fields (tw_Pole1-5, tw_Uwagi)
+            'Pole1' => $subiektProduct->Pole1 ?? $subiektProduct->pole1 ?? null,
+            'Pole2' => $subiektProduct->Pole2 ?? $subiektProduct->pole2 ?? null,
+            'Pole3' => $subiektProduct->Pole3 ?? $subiektProduct->pole3 ?? null,
+            'Pole4' => $subiektProduct->Pole4 ?? $subiektProduct->pole4 ?? null,
+            'Pole5' => $subiektProduct->Pole5 ?? $subiektProduct->pole5 ?? null,
+            'Notes' => $subiektProduct->Notes ?? $subiektProduct->notes ?? null,
+            // Boolean flags
+            'ShopInternet' => $subiektProduct->ShopInternet ?? $subiektProduct->shopInternet ?? null,
+            'SplitPayment' => $subiektProduct->SplitPayment ?? $subiektProduct->splitPayment ?? null,
+            // Manufacturer and supplier
+            'ManufacturerName' => $subiektProduct->ManufacturerName ?? $subiektProduct->manufacturerName ?? null,
+            'SupplierCode' => $subiektProduct->SupplierCode ?? $subiektProduct->supplierCode ?? null,
         ];
 
         // Add all prices if provided

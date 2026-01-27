@@ -339,6 +339,63 @@ trait ProductFormERPTabs
             ?? $this->erpDefaultData['is_active']
             ?? $this->is_active;
 
+        // === EXTENDED INFO (Subiekt GT) - ETAP_08 FAZA 7 ===
+        // Map ERP fields: tw_Pole1-5, tw_Uwagi, tw_SklepInternet, tw_MechanizmPodzielonejPlatnosci
+        $externalData = $erpData->external_data ?? [];
+
+        // CN Code (tw_Pole5)
+        $cnCode = $externalData['Pole5'] ?? $externalData['pole5'] ?? $externalData['cn_code'] ?? null;
+        if ($cnCode !== null && $cnCode !== '') {
+            $this->cnCode = $cnCode;
+        }
+
+        // Material (tw_Pole1)
+        $material = $externalData['Pole1'] ?? $externalData['pole1'] ?? $externalData['material'] ?? null;
+        if ($material !== null && $material !== '') {
+            $this->material = $material;
+        }
+
+        // Defect Symbol (tw_Pole3)
+        $defectSymbol = $externalData['Pole3'] ?? $externalData['pole3'] ?? $externalData['defect_symbol'] ?? null;
+        if ($defectSymbol !== null && $defectSymbol !== '') {
+            $this->defectSymbol = $defectSymbol;
+        }
+
+        // Application (tw_Pole4)
+        $application = $externalData['Pole4'] ?? $externalData['pole4'] ?? $externalData['application'] ?? null;
+        if ($application !== null && $application !== '') {
+            $this->application = $application;
+        }
+
+        // Notes (tw_Uwagi)
+        $notes = $externalData['Notes'] ?? $externalData['notes'] ?? $externalData['tw_Uwagi'] ?? null;
+        if ($notes !== null && $notes !== '') {
+            $this->notes = $notes;
+        }
+
+        // Shop Internet flag (tw_SklepInternet)
+        $shopInternet = $externalData['ShopInternet'] ?? $externalData['shopInternet'] ?? $externalData['shop_internet'] ?? null;
+        if ($shopInternet !== null) {
+            $this->shopInternet = (bool) $shopInternet;
+        }
+
+        // Split Payment flag (tw_MechanizmPodzielonejPlatnosci)
+        $splitPayment = $externalData['SplitPayment'] ?? $externalData['splitPayment'] ?? $externalData['split_payment'] ?? null;
+        if ($splitPayment !== null) {
+            $this->splitPayment = (bool) $splitPayment;
+        }
+
+        Log::debug('overrideFormFieldsWithErpData: Extended fields updated', [
+            'product_id' => $this->product?->id,
+            'cnCode' => $this->cnCode,
+            'material' => $this->material,
+            'defectSymbol' => $this->defectSymbol,
+            'application' => $this->application,
+            'notes' => $this->notes ? substr($this->notes, 0, 50) . '...' : null,
+            'shopInternet' => $this->shopInternet,
+            'splitPayment' => $this->splitPayment,
+        ]);
+
         // === PRICES FROM ERP (TASK 2b) ===
         // Map ERP price levels to PPM price_group_id
         $this->overrideFormPricesWithErpData($erpData);
@@ -644,9 +701,30 @@ trait ProductFormERPTabs
             'is_active' => 'is_bundle', // Note: inverse logic may apply
         ];
 
+        // ETAP_08 FAZA 7: Subiekt GT mapping (API returns PascalCase field names)
+        $subiektMapping = [
+            'sku' => ['Sku', 'Symbol', 'sku'],
+            'name' => ['Name', 'Nazwa', 'name'],
+            'ean' => ['Ean', 'EAN', 'ean'],
+            'manufacturer' => ['ManufacturerName', 'Manufacturer', 'manufacturer'],
+            'supplier_code' => ['SupplierCode', 'supplier_code', 'DostSymbol'],
+            'weight' => ['Weight', 'weight'],
+            'tax_rate' => ['VatRate', 'TaxRate', 'vat_rate', 'tax_rate'],
+            'is_active' => ['IsActive', 'Active', 'is_active'],
+        ];
+
         // Try direct field access first
         if (isset($externalData[$fieldName])) {
             return $externalData[$fieldName];
+        }
+
+        // Try Subiekt GT-style mapping (check multiple possible field names)
+        if (isset($subiektMapping[$fieldName])) {
+            foreach ($subiektMapping[$fieldName] as $possibleKey) {
+                if (isset($externalData[$possibleKey])) {
+                    return $externalData[$possibleKey];
+                }
+            }
         }
 
         // Try Baselinker-style mapping
@@ -815,6 +893,9 @@ trait ProductFormERPTabs
                     'prices_count' => isset($erpData->external_data['prices']) ? count($erpData->external_data['prices']) : 0,
                     'stock_count' => isset($erpData->external_data['stock']) ? count($erpData->external_data['stock']) : 0,
                 ]);
+
+                // ETAP_08 FAZA 7 FIX: Override ALL form fields with ERP data (including extended fields)
+                $this->overrideFormFieldsWithErpData($erpData);
 
                 // Override form prices and stock with ERP data
                 $this->overrideFormPricesWithErpData($erpData);
@@ -1958,7 +2039,7 @@ trait ProductFormERPTabs
             'error_message' => null,
         ];
 
-        // Load ERP data to form fields
+        // Load ERP data to form fields (basic data from search result)
         if (!empty($externalData)) {
             $this->overrideFormFieldsWithErpData($erpData);
         }
@@ -1968,6 +2049,11 @@ trait ProductFormERPTabs
             'connection_id' => $connectionId,
             'external_id' => $externalId,
         ]);
+
+        // ETAP_08 FAZA 7 FIX: After linking, automatically pull FULL data from ERP
+        // findProductBySku returns only basic product data, we need prices and stock too
+        Log::info('linkProductToErp: Pulling full data (prices, stock) from ERP after linking');
+        $this->pullProductDataFromErp($connectionId, true);
     }
 
     /**

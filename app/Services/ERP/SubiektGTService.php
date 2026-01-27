@@ -454,12 +454,36 @@ class SubiektGTService implements ERPSyncServiceInterface
                 $prices = ($pricesResult && ($pricesResult['success'] ?? false)) ? ($pricesResult['data'] ?? []) : [];
                 $stock = ($stockResult && ($stockResult['success'] ?? false)) ? ($stockResult['data'] ?? []) : [];
 
-                // Create object for transformer
+                // Create object for transformer with ALL fields from API
+                // ETAP_08 FAZA 7 FIX: Include extended fields (Pole1-5, ShopInternet, SplitPayment, etc.)
                 $subiektProduct = (object) [
                     'id' => $productId,
                     'sku' => $subiektProductData['sku'] ?? $subiektProductData['Sku'] ?? $subiektProductData['tw_Symbol'] ?? '',
                     'name' => $subiektProductData['name'] ?? $subiektProductData['Name'] ?? $subiektProductData['tw_Nazwa'] ?? '',
                     'ean' => $subiektProductData['ean'] ?? $subiektProductData['Ean'] ?? $subiektProductData['tw_SWW'] ?? '',
+                    // Basic fields
+                    'priceNet' => $subiektProductData['priceNet'] ?? $subiektProductData['PriceNet'] ?? null,
+                    'priceGross' => $subiektProductData['priceGross'] ?? $subiektProductData['PriceGross'] ?? null,
+                    'stock' => $subiektProductData['stock'] ?? $subiektProductData['Stock'] ?? 0,
+                    'stockReserved' => $subiektProductData['stockReserved'] ?? $subiektProductData['StockReserved'] ?? 0,
+                    'isActive' => $subiektProductData['isActive'] ?? $subiektProductData['IsActive'] ?? true,
+                    'vatRate' => $subiektProductData['vatRate'] ?? $subiektProductData['VatRate'] ?? null,
+                    'groupName' => $subiektProductData['groupName'] ?? $subiektProductData['GroupName'] ?? null,
+                    'unit' => $subiektProductData['unit'] ?? $subiektProductData['Unit'] ?? null,
+                    'weight' => $subiektProductData['weight'] ?? $subiektProductData['Weight'] ?? null,
+                    // Extended fields (tw_Pole1-5, tw_Uwagi)
+                    'Pole1' => $subiektProductData['pole1'] ?? $subiektProductData['Pole1'] ?? null,
+                    'Pole2' => $subiektProductData['pole2'] ?? $subiektProductData['Pole2'] ?? null,
+                    'Pole3' => $subiektProductData['pole3'] ?? $subiektProductData['Pole3'] ?? null,
+                    'Pole4' => $subiektProductData['pole4'] ?? $subiektProductData['Pole4'] ?? null,
+                    'Pole5' => $subiektProductData['pole5'] ?? $subiektProductData['Pole5'] ?? null,
+                    'Notes' => $subiektProductData['notes'] ?? $subiektProductData['Notes'] ?? null,
+                    // Boolean flags
+                    'ShopInternet' => $subiektProductData['shopInternet'] ?? $subiektProductData['ShopInternet'] ?? null,
+                    'SplitPayment' => $subiektProductData['splitPayment'] ?? $subiektProductData['SplitPayment'] ?? null,
+                    // Manufacturer and supplier
+                    'ManufacturerName' => $subiektProductData['manufacturerName'] ?? $subiektProductData['ManufacturerName'] ?? null,
+                    'SupplierCode' => $subiektProductData['supplierCode'] ?? $subiektProductData['SupplierCode'] ?? null,
                 ];
             } else {
                 // SQL Direct mode - use query builder
@@ -2020,6 +2044,9 @@ class SubiektGTService implements ERPSyncServiceInterface
             ['subiekt' => 'Pole4', 'alt' => 'pole4', 'ppm' => 'application'],
             ['subiekt' => 'Pole5', 'alt' => 'pole5', 'ppm' => 'cn_code'],
             ['subiekt' => 'Notes', 'alt' => 'notes', 'ppm' => 'notes'],
+            // ETAP_08 FAZA 7: Additional fields from Subiekt GT API
+            ['subiekt' => 'ManufacturerName', 'alt' => 'manufacturerName', 'ppm' => 'manufacturer'],
+            ['subiekt' => 'SupplierCode', 'alt' => 'supplierCode', 'ppm' => 'supplier_code'],
         ];
 
         $productUpdateData = [];
@@ -2028,6 +2055,25 @@ class SubiektGTService implements ERPSyncServiceInterface
             if ($value !== null && $product->{$mapping['ppm']} !== $value) {
                 $productUpdateData[$mapping['ppm']] = $value;
                 $fields[] = $mapping['ppm'];
+            }
+        }
+
+        // ETAP_08 FAZA 7: Boolean fields from Subiekt GT (tw_SklepInternet, tw_MechanizmPodzielonejPlatnosci)
+        $shopInternet = $subiektProduct->ShopInternet ?? $subiektProduct->shopInternet ?? null;
+        if ($shopInternet !== null) {
+            $shopInternetBool = (bool) $shopInternet;
+            if ($product->shop_internet !== $shopInternetBool) {
+                $productUpdateData['shop_internet'] = $shopInternetBool;
+                $fields[] = 'shop_internet';
+            }
+        }
+
+        $splitPayment = $subiektProduct->SplitPayment ?? $subiektProduct->splitPayment ?? null;
+        if ($splitPayment !== null) {
+            $splitPaymentBool = (bool) $splitPayment;
+            if ($product->split_payment !== $splitPaymentBool) {
+                $productUpdateData['split_payment'] = $splitPaymentBool;
+                $fields[] = 'split_payment';
             }
         }
 
@@ -3205,6 +3251,19 @@ class SubiektGTService implements ERPSyncServiceInterface
             // === NEW: ALL PRICES AND STOCK ===
             'prices' => $allPrices,  // [priceLevel => ['net' => X, 'gross' => Y, 'name' => Z]]
             'stock' => $allStock,     // [warehouseId => ['quantity' => X, 'reserved' => Y, 'name' => Z]]
+            // === ETAP_08 FAZA 7: Extended fields from Subiekt GT ===
+            // Text fields (tw_Pole1-5, tw_Uwagi)
+            'Pole1' => $subiektProduct->Pole1 ?? $subiektProduct->pole1 ?? null,
+            'Pole3' => $subiektProduct->Pole3 ?? $subiektProduct->pole3 ?? null,
+            'Pole4' => $subiektProduct->Pole4 ?? $subiektProduct->pole4 ?? null,
+            'Pole5' => $subiektProduct->Pole5 ?? $subiektProduct->pole5 ?? null,
+            'Notes' => $subiektProduct->Notes ?? $subiektProduct->notes ?? null,
+            // Boolean fields (tw_SklepInternet, tw_MechanizmPodzielonejPlatnosci)
+            'ShopInternet' => $subiektProduct->ShopInternet ?? $subiektProduct->shopInternet ?? null,
+            'SplitPayment' => $subiektProduct->SplitPayment ?? $subiektProduct->splitPayment ?? null,
+            // Additional identification fields
+            'ManufacturerName' => $subiektProduct->ManufacturerName ?? $subiektProduct->manufacturerName ?? null,
+            'SupplierCode' => $subiektProduct->SupplierCode ?? $subiektProduct->supplierCode ?? null,
             // Metadata
             'fetched_via' => 'rest_api',
             'fetched_at' => now()->toIso8601String(),

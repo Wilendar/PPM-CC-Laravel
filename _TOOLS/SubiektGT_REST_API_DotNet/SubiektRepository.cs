@@ -119,7 +119,10 @@ public class SubiektRepository : ISubiektRepository
                 t.tw_Pole3 AS Pole3,
                 t.tw_Pole4 AS Pole4,
                 t.tw_Pole5 AS Pole5,
-                t.tw_Uwagi AS Notes
+                t.tw_Uwagi AS Notes,
+                ISNULL(t.tw_SklepInternet, 0) AS ShopInternet,
+                ISNULL(t.tw_MechanizmPodzielonejPlatnosci, 0) AS SplitPayment,
+                t.tw_DostSymbol AS SupplierCode
             FROM tw__Towar t
             LEFT JOIN tw_Cena c ON t.tw_Id = c.tc_IdTowar
             LEFT JOIN tw_Stan s ON t.tw_Id = s.st_TowId AND s.st_MagId = @warehouseId
@@ -165,7 +168,10 @@ public class SubiektRepository : ISubiektRepository
                 t.tw_Pole3 AS Pole3,
                 t.tw_Pole4 AS Pole4,
                 t.tw_Pole5 AS Pole5,
-                t.tw_Uwagi AS Notes
+                t.tw_Uwagi AS Notes,
+                ISNULL(t.tw_SklepInternet, 0) AS ShopInternet,
+                ISNULL(t.tw_MechanizmPodzielonejPlatnosci, 0) AS SplitPayment,
+                t.tw_DostSymbol AS SupplierCode
             FROM tw__Towar t
             LEFT JOIN tw_Cena c ON t.tw_Id = c.tc_IdTowar
             LEFT JOIN tw_Stan s ON t.tw_Id = s.st_TowId AND s.st_MagId = @warehouseId
@@ -207,7 +213,10 @@ public class SubiektRepository : ISubiektRepository
                 t.tw_Pole3 AS Pole3,
                 t.tw_Pole4 AS Pole4,
                 t.tw_Pole5 AS Pole5,
-                t.tw_Uwagi AS Notes
+                t.tw_Uwagi AS Notes,
+                ISNULL(t.tw_SklepInternet, 0) AS ShopInternet,
+                ISNULL(t.tw_MechanizmPodzielonejPlatnosci, 0) AS SplitPayment,
+                t.tw_DostSymbol AS SupplierCode
             FROM tw__Towar t
             LEFT JOIN tw_Cena c ON t.tw_Id = c.tc_IdTowar
             LEFT JOIN tw_Stan s ON t.tw_Id = s.st_TowId AND s.st_MagId = @warehouseId
@@ -531,6 +540,9 @@ public class Product
     public string? Pole4 { get; set; }
     public string? Pole5 { get; set; }
     public string? Notes { get; set; }
+    public bool ShopInternet { get; set; }  // tw_SklepInternet
+    public bool SplitPayment { get; set; }  // tw_MechanizmPodzielonejPlatnosci
+    public string? SupplierCode { get; set; }  // tw_DostSymbol - Kod dostawcy
 }
 
 public class Stock
