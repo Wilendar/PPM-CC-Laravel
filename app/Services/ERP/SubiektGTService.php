@@ -15,6 +15,8 @@ use App\Services\ERP\SubiektGT\SubiektDataTransformer;
 use App\Services\ERP\SubiektGT\SubiektRestApiClient;
 use App\Services\ERP\SubiektGT\SubiektVariantResolver;
 use App\Models\ProductVariant;
+use App\Models\VariantPrice;
+use App\Models\VariantStock;
 use App\Exceptions\SubiektApiException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -586,11 +588,41 @@ class SubiektGTService implements ERPSyncServiceInterface
                 (string) $connection->id
             );
 
+            // === PULL VARIANTS IF PRODUCT IS VARIANT MASTER ===
+            $variantsUpdated = 0;
+            $variantsFailed = 0;
+            if ($product->is_variant_master && $product->variants()->count() > 0) {
+                Log::info('syncProductFromERP: Product is variant master, pulling variants from Subiekt', [
+                    'product_id' => $product->id,
+                    'sku' => $product->sku,
+                    'variants_count' => $product->variants()->count(),
+                ]);
+
+                try {
+                    $variantPullResult = $this->pullProductVariantsFromSubiekt($connection, $product);
+                    $variantsUpdated = $variantPullResult['updated'] ?? 0;
+                    $variantsFailed = $variantPullResult['failed'] ?? 0;
+
+                    Log::info('syncProductFromERP: Variants pull completed', [
+                        'product_id' => $product->id,
+                        'variants_updated' => $variantsUpdated,
+                        'variants_failed' => $variantsFailed,
+                    ]);
+                } catch (\Exception $e) {
+                    Log::error('syncProductFromERP: Variants pull failed', [
+                        'product_id' => $product->id,
+                        'error' => $e->getMessage(),
+                    ]);
+                }
+            }
+
             return [
                 'success' => true,
-                'message' => 'Produkt pobrany pomyslnie',
+                'message' => 'Produkt pobrany pomyslnie' . ($variantsUpdated > 0 ? " (+ {$variantsUpdated} wariantów)" : ''),
                 'product' => $product,
                 'erp_data' => $ppmData,
+                'variants_updated' => $variantsUpdated,
+                'variants_failed' => $variantsFailed,
             ];
 
         } catch (\Exception $e) {
@@ -1222,6 +1254,42 @@ class SubiektGTService implements ERPSyncServiceInterface
                             $result = $this->importProduct($ppmData, $connection, $subiektProduct);
                             $wasUpdated = $result['updated'] ?? $result['created'] ?? false;
                             $updateDetails = ['type' => 'full'];
+                    }
+
+                    // === PULL VARIANTS IF PRODUCT IS VARIANT MASTER ===
+                    $variantsUpdated = 0;
+                    $variantsFailed = 0;
+                    if ($ppmProduct->is_variant_master && $ppmProduct->variants()->count() > 0) {
+                        Log::info('pullLinkedProducts: Product is variant master, pulling variants from Subiekt', [
+                            'product_id' => $ppmProduct->id,
+                            'sku' => $sku,
+                            'variants_count' => $ppmProduct->variants()->count(),
+                        ]);
+
+                        try {
+                            $variantPullResult = $this->pullProductVariantsFromSubiekt($connection, $ppmProduct);
+                            $variantsUpdated = $variantPullResult['updated'] ?? 0;
+                            $variantsFailed = $variantPullResult['failed'] ?? 0;
+
+                            if ($variantsUpdated > 0) {
+                                $wasUpdated = true;
+                                $updateDetails['variants_updated'] = $variantsUpdated;
+                            }
+                            if ($variantsFailed > 0) {
+                                $updateDetails['variants_failed'] = $variantsFailed;
+                            }
+
+                            Log::info('pullLinkedProducts: Variants pull completed', [
+                                'product_id' => $ppmProduct->id,
+                                'variants_updated' => $variantsUpdated,
+                                'variants_failed' => $variantsFailed,
+                            ]);
+                        } catch (\Exception $e) {
+                            Log::error('pullLinkedProducts: Variants pull failed', [
+                                'product_id' => $ppmProduct->id,
+                                'error' => $e->getMessage(),
+                            ]);
+                        }
                     }
 
                     if ($wasUpdated) {
@@ -2524,6 +2592,27 @@ class SubiektGTService implements ERPSyncServiceInterface
                             (string) $connection->id
                         );
 
+                        // === SYNC VARIANTS IF PRODUCT IS VARIANT MASTER ===
+                        $variantsSynced = 0;
+                        $variantsFailed = 0;
+                        if ($product->is_variant_master && $product->variants()->count() > 0) {
+                            Log::info('SubiektGTService: Product is variant master, syncing variants', [
+                                'product_id' => $product->id,
+                                'sku' => $product->sku,
+                                'variant_count' => $product->variants()->count(),
+                            ]);
+
+                            $variantResult = $this->syncProductVariantsToSubiekt($connection, $product);
+                            $variantsSynced = $variantResult['synced'] ?? 0;
+                            $variantsFailed = $variantResult['failed'] ?? 0;
+
+                            Log::info('SubiektGTService: Variants sync completed', [
+                                'product_id' => $product->id,
+                                'synced' => $variantsSynced,
+                                'failed' => $variantsFailed,
+                            ]);
+                        }
+
                         return [
                             'success' => true,
                             'message' => $updateResult['message'] ?? 'Produkt zaktualizowany w Subiekt GT',
@@ -2533,6 +2622,8 @@ class SubiektGTService implements ERPSyncServiceInterface
                             'updated_fields' => $updateResult['updated_fields'] ?? [],
                             'prices_updated' => $updateResult['prices_updated'] ?? 0,
                             'sku' => $product->sku,
+                            'variants_synced' => $variantsSynced,
+                            'variants_failed' => $variantsFailed,
                         ];
                     }
 
@@ -3334,20 +3425,19 @@ class SubiektGTService implements ERPSyncServiceInterface
      * In Subiekt GT, tw_Pole2 is used to store location information.
      * This method aggregates locations from all warehouses into a CSV string.
      *
-     * Format: "WAREHOUSE1:LOCATION1,WAREHOUSE2:LOCATION2"
-     * Example: "MPPTRADE:A-12-3,PITBIKE:B-05-1"
+     * Format: "LOCATION1,LOCATION2,LOCATION3"
+     * Example: "A-12-3,B-05-1,C-07"
+     *
+     * Note: Warehouse prefix is NOT included - only raw location values
+     * separated by comma. This matches user requirement for simple format.
      *
      * @param Product $product
      * @param array $config Connection config (for warehouse mappings)
-     * @return string|null CSV of warehouse:location pairs or null if no locations
+     * @return string|null CSV of locations or null if no locations
      */
     protected function mapStockLocations(Product $product, array $config): ?string
     {
         $locations = [];
-
-        // Get warehouse mappings (PPM_ID => ERP_ID)
-        $erpToPpmWarehouseMapping = $config['warehouse_mappings'] ?? [];
-        $ppmToErpWarehouseMapping = array_flip($erpToPpmWarehouseMapping);
 
         // Get product stock entries
         $productStock = $product->stock ?? collect();
@@ -3356,20 +3446,14 @@ class SubiektGTService implements ERPSyncServiceInterface
         }
 
         foreach ($productStock as $stockData) {
-            $ppmWarehouseId = $stockData['warehouse_id'] ?? null;
             $location = $stockData['location'] ?? null;
 
-            if ($ppmWarehouseId && !empty($location)) {
-                // Try to get warehouse name for better readability
-                $warehouseName = $stockData['warehouse_name'] ?? null;
-
-                // Get ERP warehouse ID if mapped
-                $erpWarehouseId = $ppmToErpWarehouseMapping[$ppmWarehouseId] ?? null;
-
-                // Use warehouse name if available, otherwise use ERP ID or PPM ID
-                $warehouseKey = $warehouseName ?? "WH{$erpWarehouseId}" ?? "PPM{$ppmWarehouseId}";
-
-                $locations[] = "{$warehouseKey}:" . mb_substr($location, 0, 30);
+            if (!empty($location)) {
+                // Add location without warehouse prefix - simple comma-separated format
+                $trimmedLocation = trim(mb_substr($location, 0, 30));
+                if (!empty($trimmedLocation) && !in_array($trimmedLocation, $locations)) {
+                    $locations[] = $trimmedLocation;
+                }
             }
         }
 
@@ -4049,5 +4133,278 @@ class SubiektGTService implements ERPSyncServiceInterface
             'pole8' => $resolver->buildPole8Value($parentSku),  // TYLKO Pole8!
             'is_active' => $variant->is_active,
         ];
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | VARIANT PULL METHODS (Subiekt GT -> PPM)
+    |--------------------------------------------------------------------------
+    | Pull prices and stock for product variants from Subiekt GT.
+    | Variants in Subiekt are separate products with Pole8 = parent_sku.
+    */
+
+    /**
+     * Pull variant data from Subiekt GT for a variant master product.
+     *
+     * Finds all Subiekt products where Pole8 = parent_sku, matches them
+     * to PPM ProductVariant by SKU, and updates prices/stock.
+     *
+     * @param ERPConnection $connection
+     * @param Product $product The variant master product
+     * @return array Result with counts
+     */
+    public function pullProductVariantsFromSubiekt(ERPConnection $connection, Product $product): array
+    {
+        if (!$product->is_variant_master) {
+            return [
+                'success' => false,
+                'message' => 'Product is not a variant master',
+                'updated' => 0,
+                'errors' => [],
+            ];
+        }
+
+        $this->initializeForConnection($connection);
+        $config = $connection->connection_config ?? [];
+
+        $results = [
+            'success' => true,
+            'updated' => 0,
+            'skipped' => 0,
+            'not_found' => 0,
+            'errors' => [],
+        ];
+
+        $parentSku = $product->sku;
+        $variants = $product->variants()->get();
+
+        if ($variants->isEmpty()) {
+            return [
+                'success' => true,
+                'message' => 'No variants to pull',
+                'updated' => 0,
+            ];
+        }
+
+        Log::info('pullProductVariantsFromSubiekt: Starting', [
+            'parent_sku' => $parentSku,
+            'variant_count' => $variants->count(),
+            'connection_id' => $connection->id,
+        ]);
+
+        // Get warehouse and price group mappings
+        $warehouseMappings = $config['warehouse_mappings'] ?? [];
+        $priceGroupMappings = $config['price_group_mappings'] ?? [];
+
+        foreach ($variants as $variant) {
+            try {
+                // Find variant in Subiekt by SKU
+                $subiektProduct = $this->restApiClient->getProductBySku($variant->sku);
+
+                if (!$subiektProduct || !isset($subiektProduct['data'])) {
+                    $results['not_found']++;
+                    Log::debug('pullProductVariantsFromSubiekt: Variant not found in Subiekt', [
+                        'variant_sku' => $variant->sku,
+                    ]);
+                    continue;
+                }
+
+                $subiektData = $subiektProduct['data'];
+
+                // Verify this is actually a variant of our parent (Pole8 check)
+                $pole8Value = $subiektData['pole8'] ?? $subiektData['Pole8'] ?? null;
+                if ($pole8Value && $pole8Value !== $parentSku) {
+                    Log::warning('pullProductVariantsFromSubiekt: Pole8 mismatch', [
+                        'variant_sku' => $variant->sku,
+                        'expected_parent' => $parentSku,
+                        'actual_pole8' => $pole8Value,
+                    ]);
+                }
+
+                // Get prices for variant
+                $pricesResponse = $this->restApiClient->getProductPricesBySku($variant->sku);
+                $subiektPrices = $pricesResponse['data'] ?? [];
+
+                // Get stock for variant
+                $stockResponse = $this->restApiClient->getProductStockBySku($variant->sku);
+                $subiektStock = $stockResponse['data'] ?? [];
+
+                // Update variant prices
+                $pricesUpdated = $this->updateVariantPricesFromErp($variant, $subiektPrices, $priceGroupMappings);
+
+                // Update variant stock
+                $stockUpdated = $this->updateVariantStockFromErp($variant, $subiektStock, $warehouseMappings);
+
+                if ($pricesUpdated || $stockUpdated) {
+                    $results['updated']++;
+                    Log::debug('pullProductVariantsFromSubiekt: Variant updated', [
+                        'variant_sku' => $variant->sku,
+                        'prices_updated' => $pricesUpdated,
+                        'stock_updated' => $stockUpdated,
+                    ]);
+                } else {
+                    $results['skipped']++;
+                }
+
+            } catch (\Exception $e) {
+                $results['errors'][] = [
+                    'variant_sku' => $variant->sku,
+                    'error' => $e->getMessage(),
+                ];
+                Log::error('pullProductVariantsFromSubiekt: Error', [
+                    'variant_sku' => $variant->sku,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        $results['success'] = empty($results['errors']);
+
+        Log::info('pullProductVariantsFromSubiekt: Completed', [
+            'parent_sku' => $parentSku,
+            'updated' => $results['updated'],
+            'skipped' => $results['skipped'],
+            'not_found' => $results['not_found'],
+            'errors_count' => count($results['errors']),
+        ]);
+
+        return $results;
+    }
+
+    /**
+     * Update variant prices from Subiekt GT data.
+     *
+     * @param ProductVariant $variant
+     * @param array $subiektPrices Prices from Subiekt API
+     * @param array $priceGroupMappings Subiekt level -> PPM price_group_id
+     * @return bool True if any prices were updated
+     */
+    protected function updateVariantPricesFromErp(ProductVariant $variant, array $subiektPrices, array $priceGroupMappings): bool
+    {
+        $updated = false;
+
+        Log::debug('updateVariantPricesFromErp: Starting', [
+            'variant_sku' => $variant->sku,
+            'subiekt_prices_count' => count($subiektPrices),
+            'subiekt_prices_sample' => array_slice($subiektPrices, 0, 3),
+            'price_group_mappings_count' => count($priceGroupMappings),
+            'price_group_mappings' => $priceGroupMappings,
+        ]);
+
+        foreach ($subiektPrices as $priceData) {
+            $subiektLevel = $priceData['level'] ?? $priceData['Level'] ?? $priceData['priceLevel'] ?? null;
+            $priceNet = $priceData['priceNet'] ?? $priceData['PriceNet'] ?? null;
+
+            if ($subiektLevel === null || $priceNet === null) {
+                continue;
+            }
+
+            // Skip level 0 (unused in Subiekt GT)
+            if ($subiektLevel == 0) {
+                continue;
+            }
+
+            // Find PPM price group ID from mapping
+            // Mappings format: {subiektLevel: ppmId} e.g. {"1":81,"2":82}
+            $ppmPriceGroupId = null;
+
+            // Try both int and string keys
+            if (isset($priceGroupMappings[$subiektLevel])) {
+                $ppmPriceGroupId = $priceGroupMappings[$subiektLevel];
+            } elseif (isset($priceGroupMappings[(string)$subiektLevel])) {
+                $ppmPriceGroupId = $priceGroupMappings[(string)$subiektLevel];
+            }
+
+            if (!$ppmPriceGroupId) {
+                Log::debug('updateVariantPricesFromErp: No mapping for level', [
+                    'variant_sku' => $variant->sku,
+                    'subiekt_level' => $subiektLevel,
+                ]);
+                continue;
+            }
+
+            // Update or create variant price
+            $variantPrice = VariantPrice::updateOrCreate(
+                [
+                    'variant_id' => $variant->id,
+                    'price_group_id' => $ppmPriceGroupId,
+                ],
+                [
+                    'price' => (float) $priceNet,
+                ]
+            );
+
+            if ($variantPrice->wasRecentlyCreated || $variantPrice->wasChanged()) {
+                $updated = true;
+            }
+        }
+
+        return $updated;
+    }
+
+    /**
+     * Update variant stock from Subiekt GT data.
+     *
+     * @param ProductVariant $variant
+     * @param array $subiektStock Stock from Subiekt API
+     * @param array $warehouseMappings Subiekt warehouse_id -> PPM warehouse_id
+     * @return bool True if any stock was updated
+     */
+    protected function updateVariantStockFromErp(ProductVariant $variant, array $subiektStock, array $warehouseMappings): bool
+    {
+        $updated = false;
+
+        Log::debug('updateVariantStockFromErp: Starting', [
+            'variant_sku' => $variant->sku,
+            'subiekt_stock_count' => count($subiektStock),
+            'subiekt_stock' => $subiektStock,
+            'warehouse_mappings_count' => count($warehouseMappings),
+            'warehouse_mappings' => $warehouseMappings,
+        ]);
+
+        foreach ($subiektStock as $stockData) {
+            $subiektWarehouseId = $stockData['warehouseId'] ?? $stockData['WarehouseId'] ?? $stockData['warehouse_id'] ?? null;
+            $quantity = $stockData['quantity'] ?? $stockData['Quantity'] ?? $stockData['stock'] ?? 0;
+
+            if ($subiektWarehouseId === null) {
+                continue;
+            }
+
+            // Find PPM warehouse ID from mapping
+            // Mappings format: {subiektWarehouseId: ppmId} e.g. {"1":86,"4":88}
+            $ppmWarehouseId = null;
+
+            // Try both int and string keys
+            if (isset($warehouseMappings[$subiektWarehouseId])) {
+                $ppmWarehouseId = $warehouseMappings[$subiektWarehouseId];
+            } elseif (isset($warehouseMappings[(string)$subiektWarehouseId])) {
+                $ppmWarehouseId = $warehouseMappings[(string)$subiektWarehouseId];
+            }
+
+            if (!$ppmWarehouseId) {
+                Log::debug('updateVariantStockFromErp: No mapping for warehouse', [
+                    'variant_sku' => $variant->sku,
+                    'subiekt_warehouse_id' => $subiektWarehouseId,
+                ]);
+                continue;
+            }
+
+            // Update or create variant stock
+            $variantStock = VariantStock::updateOrCreate(
+                [
+                    'variant_id' => $variant->id,
+                    'warehouse_id' => $ppmWarehouseId,
+                ],
+                [
+                    'quantity' => (int) $quantity,
+                ]
+            );
+
+            if ($variantStock->wasRecentlyCreated || $variantStock->wasChanged()) {
+                $updated = true;
+            }
+        }
+
+        return $updated;
     }
 }
