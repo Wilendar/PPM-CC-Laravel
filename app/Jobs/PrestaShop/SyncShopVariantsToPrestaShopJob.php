@@ -5,6 +5,8 @@ namespace App\Jobs\PrestaShop;
 use App\Models\Product;
 use App\Models\ShopVariant;
 use App\Models\PrestaShopShop;
+use App\Models\AttributeType;
+use App\Models\AttributeValue;
 use App\Services\PrestaShop\PrestaShop8Client;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -231,9 +233,10 @@ class SyncShopVariantsToPrestaShopJob implements ShouldQueue
         if ($combinationId > 0) {
             // Set attributes if provided
             // FIX 2025-12-08: Resolve PPM attribute IDs to PrestaShop attribute IDs
+            // FIX 2026-01-28: Pass client for auto-create of missing groups/values
             $attributes = $variantData['attributes'] ?? [];
             if (!empty($attributes)) {
-                $attributeIds = $this->resolvePrestaShopAttributeIds($attributes, $this->shopId);
+                $attributeIds = $this->resolvePrestaShopAttributeIds($attributes, $this->shopId, $client);
 
                 Log::debug('[SyncShopVariantsJob] Resolved attribute IDs for ADD', [
                     'ppm_attributes' => $attributes,
@@ -309,9 +312,10 @@ class SyncShopVariantsToPrestaShopJob implements ShouldQueue
 
         // Update attributes if provided
         // FIX 2025-12-08: Resolve PPM attribute IDs to PrestaShop attribute IDs
+        // FIX 2026-01-28: Pass client for auto-create of missing groups/values
         $attributes = $variantData['attributes'] ?? [];
         if (!empty($attributes)) {
-            $attributeIds = $this->resolvePrestaShopAttributeIds($attributes, $this->shopId);
+            $attributeIds = $this->resolvePrestaShopAttributeIds($attributes, $this->shopId, $client);
 
             Log::debug('[SyncShopVariantsJob] Resolved attribute IDs for OVERRIDE', [
                 'ppm_attributes' => $attributes,
@@ -395,6 +399,9 @@ class SyncShopVariantsToPrestaShopJob implements ShouldQueue
      * FIX 2025-12-08: PPM stores attributes as [attribute_type_id => value_id]
      * but PrestaShop needs ps_attribute.id_attribute from prestashop_attribute_value_mapping
      *
+     * FIX 2026-01-28: AUTO-CREATE missing attribute groups and values in PrestaShop
+     * If group "Rozmiar" doesn't exist → create it via API and save mapping
+     *
      * SUPPORTS MULTIPLE FORMATS:
      * 1. PPM format: [attribute_type_id => value_id] (from UI input)
      * 2. PrestaShop format: [['prestashop_attribute_id' => X]] (already resolved)
@@ -402,9 +409,10 @@ class SyncShopVariantsToPrestaShopJob implements ShouldQueue
      *
      * @param array $attributes PPM attributes array
      * @param int $shopId PrestaShop shop ID
+     * @param PrestaShop8Client|null $client Optional client for auto-create
      * @return array PrestaShop attribute IDs
      */
-    protected function resolvePrestaShopAttributeIds(array $attributes, int $shopId): array
+    protected function resolvePrestaShopAttributeIds(array $attributes, int $shopId, ?PrestaShop8Client $client = null): array
     {
         $prestashopAttributeIds = [];
 
@@ -433,10 +441,11 @@ class SyncShopVariantsToPrestaShopJob implements ShouldQueue
 
             // PPM format: $key = attribute_type_id, $value = attribute_value_id
             $attributeValueId = (int) $value;
+            $attributeTypeId = (int) $key;
 
             if ($attributeValueId <= 0) {
                 Log::warning('[SyncShopVariantsJob] Invalid attribute_value_id', [
-                    'attribute_type_id' => $key,
+                    'attribute_type_id' => $attributeTypeId,
                     'value' => $value,
                 ]);
                 continue;
@@ -447,12 +456,38 @@ class SyncShopVariantsToPrestaShopJob implements ShouldQueue
             if ($psId) {
                 $prestashopAttributeIds[] = $psId;
             } else {
-                Log::warning('[SyncShopVariantsJob] No PrestaShop mapping found for attribute', [
-                    'attribute_type_id' => $key,
-                    'attribute_value_id' => $attributeValueId,
-                    'shop_id' => $shopId,
-                    'hint' => 'Run attribute sync first to create mappings',
-                ]);
+                // FIX 2026-01-28: AUTO-CREATE missing attribute group and value
+                if ($client !== null) {
+                    Log::info('[SyncShopVariantsJob] Attempting auto-create for missing attribute', [
+                        'attribute_type_id' => $attributeTypeId,
+                        'attribute_value_id' => $attributeValueId,
+                        'shop_id' => $shopId,
+                    ]);
+
+                    $psId = $this->ensureAttributeValueMapped($client, $attributeValueId, $shopId);
+
+                    if ($psId) {
+                        $prestashopAttributeIds[] = $psId;
+                        Log::info('[SyncShopVariantsJob] Auto-created attribute mapping', [
+                            'attribute_value_id' => $attributeValueId,
+                            'prestashop_attribute_id' => $psId,
+                            'shop_id' => $shopId,
+                        ]);
+                    } else {
+                        Log::error('[SyncShopVariantsJob] Failed to auto-create attribute mapping', [
+                            'attribute_type_id' => $attributeTypeId,
+                            'attribute_value_id' => $attributeValueId,
+                            'shop_id' => $shopId,
+                        ]);
+                    }
+                } else {
+                    Log::warning('[SyncShopVariantsJob] No PrestaShop mapping found for attribute (no client for auto-create)', [
+                        'attribute_type_id' => $attributeTypeId,
+                        'attribute_value_id' => $attributeValueId,
+                        'shop_id' => $shopId,
+                        'hint' => 'Run attribute sync first to create mappings',
+                    ]);
+                }
             }
         }
 
