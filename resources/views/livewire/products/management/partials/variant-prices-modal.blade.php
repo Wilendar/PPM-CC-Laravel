@@ -34,16 +34,32 @@
                     </button>
                 </div>
 
+                {{-- Sync Lock Banner --}}
+                @if($this->isVariantModalLocked())
+                <div class="px-6 py-3 bg-amber-900/30 border-b border-amber-700/50">
+                    <div class="flex items-center gap-2 text-amber-400 text-sm">
+                        <svg class="w-5 h-5 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                        </svg>
+                        <span class="font-medium">{{ $this->getVariantModalLockReason() }}</span>
+                        <span class="text-amber-500">- edycja zablokowana</span>
+                    </div>
+                </div>
+                @endif
+
                 {{-- Content --}}
-                <div class="px-6 py-4 max-h-[60vh] overflow-y-auto"
+                <div class="px-6 py-4 max-h-[60vh] overflow-y-auto {{ $this->isVariantModalLocked() ? 'opacity-60' : '' }}"
                      x-data="{
                          taxRate: {{ $tax_rate ?? 23 }},
+                         isLocked: {{ $this->isVariantModalLocked() ? 'true' : 'false' }},
                          calculateGross(netValue, groupId) {
+                             if (this.isLocked) return;
                              if (!netValue || netValue === '') return;
                              const gross = parseFloat(netValue) * (1 + this.taxRate / 100);
                              $wire.set('variantModalPrices.' + groupId + '.gross', gross.toFixed(2));
                          },
                          calculateNet(grossValue, groupId) {
+                             if (this.isLocked) return;
                              if (!grossValue || grossValue === '') return;
                              const net = parseFloat(grossValue) / (1 + this.taxRate / 100);
                              $wire.set('variantModalPrices.' + groupId + '.net', net.toFixed(2));
@@ -77,8 +93,9 @@
                                                min="0"
                                                wire:model.defer="variantModalPrices.{{ $groupId }}.net"
                                                @input="calculateGross($event.target.value, {{ $groupId }})"
-                                               class="variant-modal-price-input w-full text-right"
-                                               placeholder="0.00">
+                                               class="variant-modal-price-input w-full text-right {{ $this->isVariantModalLocked() ? 'field-pending-sync' : '' }}"
+                                               placeholder="0.00"
+                                               {{ $this->isVariantModalLocked() ? 'disabled' : '' }}>
                                     </td>
 
                                     {{-- Price Gross --}}
@@ -88,8 +105,9 @@
                                                min="0"
                                                wire:model.defer="variantModalPrices.{{ $groupId }}.gross"
                                                @input="calculateNet($event.target.value, {{ $groupId }})"
-                                               class="variant-modal-price-input w-full text-right"
-                                               placeholder="0.00">
+                                               class="variant-modal-price-input w-full text-right {{ $this->isVariantModalLocked() ? 'field-pending-sync' : '' }}"
+                                               placeholder="0.00"
+                                               {{ $this->isVariantModalLocked() ? 'disabled' : '' }}>
                                     </td>
                                 </tr>
                             @empty
@@ -121,7 +139,8 @@
                     <button type="button"
                             wire:click="saveVariantModalPrices"
                             wire:loading.attr="disabled"
-                            class="btn-enterprise-primary px-4 py-2 text-sm font-medium rounded-lg inline-flex items-center gap-2">
+                            {{ $this->isVariantModalLocked() ? 'disabled' : '' }}
+                            class="btn-enterprise-primary px-4 py-2 text-sm font-medium rounded-lg inline-flex items-center gap-2 {{ $this->isVariantModalLocked() ? 'opacity-50 cursor-not-allowed' : '' }}">
                         <span wire:loading.remove wire:target="saveVariantModalPrices">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
@@ -133,7 +152,7 @@
                                 <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                             </svg>
                         </span>
-                        Zapisz zmiany
+                        {{ $this->isVariantModalLocked() ? 'Zablokowane' : 'Zapisz zmiany' }}
                     </button>
                 </div>
             </div>

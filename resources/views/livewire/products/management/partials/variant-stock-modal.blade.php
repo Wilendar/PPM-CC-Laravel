@@ -34,8 +34,21 @@
                     </button>
                 </div>
 
+                {{-- Sync Lock Banner --}}
+                @if($this->isVariantModalLocked())
+                <div class="px-6 py-3 bg-amber-900/30 border-b border-amber-700/50">
+                    <div class="flex items-center gap-2 text-amber-400 text-sm">
+                        <svg class="w-5 h-5 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                        </svg>
+                        <span class="font-medium">{{ $this->getVariantModalLockReason() }}</span>
+                        <span class="text-amber-500">- edycja zablokowana</span>
+                    </div>
+                </div>
+                @endif
+
                 {{-- Content --}}
-                <div class="px-4 py-4 max-h-[60vh] overflow-y-auto overflow-x-auto">
+                <div class="px-4 py-4 max-h-[60vh] overflow-y-auto overflow-x-auto {{ $this->isVariantModalLocked() ? 'opacity-60' : '' }}">
                     {{-- Stock Table --}}
                     <table class="variant-modal-table w-full text-sm min-w-[700px]">
                         <thead class="text-xs text-gray-400 uppercase bg-gray-900/50">
@@ -61,8 +74,9 @@
                                                step="1"
                                                min="0"
                                                wire:model.defer="variantModalStock.{{ $warehouseId }}.quantity"
-                                               class="variant-modal-stock-input w-full text-right"
-                                               placeholder="0">
+                                               class="variant-modal-stock-input w-full text-right {{ $this->isVariantModalLocked() ? 'field-pending-sync' : '' }}"
+                                               placeholder="0"
+                                               {{ $this->isVariantModalLocked() ? 'disabled' : '' }}>
                                     </td>
 
                                     {{-- Reserved --}}
@@ -71,8 +85,9 @@
                                                step="1"
                                                min="0"
                                                wire:model.defer="variantModalStock.{{ $warehouseId }}.reserved"
-                                               class="variant-modal-stock-input w-full text-right"
-                                               placeholder="0">
+                                               class="variant-modal-stock-input w-full text-right {{ $this->isVariantModalLocked() ? 'field-pending-sync' : '' }}"
+                                               placeholder="0"
+                                               {{ $this->isVariantModalLocked() ? 'disabled' : '' }}>
                                     </td>
 
                                     {{-- Minimum --}}
@@ -81,16 +96,18 @@
                                                step="1"
                                                min="0"
                                                wire:model.defer="variantModalStock.{{ $warehouseId }}.minimum"
-                                               class="variant-modal-stock-input w-full text-right"
-                                               placeholder="0">
+                                               class="variant-modal-stock-input w-full text-right {{ $this->isVariantModalLocked() ? 'field-pending-sync' : '' }}"
+                                               placeholder="0"
+                                               {{ $this->isVariantModalLocked() ? 'disabled' : '' }}>
                                     </td>
 
                                     {{-- Location --}}
                                     <td class="px-2 py-2">
                                         <input type="text"
                                                wire:model.defer="variantModalStock.{{ $warehouseId }}.location"
-                                               class="variant-modal-location-input w-full"
-                                               placeholder="A1-R2">
+                                               class="variant-modal-location-input w-full {{ $this->isVariantModalLocked() ? 'field-pending-sync' : '' }}"
+                                               placeholder="A1-R2"
+                                               {{ $this->isVariantModalLocked() ? 'disabled' : '' }}>
                                     </td>
                                 </tr>
                             @empty
@@ -115,7 +132,8 @@
                     <button type="button"
                             wire:click="saveVariantModalStock"
                             wire:loading.attr="disabled"
-                            class="btn-enterprise-primary px-4 py-2 text-sm font-medium rounded-lg inline-flex items-center gap-2">
+                            {{ $this->isVariantModalLocked() ? 'disabled' : '' }}
+                            class="btn-enterprise-primary px-4 py-2 text-sm font-medium rounded-lg inline-flex items-center gap-2 {{ $this->isVariantModalLocked() ? 'opacity-50 cursor-not-allowed' : '' }}">
                         <span wire:loading.remove wire:target="saveVariantModalStock">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
@@ -127,7 +145,7 @@
                                 <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                             </svg>
                         </span>
-                        Zapisz zmiany
+                        {{ $this->isVariantModalLocked() ? 'Zablokowane' : 'Zapisz zmiany' }}
                     </button>
                 </div>
             </div>

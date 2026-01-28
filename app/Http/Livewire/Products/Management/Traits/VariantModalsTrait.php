@@ -322,4 +322,52 @@ trait VariantModalsTrait
             $this->variantModalStock[$warehouseId]['location'] = $location;
         }
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | SYNC LOCK METHODS
+    |--------------------------------------------------------------------------
+    */
+
+    /**
+     * Check if variant modal should be locked (active sync job running)
+     *
+     * Mirrors the parent product lock behavior:
+     * - PrestaShop sync job active
+     * - ERP sync job active
+     *
+     * @return bool True if modal inputs should be disabled
+     */
+    public function isVariantModalLocked(): bool
+    {
+        // Check PrestaShop sync job (uses hasActiveSyncJob from ProductForm)
+        if (method_exists($this, 'hasActiveSyncJob') && $this->hasActiveSyncJob()) {
+            return true;
+        }
+
+        // Check ERP sync job (uses hasActiveErpSyncJob from ProductFormERPTabs)
+        if (method_exists($this, 'hasActiveErpSyncJob') && $this->hasActiveErpSyncJob()) {
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * Get lock reason for variant modal (for display in UI)
+     *
+     * @return string|null Lock reason or null if not locked
+     */
+    public function getVariantModalLockReason(): ?string
+    {
+        if (method_exists($this, 'hasActiveErpSyncJob') && $this->hasActiveErpSyncJob()) {
+            return 'Synchronizacja ERP w trakcie';
+        }
+
+        if (method_exists($this, 'hasActiveSyncJob') && $this->hasActiveSyncJob()) {
+            return 'Synchronizacja PrestaShop w trakcie';
+        }
+
+        return null;
+    }
 }
