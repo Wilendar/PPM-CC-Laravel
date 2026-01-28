@@ -261,6 +261,15 @@
     transform: translateY(0);
 }
 
+/* Alpine.js x-show compatibility - override visibility when Alpine shows element */
+/* Alpine removes display:none when x-show=true, so we match elements without it */
+.dropdown-menu[style*="display: block"],
+.dropdown-menu[style]:not([style*="display: none"]):not([style=""]) {
+    opacity: 1 !important;
+    visibility: visible !important;
+    transform: translateY(0) !important;
+}
+
 .dropdown-item {
     display: flex;
     align-items: center;
