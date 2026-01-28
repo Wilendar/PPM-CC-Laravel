@@ -5,7 +5,7 @@
    ======================================== */
 
 .admin-header {
-    z-index: 20 !important;
+    z-index: 100 !important;
     position: relative !important;
     overflow: visible !important;
     background: linear-gradient(135deg, rgba(15, 23, 42, 0.95) 0%, rgba(30, 41, 59, 0.95) 100%);
