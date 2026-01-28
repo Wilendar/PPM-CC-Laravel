@@ -25,6 +25,7 @@ use App\Http\Livewire\Products\Management\Traits\ProductFormERPTabs;
 use App\Http\Livewire\Products\Management\Traits\ProductFormFeatures;
 use App\Http\Livewire\Products\Management\Traits\ProductFormVariants;
 use App\Http\Livewire\Products\Management\Traits\VariantShopContextTrait;
+use App\Http\Livewire\Products\Management\Traits\VariantModalsTrait;
 use App\Http\Livewire\Products\Management\Traits\ProductFormCompatibility;
 use App\Http\Livewire\Products\Management\Traits\ProductFormVisualDescription;
 use App\Http\Livewire\Products\Management\Services\ProductMultiStoreManager;
@@ -63,6 +64,7 @@ class ProductForm extends Component
     use ProductFormFeatures;
     use ProductFormVariants;
     use VariantShopContextTrait;
+    use VariantModalsTrait;
     use ProductFormCompatibility;
     use ProductFormVisualDescription;
 

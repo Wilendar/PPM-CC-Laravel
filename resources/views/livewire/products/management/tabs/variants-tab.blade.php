@@ -586,9 +586,16 @@
                                         {{ number_format($priceValue, 2, ',', ' ') }} PLN
                                     </div>
                                 @else
-                                    <div class="text-sm font-medium text-gray-300">
+                                    {{-- ETAP_14: Clickable price opens prices modal --}}
+                                    <button type="button"
+                                            wire:click="openVariantPricesModal({{ $variant->id }})"
+                                            class="variant-price-btn text-sm font-medium text-gray-300 hover:text-white"
+                                            title="Kliknij aby edytowac ceny wariantu">
                                         {{ number_format($priceValue, 2, ',', ' ') }} PLN
-                                    </div>
+                                        <svg class="w-3 h-3 ml-1 inline opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/>
+                                        </svg>
+                                    </button>
                                     @if($priceModifier != 0)
                                         <div class="text-xs text-gray-500">
                                             {{ $priceModifier > 0 ? '+' : '' }}{{ number_format($priceModifier, 2, ',', ' ') }} PLN
@@ -625,9 +632,16 @@
                                         {{ $stockValue }} szt.
                                     </div>
                                 @else
-                                    <div class="text-sm font-medium {{ $stockClass }}">
+                                    {{-- ETAP_14: Clickable stock opens stock modal --}}
+                                    <button type="button"
+                                            wire:click="openVariantStockModal({{ $variant->id }})"
+                                            class="variant-stock-btn text-sm font-medium {{ $stockClass }} hover:opacity-80"
+                                            title="Kliknij aby edytowac stany magazynowe wariantu">
                                         {{ $stockValue }} szt.
-                                    </div>
+                                        <svg class="w-3 h-3 ml-1 inline opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
+                                        </svg>
+                                    </button>
                                 @endif
                             </td>
 
@@ -1133,3 +1147,9 @@
         </div>
     </template>
 @endif
+
+{{-- ETAP_14: Variant Prices Modal --}}
+@include('livewire.products.management.partials.variant-prices-modal')
+
+{{-- ETAP_14: Variant Stock Modal --}}
+@include('livewire.products.management.partials.variant-stock-modal')
