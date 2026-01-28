@@ -188,10 +188,57 @@ Route::middleware(['auth'])->group(function () {
         return view('profile.edit');
     })->name('profile.edit');
 
-    Route::put('/profile', function () {
-        // Profile update logic
-        return redirect()->route('profile.show');
+    Route::patch('/profile', function (\Illuminate\Http\Request $request) {
+        $user = auth()->user();
+
+        $validated = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'email' => ['required', 'email', 'max:255', 'unique:users,email,' . $user->id],
+            'current_password' => ['nullable', 'current_password'],
+            'password' => ['nullable', 'min:8', 'confirmed'],
+            'avatar' => ['nullable', 'image', 'mimes:jpeg,png,gif,webp', 'max:2048'],
+            'remove_avatar' => ['nullable', 'boolean'],
+        ]);
+
+        $user->name = $validated['name'];
+        $user->email = $validated['email'];
+
+        if (!empty($validated['password'])) {
+            $user->password = bcrypt($validated['password']);
+        }
+
+        // Handle avatar removal
+        if ($request->boolean('remove_avatar') && $user->avatar) {
+            \Illuminate\Support\Facades\Storage::disk('public')->delete($user->avatar);
+            $user->avatar = null;
+        }
+
+        // Handle avatar upload
+        if ($request->hasFile('avatar')) {
+            // Delete old avatar if exists
+            if ($user->avatar) {
+                \Illuminate\Support\Facades\Storage::disk('public')->delete($user->avatar);
+            }
+
+            // Store new avatar
+            $path = $request->file('avatar')->store('avatars', 'public');
+            $user->avatar = $path;
+        }
+
+        $user->save();
+
+        return redirect()->route('profile.show')->with('success', 'Profil zaktualizowany pomyslnie.');
     })->name('profile.update');
+
+    Route::delete('/profile', function (\Illuminate\Http\Request $request) {
+        $user = auth()->user();
+        auth()->logout();
+        $user->delete();
+        $request->session()->invalidate();
+        $request->session()->regenerateToken();
+
+        return redirect('/')->with('success', 'Konto zostalo usuniete.');
+    })->name('profile.destroy');
 
     // Additional profile routes
     // Active Sessions Management - ETAP_04 FAZA A (User Management - planned)

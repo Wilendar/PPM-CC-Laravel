@@ -100,12 +100,16 @@
                         <!-- User Menu -->
                         <div class="relative" x-data="{ open: false }">
                             <button @click="open = !open" class="flex items-center space-x-2 text-sm rounded-lg p-2 hover:bg-gray-700 transition-colors duration-200">
-                                <div class="w-8 h-8 rounded-full flex items-center justify-center" style="background: linear-gradient(45deg, #e0ac7e, #d1975a);">
-                                    <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
-                                    </svg>
-                                </div>
-                                <span class="hidden sm:block text-white font-medium">Admin</span>
+                                @if(auth()->user() && auth()->user()->avatar)
+                                    <img src="{{ asset('storage/' . auth()->user()->avatar) }}"
+                                         alt="Avatar"
+                                         class="w-8 h-8 rounded-full object-cover border border-[#e0ac7e]/50">
+                                @else
+                                    <div class="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold text-gray-900" style="background: linear-gradient(45deg, #e0ac7e, #d1975a);">
+                                        {{ strtoupper(substr(auth()->user()->name ?? 'U', 0, 1)) }}
+                                    </div>
+                                @endif
+                                <span class="hidden sm:block text-white font-medium">{{ auth()->user()->name ?? 'Admin' }}</span>
                                 <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
                                 </svg>
