@@ -210,7 +210,7 @@ trait VariantValidation
                 'max:999999',
             ],
             'reserved' => [
-                'required',
+                'nullable',
                 'integer',
                 'min:0',
                 'lte:quantity',
@@ -222,7 +222,6 @@ trait VariantValidation
             'quantity.integer' => 'Ilość musi być liczbą całkowitą.',
             'quantity.min' => 'Ilość nie może być ujemna.',
             'quantity.max' => 'Ilość nie może przekraczać 999,999.',
-            'reserved.required' => 'Ilość zarezerwowana jest wymagana.',
             'reserved.integer' => 'Ilość zarezerwowana musi być liczbą całkowitą.',
             'reserved.min' => 'Ilość zarezerwowana nie może być ujemna.',
             'reserved.lte' => 'Zarezerwowana ilość nie może przekraczać dostępnej.',

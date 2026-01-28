@@ -113,10 +113,22 @@ class PermissionMatrix extends Component
             $this->showChangesModal = true;
             return;
         }
-        
+
         $this->selectedRole = $roleId;
         $this->loadRolePermissions();
         $this->calculateModuleStats();
+    }
+
+    /**
+     * Livewire hook - called when selectedRole changes via wire:model.live
+     */
+    public function updatedSelectedRole($value)
+    {
+        if ($value && !$this->hasChanges) {
+            $this->loadRolePermissions();
+        } elseif ($value && $this->hasChanges) {
+            $this->showChangesModal = true;
+        }
     }
 
     public function confirmRoleChange()
@@ -159,8 +171,74 @@ class PermissionMatrix extends Component
     // PERMISSION TOGGLE & MANAGEMENT
     // ==========================================
 
+    /**
+     * Check if permission is locked for editing (system roles can't have system/users permissions disabled)
+     */
+    public function isPermissionLocked(string $permissionName): bool
+    {
+        if (!$this->selectedRole) {
+            return false;
+        }
+
+        $role = Role::find($this->selectedRole);
+        if (!$role || !$role->is_system) {
+            return false;
+        }
+
+        // System roles have system.* and users.* permissions locked (always ON)
+        $lockedModules = ['system', 'users', 'audit'];
+        $module = explode('.', $permissionName)[0];
+
+        return in_array($module, $lockedModules);
+    }
+
+    /**
+     * Get list of locked permission IDs for the current role
+     */
+    public function getLockedPermissionIds(): array
+    {
+        if (!$this->selectedRole) {
+            return [];
+        }
+
+        $role = Role::find($this->selectedRole);
+        if (!$role || !$role->is_system) {
+            return [];
+        }
+
+        $lockedModules = ['system', 'users', 'audit'];
+        $lockedIds = [];
+
+        foreach ($this->getPermissionModules() as $moduleName => $permissions) {
+            $moduleKey = strtolower($moduleName);
+            // Check if module name matches locked modules (case-insensitive, handle translations)
+            $isLocked = false;
+            foreach ($lockedModules as $locked) {
+                if (stripos($moduleKey, $locked) !== false || $moduleKey === 'uzytkownicy') {
+                    $isLocked = true;
+                    break;
+                }
+            }
+
+            if ($isLocked) {
+                foreach ($permissions as $permission) {
+                    $lockedIds[] = $permission->id;
+                }
+            }
+        }
+
+        return $lockedIds;
+    }
+
     public function togglePermission($permissionId)
     {
+        // Check if permission is locked for system roles
+        $permission = Permission::find($permissionId);
+        if ($permission && $this->isPermissionLocked($permission->name)) {
+            session()->flash('error', 'Nie można zmienić tego uprawnienia dla roli systemowej.');
+            return;
+        }
+
         $this->permissionMatrix[$permissionId] = !$this->permissionMatrix[$permissionId];
         $this->checkForChanges();
         $this->calculateModuleStats();
@@ -597,7 +675,11 @@ class PermissionMatrix extends Component
 
     public function getRolesProperty()
     {
-        return Role::with('permissions')->orderBy('name')->get();
+        // Use subquery for users_count to avoid Spatie guard_name issue with withCount('users')
+        return Role::with('permissions')
+            ->selectRaw('roles.*, (SELECT COUNT(*) FROM model_has_roles WHERE model_has_roles.role_id = roles.id) as users_count')
+            ->orderBy('name')
+            ->get();
     }
 
     public function getSelectedRoleDataProperty()

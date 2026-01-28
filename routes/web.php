@@ -532,7 +532,6 @@ Route::prefix('admin')->name('admin.')->middleware($adminMiddleware)->group(func
     // ==========================================
     Route::get('/security', \App\Http\Livewire\Admin\Security\SecurityDashboard::class)->name('security.index');
     Route::get('/activity-log', \App\Http\Livewire\Admin\AuditLogs::class)->name('activity-log.index');
-
     // Legacy alias for backward compatibility
     Route::get('/users-legacy', function () {
         return redirect()->route('admin.users.index');

@@ -4992,11 +4992,11 @@ class ProductForm extends Component
 
         // DIAGNOSIS 2025-11-21: Debug category data flow
         Log::debug('[CATEGORY SYNC DEBUG] savePendingChanges: Category data captured', [
-            'product_id' => $this->product->id,
+            'product_id' => $this->product?->id ?? 'NEW',
             'active_shop_id' => $this->activeShopId,
             'key' => $currentKey,
             'raw_shopCategories' => $this->activeShopId !== null ? ($this->shopCategories[$this->activeShopId] ?? 'NOT_SET') : 'N/A (default context)',
-            'captured_contextCategories' => $this->pendingChanges[$currentKey]['contextCategories'],
+            'captured_contextCategories' => $this->pendingChanges[$currentKey]['contextCategories'] ?? 'NOT_SET',
             'default_categories' => $this->defaultCategories,
         ]);
 

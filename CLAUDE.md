@@ -105,9 +105,9 @@ plink -ssh host379076@host379076.hostido.net.pl -P 64321 -i $HostidoKey -batch "
 
 **⚠️ WORKFLOW:** Zmiany → Build → Deploy → **Claude in Chrome MCP** → (OK) → informuj użytkownika
 
-### Claude in Chrome MCP (MANDATORY) 
+### Claude in Chrome MCP / MCP chrome devtools z flagą --isolated (MANDATORY) 
 
-### UWAGA! jeżeli Claude in Chrome nie działa użyj MCP playwright jako narzędzia fallback, Stosuj się bezwzględnie do zasad stosowania PlayWright "D:\Skrypty\PPM-CC-Laravel\.claude\rules\verification\playwright-token-optimization.md" aby uniknąć nadmiarowego użycia tokenów
+### UWAGA! jeżeli Claude in Chrome nie działa użyj MCP chrome devtools z flagą --isolated jako narzędzia fallback, Stosuj się bezwzględnie do zasad stosowania chrome-devtools "D:\Skrypty\PPM-CC-Laravel\.claude\rules\verification\chrome-devtools.md" aby uniknąć nadmiarowego użycia tokenów
 
 **🚨 KRYTYCZNE: LOGOWANIE WYŁĄCZONE!** Na czas developmentu logowanie jest wyłączone - wszystkie strony mają wyłączone middleware auth. NIE próbuj się logować, używaj bezpośrednich linków do podstron.
 
@@ -288,21 +288,3 @@ pscp "components-X.css"                     // → pscp -r "public/build/assets/
 - **Zakazy:** Wersje plików (_v1, _v2), hardcoded values, mock data
 - **OAuth:** Ostatni krok implementacji
 
----
-
-### PAOS - Parallel Agent Orchestration
-
-**ZAWSZE** rozważ użycie PAOS gdy:
-- Zadanie wymaga modyfikacji wielu plików (>3)
-- Zadanie łączy różne domeny (backend + frontend + testy)
-- Użytkownik używa słów "i", "oraz", "a także" łączących operacje
-- Zadanie zawiera "refaktor", "przebuduj", "reorganizuj"
-
-**Komendy:**
-- `/parallel` lub `/orchestrate` - wymusz PAOS
-- `/paos` - status
-- `/paos-gui` - dashboard
-
-**KRYTYCZNE:** Przed PAOS zawsze commit + push lokalnych zmian!
-
-Dokumentacja: `.claude/skills/paos/SKILL.md`

@@ -633,7 +633,22 @@
                 </p>
             @endif
         </div>
+        </div>
 
+            {{-- PRAWA KOLUMNA: Zdjecie glowne (duze) - ETAP_07d --}}
+            @if($isEditMode && $product && $product->id)
+            <div class="h-full">
+                @include('livewire.products.management.partials.primary-image-preview', [
+                    'product' => $product
+                ])
+            </div>
+            @endif
+        </div>
+        @endif
+        {{-- ========== KONIEC SEKCJI VAT + ZDJECIE (EDIT MODE ONLY) ========== --}}
+
+        {{-- ========== STATUS PRODUKTU + HARMONOGRAM (ZAWSZE WIDOCZNE - FIX BUG /create) ========== --}}
+        <div class="md:col-span-2 grid grid-cols-1 lg:grid-cols-2 gap-6">
             {{-- Status produktu --}}
             <fieldset class="space-y-3">
                 <legend class="text-sm font-medium text-gray-300">Status produktu</legend>
@@ -718,16 +733,7 @@
                 </div>
             </fieldset>
         </div>
-
-            {{-- PRAWA KOLUMNA: Zdjecie glowne (duze) - ETAP_07d --}}
-            <div class="h-full">
-                @include('livewire.products.management.partials.primary-image-preview', [
-                    'product' => $product
-                ])
-            </div>
-        </div>
-        @endif
-        {{-- ========== KONIEC SEKCJI ETAP_07d ========== --}}
+        {{-- ========== KONIEC STATUS + HARMONOGRAM ========== --}}
 
         {{-- Categories Section --}}
         <div class="md:col-span-2">

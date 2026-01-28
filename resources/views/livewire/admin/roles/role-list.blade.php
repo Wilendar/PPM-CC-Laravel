@@ -268,9 +268,10 @@
                                         @php
                                             $level = $role->level ?? 7;
                                             $hierarchyInfo = $roleHierarchy[$level] ?? ['name' => 'User', 'color' => 'gray'];
+                                            $levelColor = $role->color ?? 'gray';
                                         @endphp
                                         <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
-                                                     bg-{{ $hierarchyInfo['color'] }}-900/30 text-{{ $hierarchyInfo['color'] }}-400">
+                                                     bg-{{ $levelColor }}-900/30 text-{{ $levelColor }}-400">
                                             {{ $level }} - {{ $hierarchyInfo['name'] }}
                                         </span>
                                     </td>
@@ -535,7 +536,7 @@
                                         Guard
                                     </label>
                                     <select id="roleGuardName"
-                                            wire:model="roleGuardName"
+                                            wire:model.live="roleGuardName"
                                             class="mt-1 block w-full rounded-md border-gray-600 bg-gray-700 text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
                                         <option value="web">web</option>
                                         <option value="api">api</option>
@@ -561,7 +562,7 @@
                                             Poziom hierarchii <span class="text-red-500">*</span>
                                         </label>
                                         <select id="roleLevel"
-                                                wire:model="roleLevel"
+                                                wire:model.live="roleLevel"
                                                 class="mt-1 block w-full rounded-md border-gray-600 bg-gray-700 text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
                                             @foreach($roleHierarchy as $level => $info)
                                                 <option value="{{ $level }}">{{ $level }} - {{ $info['name'] }}</option>
@@ -575,7 +576,7 @@
                                             Kolor
                                         </label>
                                         <select id="roleColor"
-                                                wire:model="roleColor"
+                                                wire:model.live="roleColor"
                                                 class="mt-1 block w-full rounded-md border-gray-600 bg-gray-700 text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
                                             <option value="red">Czerwony</option>
                                             <option value="orange">Pomaranczowy</option>
@@ -607,28 +608,87 @@
                                     <label class="block text-sm font-medium text-gray-300 mb-2">
                                         Uprawnienia
                                     </label>
+
+                                    {{-- Warning for system roles --}}
+                                    @if($showEditModal && $editingRole && ($editingRole->is_system ?? false))
+                                        <div class="mb-3 p-3 bg-yellow-900/30 border border-yellow-700 rounded-md">
+                                            <div class="flex items-start">
+                                                <svg class="w-5 h-5 text-yellow-400 mr-2 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                                                </svg>
+                                                <div>
+                                                    <p class="text-sm text-yellow-300 font-medium">Rola systemowa</p>
+                                                    <p class="text-xs text-yellow-400 mt-1">Uprawnienia System, Uzytkownicy i Audyt sa wymagane i nie moga byc wyłączone dla tej roli.</p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    @endif
+
                                     <div class="max-h-64 overflow-y-auto border border-gray-600 rounded-md p-3 bg-gray-700">
                                         @foreach($permissionsByModule as $moduleName => $modulePermissions)
-                                            <div class="mb-4 last:mb-0">
+                                            @php
+                                                // Check if this module is locked for system roles
+                                                $moduleKey = strtolower($moduleName);
+                                                $lockedModules = ['system', 'users', 'audit'];
+                                                $isModuleLocked = false;
+
+                                                if ($showEditModal && $editingRole && ($editingRole->is_system ?? false)) {
+                                                    foreach ($lockedModules as $locked) {
+                                                        if (stripos($moduleKey, $locked) !== false || $moduleKey === 'uzytkownicy') {
+                                                            $isModuleLocked = true;
+                                                            break;
+                                                        }
+                                                    }
+                                                }
+                                            @endphp
+                                            <div class="mb-4 last:mb-0 {{ $isModuleLocked ? 'p-2 bg-red-900/20 border border-red-800/50 rounded-md' : '' }}">
                                                 <div class="flex items-center justify-between mb-2">
-                                                    <h4 class="text-sm font-semibold text-white">{{ ucfirst($moduleName) }}</h4>
-                                                    <button type="button"
-                                                            wire:click="$set('selectedPermissions', array_merge($selectedPermissions, {{ json_encode($modulePermissions->pluck('name')->toArray()) }}))"
-                                                            class="text-xs text-blue-400 hover:text-blue-300">
-                                                        Zaznacz wszystkie
-                                                    </button>
+                                                    <div class="flex items-center">
+                                                        <h4 class="text-sm font-semibold {{ $isModuleLocked ? 'text-red-300' : 'text-white' }}">
+                                                            {{ ucfirst($moduleName) }}
+                                                        </h4>
+                                                        @if($isModuleLocked)
+                                                            <span class="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-900/50 text-red-300">
+                                                                <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
+                                                                </svg>
+                                                                Zablokowane
+                                                            </span>
+                                                        @endif
+                                                    </div>
+                                                    @if(!$isModuleLocked)
+                                                        <button type="button"
+                                                                wire:click="selectAllPermissionsForModule('{{ $moduleName }}')"
+                                                                class="text-xs text-blue-400 hover:text-blue-300">
+                                                            Zaznacz wszystkie
+                                                        </button>
+                                                    @endif
                                                 </div>
                                                 <div class="grid grid-cols-2 gap-2">
                                                     @foreach($modulePermissions as $permission)
-                                                        <label class="flex items-center space-x-2 text-sm">
-                                                            <input type="checkbox"
-                                                                   wire:model="selectedPermissions"
-                                                                   value="{{ $permission->name }}"
-                                                                   class="h-4 w-4 rounded border-gray-500 text-blue-600 focus:ring-blue-500 bg-gray-700">
-                                                            <span class="text-gray-300 truncate" title="{{ $permission->name }}">
-                                                                {{ str_replace($moduleName . '.', '', $permission->name) }}
-                                                            </span>
-                                                        </label>
+                                                        @if($isModuleLocked)
+                                                            {{-- Locked permission - always checked, disabled --}}
+                                                            <div class="flex items-center space-x-2 text-sm opacity-75">
+                                                                <svg class="w-4 h-4 text-red-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
+                                                                </svg>
+                                                                <span class="text-red-300 truncate" title="{{ $permission->name }} - Wymagane dla roli systemowej">
+                                                                    {{ str_replace($moduleName . '.', '', $permission->name) }}
+                                                                </span>
+                                                                <span class="text-xs text-red-400">(wymagane)</span>
+                                                            </div>
+                                                        @else
+                                                            {{-- Normal permission - editable --}}
+                                                            <label class="flex items-center space-x-2 text-sm">
+                                                                <input type="checkbox"
+                                                                       wire:model="selectedPermissions"
+                                                                       value="{{ $permission->name }}"
+                                                                       class="h-4 w-4 rounded border-gray-500 text-blue-600 focus:ring-blue-500 bg-gray-700">
+                                                                <span class="text-gray-300 truncate" title="{{ $permission->name }}">
+                                                                    {{ str_replace($moduleName . '.', '', $permission->name) }}
+                                                                </span>
+                                                            </label>
+                                                        @endif
                                                     @endforeach
                                                 </div>
                                             </div>
@@ -636,6 +696,9 @@
                                     </div>
                                     <div class="mt-2 text-xs text-gray-400">
                                         Wybrano: {{ count($selectedPermissions) }} uprawnien
+                                        @if($showEditModal && $editingRole && ($editingRole->is_system ?? false))
+                                            <span class="text-red-400 ml-2">(+ uprawnienia systemowe zawsze wlaczone)</span>
+                                        @endif
                                     </div>
                                 </div>
                             </div>

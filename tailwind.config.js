@@ -12,6 +12,13 @@ export default {
     'lg:grid-cols-[16rem_1fr]',
     'lg:grid-cols-[4rem_1fr]',
     'lg:static',
+    // Dynamic role colors (used in admin/roles)
+    {
+      pattern: /bg-(red|orange|yellow|green|teal|blue|indigo|purple|pink|gray)-900\/30/,
+    },
+    {
+      pattern: /text-(red|orange|yellow|green|teal|blue|indigo|purple|pink|gray)-400/,
+    },
   ],
   darkMode: 'class',
   theme: {

@@ -44,7 +44,7 @@
                 <label class="block text-sm font-medium text-gray-300 mb-2">
                     Wybierz rolę:
                 </label>
-                <select wire:model="selectedRole"
+                <select wire:model.live="selectedRole"
                         class="w-full px-3 py-2 border border-gray-600 rounded-lg bg-gray-700 text-white focus:ring-2 focus:ring-[#e0ac7e] focus:border-transparent">
                     <option value="" class="bg-gray-700 text-white">-- Wybierz rolę --</option>
                     @foreach($roles as $role)
@@ -212,34 +212,50 @@
             @if($expandedModules[$moduleName] ?? true)
             <div class="px-6 py-4">
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    @php
+                        $lockedPermissionIds = $this->getLockedPermissionIds();
+                    @endphp
                     @foreach($permissions as $permission)
-                    <div class="flex items-center justify-between p-3 rounded-lg border border-gray-600 hover:bg-gray-700/50 transition-colors">
+                    @php
+                        $isLocked = in_array($permission->id, $lockedPermissionIds);
+                    @endphp
+                    <div class="flex items-center justify-between p-3 rounded-lg border {{ $isLocked ? 'border-red-800/50 bg-red-900/10' : 'border-gray-600 hover:bg-gray-700/50' }} transition-colors">
                         <div class="flex items-center space-x-3">
-                            @if($bulkSelectMode)
-                                <input type="checkbox" 
+                            @if($bulkSelectMode && !$isLocked)
+                                <input type="checkbox"
                                        wire:click="togglePermissionSelection({{ $permission->id }})"
                                        :checked="$wire.selectedPermissions.includes({{ $permission->id }})"
                                        class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
                             @endif
-                            
+
                             <div>
-                                <div class="font-medium text-sm text-white">
+                                <div class="font-medium text-sm {{ $isLocked ? 'text-red-300' : 'text-white' }} flex items-center">
+                                    @if($isLocked)
+                                    <svg class="w-4 h-4 mr-1.5 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
+                                    </svg>
+                                    @endif
                                     {{ str_replace('.', ' › ', $permission->name) }}
                                 </div>
                                 @if($permission->description)
-                                <div class="text-xs text-gray-400 mt-1">
+                                <div class="text-xs {{ $isLocked ? 'text-red-400/70' : 'text-gray-400' }} mt-1">
                                     {{ $permission->description }}
+                                </div>
+                                @endif
+                                @if($isLocked)
+                                <div class="text-xs text-red-400 mt-1 font-medium">
+                                    Zablokowane dla roli systemowej
                                 </div>
                                 @endif
                             </div>
                         </div>
-                        
+
                         <div class="flex items-center space-x-2">
                             <!-- Permission status indicator -->
                             <div class="flex items-center space-x-1">
                                 @if($permissionMatrix[$permission->id] ?? false)
-                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-900/50 text-green-300">
-                                        Włączone
+                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium {{ $isLocked ? 'bg-red-900/50 text-red-300' : 'bg-green-900/50 text-green-300' }}">
+                                        {{ $isLocked ? 'Wymagane' : 'Włączone' }}
                                     </span>
                                 @else
                                     <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-700 text-gray-300">
@@ -247,15 +263,23 @@
                                     </span>
                                 @endif
                             </div>
-                            
+
                             <!-- Toggle switch -->
+                            @if($isLocked)
+                            <div class="w-11 h-6 bg-red-900/30 rounded-full flex items-center justify-center cursor-not-allowed" title="Uprawnienie zablokowane dla roli systemowej">
+                                <svg class="w-4 h-4 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
+                                </svg>
+                            </div>
+                            @else
                             <label class="relative inline-flex items-center cursor-pointer">
-                                <input type="checkbox" 
+                                <input type="checkbox"
                                        wire:click="togglePermission({{ $permission->id }})"
                                        :checked="{{ $permissionMatrix[$permission->id] ?? false ? 'true' : 'false' }}"
                                        class="sr-only peer">
                                 <div class="w-11 h-6 bg-gray-700 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-gray-400 after:border-gray-600 after:border after:rounded-full after:h-5 after:w-5 after:transition-all border-gray-600 peer-checked:bg-blue-600"></div>
                             </label>
+                            @endif
                         </div>
                     </div>
                     @endforeach

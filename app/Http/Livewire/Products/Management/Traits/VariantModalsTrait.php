@@ -45,6 +45,9 @@ trait VariantModalsTrait
     /** @var array Prices data for modal [groupId => ['net' => X, 'gross' => Y]] */
     public array $variantModalPrices = [];
 
+    /** @var bool Prices modal unlocked for editing */
+    public bool $variantPricesUnlocked = false;
+
     /*
     |--------------------------------------------------------------------------
     | PROPERTIES - STOCK MODAL
@@ -62,6 +65,16 @@ trait VariantModalsTrait
 
     /** @var array Stock data for modal [warehouseId => ['quantity', 'reserved', 'minimum', 'location']] */
     public array $variantModalStock = [];
+
+    /** @var array Granular column locks for stock modal [column => bool] */
+    public array $variantStockColumnLocks = [
+        'quantity' => false,
+        'reserved' => false,
+        'minimum' => false,
+    ];
+
+    /** @var string|null Pending column unlock (for confirmation modal) */
+    public ?string $pendingVariantStockColumnUnlock = null;
 
     /*
     |--------------------------------------------------------------------------
@@ -87,6 +100,7 @@ trait VariantModalsTrait
             ];
 
             $this->loadVariantPricesForModal($variant);
+            $this->variantPricesUnlocked = false; // Reset lock state
             $this->showVariantPricesModal = true;
 
             Log::debug('Opened variant prices modal', [
@@ -111,6 +125,7 @@ trait VariantModalsTrait
         $this->selectedVariantIdForPrices = null;
         $this->selectedVariantForPricesData = [];
         $this->variantModalPrices = [];
+        $this->variantPricesUnlocked = false;
     }
 
     /**
@@ -120,6 +135,12 @@ trait VariantModalsTrait
     {
         if (!$this->selectedVariantIdForPrices) {
             session()->flash('error', 'Brak wybranego wariantu.');
+            return;
+        }
+
+        // Check if prices are unlocked
+        if (!$this->variantPricesUnlocked) {
+            session()->flash('warning', 'Odblokuj edycje cen przed zapisem.');
             return;
         }
 
@@ -207,6 +228,13 @@ trait VariantModalsTrait
             ];
 
             $this->loadVariantStockForModal($variant);
+            // Reset column locks
+            $this->variantStockColumnLocks = [
+                'quantity' => false,
+                'reserved' => false,
+                'minimum' => false,
+            ];
+            $this->pendingVariantStockColumnUnlock = null;
             $this->showVariantStockModal = true;
 
             Log::debug('Opened variant stock modal', [
@@ -231,6 +259,12 @@ trait VariantModalsTrait
         $this->selectedVariantIdForStock = null;
         $this->selectedVariantForStockData = [];
         $this->variantModalStock = [];
+        $this->variantStockColumnLocks = [
+            'quantity' => false,
+            'reserved' => false,
+            'minimum' => false,
+        ];
+        $this->pendingVariantStockColumnUnlock = null;
     }
 
     /**
@@ -243,25 +277,49 @@ trait VariantModalsTrait
             return;
         }
 
+        // Check if any column is unlocked
+        $hasUnlockedColumns = array_filter($this->variantStockColumnLocks);
+        if (empty($hasUnlockedColumns)) {
+            session()->flash('warning', 'Odblokuj przynajmniej jedna kolumne przed zapisem.');
+            return;
+        }
+
         try {
             DB::beginTransaction();
 
             foreach ($this->variantModalStock as $warehouseId => $stockData) {
-                $this->updateVariantStock(
-                    $this->selectedVariantIdForStock,
-                    (int) $warehouseId,
-                    [
-                        'quantity' => (int) ($stockData['quantity'] ?? 0),
-                        'reserved' => (int) ($stockData['reserved'] ?? 0),
-                    ]
-                );
+                // Only update unlocked columns
+                $updateData = [];
+                if ($this->variantStockColumnLocks['quantity']) {
+                    $updateData['quantity'] = (int) ($stockData['quantity'] ?? 0);
+                }
+                if ($this->variantStockColumnLocks['reserved']) {
+                    $updateData['reserved'] = (int) ($stockData['reserved'] ?? 0);
+                }
 
-                // Update location if provided
+                if (!empty($updateData)) {
+                    $this->updateVariantStock(
+                        $this->selectedVariantIdForStock,
+                        (int) $warehouseId,
+                        $updateData
+                    );
+                }
+
+                // Update minimum and location (always editable)
                 $variant = ProductVariant::find($this->selectedVariantIdForStock);
                 if ($variant) {
                     $stock = $variant->stock()->where('warehouse_id', $warehouseId)->first();
-                    if ($stock && isset($stockData['location'])) {
-                        $stock->update(['location' => $stockData['location']]);
+                    if ($stock) {
+                        $stockUpdate = [];
+                        if ($this->variantStockColumnLocks['minimum']) {
+                            $stockUpdate['minimum_stock'] = (int) ($stockData['minimum'] ?? 0);
+                        }
+                        if (isset($stockData['location'])) {
+                            $stockUpdate['location'] = $stockData['location'];
+                        }
+                        if (!empty($stockUpdate)) {
+                            $stock->update($stockUpdate);
+                        }
                     }
                 }
             }
@@ -321,6 +379,109 @@ trait VariantModalsTrait
         if (isset($this->variantModalStock[$warehouseId])) {
             $this->variantModalStock[$warehouseId]['location'] = $location;
         }
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | PRICES MODAL LOCK METHODS
+    |--------------------------------------------------------------------------
+    */
+
+    /**
+     * Toggle variant prices lock/unlock state
+     */
+    public function toggleVariantPricesLock(): void
+    {
+        $this->variantPricesUnlocked = !$this->variantPricesUnlocked;
+
+        Log::debug('Variant prices lock toggled', [
+            'unlocked' => $this->variantPricesUnlocked,
+            'variant_id' => $this->selectedVariantIdForPrices,
+        ]);
+    }
+
+    /**
+     * Check if variant prices are unlocked
+     */
+    public function isVariantPricesUnlocked(): bool
+    {
+        return $this->variantPricesUnlocked;
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | STOCK MODAL COLUMN LOCK METHODS
+    |--------------------------------------------------------------------------
+    */
+
+    /**
+     * Check if specific stock column is unlocked
+     */
+    public function isVariantStockColumnUnlocked(string $column): bool
+    {
+        return $this->variantStockColumnLocks[$column] ?? false;
+    }
+
+    /**
+     * Request unlock for a stock column (shows confirmation modal)
+     */
+    public function requestVariantStockColumnUnlock(string $column): void
+    {
+        $this->pendingVariantStockColumnUnlock = $column;
+        $this->dispatch('show-variant-stock-unlock-modal');
+    }
+
+    /**
+     * Confirm stock column unlock
+     */
+    public function confirmVariantStockColumnUnlock(): void
+    {
+        if ($this->pendingVariantStockColumnUnlock) {
+            $this->variantStockColumnLocks[$this->pendingVariantStockColumnUnlock] = true;
+
+            Log::debug('Variant stock column unlocked', [
+                'column' => $this->pendingVariantStockColumnUnlock,
+                'variant_id' => $this->selectedVariantIdForStock,
+            ]);
+        }
+
+        $this->pendingVariantStockColumnUnlock = null;
+        $this->dispatch('close-variant-stock-unlock-modal');
+    }
+
+    /**
+     * Cancel stock column unlock request
+     */
+    public function cancelVariantStockColumnUnlock(): void
+    {
+        $this->pendingVariantStockColumnUnlock = null;
+        $this->dispatch('close-variant-stock-unlock-modal');
+    }
+
+    /**
+     * Lock a stock column
+     */
+    public function lockVariantStockColumn(string $column): void
+    {
+        $this->variantStockColumnLocks[$column] = false;
+
+        Log::debug('Variant stock column locked', [
+            'column' => $column,
+            'variant_id' => $this->selectedVariantIdForStock,
+        ]);
+    }
+
+    /**
+     * Get column label for display
+     */
+    public function getVariantStockColumnLabel(string $column): string
+    {
+        return match ($column) {
+            'quantity' => 'Stan',
+            'reserved' => 'Zarezerwowane',
+            'minimum' => 'Minimum',
+            default => $column,
+        };
     }
 
     /*

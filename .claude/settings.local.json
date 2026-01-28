@@ -217,7 +217,46 @@
       "Bash(\"/c/Program Files/PuTTY/plink.exe\" -ssh host379076@host379076.hostido.net.pl -P 64321 -i \"D:/SSH/Hostido/HostidoSSHNoPass.ppk\" -batch \"cd domains/ppm.mpptrade.pl/public_html && tail -30 storage/logs/laravel.log | grep -E ''updateSyncJobStatus''\")",
       "Bash(\"/c/Program Files/PuTTY/plink.exe\" -ssh host379076@host379076.hostido.net.pl -P 64321 -i \"D:/SSH/Hostido/HostidoSSHNoPass.ppk\" -batch \"cd domains/ppm.mpptrade.pl/public_html && cat > check_job.php << ''EOF''\n<?php\nrequire __DIR__ . ''/vendor/autoload.php'';\n$app = require_once __DIR__ . ''/bootstrap/app.php'';\n$app->make\\(''Illuminate\\\\Contracts\\\\Console\\\\Kernel''\\)->bootstrap\\(\\);\n\n$job = DB::table\\(''sync_jobs''\\)->where\\(''id'', 4050\\)->first\\(\\);\necho ''Status: '' . $job->status . PHP_EOL;\necho ''Total Items: '' . $job->total_items . PHP_EOL;\necho ''Processed: '' . $job->processed_items . PHP_EOL;\necho ''Successful: '' . $job->successful_items . PHP_EOL;\necho ''Duration: '' . $job->duration_seconds . ''s'' . PHP_EOL;\necho ''Progress: '' . $job->progress_percentage . ''%'' . PHP_EOL;\nEOF\nphp check_job.php && rm check_job.php\")",
       "Bash(\"/c/Program Files/PuTTY/plink.exe\" -ssh host379076@host379076.hostido.net.pl -P 64321 -i \"D:/SSH/Hostido/HostidoSSHNoPass.ppk\" -batch \"cd domains/ppm.mpptrade.pl/public_html && cat > test_final.php << ''EOF''\n<?php\nrequire __DIR__ . ''/vendor/autoload.php'';\n$app = require_once __DIR__ . ''/bootstrap/app.php'';\n$app->make\\(''Illuminate\\\\Contracts\\\\Console\\\\Kernel''\\)->bootstrap\\(\\);\n\nuse App\\\\Jobs\\\\ERP\\\\PullProductsFromSubiektGT;\nuse App\\\\Models\\\\ERPConnection;\nuse App\\\\Models\\\\SyncJob;\n\n$conn = ERPConnection::where\\(''erp_type'', ''subiekt_gt''\\)->where\\(''is_active'', true\\)->first\\(\\);\n$syncJob = SyncJob::create\\([\n    ''job_id'' => Str::uuid\\(\\)->toString\\(\\),\n    ''job_type'' => ''pull_prices'',\n    ''job_name'' => ''FINAL Test: '' . $conn->instance_name,\n    ''source_type'' => ''subiekt_gt'',\n    ''source_id'' => $conn->id,\n    ''target_type'' => ''ppm'',\n    ''status'' => ''pending'',\n    ''trigger_type'' => ''manual'',\n    ''queue_name'' => ''erp_default'',\n]\\);\n\necho ''Created SyncJob ID: '' . $syncJob->id . PHP_EOL;\n\nPullProductsFromSubiektGT::dispatch\\($conn->id, ''full'', null, 5, 100, $syncJob->id\\);\necho ''Dispatched!'' . PHP_EOL;\necho ''Jobs in queue: '' . DB::table\\(''jobs''\\)->count\\(\\) . PHP_EOL;\nEOF\nphp test_final.php && rm test_final.php\")",
-      "Bash(\"/c/Program Files/PuTTY/plink.exe\" -ssh host379076@host379076.hostido.net.pl -P 64321 -i \"D:/SSH/Hostido/HostidoSSHNoPass.ppk\" -batch \"cd domains/ppm.mpptrade.pl/public_html && tail -20 storage/logs/laravel.log | grep ''updateSyncJobStatus''\")"
+      "Bash(\"/c/Program Files/PuTTY/plink.exe\" -ssh host379076@host379076.hostido.net.pl -P 64321 -i \"D:/SSH/Hostido/HostidoSSHNoPass.ppk\" -batch \"cd domains/ppm.mpptrade.pl/public_html && tail -20 storage/logs/laravel.log | grep ''updateSyncJobStatus''\")",
+      "Bash(\"/c/Users/kamil/AppData/Local/Microsoft/dotnet/dotnet.exe\" publish \"D:/Skrypty/PPM-CC-Laravel/_TOOLS/SubiektGT_REST_API_DotNet/SubiektApi.csproj\" -c Release -o \"D:/Skrypty/PPM-CC-Laravel/_TOOLS/SubiektGT_REST_API_DotNet/publish\")",
+      "Bash(HostidoKey=\"D:/SSH/Hostido/HostidoSSHNoPass.ppk\")",
+      "Bash(python:*)",
+      "mcp__plugin_playwright_playwright__browser_navigate",
+      "mcp__plugin_playwright_playwright__browser_click",
+      "mcp__plugin_playwright_playwright__browser_snapshot",
+      "mcp__plugin_playwright_playwright__browser_console_messages",
+      "mcp__plugin_playwright_playwright__browser_take_screenshot",
+      "mcp__plugin_playwright_playwright__browser_evaluate",
+      "mcp__plugin_playwright_playwright__browser_run_code",
+      "mcp__plugin_playwright_playwright__browser_wait_for",
+      "Bash(git rev-parse:*)",
+      "mcp__plugin_playwright_playwright__browser_type",
+      "mcp__plugin_playwright_playwright__browser_handle_dialog",
+      "Bash($timestamp = Get-Date -Format \"yyyyMMdd_HHmmss\")",
+      "Bash(New-Item -ItemType Directory -Force -Path \"D:\\\\Skrypty\\\\PPM-CC-Laravel\\\\.claude\\\\backups\")",
+      "Bash(Out-Null)",
+      "Bash(Copy-Item \"D:\\\\Skrypty\\\\PPM-CC-Laravel\\\\.claude\\\\skill-rules.json\" \"D:\\\\Skrypty\\\\PPM-CC-Laravel\\\\.claude\\\\backups\\\\skill-rules_$timestamp.json\")",
+      "Bash(Write-Host \"Backup created: skill-rules_$timestamp.json\")",
+      "Bash(subtask draft:*)",
+      "Bash(subtask send variant/rest-api-pole6-8 \"Wykonaj wszystkie modyfikacje zgodnie z opisem zadania. Zmodyfikuj 4 pliki w _TOOLS/SubiektGT_REST_API_DotNet/. Po zakończeniu uruchom ''dotnet build'' aby zweryfikować kompilację.\")",
+      "Bash(subtask send:*)",
+      "Bash(subtask interrupt variant/rest-api-pole6-8)",
+      "Bash(subtask interrupt:*)",
+      "Bash(subtask close:*)",
+      "Bash(subtask show:*)",
+      "Bash(subtask diff:*)",
+      "Bash(subtask stage:*)",
+      "Bash(Select-String -Pattern \"Pole2|location|stock|Enriched\" -CaseSensitive:$false)",
+      "mcp__plugin_playwright_playwright__browser_close",
+      "Bash(Select-String -Pattern \"pole2|location|parseStock\" -CaseSensitive:$false)",
+      "Bash(python3:*)",
+      "Bash(git worktree:*)",
+      "mcp__plugin_playwright_playwright__browser_install",
+      "Bash(git restore:*)",
+      "mcp__chrome-devtools__list_pages",
+      "mcp__chrome-devtools__navigate_page",
+      "mcp__plugin_playwright_playwright__browser_fill_form",
+      "mcp__plugin_playwright_playwright__browser_select_option"
     ],
     "deny": [],
     "ask": []
@@ -262,6 +301,16 @@
             "type": "command",
             "command": "pwsh -Command \"Write-Host '✅ Context7 MCP - EXCELLENT!' -ForegroundColor Green\"",
             "timeout": 1000
+          }
+        ]
+      },
+      {
+        "matcher": "mcp__plugin_playwright_playwright__.*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python .claude/hooks/pretooluse_playwright_optimization.py",
+            "timeout": 2000
           }
         ]
       }

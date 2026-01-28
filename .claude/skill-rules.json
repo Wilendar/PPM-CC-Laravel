@@ -1189,7 +1189,63 @@
         "WYMAGANE: Uzyj MERGE zamiast REPLACE calego pliku"
       ],
       "description": "Settings protection: CHRONI hooks i skills permissions przed przypadkowym usunieciem podczas edycji/czyszczenia settings.json"
+    },
+
+    "multi-agent-orchestrator": {
+      "type": "workflow",
+      "enforcement": "suggest",
+      "priority": "high",
+      "promptTriggers": {
+        "keywords": [
+          "/ma",
+          "/ma_gui",
+          "/ma_status",
+          "/ma_abort",
+          "multi-agent",
+          "multiagent",
+          "parallel agents",
+          "worktree",
+          "orchestrator",
+          "równoległe agenty",
+          "jednocześnie agenci",
+          "wiele agentów",
+          "git worktree isolation"
+        ],
+        "intentPatterns": [
+          "(parallel|równoleg).*?(agent|task|zadani)",
+          "multi.*?agent",
+          "(uruchom|start|run).*?(wielu|wiele|kilku|parallel).*?agent",
+          "worktree.*?isolation",
+          "(orchestrat|koordyn).*?agent",
+          "agent.*?(parallel|równoleg|jednocze)",
+          "/ma"
+        ]
+      },
+      "fileTriggers": {
+        "pathPatterns": [
+          "app/Services/MultiAgent/**/*.php",
+          "app/Http/Livewire/Admin/MultiAgent/**/*.php",
+          ".ma-orchestrator/**/*"
+        ],
+        "contentPatterns": [
+          "StateManager",
+          "WorktreeManager",
+          "GitSyncValidator",
+          "orchestration_id",
+          "worktree"
+        ]
+      },
+      "criticalRules": [
+        "WYMAGANE: Git sync validation (local = remote) przed orchestration",
+        "WYMAGANE: Worktree isolation dla każdego agenta",
+        "WYMAGANE: Auto-merge po successful verification",
+        "WYMAGANE: Raportowanie do głównego agenta po zakończeniu",
+        "ZAKAZ: Modyfikacja main branch bezpośrednio przez subagentów"
+      ],
+      "skillLocation": ".claude/skills/multi-agent-orchestrator/SKILL.md",
+      "description": "Multi-Agent Orchestrator: Parallel agent execution with git worktree isolation, real-time GUI monitoring, auto-merge workflow"
     }
+
   },
 
   "globalRules": {

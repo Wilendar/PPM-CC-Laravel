@@ -4,7 +4,7 @@ namespace App\Http\Livewire\Admin\Roles;
 
 use Livewire\Component;
 use Livewire\WithPagination;
-use Spatie\Permission\Models\Role;
+use App\Models\Role;
 use Spatie\Permission\Models\Permission;
 use Illuminate\Database\Eloquent\Builder;
 
@@ -54,13 +54,13 @@ class RoleList extends Component
     
     // Create/Edit role data
     public $editingRole = null;
-    public $roleName = '';
-    public $roleGuardName = 'web';
-    public $roleDescription = '';
-    public $roleLevel = 7;
-    public $roleColor = 'gray';
-    public $isSystemRole = false;
-    public $selectedPermissions = [];
+    public string $roleName = '';
+    public string $roleGuardName = 'web';
+    public string $roleDescription = '';
+    public int $roleLevel = 7;  // Type hint for auto-casting from select (string -> int)
+    public string $roleColor = 'gray';
+    public bool $isSystemRole = false;
+    public array $selectedPermissions = [];
     
     // Role hierarchy
     public $roleHierarchy = [
@@ -213,8 +213,35 @@ class RoleList extends Component
             $action = 'utworzona';
         }
 
-        // Sync permissions
-        $role->syncPermissions($this->selectedPermissions);
+        // Sync permissions - for system roles, ensure locked permissions are always included
+        $permissionsToSync = $this->selectedPermissions;
+
+        if ($role->is_system) {
+            // Get all locked module permissions and ensure they're included
+            $lockedModules = ['system', 'users', 'audit'];
+
+            foreach ($this->permissionsByModule as $moduleName => $permissions) {
+                $moduleKey = strtolower($moduleName);
+                $isLocked = false;
+
+                foreach ($lockedModules as $locked) {
+                    if (stripos($moduleKey, $locked) !== false || $moduleKey === 'uzytkownicy') {
+                        $isLocked = true;
+                        break;
+                    }
+                }
+
+                if ($isLocked) {
+                    foreach ($permissions as $permission) {
+                        if (!in_array($permission->name, $permissionsToSync)) {
+                            $permissionsToSync[] = $permission->name;
+                        }
+                    }
+                }
+            }
+        }
+
+        $role->syncPermissions($permissionsToSync);
 
         session()->flash('success', "Rola '{$role->name}' została {$action}.");
         $this->closeModals();
@@ -248,6 +275,20 @@ class RoleList extends Component
     // ==========================================
     // PERMISSION MANAGEMENT
     // ==========================================
+
+    /**
+     * Select all permissions for a given module (used in create/edit modal)
+     */
+    public function selectAllPermissionsForModule(string $moduleName): void
+    {
+        $modulePermissions = $this->permissionsByModule[$moduleName] ?? collect();
+        $permissionNames = $modulePermissions->pluck('name')->toArray();
+
+        // Merge with existing selections (avoid duplicates)
+        $this->selectedPermissions = array_values(
+            array_unique(array_merge($this->selectedPermissions, $permissionNames))
+        );
+    }
 
     public function togglePermissionForRole($roleId, $permissionName)
     {
@@ -357,14 +398,12 @@ class RoleList extends Component
     public function getPermissionsByModuleProperty()
     {
         $permissions = Permission::orderBy('name')->get();
-        $grouped = [];
-        
-        foreach ($permissions as $permission) {
-            $module = explode('.', $permission->name)[0];
-            $grouped[$module][] = $permission;
-        }
-        
-        return $grouped;
+
+        // Group by module name and return as Collection (NOT array!)
+        // This is required because Blade template uses ->pluck() on modulePermissions
+        return $permissions->groupBy(function ($permission) {
+            return explode('.', $permission->name)[0];
+        });
     }
 
     public function getRoleUsageStatsProperty()
@@ -435,6 +474,57 @@ class RoleList extends Component
                 ]
             ]
         ];
+    }
+
+    /**
+     * Check if a permission is locked for the currently editing role (system role protection)
+     * System roles (Admin) must always have system.*, users.* and audit.* permissions
+     */
+    public function isPermissionLockedForEdit(string $permissionName): bool
+    {
+        // Only apply lock when editing an existing system role
+        if (!$this->editingRole || !($this->editingRole->is_system ?? false)) {
+            return false;
+        }
+
+        // Locked modules for system roles
+        $lockedModules = ['system', 'users', 'audit'];
+        $module = explode('.', $permissionName)[0];
+
+        return in_array($module, $lockedModules);
+    }
+
+    /**
+     * Get all locked permission names for current editing role
+     */
+    public function getLockedPermissionNamesProperty(): array
+    {
+        if (!$this->editingRole || !($this->editingRole->is_system ?? false)) {
+            return [];
+        }
+
+        $lockedModules = ['system', 'users', 'audit'];
+        $lockedNames = [];
+
+        foreach ($this->permissionsByModule as $moduleName => $permissions) {
+            $moduleKey = strtolower($moduleName);
+            $isLocked = false;
+
+            foreach ($lockedModules as $locked) {
+                if (stripos($moduleKey, $locked) !== false || $moduleKey === 'uzytkownicy') {
+                    $isLocked = true;
+                    break;
+                }
+            }
+
+            if ($isLocked) {
+                foreach ($permissions as $permission) {
+                    $lockedNames[] = $permission->name;
+                }
+            }
+        }
+
+        return $lockedNames;
     }
 
     public function getCompareRolesDataProperty()
