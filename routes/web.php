@@ -613,6 +613,10 @@ Route::prefix('admin')->name('admin.')->middleware($adminMiddleware)->group(func
     Route::get('/product-parameters', fn() => view('admin.product-parameters'))
         ->name('product-parameters');
 
+    // Supplier Management Panel (ETAP_15)
+    Route::get('/suppliers', \App\Http\Livewire\Admin\Suppliers\BusinessPartnerPanel::class)
+        ->name('suppliers.index');
+
     // ETAP_07g: Manufacturer Management Panel
     // Dedicated panel for manufacturer/brand management with PrestaShop sync
     Route::get('/manufacturers', fn() => view('admin.manufacturers'))

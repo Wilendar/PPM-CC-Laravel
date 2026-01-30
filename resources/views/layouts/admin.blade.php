@@ -26,7 +26,8 @@
         'resources/css/admin/media-admin.css',
         'resources/css/admin/feature-browser.css',
         'resources/css/components/category-picker.css',
-        'resources/css/products/compatibility-tiles.css'
+        'resources/css/products/compatibility-tiles.css',
+        'resources/css/admin/supplier-panel.css'
     ])
 
     {{-- Alpine.js is included with Livewire 3.x - no need to load separately --}}
@@ -421,6 +422,16 @@
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 4a2 2 0 114 0v1a1 1 0 001 1h3a1 1 0 011 1v3a1 1 0 01-1 1h-1a2 2 0 100 4h1a1 1 0 011 1v3a1 1 0 01-1 1h-3a1 1 0 01-1-1v-1a2 2 0 10-4 0v1a1 1 0 01-1 1H7a1 1 0 01-1-1v-3a1 1 0 00-1-1H4a2 2 0 110-4h1a1 1 0 001-1V7a1 1 0 011-1h3a1 1 0 001-1V4z"></path>
                                     </svg>
                                     <span x-show="!sidebarCollapsed" x-transition class="whitespace-nowrap">Dopasowania czesci</span>
+                                </a>
+                                <a href="/admin/suppliers" class="flex items-center px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-700 hover:text-white transition-colors duration-200 {{ request()->is('admin/suppliers*') ? 'bg-gray-700 text-white' : '' }}"
+                                   :title="sidebarCollapsed ? 'Zarzadzanie dostawcami' : ''"
+                                   :class="{ 'justify-center': sidebarCollapsed }">
+                                    <svg class="w-4 h-4 flex-shrink-0"
+                                         :class="{ 'mr-0': sidebarCollapsed, 'mr-3': !sidebarCollapsed }"
+                                         fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M18 18.72a9.094 9.094 0 003.741-.479 3 3 0 00-4.682-2.72m.94 3.198l.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0112 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 016 18.719m12 0a5.971 5.971 0 00-.941-3.197m0 0A5.995 5.995 0 0012 12.75a5.995 5.995 0 00-5.058 2.772m0 0a3 3 0 00-4.681 2.72 8.986 8.986 0 003.74.477m.94-3.197a5.971 5.971 0 00-.94 3.197M15 6.75a3 3 0 11-6 0 3 3 0 016 0zm6 3a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0zm-13.5 0a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0z" />
+                                    </svg>
+                                    <span x-show="!sidebarCollapsed" x-transition class="whitespace-nowrap">Zarzadzanie dostawcami</span>
                                 </a>
                             </div>
 
