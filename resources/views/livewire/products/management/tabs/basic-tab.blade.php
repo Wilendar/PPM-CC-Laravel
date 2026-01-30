@@ -444,25 +444,71 @@
             @endif
         </div>
 
-        {{-- Manufacturer --}}
+        {{-- Dostawca (BusinessPartner dropdown) --}}
         <div class="md:col-span-1">
-            <label for="manufacturer" class="block text-sm font-medium text-gray-300 mb-2">
-                Producent
-                @php
-                            $manufacturerIndicator = $this->getFieldStatusIndicator('manufacturer');
-                        @endphp
-                @if($manufacturerIndicator['show'])
-                    <span class="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium {{ $manufacturerIndicator['class'] }}">
-                        {{ $manufacturerIndicator['text'] }}
+            <label for="supplier_id" class="block text-sm font-medium text-gray-300 mb-2">
+                Dostawca
+                @php $supplierBpIndicator = $this->getFieldStatusIndicator('supplier_id'); @endphp
+                @if($supplierBpIndicator['show'])
+                    <span class="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium {{ $supplierBpIndicator['class'] }}">
+                        {{ $supplierBpIndicator['text'] }}
                     </span>
                 @endif
             </label>
-            <input wire:model.live="manufacturer"
-                   type="text"
-                   id="manufacturer"
-                   placeholder="np. Honda, Toyota, Bosch"
-                   class="{{ $this->getFieldClasses('manufacturer') }} @error('manufacturer') !border-red-500 @enderror">
-            @error('manufacturer')
+            <select wire:model.live="supplier_id" id="supplier_id"
+                    class="{{ $this->getFieldClasses('supplier_id') }} @error('supplier_id') !border-red-500 @enderror">
+                <option value="">-- brak --</option>
+                @foreach($this->suppliersForDropdown as $bp)
+                    <option value="{{ $bp->id }}">{{ $bp->name }}</option>
+                @endforeach
+            </select>
+            @error('supplier_id')
+                <p class="mt-1 text-sm text-red-600 dark:text-red-400">{{ $message }}</p>
+            @enderror
+        </div>
+
+        {{-- Producent (BusinessPartner dropdown) --}}
+        <div class="md:col-span-1">
+            <label for="manufacturer_id" class="block text-sm font-medium text-gray-300 mb-2">
+                Producent
+                @php $mfgIndicator = $this->getFieldStatusIndicator('manufacturer_id'); @endphp
+                @if($mfgIndicator['show'])
+                    <span class="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium {{ $mfgIndicator['class'] }}">
+                        {{ $mfgIndicator['text'] }}
+                    </span>
+                @endif
+            </label>
+            <select wire:model.live="manufacturer_id" id="manufacturer_id"
+                    class="{{ $this->getFieldClasses('manufacturer_id') }} @error('manufacturer_id') !border-red-500 @enderror">
+                <option value="">-- brak --</option>
+                @foreach($this->manufacturersForDropdown as $bp)
+                    <option value="{{ $bp->id }}">{{ $bp->name }}</option>
+                @endforeach
+            </select>
+            @error('manufacturer_id')
+                <p class="mt-1 text-sm text-red-600 dark:text-red-400">{{ $message }}</p>
+            @enderror
+        </div>
+
+        {{-- Importer (BusinessPartner dropdown) --}}
+        <div class="md:col-span-1">
+            <label for="importer_id" class="block text-sm font-medium text-gray-300 mb-2">
+                Importer
+                @php $impIndicator = $this->getFieldStatusIndicator('importer_id'); @endphp
+                @if($impIndicator['show'])
+                    <span class="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium {{ $impIndicator['class'] }}">
+                        {{ $impIndicator['text'] }}
+                    </span>
+                @endif
+            </label>
+            <select wire:model.live="importer_id" id="importer_id"
+                    class="{{ $this->getFieldClasses('importer_id') }} @error('importer_id') !border-red-500 @enderror">
+                <option value="">-- brak --</option>
+                @foreach($this->importersForDropdown as $bp)
+                    <option value="{{ $bp->id }}">{{ $bp->name }}</option>
+                @endforeach
+            </select>
+            @error('importer_id')
                 <p class="mt-1 text-sm text-red-600 dark:text-red-400">{{ $message }}</p>
             @enderror
         </div>
@@ -471,12 +517,10 @@
         <div class="md:col-span-1">
             <label for="supplier_code" class="block text-sm font-medium text-gray-300 mb-2">
                 Kod dostawcy
-                @php
-                            $supplierIndicator = $this->getFieldStatusIndicator('supplier_code');
-                        @endphp
-                @if($supplierIndicator['show'])
-                    <span class="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium {{ $supplierIndicator['class'] }}">
-                        {{ $supplierIndicator['text'] }}
+                @php $supplierCodeIndicator = $this->getFieldStatusIndicator('supplier_code'); @endphp
+                @if($supplierCodeIndicator['show'])
+                    <span class="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium {{ $supplierCodeIndicator['class'] }}">
+                        {{ $supplierCodeIndicator['text'] }}
                     </span>
                 @endif
             </label>

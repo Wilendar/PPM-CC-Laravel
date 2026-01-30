@@ -6,6 +6,7 @@ use App\Models\Category;
 use App\Models\ProductType;
 use App\Models\PrestaShopShop;
 use App\Models\ProductAttribute;
+use App\Models\BusinessPartner;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -114,6 +115,57 @@ trait ProductFormComputed
             // Fallback if attributes table doesn't exist yet
             Log::warning('Could not load attributes', ['error' => $e->getMessage()]);
             return [];
+        }
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | BUSINESS PARTNER DROPDOWNS - Computed Properties
+    |--------------------------------------------------------------------------
+    */
+
+    /**
+     * Get suppliers for dropdown selection
+     *
+     * @return \Illuminate\Support\Collection
+     */
+    public function getSuppliersForDropdownProperty()
+    {
+        try {
+            return BusinessPartner::getForDropdown(BusinessPartner::TYPE_SUPPLIER);
+        } catch (\Exception $e) {
+            Log::warning('Could not load suppliers', ['error' => $e->getMessage()]);
+            return collect([]);
+        }
+    }
+
+    /**
+     * Get manufacturers for dropdown selection
+     *
+     * @return \Illuminate\Support\Collection
+     */
+    public function getManufacturersForDropdownProperty()
+    {
+        try {
+            return BusinessPartner::getForDropdown(BusinessPartner::TYPE_MANUFACTURER);
+        } catch (\Exception $e) {
+            Log::warning('Could not load manufacturers', ['error' => $e->getMessage()]);
+            return collect([]);
+        }
+    }
+
+    /**
+     * Get importers for dropdown selection
+     *
+     * @return \Illuminate\Support\Collection
+     */
+    public function getImportersForDropdownProperty()
+    {
+        try {
+            return BusinessPartner::getForDropdown(BusinessPartner::TYPE_IMPORTER);
+        } catch (\Exception $e) {
+            Log::warning('Could not load importers', ['error' => $e->getMessage()]);
+            return collect([]);
         }
     }
 

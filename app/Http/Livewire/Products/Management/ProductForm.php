@@ -104,6 +104,9 @@ class ProductForm extends Component
     public string $slug = '';
     public ?int $product_type_id = 1; // Default to ID 1
     public string $manufacturer = '';
+    public ?int $manufacturer_id = null;
+    public ?int $supplier_id = null;
+    public ?int $importer_id = null;
     public string $supplier_code = '';
     public string $ean = '';
     public bool $is_active = true;
@@ -1201,6 +1204,9 @@ class ProductForm extends Component
         $this->slug = $this->product->slug ?? '';
         $this->product_type_id = $this->product->product_type_id;
         $this->manufacturer = $this->product->manufacturer ?? '';
+        $this->manufacturer_id = $this->product->manufacturer_id;
+        $this->supplier_id = $this->product->supplier_id;
+        $this->importer_id = $this->product->importer_id;
         $this->supplier_code = $this->product->supplier_code ?? '';
         $this->ean = $this->product->ean ?? '';
         $this->is_active = $this->product->is_active;
