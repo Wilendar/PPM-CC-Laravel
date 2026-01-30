@@ -28,6 +28,8 @@ use Illuminate\Support\Str;
  * @property int|null $product_type_id
  * @property string|null $manufacturer
  * @property int|null $manufacturer_id
+ * @property int|null $supplier_id
+ * @property int|null $importer_id
  * @property string|null $supplier_code
  * @property string|null $ean
  * @property array|null $category_ids

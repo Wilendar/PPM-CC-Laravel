@@ -12,7 +12,7 @@ use Illuminate\Support\Facades\Log;
  * ETAP_06 FAZA 4 - Column Mapping
  *
  * Features:
- * - 65 synonimow dla 22 PPM fields
+ * - 78 synonimow dla 24 PPM fields
  * - Confidence score (exact match = 1.0, Levenshtein + substring)
  * - Auto-map only if >=70% confidence
  * - Top 3 suggestions for user choice
@@ -37,7 +37,7 @@ class ColumnMappingService
      * Slownik mapowania: PPM field => array of synonyms
      *
      * Format: case-insensitive, normalized (trim, lowercase, no diacritics)
-     * Total: 65 synonyms for 22 PPM fields
+     * Total: 78 synonyms for 24 PPM fields
      */
     public const MAPPING_DICTIONARY = [
         'sku' => [
@@ -67,7 +67,17 @@ class ColumnMappingService
 
         'manufacturer' => [
             'producent', 'manufacturer', 'marka', 'brand', 'fabrikant',
-            'wytworca', 'maker',
+            'wytworca', 'maker', 'nazwa producenta', 'manufacturer name',
+        ],
+
+        'supplier_id' => [
+            'dostawca', 'supplier', 'dostawca nazwa', 'supplier name',
+            'nazwa dostawcy', 'vendor',
+        ],
+
+        'importer_id' => [
+            'importer', 'importer nazwa', 'importer name',
+            'nazwa importera',
         ],
 
         'supplier_code' => [
@@ -358,6 +368,8 @@ class ColumnMappingService
             'name' => 'Nazwa',
             'product_type' => 'Typ produktu',
             'manufacturer' => 'Producent',
+            'supplier_id' => 'Dostawca',
+            'importer_id' => 'Importer',
             'supplier_code' => 'Kod dostawcy',
             'ean' => 'EAN',
             'weight' => 'Waga (kg)',

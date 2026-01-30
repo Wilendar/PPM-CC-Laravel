@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace App\Services\Import;
 
+use App\Models\BusinessPartner;
 use App\Models\ImportSession;
 use App\Models\PendingProduct;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 
 /**
  * BatchImportProcessor - przetwarzanie importu w batch
@@ -258,12 +260,35 @@ class BatchImportProcessor
             ];
         }
 
+        // Resolve business partner names to FK IDs
+        $manufacturerId = null;
+        if (!empty($row['manufacturer'])) {
+            $manufacturerId = $this->resolveBusinessPartnerId($row['manufacturer'], 'manufacturer');
+        }
+
+        $supplierId = null;
+        if (isset($row['supplier_id'])) {
+            $supplierId = is_numeric($row['supplier_id'])
+                ? (int) $row['supplier_id']
+                : $this->resolveBusinessPartnerId($row['supplier_id'], 'supplier');
+        }
+
+        $importerId = null;
+        if (isset($row['importer_id'])) {
+            $importerId = is_numeric($row['importer_id'])
+                ? (int) $row['importer_id']
+                : $this->resolveBusinessPartnerId($row['importer_id'], 'importer');
+        }
+
         // Create PendingProduct
         PendingProduct::create([
             'import_session_id' => $this->session->id,
             'sku' => $sku,
             'name' => $this->trimOrNull($row['name'] ?? null),
             'manufacturer' => $this->trimOrNull($row['manufacturer'] ?? null),
+            'manufacturer_id' => $manufacturerId,
+            'supplier_id' => $supplierId,
+            'importer_id' => $importerId,
             'supplier_code' => $this->trimOrNull($row['supplier_code'] ?? null),
             'ean' => $this->trimOrNull($row['ean'] ?? null),
             'weight' => $this->parseFloat($row['weight'] ?? null),
@@ -289,6 +314,62 @@ class BatchImportProcessor
             'success' => true,
             'error' => null,
         ];
+    }
+
+    /**
+     * Resolve BusinessPartner name to ID (find or auto-create)
+     *
+     * @param string|null $name Partner name from import
+     * @param string $type Partner type (supplier, manufacturer, importer)
+     * @return int|null Partner ID or null if name empty
+     */
+    protected function resolveBusinessPartnerId(?string $name, string $type): ?int
+    {
+        if (empty($name)) {
+            return null;
+        }
+
+        $name = trim($name);
+        if ($name === '') {
+            return null;
+        }
+
+        // Find existing partner by name and type
+        $partner = BusinessPartner::where('name', $name)
+            ->where('type', $type)
+            ->first();
+
+        if ($partner) {
+            return $partner->id;
+        }
+
+        // Auto-create new partner
+        $code = Str::slug($name, '_');
+
+        // Ensure unique code+type combination
+        $baseCode = $code;
+        $counter = 1;
+        while (BusinessPartner::where('code', $code)->where('type', $type)->exists()) {
+            $code = $baseCode . '_' . $counter++;
+        }
+
+        $partner = BusinessPartner::create([
+            'name' => $name,
+            'code' => $code,
+            'type' => $type,
+            'is_active' => true,
+            'sort_order' => 0,
+        ]);
+
+        Log::info('BatchImportProcessor: auto-created BusinessPartner', [
+            'session_id' => $this->session?->id,
+            'partner_id' => $partner->id,
+            'name' => $name,
+            'type' => $type,
+            'code' => $code,
+        ]);
+
+        return $partner->id;
     }
 
     /**
