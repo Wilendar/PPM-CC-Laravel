@@ -141,6 +141,10 @@ class SubiektDataTransformer
             // Manufacturer and supplier
             'ManufacturerName' => $subiektProduct->ManufacturerName ?? $subiektProduct->manufacturerName ?? null,
             'SupplierCode' => $subiektProduct->SupplierCode ?? $subiektProduct->supplierCode ?? null,
+            // Contractor IDs (FK to kh__Kontrahent) - for BusinessPartner mapping
+            'SupplierContractorId' => $subiektProduct->SupplierContractorId ?? $subiektProduct->supplierContractorId ?? null,
+            'ManufacturerContractorId' => $subiektProduct->ManufacturerContractorId ?? $subiektProduct->manufacturerContractorId ?? null,
+            'ManufacturerContractorName' => $subiektProduct->ManufacturerContractorName ?? $subiektProduct->manufacturerContractorName ?? null,
         ];
 
         // Add all prices if provided

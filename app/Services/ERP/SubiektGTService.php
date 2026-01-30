@@ -1815,6 +1815,11 @@ class SubiektGTService implements ERPSyncServiceInterface
         // Update IntegrationMapping
         $this->updateIntegrationMapping($product, $connection, (string) $subiektProduct->id);
 
+        // ====== SUPPLIER & MANUFACTURER MAPPING (ST9) ======
+        // Map tw_IdPodstDostawca -> supplier BusinessPartner
+        // Map tw_IdProducenta -> manufacturer BusinessPartner
+        $this->mapSupplierAndManufacturerFromSubiekt($product, $ppmData);
+
         return [
             'created' => $wasCreated,
             'updated' => !$wasCreated,
@@ -1823,6 +1828,67 @@ class SubiektGTService implements ERPSyncServiceInterface
             'sku' => $product->sku,
             'name' => $product->name,
         ];
+    }
+
+    /**
+     * Map supplier and manufacturer from Subiekt GT contractor IDs to PPM BusinessPartner.
+     *
+     * PULL direction: Subiekt GT -> PPM
+     * - tw_IdPodstDostawca (SupplierContractorId) -> product.supplier_id via BusinessPartner(type=supplier)
+     * - tw_IdProducenta (ManufacturerContractorId) -> product.manufacturer_id via BusinessPartner(type=manufacturer)
+     *
+     * @param Product $product PPM product to update
+     * @param array $ppmData Transformed data from SubiektDataTransformer
+     */
+    protected function mapSupplierAndManufacturerFromSubiekt(Product $product, array $ppmData): void
+    {
+        $updateData = [];
+
+        // Map supplier: tw_IdPodstDostawca -> supplier BusinessPartner
+        $supplierContractorId = $ppmData['SupplierContractorId'] ?? null;
+        if ($supplierContractorId !== null) {
+            $supplierId = $this->resolveSubiektContractorToBusinessPartner(
+                (int) $supplierContractorId,
+                'supplier'
+            );
+            if ($supplierId !== null) {
+                $updateData['supplier_id'] = $supplierId;
+            }
+        }
+
+        // Map manufacturer: tw_IdProducenta -> manufacturer BusinessPartner
+        $manufacturerContractorId = $ppmData['ManufacturerContractorId'] ?? null;
+        if ($manufacturerContractorId !== null) {
+            $manufacturerId = $this->resolveSubiektContractorToBusinessPartner(
+                (int) $manufacturerContractorId,
+                'manufacturer'
+            );
+            if ($manufacturerId !== null) {
+                $updateData['manufacturer_id'] = $manufacturerId;
+            }
+        }
+
+        if (!empty($updateData)) {
+            // Only update if product model has these columns (supplier_id may be added later)
+            try {
+                $product->update($updateData);
+
+                Log::debug('mapSupplierAndManufacturerFromSubiekt: Updated product', [
+                    'product_id' => $product->id,
+                    'sku' => $product->sku,
+                    'supplier_contractor_id' => $supplierContractorId,
+                    'manufacturer_contractor_id' => $manufacturerContractorId,
+                    'mapped_supplier_id' => $updateData['supplier_id'] ?? null,
+                    'mapped_manufacturer_id' => $updateData['manufacturer_id'] ?? null,
+                ]);
+            } catch (\Exception $e) {
+                // Column may not exist yet (supplier_id migration pending)
+                Log::debug('mapSupplierAndManufacturerFromSubiekt: Update failed (column may not exist)', [
+                    'product_id' => $product->id,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
     }
 
     /**
@@ -3386,23 +3452,54 @@ class SubiektGTService implements ERPSyncServiceInterface
         }
 
         // tw_IdPodstDostawca = Manufacturer ID (FK to kh__Kontrahent)
-        // Try to resolve manufacturer by name
+        // Try to resolve manufacturer by name (legacy approach)
         if (!empty($product->manufacturer)) {
             $manufacturerId = $this->findManufacturerIdByName($product->manufacturer, $config);
             if ($manufacturerId !== null) {
                 $data['manufacturer_id'] = $manufacturerId;
 
-                Log::debug('mapExtendedFields: Manufacturer resolved', [
+                Log::debug('mapExtendedFields: Manufacturer resolved by name', [
                     'sku' => $product->sku,
                     'manufacturer_name' => $product->manufacturer,
                     'manufacturer_id' => $manufacturerId,
                 ]);
             } else {
-                Log::debug('mapExtendedFields: Manufacturer not found in Subiekt', [
+                Log::debug('mapExtendedFields: Manufacturer not found in Subiekt by name', [
                     'sku' => $product->sku,
                     'manufacturer_name' => $product->manufacturer,
                 ]);
             }
+        }
+
+        // ====== SUPPLIER & MANUFACTURER via BusinessPartner (ST9) ======
+        // tw_IdPodstDostawca <- supplier BusinessPartner.subiekt_contractor_id
+        // tw_IdProducenta <- manufacturer BusinessPartner.subiekt_contractor_id
+        $supplierContractorId = $this->resolveBusinessPartnerToSubiektContractor(
+            $product->supplier_id ?? null,
+            'supplier'
+        );
+        if ($supplierContractorId !== null) {
+            $data['supplier_contractor_id'] = $supplierContractorId;
+
+            Log::debug('mapExtendedFields: Supplier contractor resolved via BusinessPartner', [
+                'sku' => $product->sku,
+                'supplier_id' => $product->supplier_id,
+                'subiekt_contractor_id' => $supplierContractorId,
+            ]);
+        }
+
+        $manufacturerContractorId = $this->resolveBusinessPartnerToSubiektContractor(
+            $product->manufacturer_id ?? null,
+            'manufacturer'
+        );
+        if ($manufacturerContractorId !== null) {
+            $data['manufacturer_contractor_id'] = $manufacturerContractorId;
+
+            Log::debug('mapExtendedFields: Manufacturer contractor resolved via BusinessPartner', [
+                'sku' => $product->sku,
+                'manufacturer_id' => $product->manufacturer_id,
+                'subiekt_contractor_id' => $manufacturerContractorId,
+            ]);
         }
 
         return $data;
@@ -3480,6 +3577,100 @@ class SubiektGTService implements ERPSyncServiceInterface
         } catch (\Exception $e) {
             Log::warning('findManufacturerIdByName: Error searching manufacturer', [
                 'name' => $name,
+                'error' => $e->getMessage(),
+            ]);
+            return null;
+        }
+    }
+
+    /**
+     * Resolve Subiekt GT contractor ID to BusinessPartner ID.
+     *
+     * Maps kh_Id from kh__Kontrahent (Subiekt GT) to BusinessPartner.id (PPM)
+     * using the subiekt_contractor_id field on BusinessPartner model.
+     *
+     * @param int|null $subiektContractorId kh_Id from Subiekt GT
+     * @param string $type BusinessPartner type: 'supplier' or 'manufacturer'
+     * @return int|null BusinessPartner ID or null if not mapped
+     */
+    protected function resolveSubiektContractorToBusinessPartner(?int $subiektContractorId, string $type): ?int
+    {
+        if (!$subiektContractorId || $subiektContractorId <= 0) {
+            return null;
+        }
+
+        try {
+            $partner = \App\Models\BusinessPartner::where('subiekt_contractor_id', $subiektContractorId)
+                ->where('type', $type)
+                ->first();
+
+            if ($partner) {
+                Log::debug('resolveSubiektContractorToBusinessPartner: Resolved', [
+                    'subiekt_contractor_id' => $subiektContractorId,
+                    'type' => $type,
+                    'business_partner_id' => $partner->id,
+                    'business_partner_name' => $partner->name ?? 'N/A',
+                ]);
+                return $partner->id;
+            }
+
+            Log::debug('resolveSubiektContractorToBusinessPartner: Not found', [
+                'subiekt_contractor_id' => $subiektContractorId,
+                'type' => $type,
+            ]);
+            return null;
+
+        } catch (\Exception $e) {
+            // BusinessPartner model may not exist yet (created in another worktree)
+            Log::debug('resolveSubiektContractorToBusinessPartner: Error (model may not exist yet)', [
+                'subiekt_contractor_id' => $subiektContractorId,
+                'type' => $type,
+                'error' => $e->getMessage(),
+            ]);
+            return null;
+        }
+    }
+
+    /**
+     * Resolve PPM BusinessPartner to Subiekt GT contractor ID.
+     *
+     * Reverse mapping: from PPM supplier/manufacturer_id to kh_Id in Subiekt GT.
+     *
+     * @param int|null $businessPartnerId PPM BusinessPartner ID
+     * @param string $type BusinessPartner type: 'supplier' or 'manufacturer'
+     * @return int|null Subiekt GT contractor ID (kh_Id) or null
+     */
+    protected function resolveBusinessPartnerToSubiektContractor(?int $businessPartnerId, string $type): ?int
+    {
+        if (!$businessPartnerId || $businessPartnerId <= 0) {
+            return null;
+        }
+
+        try {
+            $partner = \App\Models\BusinessPartner::where('id', $businessPartnerId)
+                ->where('type', $type)
+                ->first();
+
+            if ($partner && $partner->subiekt_contractor_id) {
+                Log::debug('resolveBusinessPartnerToSubiektContractor: Resolved', [
+                    'business_partner_id' => $businessPartnerId,
+                    'type' => $type,
+                    'subiekt_contractor_id' => $partner->subiekt_contractor_id,
+                ]);
+                return $partner->subiekt_contractor_id;
+            }
+
+            Log::debug('resolveBusinessPartnerToSubiektContractor: Not mapped', [
+                'business_partner_id' => $businessPartnerId,
+                'type' => $type,
+                'has_subiekt_id' => $partner ? ($partner->subiekt_contractor_id !== null) : false,
+            ]);
+            return null;
+
+        } catch (\Exception $e) {
+            Log::debug('resolveBusinessPartnerToSubiektContractor: Error (model may not exist yet)', [
+                'business_partner_id' => $businessPartnerId,
+                'type' => $type,
                 'error' => $e->getMessage(),
             ]);
             return null;

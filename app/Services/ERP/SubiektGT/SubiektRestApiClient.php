@@ -520,6 +520,16 @@ class SubiektRestApiClient
             $body['ManufacturerId'] = (int)$data['manufacturer_id'];
         }
 
+        // Contractor IDs (FK to kh__Kontrahent) - for BusinessPartner mapping (ST9)
+        // tw_IdPodstDostawca = supplier contractor
+        if (isset($data['supplier_contractor_id'])) {
+            $body['SupplierContractorId'] = (int)$data['supplier_contractor_id'];
+        }
+        // tw_IdProducenta = manufacturer contractor
+        if (isset($data['manufacturer_contractor_id'])) {
+            $body['ManufacturerContractorId'] = (int)$data['manufacturer_contractor_id'];
+        }
+
         // Status
         if (isset($data['is_active'])) {
             $body['IsActive'] = (bool)$data['is_active'];

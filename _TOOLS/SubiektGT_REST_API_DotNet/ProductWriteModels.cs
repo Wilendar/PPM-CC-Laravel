@@ -74,8 +74,23 @@ public class ProductWriteRequest
     /// <summary>
     /// Manufacturer/Supplier ID (foreign key to kh__Kontrahent).
     /// Maps to tw_IdPodstDostawca in Subiekt GT.
+    /// LEGACY: Use SupplierContractorId/ManufacturerContractorId for explicit mapping.
     /// </summary>
     public int? ManufacturerId { get; set; }
+
+    /// <summary>
+    /// Supplier contractor ID (foreign key to kh__Kontrahent).
+    /// Maps to tw_IdPodstDostawca in Subiekt GT.
+    /// Used by BusinessPartner mapping (ST9).
+    /// </summary>
+    public int? SupplierContractorId { get; set; }
+
+    /// <summary>
+    /// Manufacturer contractor ID (foreign key to kh__Kontrahent).
+    /// Maps to tw_IdProducenta in Subiekt GT.
+    /// Used by BusinessPartner mapping (ST9).
+    /// </summary>
+    public int? ManufacturerContractorId { get; set; }
 
     /// <summary>
     /// Prices by level (0-9).

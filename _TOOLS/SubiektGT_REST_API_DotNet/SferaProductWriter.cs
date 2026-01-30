@@ -347,6 +347,7 @@ public class DirectSqlProductWriter : ISferaProductWriter
                     tw_IdVatZak,
                     tw_IdGrupa,
                     tw_IdPodstDostawca,
+                    tw_IdProducenta,
                     tw_Masa
                 )
                 VALUES (
@@ -404,6 +405,7 @@ public class DirectSqlProductWriter : ISferaProductWriter
                     @tw_IdVatZak,
                     @tw_IdGrupa,
                     @tw_IdPodstDostawca,
+                    @tw_IdProducenta,
                     @tw_Masa
                 )";
 
@@ -462,7 +464,8 @@ public class DirectSqlProductWriter : ISferaProductWriter
                 tw_IdVatSp = vatRateId,        // Use default if not specified
                 tw_IdVatZak = vatRateId,       // Same VAT for purchase
                 tw_IdGrupa = request.GroupId,
-                tw_IdPodstDostawca = request.ManufacturerId,
+                tw_IdPodstDostawca = request.SupplierContractorId ?? request.ManufacturerId,
+                tw_IdProducenta = request.ManufacturerContractorId,
                 tw_Masa = request.Weight
             };
 
@@ -717,10 +720,25 @@ public class DirectSqlProductWriter : ISferaProductWriter
                 parameters.Add("@groupId", request.GroupId.Value);
             }
 
-            if (request.ManufacturerId.HasValue)
+            // tw_IdPodstDostawca - Supplier contractor (FK to kh__Kontrahent)
+            // ST9: SupplierContractorId takes priority over legacy ManufacturerId
+            if (request.SupplierContractorId.HasValue)
             {
+                updates.Add("tw_IdPodstDostawca = @supplierContractorId");
+                parameters.Add("@supplierContractorId", request.SupplierContractorId.Value);
+            }
+            else if (request.ManufacturerId.HasValue)
+            {
+                // Legacy: ManufacturerId mapped to tw_IdPodstDostawca
                 updates.Add("tw_IdPodstDostawca = @manufacturerId");
                 parameters.Add("@manufacturerId", request.ManufacturerId.Value);
+            }
+
+            // ST9: tw_IdProducenta - Manufacturer contractor (FK to kh__Kontrahent)
+            if (request.ManufacturerContractorId.HasValue)
+            {
+                updates.Add("tw_IdProducenta = @manufacturerContractorId");
+                parameters.Add("@manufacturerContractorId", request.ManufacturerContractorId.Value);
             }
 
             // Product-level minimum stock (tw_StanMin) - NOT per-warehouse!

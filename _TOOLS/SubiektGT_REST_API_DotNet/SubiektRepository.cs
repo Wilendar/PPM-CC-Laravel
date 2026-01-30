@@ -114,6 +114,9 @@ public class SubiektRepository : ISubiektRepository
                 CASE WHEN t.tw_Usuniety = 0 AND t.tw_Zablokowany = 0 THEN 1 ELSE 0 END AS IsActive,
                 gr.grt_Nazwa AS GroupName,
                 kh.kh_Symbol AS ManufacturerName,
+                t.tw_IdPodstDostawca AS SupplierContractorId,
+                t.tw_IdProducenta AS ManufacturerContractorId,
+                kh2.kh_Symbol AS ManufacturerContractorName,
                 t.tw_Pole1 AS Pole1,
                 t.tw_Pole2 AS Pole2,
                 t.tw_Pole3 AS Pole3,
@@ -130,6 +133,7 @@ public class SubiektRepository : ISubiektRepository
             LEFT JOIN sl_StawkaVAT v ON t.tw_IdVatSp = v.vat_Id
             LEFT JOIN sl_GrupaTw gr ON t.tw_IdGrupa = gr.grt_Id
             LEFT JOIN kh__Kontrahent kh ON t.tw_IdPodstDostawca = kh.kh_Id
+            LEFT JOIN kh__Kontrahent kh2 ON t.tw_IdProducenta = kh2.kh_Id
             {whereClause}
             ORDER BY t.tw_Id
             OFFSET @offset ROWS FETCH NEXT @pageSize ROWS ONLY";
@@ -164,6 +168,9 @@ public class SubiektRepository : ISubiektRepository
                 CASE WHEN t.tw_Usuniety = 0 AND t.tw_Zablokowany = 0 THEN 1 ELSE 0 END AS IsActive,
                 gr.grt_Nazwa AS GroupName,
                 kh.kh_Symbol AS ManufacturerName,
+                t.tw_IdPodstDostawca AS SupplierContractorId,
+                t.tw_IdProducenta AS ManufacturerContractorId,
+                kh2.kh_Symbol AS ManufacturerContractorName,
                 t.tw_Pole1 AS Pole1,
                 t.tw_Pole2 AS Pole2,
                 t.tw_Pole3 AS Pole3,
@@ -180,6 +187,7 @@ public class SubiektRepository : ISubiektRepository
             LEFT JOIN sl_StawkaVAT v ON t.tw_IdVatSp = v.vat_Id
             LEFT JOIN sl_GrupaTw gr ON t.tw_IdGrupa = gr.grt_Id
             LEFT JOIN kh__Kontrahent kh ON t.tw_IdPodstDostawca = kh.kh_Id
+            LEFT JOIN kh__Kontrahent kh2 ON t.tw_IdProducenta = kh2.kh_Id
             WHERE t.tw_Id = @id";
 
         return await conn.QueryFirstOrDefaultAsync<Product>(sql, new { id, warehouseId });
@@ -210,6 +218,9 @@ public class SubiektRepository : ISubiektRepository
                 CASE WHEN t.tw_Usuniety = 0 AND t.tw_Zablokowany = 0 THEN 1 ELSE 0 END AS IsActive,
                 gr.grt_Nazwa AS GroupName,
                 kh.kh_Symbol AS ManufacturerName,
+                t.tw_IdPodstDostawca AS SupplierContractorId,
+                t.tw_IdProducenta AS ManufacturerContractorId,
+                kh2.kh_Symbol AS ManufacturerContractorName,
                 t.tw_Pole1 AS Pole1,
                 t.tw_Pole2 AS Pole2,
                 t.tw_Pole3 AS Pole3,
@@ -226,6 +237,7 @@ public class SubiektRepository : ISubiektRepository
             LEFT JOIN sl_StawkaVAT v ON t.tw_IdVatSp = v.vat_Id
             LEFT JOIN sl_GrupaTw gr ON t.tw_IdGrupa = gr.grt_Id
             LEFT JOIN kh__Kontrahent kh ON t.tw_IdPodstDostawca = kh.kh_Id
+            LEFT JOIN kh__Kontrahent kh2 ON t.tw_IdProducenta = kh2.kh_Id
             WHERE t.tw_Symbol = @sku AND t.tw_Usuniety = 0";
 
         return await conn.QueryFirstOrDefaultAsync<Product>(sql, new { sku, warehouseId });
@@ -547,6 +559,9 @@ public class Product
     public bool SplitPayment { get; set; }  // tw_MechanizmPodzielonejPlatnosci
     public string? SupplierCode { get; set; }  // tw_DostSymbol - Kod dostawcy
     public string? Pole8 { get; set; }  // tw_Pole8 - Parent SKU for variant products
+    public int? SupplierContractorId { get; set; }  // tw_IdPodstDostawca - FK to kh__Kontrahent (supplier)
+    public int? ManufacturerContractorId { get; set; }  // tw_IdProducenta - FK to kh__Kontrahent (manufacturer)
+    public string? ManufacturerContractorName { get; set; }  // kh_Symbol from kh2 (manufacturer name)
 }
 
 public class Stock
