@@ -123,6 +123,8 @@ class PendingProduct extends Model
         'product_type_id',
         'manufacturer',
         'manufacturer_id',
+        'supplier_id',
+        'importer_id',
         'supplier_code',
         'ean',
         'category_ids',
@@ -247,11 +249,27 @@ class PendingProduct extends Model
     }
 
     /**
-     * Manufacturer (brand)
+     * Manufacturer (brand) - points to BusinessPartner
      */
     public function manufacturerRelation(): BelongsTo
     {
-        return $this->belongsTo(Manufacturer::class, 'manufacturer_id');
+        return $this->belongsTo(BusinessPartner::class, 'manufacturer_id');
+    }
+
+    /**
+     * Supplier (dostawca) - points to BusinessPartner
+     */
+    public function supplierRelation(): BelongsTo
+    {
+        return $this->belongsTo(BusinessPartner::class, 'supplier_id');
+    }
+
+    /**
+     * Importer - points to BusinessPartner
+     */
+    public function importerRelation(): BelongsTo
+    {
+        return $this->belongsTo(BusinessPartner::class, 'importer_id');
     }
 
     /**

@@ -108,6 +108,8 @@ class Product extends Model
         'long_description',
         'product_type_id',
         'manufacturer_id',
+        'supplier_id',
+        'importer_id',
         'manufacturer',
         'supplier_code',
         'weight',
@@ -234,13 +236,30 @@ class Product extends Model
     }
 
     /**
-     * Manufacturer relationship (Marka produktu)
-     *
-     * FIX 2025-12-15: Added for automatic manufacturer import from PrestaShop
+     * Manufacturer relationship (Marka/Producent)
+     * Points to BusinessPartner via manufacturer_id FK.
      */
     public function manufacturerRelation(): BelongsTo
     {
-        return $this->belongsTo(Manufacturer::class, 'manufacturer_id');
+        return $this->belongsTo(BusinessPartner::class, 'manufacturer_id');
+    }
+
+    /**
+     * Supplier relationship (Dostawca)
+     * Points to BusinessPartner via supplier_id FK.
+     */
+    public function supplierRelation(): BelongsTo
+    {
+        return $this->belongsTo(BusinessPartner::class, 'supplier_id');
+    }
+
+    /**
+     * Importer relationship (Importer)
+     * Points to BusinessPartner via importer_id FK.
+     */
+    public function importerRelation(): BelongsTo
+    {
+        return $this->belongsTo(BusinessPartner::class, 'importer_id');
     }
 
     /*
