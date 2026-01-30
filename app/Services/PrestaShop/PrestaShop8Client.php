@@ -1196,6 +1196,336 @@ class PrestaShop8Client extends BasePrestaShopClient
     }
 
     // ===================================
+    // SUPPLIERS API METHODS (for Importer sync)
+    // ETAP_08: Importer → PS Supplier Sync
+    // ===================================
+
+    /**
+     * Get all suppliers from PrestaShop
+     *
+     * @param array $filters Query filters
+     * @return array Suppliers array
+     * @throws \App\Exceptions\PrestaShopAPIException
+     */
+    public function getSuppliers(array $filters = []): array
+    {
+        $defaultFilters = ['display' => 'full'];
+        $filters = array_merge($defaultFilters, $filters);
+
+        $queryParams = $this->buildQueryParams($filters);
+        $endpoint = empty($queryParams) ? '/suppliers' : "/suppliers?{$queryParams}";
+
+        $response = $this->makeRequest('GET', $endpoint);
+
+        if (isset($response['suppliers']) && is_array($response['suppliers'])) {
+            return $response['suppliers'];
+        }
+
+        return [];
+    }
+
+    /**
+     * Get single supplier by ID
+     *
+     * @param int $supplierId PrestaShop supplier ID
+     * @return array|null Supplier data or null if not found
+     * @throws \App\Exceptions\PrestaShopAPIException
+     */
+    public function getSupplier(int $supplierId): ?array
+    {
+        try {
+            $response = $this->makeRequest('GET', "/suppliers/{$supplierId}");
+
+            if (isset($response['supplier'])) {
+                return $response['supplier'];
+            }
+
+            return $response;
+        } catch (\App\Exceptions\PrestaShopAPIException $e) {
+            if ($e->getHttpStatusCode() === 404) {
+                return null;
+            }
+            throw $e;
+        }
+    }
+
+    /**
+     * Create new supplier in PrestaShop
+     *
+     * ETAP_08: Importer Sync System
+     * Supplier fields are IDENTICAL to manufacturer fields:
+     * - name (string, NOT multilang)
+     * - active (0|1)
+     * - description, short_description, meta_title, meta_description, meta_keywords (multilang)
+     * - link_rewrite (multilang)
+     *
+     * @param array $supplierData Supplier data in PrestaShop format
+     * @return array Created supplier with ID
+     * @throws \App\Exceptions\PrestaShopAPIException
+     */
+    public function createSupplier(array $supplierData): array
+    {
+        if (!isset($supplierData['active'])) {
+            $supplierData['active'] = 1;
+        }
+
+        $xmlBody = $this->arrayToXml(['supplier' => $supplierData]);
+
+        Log::info('[SUPPLIER API] Creating supplier', [
+            'shop_id' => $this->shop->id,
+            'name' => $supplierData['name'] ?? 'N/A',
+        ]);
+
+        $response = $this->makeRequest('POST', '/suppliers', [], [
+            'body' => $xmlBody,
+            'headers' => ['Content-Type' => 'application/xml'],
+        ]);
+
+        Log::info('[SUPPLIER API] Supplier created', [
+            'shop_id' => $this->shop->id,
+            'supplier_id' => $response['supplier']['id'] ?? null,
+            'name' => $supplierData['name'] ?? 'N/A',
+        ]);
+
+        return $response;
+    }
+
+    /**
+     * Update existing supplier in PrestaShop
+     *
+     * @param int $supplierId PrestaShop supplier ID
+     * @param array $supplierData Updated supplier data
+     * @return array Updated supplier data
+     * @throws \App\Exceptions\PrestaShopAPIException
+     */
+    public function updateSupplier(int $supplierId, array $supplierData): array
+    {
+        // CRITICAL: Inject id for UPDATE operation
+        $supplierData = array_merge(['id' => $supplierId], $supplierData);
+
+        $xmlBody = $this->arrayToXml(['supplier' => $supplierData]);
+
+        Log::info('[SUPPLIER API] Updating supplier', [
+            'shop_id' => $this->shop->id,
+            'supplier_id' => $supplierId,
+        ]);
+
+        $response = $this->makeRequest('PUT', "/suppliers/{$supplierId}", [], [
+            'body' => $xmlBody,
+            'headers' => ['Content-Type' => 'application/xml'],
+        ]);
+
+        Log::info('[SUPPLIER API] Supplier updated', [
+            'shop_id' => $this->shop->id,
+            'supplier_id' => $supplierId,
+        ]);
+
+        return $response;
+    }
+
+    /**
+     * Delete supplier from PrestaShop
+     *
+     * WARNING: This permanently removes the supplier from PrestaShop!
+     *
+     * @param int $supplierId PrestaShop supplier ID
+     * @return bool True on success
+     * @throws \App\Exceptions\PrestaShopAPIException
+     */
+    public function deleteSupplier(int $supplierId): bool
+    {
+        Log::info('[SUPPLIER API] Deleting supplier', [
+            'shop_id' => $this->shop->id,
+            'supplier_id' => $supplierId,
+        ]);
+
+        $this->makeRequest('DELETE', "/suppliers/{$supplierId}");
+
+        Log::info('[SUPPLIER API] Supplier deleted', [
+            'shop_id' => $this->shop->id,
+            'supplier_id' => $supplierId,
+        ]);
+
+        return true;
+    }
+
+    /**
+     * Upload logo image for supplier
+     *
+     * PrestaShop endpoint: POST /api/images/suppliers/{id}
+     * NOTE: Requires multipart/form-data (NOT XML!)
+     *
+     * @param int $supplierId PrestaShop supplier ID
+     * @param string $imagePath Local file path to logo image
+     * @param string $filename Original filename (default: logo.jpg)
+     * @return bool True on success
+     * @throws \App\Exceptions\PrestaShopAPIException
+     */
+    public function uploadSupplierImage(int $supplierId, string $imagePath, string $filename = 'logo.jpg'): bool
+    {
+        try {
+            $url = $this->buildUrl("/images/suppliers/{$supplierId}");
+
+            Log::info('[SUPPLIER API] Uploading logo', [
+                'shop_id' => $this->shop->id,
+                'supplier_id' => $supplierId,
+                'file_path' => $imagePath,
+                'file_size' => file_exists($imagePath) ? filesize($imagePath) : 0,
+            ]);
+
+            $response = \Illuminate\Support\Facades\Http::withBasicAuth($this->shop->api_key, '')
+                ->timeout($this->timeout)
+                ->attach('image', file_get_contents($imagePath), $filename)
+                ->post($url);
+
+            if (!$response->successful()) {
+                Log::error('[SUPPLIER API] Logo upload failed', [
+                    'supplier_id' => $supplierId,
+                    'status' => $response->status(),
+                    'body' => $response->body(),
+                ]);
+
+                throw new \App\Exceptions\PrestaShopAPIException(
+                    'Supplier logo upload failed: ' . $response->body(),
+                    $response->status()
+                );
+            }
+
+            Log::info('[SUPPLIER API] Logo uploaded successfully', [
+                'shop_id' => $this->shop->id,
+                'supplier_id' => $supplierId,
+            ]);
+
+            return true;
+
+        } catch (\App\Exceptions\PrestaShopAPIException $e) {
+            throw $e;
+        } catch (\Exception $e) {
+            Log::error('[SUPPLIER API] Logo upload exception', [
+                'supplier_id' => $supplierId,
+                'error' => $e->getMessage(),
+            ]);
+
+            throw new \App\Exceptions\PrestaShopAPIException(
+                'Supplier logo upload exception: ' . $e->getMessage(),
+                500,
+                $e
+            );
+        }
+    }
+
+    /**
+     * Download supplier logo from PrestaShop
+     *
+     * PrestaShop endpoint: GET /api/images/suppliers/{id}
+     *
+     * @param int $supplierId PrestaShop supplier ID
+     * @return string|null Binary image data or null if not found
+     * @throws \App\Exceptions\PrestaShopAPIException
+     */
+    public function downloadSupplierImage(int $supplierId): ?string
+    {
+        try {
+            $url = $this->buildUrl("/images/suppliers/{$supplierId}");
+
+            Log::debug('[SUPPLIER API] Downloading logo', [
+                'shop_id' => $this->shop->id,
+                'supplier_id' => $supplierId,
+            ]);
+
+            $response = \Illuminate\Support\Facades\Http::withBasicAuth($this->shop->api_key, '')
+                ->timeout($this->timeout)
+                ->get($url);
+
+            if ($response->status() === 404) {
+                Log::debug('[SUPPLIER API] No logo found', [
+                    'supplier_id' => $supplierId,
+                ]);
+                return null;
+            }
+
+            if (!$response->successful()) {
+                Log::error('[SUPPLIER API] Logo download failed', [
+                    'supplier_id' => $supplierId,
+                    'status' => $response->status(),
+                ]);
+                return null;
+            }
+
+            $imageData = $response->body();
+
+            Log::info('[SUPPLIER API] Logo downloaded', [
+                'shop_id' => $this->shop->id,
+                'supplier_id' => $supplierId,
+                'size' => strlen($imageData),
+            ]);
+
+            return $imageData;
+
+        } catch (\Exception $e) {
+            Log::error('[SUPPLIER API] Logo download exception', [
+                'supplier_id' => $supplierId,
+                'error' => $e->getMessage(),
+            ]);
+            return null;
+        }
+    }
+
+    /**
+     * Check if supplier has logo in PrestaShop
+     *
+     * @param int $supplierId PrestaShop supplier ID
+     * @return bool True if logo exists
+     */
+    public function hasSupplierImage(int $supplierId): bool
+    {
+        try {
+            $url = $this->buildUrl("/images/suppliers/{$supplierId}");
+
+            $response = \Illuminate\Support\Facades\Http::withBasicAuth($this->shop->api_key, '')
+                ->timeout($this->timeout)
+                ->head($url);
+
+            return $response->successful();
+
+        } catch (\Exception $e) {
+            return false;
+        }
+    }
+
+    /**
+     * Delete supplier logo from PrestaShop
+     *
+     * @param int $supplierId PrestaShop supplier ID
+     * @return bool True on success
+     */
+    public function deleteSupplierImage(int $supplierId): bool
+    {
+        try {
+            $this->makeRequest('DELETE', "/images/suppliers/{$supplierId}");
+
+            Log::info('[SUPPLIER API] Logo deleted', [
+                'shop_id' => $this->shop->id,
+                'supplier_id' => $supplierId,
+            ]);
+
+            return true;
+
+        } catch (\App\Exceptions\PrestaShopAPIException $e) {
+            if ($e->getHttpStatusCode() === 404) {
+                return true; // Already deleted
+            }
+
+            Log::error('[SUPPLIER API] Logo delete failed', [
+                'supplier_id' => $supplierId,
+                'error' => $e->getMessage(),
+            ]);
+
+            return false;
+        }
+    }
+
+    // ===================================
     // PRODUCT IMAGES API METHODS
     // ETAP_07d: Media Sync System
     // ===================================

@@ -3,6 +3,7 @@
 namespace App\Services\PrestaShop;
 
 use App\Models\Category;
+use App\Models\BusinessPartner;
 use App\Models\Manufacturer;
 use App\Models\Product;
 use App\Models\ProductDescription;
@@ -13,6 +14,7 @@ use App\Services\PrestaShop\PriceGroupMapper;
 use App\Services\PrestaShop\WarehouseMapper;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 use InvalidArgumentException;
 
 /**
@@ -155,6 +157,10 @@ class ProductTransformer
                 // Manufacturer (FIX 2025-12-15: Map manufacturer_id to PrestaShop id_manufacturer)
                 // 'manufacturer_name' => $product->manufacturer ?? '', // ❌ READONLY - causes API error
                 'id_manufacturer' => $this->getManufacturerPsId($product, $shop),
+
+                // Supplier / Importer (ETAP_08: Map importer_id to PrestaShop id_supplier)
+                // PPM Importer (BusinessPartner type='importer') → PS Supplier
+                'id_supplier' => $this->getImporterPsId($product, $shop),
 
                 // SEO fields
                 'meta_title' => $this->buildMultilangField(
@@ -933,6 +939,9 @@ class ProductTransformer
                 'manufacturer' => $prestashopProduct['manufacturer_name'] ?? null,
                 'manufacturer_id' => $this->importManufacturer($prestashopProduct, $shop),
 
+                // Importer / Supplier (ETAP_08: Import importer from PrestaShop supplier)
+                'importer_id' => $this->importImporter($prestashopProduct, $shop),
+
                 // Timestamps (preserve PrestaShop dates)
                 'created_at' => $prestashopProduct['date_add'] ?? now(),
                 'updated_at' => $prestashopProduct['date_upd'] ?? now(),
@@ -1437,5 +1446,96 @@ class ProductTransformer
             ->first();
 
         return $pivot?->pivot?->ps_manufacturer_id;
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | IMPORTER / SUPPLIER MAPPING (ETAP_08)
+    |--------------------------------------------------------------------------
+    */
+
+    /**
+     * Get PrestaShop supplier ID for product sync
+     *
+     * ETAP_08: Map importer_id (BusinessPartner) to PrestaShop id_supplier
+     *
+     * @param Product $product PPM Product instance
+     * @param PrestaShopShop $shop Shop instance
+     * @return int|null PrestaShop supplier ID or null
+     */
+    private function getImporterPsId(Product $product, PrestaShopShop $shop): ?int
+    {
+        if (!$product->importer_id) {
+            return null;
+        }
+
+        $importer = BusinessPartner::find($product->importer_id);
+        if (!$importer || !$importer->isImporter()) {
+            return null;
+        }
+
+        return $importer->getPsSupplierIdForShop($shop->id);
+    }
+
+    /**
+     * Import importer from PrestaShop product supplier data
+     *
+     * ETAP_08: Auto-import importers during product import
+     *
+     * Workflow:
+     * 1. Extract supplier_name and id_supplier from PS product
+     * 2. If supplier_name is empty or id_supplier is 0, return null
+     * 3. Look up existing BusinessPartner (type=importer) by code
+     * 4. If not found, create new BusinessPartner
+     * 5. Assign to shop with PS supplier ID
+     * 6. Return importer_id for Product
+     *
+     * @param array $prestashopProduct PrestaShop product data
+     * @param PrestaShopShop $shop Shop instance
+     * @return int|null Importer (BusinessPartner) ID or null
+     */
+    private function importImporter(array $prestashopProduct, PrestaShopShop $shop): ?int
+    {
+        $supplierName = $prestashopProduct['supplier_name'] ?? null;
+        $psSupplierId = (int) ($prestashopProduct['id_supplier'] ?? 0);
+
+        if (empty($supplierName) || $psSupplierId === 0) {
+            return null;
+        }
+
+        $code = Str::slug($supplierName, '_');
+
+        // Look up existing importer by code
+        $importer = BusinessPartner::where('code', $code)
+            ->where('type', 'importer')
+            ->first();
+
+        if (!$importer) {
+            $importer = BusinessPartner::create([
+                'name' => $supplierName,
+                'code' => $code,
+                'type' => 'importer',
+                'is_active' => true,
+            ]);
+
+            Log::info('ProductTransformer: Created new importer during import', [
+                'importer_id' => $importer->id,
+                'name' => $supplierName,
+                'code' => $code,
+                'ps_supplier_id' => $psSupplierId,
+                'shop_id' => $shop->id,
+            ]);
+        }
+
+        // Ensure importer is assigned to shop with PS supplier ID
+        if (!$importer->shops()->where('prestashop_shop_id', $shop->id)->exists()) {
+            $importer->shops()->attach($shop->id, [
+                'ps_supplier_id' => $psSupplierId,
+                'sync_status' => 'synced',
+                'last_synced_at' => now(),
+            ]);
+        }
+
+        return $importer->id;
     }
 }
