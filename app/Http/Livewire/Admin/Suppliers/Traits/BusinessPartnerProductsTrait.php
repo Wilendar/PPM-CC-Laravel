@@ -46,7 +46,7 @@ trait BusinessPartnerProductsTrait
     public function entityProducts(): LengthAwarePaginator
     {
         if ($this->activeTab === 'brak') {
-            return $this->getBrakProducts();
+            return $this->brakProducts;
         }
 
         if (! $this->selectedEntityId) {
@@ -113,6 +113,21 @@ trait BusinessPartnerProductsTrait
             ->where('is_active', true)
             ->orderBy('name')
             ->get(['id', 'name']);
+    }
+
+    #[Computed]
+    public function brakStats(): array
+    {
+        return [
+            'total' => Product::where(function ($q) {
+                $q->whereNull('supplier_id')
+                    ->orWhereNull('manufacturer_id')
+                    ->orWhereNull('importer_id');
+            })->count(),
+            'no_supplier' => Product::whereNull('supplier_id')->count(),
+            'no_manufacturer' => Product::whereNull('manufacturer_id')->count(),
+            'no_importer' => Product::whereNull('importer_id')->count(),
+        ];
     }
 
     /*
@@ -224,7 +239,8 @@ trait BusinessPartnerProductsTrait
     /**
      * Produkty bez przypisanego partnera (zakladka BRAK)
      */
-    private function getBrakProducts(): LengthAwarePaginator
+    #[Computed]
+    public function brakProducts(): LengthAwarePaginator
     {
         $query = Product::query();
 

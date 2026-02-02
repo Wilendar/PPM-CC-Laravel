@@ -16,6 +16,7 @@ export default defineConfig({
                 'resources/css/admin/feature-browser.css',
                 'resources/css/components/category-picker.css',
                 'resources/css/products/compatibility-tiles.css',
+                'resources/css/admin/supplier-panel.css',
                 'resources/css/visual-editor/editor.css',
                 'resources/css/visual-editor/preview.css',
                 'resources/js/app.js',
