@@ -4305,6 +4305,7 @@ class SubiektGTService implements ERPSyncServiceInterface
         }
 
         $this->initializeForConnection($connection);
+        $config = $connection->connection_config ?? [];
 
         $results = [
             'success' => true,
@@ -4324,7 +4325,7 @@ class SubiektGTService implements ERPSyncServiceInterface
 
         foreach ($variants as $variant) {
             try {
-                $variantData = $this->buildVariantSyncData($variant, $parentSku);
+                $variantData = $this->buildVariantSyncData($variant, $parentSku, $product, $config);
 
                 // Check if variant already exists in Subiekt
                 $existsResult = $this->restApiClient->productExists($variant->sku);
@@ -4376,21 +4377,65 @@ class SubiektGTService implements ERPSyncServiceInterface
     /**
      * Builds sync data for a variant product.
      *
-     * Uses ONLY tw_Pole8 for parent_sku (no Pole6/Pole7 references).
+     * Variants in Subiekt GT are separate products (tw__Towar).
+     * They inherit extended fields from master product:
+     * - Producent (manufacturer_id → tw_IdProducenta via BusinessPartner)
+     * - Dostawca (supplier_id → tw_IdPodstDostawca via BusinessPartner)
+     * - Kod CN (cn_code → tw_Pole5)
+     * - Material (material → tw_Pole1)
+     * - Symbol z wada (defect_symbol → tw_Pole3)
+     * - Zastosowanie (application → tw_Pole4)
+     * - Sklep internetowy (shop_internet → tw_SklepInternet)
+     * - Mechanizm podzielonej platnosci (split_payment)
+     * - Kod dostawcy (supplier_code → tw_DostSymbol)
+     * - Kod EAN (ean → tw_PodstKodKresk)
+     *
+     * Uses tw_Pole8 for parent_sku link.
      *
      * @param ProductVariant $variant The variant to sync
      * @param string $parentSku Parent product SKU
+     * @param Product|null $parentProduct Master product for field inheritance
+     * @param array $config Connection config (for contractor resolution)
      * @return array Data to send to Subiekt API
      */
-    protected function buildVariantSyncData(ProductVariant $variant, string $parentSku): array
-    {
+    protected function buildVariantSyncData(
+        ProductVariant $variant,
+        string $parentSku,
+        ?Product $parentProduct = null,
+        array $config = []
+    ): array {
         $resolver = $this->getVariantResolver();
 
-        return [
+        $data = [
             'name' => $variant->name,
-            'pole8' => $resolver->buildPole8Value($parentSku),  // TYLKO Pole8!
+            'pole8' => $resolver->buildPole8Value($parentSku),
             'is_active' => $variant->is_active,
         ];
+
+        // Inherit fields from master product
+        if ($parentProduct) {
+            // EAN from master (variants don't have own EAN in PPM)
+            if (!empty($parentProduct->ean)) {
+                $data['ean'] = mb_substr($parentProduct->ean, 0, 20);
+            }
+
+            // Extended fields: material, cn_code, defect_symbol, application,
+            // shop_internet, split_payment, supplier_code,
+            // manufacturer (legacy), supplier_id, manufacturer_id (BusinessPartner)
+            $extendedFields = $this->mapExtendedFields($parentProduct, $config);
+            if (!empty($extendedFields)) {
+                $data = array_merge($data, $extendedFields);
+            }
+
+            Log::debug('buildVariantSyncData: Inherited master fields', [
+                'variant_sku' => $variant->sku,
+                'parent_sku' => $parentSku,
+                'inherited_fields' => array_keys($extendedFields ?? []),
+                'has_ean' => !empty($parentProduct->ean),
+            ]);
+        }
+
+        return $data;
     }
 
     /*
