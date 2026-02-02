@@ -124,10 +124,10 @@
             <div>
                 <label class="block text-sm font-medium text-gray-300 mb-1">Firma</label>
                 <input type="text"
-                       wire:model="formData.company"
+                       wire:model="formData.company_name"
                        class="form-input-dark w-full"
                        placeholder="Nazwa firmy">
-                @error('formData.company') <span class="text-xs text-red-400">{{ $message }}</span> @enderror
+                @error('formData.company_name') <span class="text-xs text-red-400">{{ $message }}</span> @enderror
             </div>
         </div>
 
@@ -287,11 +287,11 @@
                         Czy na pewno chcesz usunac <strong class="text-white">{{ $entity->name }}</strong>? Ta operacja jest nieodwracalna.
                     </p>
                     <div class="flex items-center gap-2 mt-3">
-                        <button wire:click="deleteEntity"
+                        <button wire:click="delete"
                                 wire:loading.attr="disabled"
                                 class="btn-enterprise-secondary supplier-panel__btn-danger-confirm">
-                            <span wire:loading.remove wire:target="deleteEntity">Tak, usun</span>
-                            <span wire:loading wire:target="deleteEntity">Usuwanie...</span>
+                            <span wire:loading.remove wire:target="delete">Tak, usun</span>
+                            <span wire:loading wire:target="delete">Usuwanie...</span>
                         </button>
                         <button wire:click="$set('showDeleteConfirm', false)"
                                 class="btn-enterprise-secondary">

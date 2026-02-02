@@ -1,7 +1,7 @@
 {{-- Create Modal - Tworzenie nowego podmiotu --}}
 @if($showCreateModal)
     <div class="supplier-panel__modal-overlay" wire:click.self="$set('showCreateModal', false)">
-        <div class="supplier-panel__modal" wire:click.stop>
+        <div class="supplier-panel__modal" @click.stop>
             {{-- Header --}}
             <div class="flex items-center justify-between px-6 py-4 border-b border-gray-700">
                 <h3 class="text-lg font-semibold text-white">
@@ -88,10 +88,10 @@
                         <div>
                             <label class="block text-sm font-medium text-gray-300 mb-1">Firma</label>
                             <input type="text"
-                                   wire:model="formData.company"
+                                   wire:model="formData.company_name"
                                    class="form-input-dark w-full"
                                    placeholder="Nazwa firmy">
-                            @error('formData.company') <span class="text-xs text-red-400">{{ $message }}</span> @enderror
+                            @error('formData.company_name') <span class="text-xs text-red-400">{{ $message }}</span> @enderror
                         </div>
                     </div>
 
@@ -174,16 +174,16 @@
                         class="btn-enterprise-secondary">
                     Anuluj
                 </button>
-                <button wire:click="createEntity"
+                <button wire:click="save"
                         wire:loading.attr="disabled"
                         class="btn-enterprise-primary">
-                    <span wire:loading.remove wire:target="createEntity">
+                    <span wire:loading.remove wire:target="save">
                         <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
                         </svg>
                         Zapisz
                     </span>
-                    <span wire:loading wire:target="createEntity" class="flex items-center">
+                    <span wire:loading wire:target="save" class="flex items-center">
                         <svg class="animate-spin w-4 h-4 mr-1.5" fill="none" viewBox="0 0 24 24">
                             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>

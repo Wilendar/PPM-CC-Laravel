@@ -123,6 +123,7 @@ trait BusinessPartnerCrudTrait
             $data['type'] = $this->activeTab;
         }
         $data['slug'] = Str::slug($data['name']);
+        $data['code'] = Str::upper(Str::slug($data['name'], '_'));
 
         try {
             $entity = BusinessPartner::create($data);
