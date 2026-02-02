@@ -4323,6 +4323,9 @@ class ProductForm extends Component
             $this->slug = $this->defaultData['slug'] ?? $this->slug;
             $this->product_type_id = $this->defaultData['product_type_id'] ?? $this->product_type_id;
             $this->manufacturer = $this->defaultData['manufacturer'] ?? $this->manufacturer;
+            $this->manufacturer_id = array_key_exists('manufacturer_id', $this->defaultData) ? $this->defaultData['manufacturer_id'] : $this->manufacturer_id;
+            $this->supplier_id = array_key_exists('supplier_id', $this->defaultData) ? $this->defaultData['supplier_id'] : $this->supplier_id;
+            $this->importer_id = array_key_exists('importer_id', $this->defaultData) ? $this->defaultData['importer_id'] : $this->importer_id;
             $this->supplier_code = $this->defaultData['supplier_code'] ?? $this->supplier_code;
             $this->ean = $this->defaultData['ean'] ?? $this->ean;
 
@@ -4843,6 +4846,9 @@ class ProductForm extends Component
             'slug' => $this->slug,
             'product_type_id' => $this->product_type_id,
             'manufacturer' => $this->manufacturer,
+            'manufacturer_id' => $this->manufacturer_id,
+            'supplier_id' => $this->supplier_id,
+            'importer_id' => $this->importer_id,
             'supplier_code' => $this->supplier_code,
             'ean' => $this->ean,
 
@@ -4940,6 +4946,9 @@ class ProductForm extends Component
             'slug' => $this->slug,
             'product_type_id' => $this->product_type_id,
             'manufacturer' => $this->manufacturer,
+            'manufacturer_id' => $this->manufacturer_id,
+            'supplier_id' => $this->supplier_id,
+            'importer_id' => $this->importer_id,
             'supplier_code' => $this->supplier_code,
             'ean' => $this->ean,
 
@@ -6005,6 +6014,9 @@ class ProductForm extends Component
                         'slug' => $this->slug ?: Str::slug($this->name),
                         'product_type_id' => $this->product_type_id,
                         'manufacturer' => $this->manufacturer,
+                        'manufacturer_id' => $this->manufacturer_id,
+                        'supplier_id' => $this->supplier_id,
+                        'importer_id' => $this->importer_id,
                         'supplier_code' => $this->supplier_code,
                         'ean' => $this->ean,
                         'short_description' => $this->short_description,
@@ -8582,6 +8594,9 @@ class ProductForm extends Component
                 'slug' => $changes['slug'] ?? $this->product->slug ?: Str::slug($changes['name'] ?? $this->product->name),
                 'product_type_id' => $changes['product_type_id'] ?? $this->product->product_type_id,
                 'manufacturer' => $changes['manufacturer'] ?? $this->product->manufacturer,
+                'manufacturer_id' => array_key_exists('manufacturer_id', $changes) ? $changes['manufacturer_id'] : $this->product->manufacturer_id,
+                'supplier_id' => array_key_exists('supplier_id', $changes) ? $changes['supplier_id'] : $this->product->supplier_id,
+                'importer_id' => array_key_exists('importer_id', $changes) ? $changes['importer_id'] : $this->product->importer_id,
                 'supplier_code' => $changes['supplier_code'] ?? $this->product->supplier_code,
                 'ean' => $changes['ean'] ?? $this->product->ean,
                 'short_description' => $changes['short_description'] ?? $this->product->short_description,
