@@ -74,6 +74,8 @@ trait BusinessPartnerProductsTrait
                 'supplierRelation:id,name,type',
                 'manufacturerRelation:id,name,type',
                 'importerRelation:id,name,type',
+                'erpData.erpConnection:id,erp_type,instance_name',
+                'shopData.shop:id,name',
             ])
             ->orderBy('name')
             ->paginate($this->productPerPage, ['*'], 'products');
@@ -279,6 +281,8 @@ trait BusinessPartnerProductsTrait
                 'supplierRelation:id,name,type',
                 'manufacturerRelation:id,name,type',
                 'importerRelation:id,name,type',
+                'erpData.erpConnection:id,erp_type,instance_name',
+                'shopData.shop:id,name',
             ])
             ->orderBy('name')
             ->paginate($this->productPerPage, ['*'], 'products');

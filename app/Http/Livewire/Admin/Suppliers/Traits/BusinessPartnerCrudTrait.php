@@ -73,7 +73,7 @@ trait BusinessPartnerCrudTrait
 
         $relation = self::RELATION_MAP[$this->activeTab] ?? null;
         if ($relation) {
-            $query->withCount($relation);
+            $query->withCount([$relation . ' as products_count']);
         }
 
         return $query->orderBy('sort_order')->orderBy('name')->get();

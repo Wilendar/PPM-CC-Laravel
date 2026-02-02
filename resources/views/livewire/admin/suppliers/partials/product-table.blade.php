@@ -124,8 +124,8 @@
                             <div class="flex flex-wrap justify-center gap-1">
                                 @forelse($product->erpData ?? [] as $erpData)
                                     <span class="supplier-panel__badge supplier-panel__badge--erp"
-                                          title="{{ $erpData->erp_system ?? '' }}">
-                                        {{ Str::limit($erpData->erp_system ?? '?', 8) }}
+                                          title="{{ $erpData->erpConnection->instance_name ?? $erpData->erpConnection->erp_type ?? '' }}">
+                                        {{ Str::limit($erpData->erpConnection->instance_name ?? $erpData->erpConnection->erp_type ?? '?', 8) }}
                                     </span>
                                 @empty
                                     <span class="text-xs text-gray-600">-</span>

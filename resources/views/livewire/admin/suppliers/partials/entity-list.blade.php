@@ -58,8 +58,8 @@
                     {{-- Info --}}
                     <div class="flex-1 min-w-0 text-left">
                         <div class="text-sm font-medium text-white truncate">{{ $entity->name }}</div>
-                        @if($entity->company)
-                            <div class="text-xs text-gray-500 truncate">{{ $entity->company }}</div>
+                        @if($entity->company_name)
+                            <div class="text-xs text-gray-500 truncate">{{ $entity->company_name }}</div>
                         @endif
                         <div class="flex items-center gap-2 mt-0.5">
                             <span class="text-xs text-gray-500">
