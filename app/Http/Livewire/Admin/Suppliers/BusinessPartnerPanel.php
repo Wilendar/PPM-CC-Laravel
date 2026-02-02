@@ -88,6 +88,7 @@ class BusinessPartnerPanel extends Component
     public function selectEntity(int $id): void
     {
         $this->selectedEntityId = $id;
+        $this->loadEntityForEdit();
         $this->productSearch = '';
         $this->resetPage('products');
     }

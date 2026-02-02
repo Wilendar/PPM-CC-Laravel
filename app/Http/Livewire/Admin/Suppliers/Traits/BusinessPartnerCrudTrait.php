@@ -275,6 +275,11 @@ trait BusinessPartnerCrudTrait
             }
 
             $this->logoUpload->storeAs('public', $filename);
+
+            $fullPath = Storage::disk('public')->path($filename);
+            @chmod(dirname($fullPath), 0755);
+            @chmod($fullPath, 0644);
+
             $entity->update(['logo_path' => $filename]);
             Log::info('[BUSINESS_PARTNER] Logo uploaded', ['id' => $entity->id, 'filename' => $filename]);
         } catch (\Exception $e) {
