@@ -83,20 +83,20 @@
     $iconPath = $iconPaths[$icon] ?? $iconPaths['cog'];
 @endphp
 
-<span class="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-xs cursor-help transition-colors hover:opacity-80"
+<span class="inline-flex items-center justify-center gap-0.5 h-6 px-1.5 rounded text-xs cursor-help transition-colors hover:opacity-80"
       style="background-color: {{ $color }}{{ $bgOpacity }}; color: {{ $color }}; border: 1px solid {{ $color }}{{ $borderOpacity }};"
       title="{{ $tooltipText }}">
     {{-- Integration icon --}}
-    <svg class="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <svg class="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="{{ $iconPath }}"/>
     </svg>
 
     {{-- Status: checkmark (OK) or issue count --}}
     @if($hasIssues && count($issues) > 0)
-        <span class="font-semibold text-[10px]">{{ count($issues) }}</span>
+        <span class="font-semibold text-[10px] leading-none">{{ count($issues) }}</span>
     @else
         {{-- Checkmark for OK status --}}
-        <svg class="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg class="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/>
         </svg>
     @endif
