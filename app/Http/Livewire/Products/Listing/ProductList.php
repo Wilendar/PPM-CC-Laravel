@@ -410,7 +410,7 @@ class ProductList extends Component
      *
      * @param string $column
      */
-    public function sortBy(string $column): void
+    public function setSortColumn(string $column): void
     {
         if ($this->sortBy === $column) {
             $this->sortDirection = $this->sortDirection === 'asc' ? 'desc' : 'asc';

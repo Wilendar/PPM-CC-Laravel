@@ -434,7 +434,7 @@
 
                                 {{-- Sortable Headers --}}
                                 <th class="px-6 py-3 text-left text-xs font-medium text-muted uppercase tracking-wider cursor-pointer hover:bg-card-hover transition-all duration-300"
-                                    wire:click="sortBy('sku')">
+                                    wire:click="setSortColumn('sku')">
                                     <div class="flex items-center">
                                         SKU
                                         @if($sortBy === 'sku')
@@ -446,7 +446,7 @@
                                 </th>
 
                                 <th class="px-6 py-3 text-left text-xs font-medium text-muted uppercase tracking-wider cursor-pointer hover:bg-card-hover transition-all duration-300"
-                                    wire:click="sortBy('name')">
+                                    wire:click="setSortColumn('name')">
                                     <div class="flex items-center">
                                         Nazwa
                                         @if($sortBy === 'name')
@@ -480,7 +480,7 @@
                                 </th>
 
                                 <th class="px-6 py-3 text-left text-xs font-medium text-muted uppercase tracking-wider cursor-pointer hover:bg-card-hover transition-all duration-300"
-                                    wire:click="sortBy('updated_at')">
+                                    wire:click="setSortColumn('updated_at')">
                                     <div class="flex items-center">
                                         Ostatnia aktualizacja
                                         @if($sortBy === 'updated_at')
