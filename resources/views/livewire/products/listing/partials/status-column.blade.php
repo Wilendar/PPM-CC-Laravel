@@ -25,66 +25,60 @@
             {{-- Main popover trigger with full details --}}
             <x-product-status-popover :status="$status" :product="$product" />
 
-            {{-- Quick visual indicators (icons only for at-a-glance view) --}}
-            @if($status->hasAnyIssues())
-                {{-- Global issues as icons --}}
-                @if($status->globalIssues[ProductStatusDTO::ISSUE_ZERO_PRICE] ?? false)
-                    <x-product-status-icon type="zero_price" />
-                @endif
+            {{-- Global issues as icons (if any) --}}
+            @if($status->globalIssues[ProductStatusDTO::ISSUE_ZERO_PRICE] ?? false)
+                <x-product-status-icon type="zero_price" />
+            @endif
 
-                @if($status->globalIssues[ProductStatusDTO::ISSUE_LOW_STOCK] ?? false)
-                    <x-product-status-icon type="low_stock" />
-                @endif
+            @if($status->globalIssues[ProductStatusDTO::ISSUE_LOW_STOCK] ?? false)
+                <x-product-status-icon type="low_stock" />
+            @endif
 
-                @if($status->globalIssues[ProductStatusDTO::ISSUE_NO_IMAGES] ?? false)
-                    <x-product-status-icon type="no_images" />
-                @endif
+            @if($status->globalIssues[ProductStatusDTO::ISSUE_NO_IMAGES] ?? false)
+                <x-product-status-icon type="no_images" />
+            @endif
 
-                @if($status->globalIssues[ProductStatusDTO::ISSUE_NOT_IN_PRESTASHOP] ?? false)
-                    <x-product-status-icon type="not_in_prestashop" />
-                @endif
+            @if($status->globalIssues[ProductStatusDTO::ISSUE_NOT_IN_PRESTASHOP] ?? false)
+                <x-product-status-icon type="not_in_prestashop" />
+            @endif
 
-                {{-- Shop issues as colored badges --}}
-                @foreach($status->shopIssues as $shopId => $issues)
-                    @php
-                        $shopData = $product->shopData->firstWhere('shop_id', $shopId);
-                        $shop = $shopData?->shop;
-                    @endphp
-                    @if($shop)
-                        <x-integration-status-badge
-                            :name="$shop->name"
-                            :color="$shop->label_color"
-                            :icon="$shop->label_icon ?? 'shopping-cart'"
-                            :issues="$issues"
-                            type="shop"
-                        />
-                    @endif
+            {{-- ALL connected integrations (always show, with OK checkmark or issue count) --}}
+            @if($status->hasConnectedIntegrations())
+                {{-- Connected shops --}}
+                @foreach($status->connectedShops as $shopId => $shopInfo)
+                    <x-integration-status-badge
+                        :name="$shopInfo['name']"
+                        :color="'#' . ltrim($shopInfo['color'], '#')"
+                        :icon="$shopInfo['icon']"
+                        :hasIssues="$shopInfo['hasIssues']"
+                        :issues="$status->shopIssues[$shopId] ?? []"
+                        type="shop"
+                    />
                 @endforeach
 
-                {{-- ERP issues as colored badges --}}
-                @foreach($status->erpIssues as $erpId => $issues)
-                    @php
-                        $erpData = $product->erpData->firstWhere('erp_connection_id', $erpId);
-                        $erp = $erpData?->erpConnection;
-                    @endphp
-                    @if($erp)
-                        <x-integration-status-badge
-                            :name="$erp->instance_name"
-                            :color="$erp->label_color"
-                            :icon="$erp->label_icon ?? 'database'"
-                            :issues="$issues"
-                            type="erp"
-                        />
-                    @endif
+                {{-- Connected ERPs --}}
+                @foreach($status->connectedErps as $erpId => $erpInfo)
+                    <x-integration-status-badge
+                        :name="$erpInfo['name']"
+                        :color="'#' . ltrim($erpInfo['color'], '#')"
+                        :icon="$erpInfo['icon']"
+                        :hasIssues="$erpInfo['hasIssues']"
+                        :issues="$status->erpIssues[$erpId] ?? []"
+                        type="erp"
+                    />
                 @endforeach
+            @elseif(!$status->hasGlobalIssues())
+                {{-- No integrations and no global issues - show generic OK --}}
+                <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-gray-700/30 text-gray-500" title="Brak integracji">
+                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/>
+                    </svg>
+                </span>
+            @endif
 
-                {{-- Variant issues summary --}}
-                @if(!empty($status->variantIssues))
-                    <x-product-status-icon type="variant_issues" :count="count($status->variantIssues)" />
-                @endif
-            @else
-                {{-- All OK badge --}}
-                <x-product-status-icon type="ok" />
+            {{-- Variant issues summary --}}
+            @if(!empty($status->variantIssues))
+                <x-product-status-icon type="variant_issues" :count="count($status->variantIssues)" />
             @endif
         @else
             {{-- Loading/No data state --}}

@@ -1,6 +1,6 @@
 {{--
     Integration Status Badge Component
-    Displays a compact badge for per-integration issues
+    Displays a compact badge for per-integration status (OK or issues)
 
     Uses label_color and label_icon from ERPConnection/PrestaShopShop
     per INTEGRATION_LABELS.md specification
@@ -8,23 +8,36 @@
     @param string $name - Integration name (shop/ERP instance name)
     @param string $color - Hex color from label_color (#RRGGBB)
     @param string $icon - Icon name from label_icon
+    @param bool $hasIssues - Whether the integration has issues (default: true for backward compat)
     @param array $issues - Array of issue types ['basic', 'desc', 'physical', 'images']
     @param string $type - 'shop' or 'erp'
 
-    Usage:
+    Usage (with issues):
     <x-integration-status-badge
         :name="$shop->name"
         :color="$shop->label_color"
         :icon="$shop->label_icon"
+        :hasIssues="true"
         :issues="['basic', 'desc']"
+        type="shop"
+    />
+
+    Usage (OK status):
+    <x-integration-status-badge
+        :name="$shop->name"
+        :color="$shop->label_color"
+        :icon="$shop->label_icon"
+        :hasIssues="false"
+        :issues="[]"
         type="shop"
     />
 
     @since 2026-02-04
     @see .Release_docs/INTEGRATION_LABELS.md
+    @see Plan_Projektu/synthetic-mixing-thunder.md (section 11.7)
 --}}
 
-@props(['name', 'color', 'icon', 'issues', 'type' => 'shop'])
+@props(['name', 'color', 'icon', 'hasIssues' => true, 'issues' => [], 'type' => 'shop'])
 
 @php
     // Issue labels in Polish
@@ -37,15 +50,22 @@
         'compatibility' => 'Dopasowania',
     ];
 
-    // Build tooltip text
-    $tooltipIssues = collect($issues)
-        ->map(fn($issue) => $issueLabels[$issue] ?? $issue)
-        ->join(', ');
-
-    $tooltipText = "{$name}: {$tooltipIssues}";
+    // Build tooltip text based on status
+    if ($hasIssues && !empty($issues)) {
+        $tooltipIssues = collect($issues)
+            ->map(fn($issue) => $issueLabels[$issue] ?? $issue)
+            ->join(', ');
+        $tooltipText = "{$name}: {$tooltipIssues}";
+    } else {
+        $tooltipText = "{$name} - OK";
+    }
 
     // Default color if not provided
     $color = $color ?? ($type === 'shop' ? '#06b6d4' : '#f97316');
+
+    // Style adjustments for OK vs issues state
+    $bgOpacity = $hasIssues ? '30' : '15';
+    $borderOpacity = $hasIssues ? '60' : '40';
 
     // Icon SVG paths based on icon name
     $iconPaths = [
@@ -63,14 +83,21 @@
     $iconPath = $iconPaths[$icon] ?? $iconPaths['cog'];
 @endphp
 
-<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs cursor-help transition-colors hover:opacity-80"
-      style="background-color: {{ $color }}20; color: {{ $color }}; border: 1px solid {{ $color }}50;"
+<span class="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-xs cursor-help transition-colors hover:opacity-80"
+      style="background-color: {{ $color }}{{ $bgOpacity }}; color: {{ $color }}; border: 1px solid {{ $color }}{{ $borderOpacity }};"
       title="{{ $tooltipText }}">
     {{-- Integration icon --}}
     <svg class="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="{{ $iconPath }}"/>
     </svg>
 
-    {{-- Issue count --}}
-    <span class="font-semibold">{{ count($issues) }}</span>
+    {{-- Status: checkmark (OK) or issue count --}}
+    @if($hasIssues && count($issues) > 0)
+        <span class="font-semibold text-[10px]">{{ count($issues) }}</span>
+    @else
+        {{-- Checkmark for OK status --}}
+        <svg class="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/>
+        </svg>
+    @endif
 </span>
