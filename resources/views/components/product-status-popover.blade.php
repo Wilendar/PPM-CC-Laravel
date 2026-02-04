@@ -41,15 +41,26 @@
     ];
 @endphp
 
-<div x-data="{ open: false }"
-     @mouseenter="open = true"
+<div x-data="{
+        open: false,
+        position: 'bottom',
+        checkPosition() {
+            const btn = this.$refs.trigger;
+            const rect = btn.getBoundingClientRect();
+            const spaceBelow = window.innerHeight - rect.bottom;
+            this.position = spaceBelow < 300 ? 'top' : 'bottom';
+        }
+     }"
+     @mouseenter="checkPosition(); open = true"
      @mouseleave="open = false"
-     class="relative inline-flex">
+     class="relative inline-flex"
+     :class="{ 'z-[9999]': open }">
 
     {{-- Trigger Button - Shows summary icon --}}
     <button type="button"
+            x-ref="trigger"
             class="inline-flex items-center justify-center w-6 h-6 rounded border {{ $severityConfig['bg'] }} {{ $severityConfig['border'] }} {{ $severityConfig['text'] }} cursor-pointer transition-all hover:scale-105"
-            @click.stop="open = !open">
+            @click.stop="checkPosition(); open = !open">
         @if($hasIssues)
             {{-- Warning/Error icon with count --}}
             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -69,13 +80,14 @@
     {{-- Popover Content --}}
     <div x-show="open"
          x-transition:enter="transition ease-out duration-200"
-         x-transition:enter-start="opacity-0 translate-y-1"
-         x-transition:enter-end="opacity-100 translate-y-0"
+         x-transition:enter-start="opacity-0"
+         x-transition:enter-end="opacity-100"
          x-transition:leave="transition ease-in duration-150"
-         x-transition:leave-start="opacity-100 translate-y-0"
-         x-transition:leave-end="opacity-0 translate-y-1"
+         x-transition:leave-start="opacity-100"
+         x-transition:leave-end="opacity-0"
          @click.stop
-         class="absolute z-50 left-0 mt-2 w-72 origin-top-left"
+         class="absolute z-[100] left-0 w-72"
+         :class="position === 'top' ? 'bottom-full mb-2' : 'top-full mt-2'"
          style="display: none;">
 
         <div class="bg-gray-800 rounded-lg shadow-xl border border-gray-700 overflow-hidden">
