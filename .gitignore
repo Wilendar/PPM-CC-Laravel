@@ -1,6 +1,6 @@
 # ============================================
 # PPM-CC-Laravel .gitignore
-# Clean repository - only source code tracked
+# ONLY Laravel source code tracked
 # ============================================
 
 # ============================================
@@ -44,7 +44,7 @@ Thumbs.db
 *.swo
 
 # ============================================
-# TESTING
+# TESTING CACHE
 # ============================================
 /tests/coverage/
 /.phpunit.cache/
@@ -53,15 +53,49 @@ Thumbs.db
 /.php-cs-fixer.cache
 
 # ============================================
-# CLAUDE CODE CACHE (CRITICAL!)
+# CLAUDE CODE & PROJECT MANAGEMENT
 # ============================================
 tmpclaude-*-cwd
+/.claude/
+/.subtask/
+/.coordination/
+/.parallel-work/
+/.ma-orchestrator/
+/.playwright-mcp/
+/.Release_docs/
+
+# Project documentation (not source code)
+/CLAUDE.md
+/AGENTS.md
+/QUICKSTART.md
+/GEMINI.md
+/PROGRESS.json
+
+# ============================================
+# PROJECT FOLDERS (not source code)
+# ============================================
+/_DOCS/
+/_ISSUES_FIXES/
+/_TOOLS/
+/_TEMP/
+/_TEST/
+/_OTHER/
+/_ARCHIVE/
+/_BACKUP/
+/_DIAGNOSTICS/
+/_REPORTS/
+/_AGENT_REPORTS/
+/_AGENT_STATE/
+/References/
+/screenshots/
+/Plan_Projektu/
+/Plan_Projektu\ copy/
 
 # ============================================
 # DEBUG/TEST FILES IN ROOT
 # ============================================
 
-# Debug artifacts (files without extension)
+# Files without extension (debug artifacts)
 /nul
 /id
 /ppm_id
@@ -74,6 +108,7 @@ tmpclaude-*-cwd
 /name-
 /name}n;
 /_ul*
+/_UL*
 /echo
 
 # Test/debug PHP scripts
@@ -86,81 +121,39 @@ tmpclaude-*-cwd
 /reset_*.php
 
 # Python debug scripts
-/count_*.py
-/check_*.py
+/*.py
 
-# Temporary files
+# Temporary files in root
 /_BACKUP_*
 /_TEMP_*
 /_WORKING_*
 /temp_*.txt
 /temp_*.log
 /temp_*.blade.php
+/Dtemp_*.txt
 /category-form-server.blade.php
 
-# Duplicates
+# Duplicates and misc
 /CLAUDE\ —\ kopia.md
-/GEMINI.md
 /*.sln
-
-# Debug images
 /*.png
-
-# Install scripts
 /dotnet-install.ps1
-
-# Shell scripts (deploy helpers - keep locally)
 /upload_*.sh
 
 # ============================================
-# WORKING FOLDERS (not source code)
-# ============================================
-/_TEMP/
-/_TEST/
-/_OTHER/
-/_ARCHIVE/
-/_BACKUP/
-/_DIAGNOSTICS/
-/_REPORTS/
-/_AGENT_REPORTS/
-/Plan_Projektu\ copy/
-
-# ============================================
-# ORCHESTRATION & MCP
-# ============================================
-/.subtask/
-/.parallel-work/
-/.ma-orchestrator/
-/.playwright-mcp/
-/.Release_docs/
-
-# ============================================
-# _TOOLS DEBUG/TEST FILES
-# ============================================
-/_TOOLS/debug_*.php
-/_TOOLS/test_*.php
-/_TOOLS/fix_*.php
-/_TOOLS/check_*.php
-/_TOOLS/add_*.php
-/_TOOLS/create_*.php
-/_TOOLS/prepare_*.php
-
-# ============================================
-# .NET BUILD (SubiektGT API)
-# ============================================
-/_TOOLS/SubiektGT_REST_API_DotNet/bin/
-/_TOOLS/SubiektGT_REST_API_DotNet/obj/
-/_TOOLS/SubiektGT_REST_API_DotNet/publish/
-/_TOOLS/SubiektApi_backup/logs/
-*.cache
-
-# ============================================
-# TRACKED FILES (for Claude Code CLI):
-# - CLAUDE.md, AGENTS.md - project instructions
-# - .claude/ - agent system configuration
-# - Plan_Projektu/ - ETAP tracking (NOT "copy")
-# - _DOCS/ - project documentation
-# - _ISSUES_FIXES/ - knowledge base
-# - _TOOLS/ (source code only, not build artifacts)
-# - References/ - UI mockups
+# KEEP ONLY LARAVEL SOURCE CODE:
+# - app/
+# - bootstrap/ (except cache)
+# - config/
+# - database/
+# - public/ (except build)
+# - resources/
+# - routes/
+# - tests/ (unit/feature tests)
+# - artisan
+# - composer.json, composer.lock
+# - package.json, package-lock.json
+# - vite.config.js
+# - phpunit.xml
+# - .env.example
 # ============================================

@@ -164,7 +164,7 @@
                             <div class="resize-handle" x-on:mousedown="startResize($event, 'price')"></div>
                         </th>
 
-                        {{-- KATEGORIE - 4 kolumny z bulk actions --}}
+                        {{-- KATEGORIE - kolumny L3-L8 (bulk actions dla L3-L5) --}}
                         @php
                             $hasSelection = count($selectedIds ?? []) > 0;
                         @endphp
@@ -176,7 +176,7 @@
                                     @include('livewire.products.import.partials.bulk-category-dropdown', ['level' => 3])
                                 </div>
                             @else
-                                <span class="text-gray-400">Kategoria</span>
+                                <span class="text-gray-400">Kategoria L3</span>
                             @endif
                             <div class="resize-handle" x-on:mousedown="startResize($event, 'cat_l3')"></div>
                         </th>
@@ -187,7 +187,7 @@
                                     @include('livewire.products.import.partials.bulk-category-dropdown', ['level' => 4])
                                 </div>
                             @else
-                                <span class="text-gray-400">Podkat.</span>
+                                <span class="text-gray-400">Kategoria L4</span>
                             @endif
                             <div class="resize-handle" x-on:mousedown="startResize($event, 'cat_l4')"></div>
                         </th>
@@ -198,11 +198,22 @@
                                     @include('livewire.products.import.partials.bulk-category-dropdown', ['level' => 5])
                                 </div>
                             @else
-                                <span class="text-gray-400">Szczeg.</span>
+                                <span class="text-gray-400">Kategoria L5</span>
                             @endif
                             <div class="resize-handle" x-on:mousedown="startResize($event, 'cat_l5')"></div>
                         </th>
-                        <th class="px-1 w-8 text-xs text-center text-gray-500">+</th>
+                        <th class="px-1 w-24 text-xs text-center text-gray-500 relative resizable-column" data-column-id="cat_l6" style="width: 96px; min-width: 70px;">
+                            <span class="text-gray-400">KAT L6</span>
+                            <div class="resize-handle" x-on:mousedown="startResize($event, 'cat_l6')"></div>
+                        </th>
+                        <th class="px-1 w-24 text-xs text-center text-gray-500 relative resizable-column" data-column-id="cat_l7" style="width: 96px; min-width: 70px;">
+                            <span class="text-gray-400">KAT L7</span>
+                            <div class="resize-handle" x-on:mousedown="startResize($event, 'cat_l7')"></div>
+                        </th>
+                        <th class="px-1 w-24 text-xs text-center text-gray-500 relative resizable-column" data-column-id="cat_l8" style="width: 96px; min-width: 70px;">
+                            <span class="text-gray-400">KAT L8</span>
+                            <div class="resize-handle" x-on:mousedown="startResize($event, 'cat_l8')"></div>
+                        </th>
 
                         {{-- PUBLIKACJA (FAZA 9.3 - zastepuje Sklepy) --}}
                         <th class="px-1 w-28 relative resizable-column" data-column-id="publication" style="width: 112px; min-width: 80px;">
@@ -232,7 +243,7 @@
                         @include('livewire.products.import.partials.product-row', ['product' => $product])
                     @empty
                         <tr>
-                            <td colspan="16" class="text-center py-12">
+                            <td colspan="18" class="text-center py-12">
                                 <div class="text-gray-400">
                                     <svg class="w-12 h-12 mx-auto mb-4 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"

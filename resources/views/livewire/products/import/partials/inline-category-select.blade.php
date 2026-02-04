@@ -1,5 +1,5 @@
 {{-- ETAP_06 FAZA 5.2: Inline Category Select - kompaktowy dropdown z wyszukiwaniem i tworzeniem --}}
-{{-- @props: $product, $level (3,4,5,6,7), $disabled (bool), $parentCategoryId --}}
+{{-- @props: $product, $level (3+), $disabled (bool), $parentCategoryId --}}
 {{-- FIX 2025-12-09: Dodano pole wyszukiwania, opcje "Dodaj nowa", naprawiono x-show --}}
 @php
     $levelIndex = $level - 3; // 0, 1, 2, 3, 4
@@ -37,18 +37,13 @@
     }
 
     $hasOptions = $categories->isNotEmpty();
-    $isDisabled = $disabled || (!$hasOptions && $level > 3);
+    // Pozwól otworzyć dropdown nawet gdy brak opcji (żeby można było utworzyć pierwszą kategorię na tym poziomie),
+    // o ile istnieje parent (dla L4+).
+    $isDisabled = $disabled || ($level > 3 && !$parentCategoryId);
     $selectedCategory = $selectedId ? $categories->firstWhere('id', $selectedId) : null;
 
     // Level labels for placeholder
-    $levelLabels = [
-        3 => 'Kategoria L3',
-        4 => 'Kategoria L4',
-        5 => 'Kategoria L5',
-        6 => 'Kategoria L6',
-        7 => 'Kategoria L7',
-    ];
-    $levelLabel = $levelLabels[$level] ?? "Poziom $level";
+    $levelLabel = $level >= 3 ? "Kategoria L{$level}" : "Poziom {$level}";
 @endphp
 
 <div class="inline-category-select relative"
@@ -206,7 +201,7 @@
             {{-- Empty state (no categories at all) --}}
             <template x-if="categories.length === 0 && !search.trim()">
                 <div class="px-3 py-2 text-xs text-gray-500 italic">
-                    {{ $level === 3 ? 'Brak kategorii' : 'Wybierz wyzszy poziom' }}
+                    {{ $level === 3 ? 'Brak kategorii' : ($parentCategoryId ? 'Brak kategorii na tym poziomie' : 'Wybierz wyzszy poziom') }}
                 </div>
             </template>
         </div>

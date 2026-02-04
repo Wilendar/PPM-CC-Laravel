@@ -3,31 +3,22 @@
     $productCats = $product->category_ids ?? [];
     $shopIds = $product->shop_ids ?? [];
 
-    // Get selected categories at each level
-    $selectedL3 = \App\Models\Category::whereIn('id', $productCats)->where('level', 2)->first();
-    $selectedL4 = $selectedL3
-        ? \App\Models\Category::whereIn('id', $productCats)->where('parent_id', $selectedL3->id)->first()
-        : null;
-    $selectedL5 = $selectedL4
-        ? \App\Models\Category::whereIn('id', $productCats)->where('parent_id', $selectedL4->id)->first()
-        : null;
-    $selectedL6 = $selectedL5
-        ? \App\Models\Category::whereIn('id', $productCats)->where('parent_id', $selectedL5->id)->first()
-        : null;
+    $categoriesForProduct = empty($productCats)
+        ? collect()
+        : \App\Models\Category::whereIn('id', $productCats)->get();
 
-    // Check if L6 has children (for showing + button)
-    $hasL4Options = $selectedL3 && \App\Models\Category::where('parent_id', $selectedL3->id)->where('is_active', true)->exists();
-    $hasL5Options = $selectedL4 && \App\Models\Category::where('parent_id', $selectedL4->id)->where('is_active', true)->exists();
-    $hasL6Options = $selectedL5 && \App\Models\Category::where('parent_id', $selectedL5->id)->where('is_active', true)->exists();
+    // Get selected categories at each level (single branch)
+    $selectedL3 = $categoriesForProduct->firstWhere('level', 2);
+    $selectedL4 = $selectedL3 ? $categoriesForProduct->firstWhere('parent_id', $selectedL3->id) : null;
+    $selectedL5 = $selectedL4 ? $categoriesForProduct->firstWhere('parent_id', $selectedL4->id) : null;
+    $selectedL6 = $selectedL5 ? $categoriesForProduct->firstWhere('parent_id', $selectedL5->id) : null;
+    $selectedL7 = $selectedL6 ? $categoriesForProduct->firstWhere('parent_id', $selectedL6->id) : null;
+    $selectedL8 = $selectedL7 ? $categoriesForProduct->firstWhere('parent_id', $selectedL7->id) : null;
 
     // Status
     $percentage = $product->completion_percentage ?? 0;
     $isReady = $product->is_ready_for_publish ?? false;
 
-    // Show expanded levels based on selection
-    $showL4 = $selectedL3 || $hasL4Options;
-    $showL5 = $selectedL4 || ($showL4 && $hasL5Options);
-    $showL6 = $selectedL5 && $hasL6Options;
 @endphp
 
 <tr class="border-b border-gray-700/50 hover:bg-gray-800/30 transition-colors"
@@ -183,77 +174,34 @@
         ])
     </td>
 
-    {{-- L6 (Dodatkowa) - only if L5 has children, or + button with create form --}}
+    {{-- L6 (KAT L6) --}}
     <td class="px-2 py-2 relative">
-        @if($hasL6Options || $selectedL6)
-            @include('livewire.products.import.partials.inline-category-select', [
-                'product' => $product,
-                'level' => 6,
-                'disabled' => !$selectedL5,
-                'parentCategoryId' => $selectedL5?->id
-            ])
-        @else
-            {{-- + button with inline create form --}}
-            <div x-data="{
-                showForm: false,
-                newName: '',
-                async create() {
-                    if (!this.newName.trim()) return;
-                    const result = await $wire.createInlineCategory({{ $product->id }}, 6, {{ $selectedL5?->id ?? 'null' }}, this.newName);
-                    if (result && result.id) {
-                        this.newName = '';
-                        this.showForm = false;
-                    }
-                }
-            }" class="relative">
-                {{-- Toggle button --}}
-                <button type="button"
-                        x-show="!showForm"
-                        @click="showForm = true; $nextTick(() => $refs.newL6Input?.focus())"
-                        class="inline-flex items-center justify-center w-7 h-7 rounded text-gray-500
-                               bg-gray-700/30 hover:bg-gray-700/50 hover:text-green-400 transition-colors
-                               {{ !$selectedL5 ? 'opacity-30 cursor-not-allowed' : '' }}"
-                        @if(!$selectedL5) disabled @endif
-                        title="Dodaj podkategorie L6">
-                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
-                    </svg>
-                </button>
+        @include('livewire.products.import.partials.inline-category-select', [
+            'product' => $product,
+            'level' => 6,
+            'disabled' => !$selectedL5,
+            'parentCategoryId' => $selectedL5?->id
+        ])
+    </td>
 
-                {{-- Inline create form --}}
-                <div x-show="showForm"
-                     x-cloak
-                     @click.outside="showForm = false; newName = ''"
-                     @keydown.escape.window="if(showForm) { showForm = false; newName = ''; }"
-                     class="absolute z-50 left-0 top-0 w-48 bg-gray-800 border border-gray-600 rounded-lg shadow-xl p-2">
-                    <div class="flex items-center gap-1">
-                         <input type="text"
-                                x-ref="newL6Input"
-                                x-model="newName"
-                                @keydown.enter="create()"
-                                placeholder="Nazwa L6..."
-                                class="flex-1 min-w-0 px-2 py-1 text-xs bg-gray-700 border border-gray-600 rounded
-                                       text-white placeholder-gray-400 focus:border-green-500 focus:ring-1 focus:ring-green-500">
-                        <button type="button"
-                                @click="create()"
-                                :disabled="!newName.trim()"
-                                class="p-1 bg-green-600 hover:bg-green-700 text-white rounded transition-colors
-                                       disabled:opacity-50 disabled:cursor-not-allowed">
-                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
-                            </svg>
-                        </button>
-                        <button type="button"
-                                @click="showForm = false; newName = ''"
-                                class="p-1 bg-gray-600 hover:bg-gray-500 text-gray-300 rounded transition-colors">
-                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-                            </svg>
-                        </button>
-                    </div>
-                </div>
-            </div>
-        @endif
+    {{-- L7 (KAT L7) --}}
+    <td class="px-2 py-2 relative">
+        @include('livewire.products.import.partials.inline-category-select', [
+            'product' => $product,
+            'level' => 7,
+            'disabled' => !$selectedL6,
+            'parentCategoryId' => $selectedL6?->id
+        ])
+    </td>
+
+    {{-- L8 (KAT L8) --}}
+    <td class="px-2 py-2 relative">
+        @include('livewire.products.import.partials.inline-category-select', [
+            'product' => $product,
+            'level' => 8,
+            'disabled' => !$selectedL7,
+            'parentCategoryId' => $selectedL7?->id
+        ])
     </td>
 
     {{-- PUBLIKACJA - interaktywny dropdown ERPConnection + PrestaShop (FAZA 9.3 - zastepuje Sklepy) --}}

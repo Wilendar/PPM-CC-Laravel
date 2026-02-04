@@ -1,9 +1,0 @@
-[
-    {"step": "Migration 1: create_business_partners_table", "done": true},
-    {"step": "Migration 2: create_business_partner_shop_table", "done": true},
-    {"step": "Migration 3: migrate_manufacturers_to_business_partners", "done": true},
-    {"step": "Migration 4: migrate_manufacturer_shop_to_business_partner_shop", "done": true},
-    {"step": "Migration 5: add_supplier_importer_fk_to_products", "done": true},
-    {"step": "Migration 6: remap_manufacturer_id_fk_to_business_partners", "done": true},
-    {"step": "Git commit", "done": true}
-]

@@ -451,11 +451,9 @@ trait ImportPanelCategoryShopTrait
             $wszystko = Category::where('level', 1)->where('is_active', true)->first();
 
             // Remove old category at this level and all dependent levels
-            $levelsToRemove = range($level, 6); // L3-L6
-            $levelDbValues = array_map(fn($l) => $l - 1, $levelsToRemove); // level db is 0-indexed
-
+            $dbLevel = $level - 1; // level db is 0-indexed
             $catsToRemove = Category::whereIn('id', $currentCats)
-                ->whereIn('level', $levelDbValues)
+                ->where('level', '>=', $dbLevel)
                 ->pluck('id')
                 ->toArray();
 
@@ -573,7 +571,7 @@ trait ImportPanelCategoryShopTrait
      * Auto-assigns to product after creation
      *
      * @param int $productId Product to assign category to
-     * @param int $level Category level (3, 4, 5, 6, 7)
+     * @param int $level Category level (3+)
      * @param int|null $parentId Parent category ID (null for L3)
      * @param string $name New category name
      * @return array|null ['id' => int, 'name' => string] or null on failure

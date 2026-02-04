@@ -1,4 +1,0 @@
-- Import produktu wciąż nie działa z powodu błędów z kategoriami. Odkrycie Modal pokazujący dopasowanie kategorii przy imporcie nie pokazuje kategorii Baza i zaczyna od Wszystko !
-  [ ] Fix variant thumbnail images (PrestaShop variants show placeholder)
-  [ ] Fix variant context badge logic (dziedziczone vs Zgodne vs Wlasne)
-Modal Podgląd Kategorii do Zaimportowania Lista kategorii wyświetlana jak categorypreview w ProductForm
