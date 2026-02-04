@@ -227,13 +227,13 @@
                      @keydown.escape.window="if(showForm) { showForm = false; newName = ''; }"
                      class="absolute z-50 left-0 top-0 w-48 bg-gray-800 border border-gray-600 rounded-lg shadow-xl p-2">
                     <div class="flex items-center gap-1">
-                        <input type="text"
-                               x-ref="newL6Input"
-                               x-model="newName"
-                               @keydown.enter="create()"
-                               placeholder="Nazwa L6..."
-                               class="flex-1 px-2 py-1 text-xs bg-gray-700 border border-gray-600 rounded
-                                      text-white placeholder-gray-400 focus:border-green-500 focus:ring-1 focus:ring-green-500">
+                         <input type="text"
+                                x-ref="newL6Input"
+                                x-model="newName"
+                                @keydown.enter="create()"
+                                placeholder="Nazwa L6..."
+                                class="flex-1 min-w-0 px-2 py-1 text-xs bg-gray-700 border border-gray-600 rounded
+                                       text-white placeholder-gray-400 focus:border-green-500 focus:ring-1 focus:ring-green-500">
                         <button type="button"
                                 @click="create()"
                                 :disabled="!newName.trim()"

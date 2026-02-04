@@ -270,35 +270,8 @@
         @endif
     </div>
 
-    {{-- Modal: Zunifikowany import (FAZA 9.2) - CSV + Column mode --}}
-    @livewire('products.import.modals.product-import-modal', key('product-import-modal'))
-
-    {{-- Modal: Ceny per grupa (FAZA 9.4) --}}
-    @livewire('products.import.modals.import-prices-modal', key('import-prices-modal'))
-
-    {{-- Modal: PrestaShop Category Picker (FAZA 9.7b Feature #8) --}}
-    @livewire('products.import.modals.presta-shop-category-picker-modal', key('presta-shop-category-picker-modal'))
-
     {{-- Modal: Wklejanie SKU (FAZA 3 - legacy) --}}
     @if($activeModal === 'sku-paste')
         @livewire('products.import.modals.s-k-u-paste-modal', key('sku-paste-modal'))
     @endif
-
-    {{-- Modal: Import CSV/Excel (FAZA 4 - legacy) --}}
-    @livewire('products.import.modals.c-s-v-import-modal', key('csv-import-modal'))
-
-    {{-- Modal: Warianty (FAZA 5.4) --}}
-    @livewire('products.import.modals.variant-modal', key('variant-modal'))
-
-    {{-- Modal: Cechy (FAZA 5.5) --}}
-    @livewire('products.import.modals.feature-template-modal', key('feature-template-modal'))
-
-    {{-- Modal: Dopasowania (FAZA 5.6) --}}
-    @livewire('products.import.modals.compatibility-modal', key('compatibility-modal'))
-
-    {{-- Modal: Zdjecia (FAZA 5.7) --}}
-    @livewire('products.import.modals.image-upload-modal', key('image-upload-modal'))
-
-    {{-- Modal: Opisy produktu (FAZA 6.5.4) --}}
-    @livewire('products.import.modals.description-modal', key('description-modal'))
 </div>

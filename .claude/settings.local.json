@@ -263,7 +263,9 @@
       "Bash(git merge:*)",
       "Bash(Select-String -Pattern \"scan\")",
       "Skill(integration-labels)",
-      "Read(//c/Users/kamil/.claude/**)"
+      "Read(//c/Users/kamil/.claude/**)",
+      "Bash(Test-Path \"C:\\\\Users\\\\kamil\\\\.claude\\\\hooks\\\\agent-forced-eval-hook.ps1\")",
+      "Bash(Test-Path \"C:\\\\Users\\\\kamil\\\\.claude\\\\hooks\\\\skill-forced-eval-hook.ps1\")"
     ],
     "deny": [],
     "ask": []
