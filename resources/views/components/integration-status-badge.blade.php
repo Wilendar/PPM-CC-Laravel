@@ -1,0 +1,76 @@
+{{--
+    Integration Status Badge Component
+    Displays a compact badge for per-integration issues
+
+    Uses label_color and label_icon from ERPConnection/PrestaShopShop
+    per INTEGRATION_LABELS.md specification
+
+    @param string $name - Integration name (shop/ERP instance name)
+    @param string $color - Hex color from label_color (#RRGGBB)
+    @param string $icon - Icon name from label_icon
+    @param array $issues - Array of issue types ['basic', 'desc', 'physical', 'images']
+    @param string $type - 'shop' or 'erp'
+
+    Usage:
+    <x-integration-status-badge
+        :name="$shop->name"
+        :color="$shop->label_color"
+        :icon="$shop->label_icon"
+        :issues="['basic', 'desc']"
+        type="shop"
+    />
+
+    @since 2026-02-04
+    @see .Release_docs/INTEGRATION_LABELS.md
+--}}
+
+@props(['name', 'color', 'icon', 'issues', 'type' => 'shop'])
+
+@php
+    // Issue labels in Polish
+    $issueLabels = [
+        'basic' => 'Dane podstawowe',
+        'desc' => 'Opisy',
+        'physical' => 'Wymiary/waga',
+        'images' => 'Zdjęcia',
+        'attributes' => 'Atrybuty',
+        'compatibility' => 'Dopasowania',
+    ];
+
+    // Build tooltip text
+    $tooltipIssues = collect($issues)
+        ->map(fn($issue) => $issueLabels[$issue] ?? $issue)
+        ->join(', ');
+
+    $tooltipText = "{$name}: {$tooltipIssues}";
+
+    // Default color if not provided
+    $color = $color ?? ($type === 'shop' ? '#06b6d4' : '#f97316');
+
+    // Icon SVG paths based on icon name
+    $iconPaths = [
+        'database' => 'M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4',
+        'shopping-cart' => 'M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z',
+        'shopping-bag' => 'M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z',
+        'cube' => 'M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4',
+        'cog' => 'M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z M15 12a3 3 0 11-6 0 3 3 0 016 0z',
+        'globe' => 'M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9',
+        'server' => 'M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01',
+        'link' => 'M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1',
+        'cloud' => 'M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z',
+    ];
+
+    $iconPath = $iconPaths[$icon] ?? $iconPaths['cog'];
+@endphp
+
+<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs cursor-help transition-colors hover:opacity-80"
+      style="background-color: {{ $color }}20; color: {{ $color }}; border: 1px solid {{ $color }}50;"
+      title="{{ $tooltipText }}">
+    {{-- Integration icon --}}
+    <svg class="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="{{ $iconPath }}"/>
+    </svg>
+
+    {{-- Issue count --}}
+    <span class="font-semibold">{{ count($issues) }}</span>
+</span>

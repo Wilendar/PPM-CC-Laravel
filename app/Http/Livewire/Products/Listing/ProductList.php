@@ -17,6 +17,8 @@ use Illuminate\Support\Facades\Log;
 use App\Services\PrestaShop\PrestaShopClientFactory;
 use App\Jobs\PrestaShop\BulkImportProducts;
 use App\Services\JobProgressService;
+use App\Services\Product\ProductStatusAggregator;
+use App\DTOs\ProductStatusDTO;
 use App\Http\Livewire\Products\Listing\Traits\ProductListERPImport;
 
 /**
@@ -71,6 +73,10 @@ class ProductList extends Component
     public string $dateType = 'created_at'; // created_at, updated_at, last_sync
     public string $integrationFilter = 'all'; // all, synced, pending, error
     public string $mediaFilter = 'all'; // all, has_images, no_images, primary_image
+
+    // ETAP: Product Status Filters (2026-02-04)
+    public ?string $dataStatusFilter = null; // null, 'issues', 'ok'
+    public array $issueTypeFilters = []; // ['zero_price', 'low_stock', 'no_images', 'discrepancy', 'not_in_prestashop']
 
     // Sorting & Display
     public string $sortBy = 'updated_at';
@@ -234,6 +240,43 @@ class ProductList extends Component
     public function totalFilteredCount(): int
     {
         return $this->buildProductQuery()->count();
+    }
+
+    /**
+     * Aggregated product statuses for current page
+     *
+     * ETAP: Product Status Column Enhancement (2026-02-04)
+     * Uses ProductStatusAggregator service with caching
+     *
+     * @return array<int, ProductStatusDTO> [product_id => ProductStatusDTO]
+     */
+    #[Computed]
+    public function productStatuses(): array
+    {
+        // Get products collection from paginator (not the paginator itself!)
+        $paginator = $this->products;
+
+        if ($paginator->isEmpty()) {
+            return [];
+        }
+
+        // Extract the Collection from LengthAwarePaginator
+        $products = $paginator->getCollection();
+
+        // Use the aggregator service
+        return app(ProductStatusAggregator::class)->aggregateForProducts($products);
+    }
+
+    /**
+     * Get status for a specific product
+     *
+     * @param int $productId
+     * @return ProductStatusDTO|null
+     */
+    public function getProductStatus(int $productId): ?ProductStatusDTO
+    {
+        $statuses = $this->productStatuses;
+        return $statuses[$productId] ?? null;
     }
 
     /**
@@ -808,20 +851,34 @@ class ProductList extends Component
         $query = Product::query()
             ->with([
                 'productType:id,name,slug',
-                // FAZA 1.5: Multi-Store Sync Status - Eager load shop data for sync status display
-                // ETAP_07 OPCJA B (2025-10-13): Consolidated sync tracking in product_shop_data
-                'shopData:id,product_id,shop_id,sync_status,is_published,last_sync_at',
-                'shopData.shop:id,name', // Load shop relation through shopData (replaces syncStatuses.shop)
-                // ETAP_07d FAZA 7: Primary image for thumbnail column
-                'media' => fn($q) => $q->where('is_primary', true)->where('is_active', true)->limit(1),
-                // FIX 2025-12-15: Eager load variants with attributes for expanded rows
-                'variants.images',
+                // FAZA 1.5: Multi-Store Sync Status - Extended for status column (2026-02-04)
+                'shopData:id,product_id,shop_id,sync_status,is_published,last_sync_at,name,short_description,long_description,weight,height,width,length,tax_rate,is_active',
+                'shopData.shop:id,name,label_color,label_icon', // INTEGRATION_LABELS.md support
+                // ETAP: ERP Data for status comparison (2026-02-04)
+                'erpData:id,product_id,erp_connection_id,sync_status,name,short_description,long_description,weight,height,width,length,tax_rate,is_active',
+                'erpData.erpConnection:id,instance_name,erp_type,label_color,label_icon', // INTEGRATION_LABELS.md support
+                // ETAP: Prices for zero-price check (2026-02-04)
+                'prices:id,product_id,price_group_id,price_net',
+                'prices.priceGroup:id,is_active',
+                // ETAP: Stock for low-stock check (2026-02-04)
+                'stock:id,product_id,warehouse_id,quantity,reserved_quantity,minimum_stock',
+                'stock.warehouse:id,is_default',
+                // ETAP_07d FAZA 7: All active media for status check (expanded from primary only)
+                'media' => fn($q) => $q->where('is_active', true)->select('id', 'mediable_id', 'mediable_type', 'is_primary', 'is_active', 'prestashop_mapping'),
+                // FIX 2025-12-15: Eager load variants with attributes + prices/stock for status
+                'variants:id,product_id,sku,is_active',
+                'variants.images:id,variant_id',
+                'variants.prices:id,variant_id,price_group_id,price',
+                'variants.stock:id,variant_id,warehouse_id,quantity,reserved',
                 'variants.attributes.attributeType:id,name,code',
                 'variants.attributes.attributeValue:id,label,code'
             ])
             ->select([
                 'id', 'sku', 'name', 'product_type_id', 'manufacturer',
                 'supplier_code', 'is_active', 'is_variant_master',
+                // ETAP: Extended fields for status comparison (2026-02-04)
+                'short_description', 'long_description',
+                'weight', 'height', 'width', 'length', 'tax_rate',
                 'created_at', 'updated_at'
             ]);
 
@@ -927,6 +984,97 @@ class ProductList extends Component
         // 1.1.1.2.8: Media status filter
         if ($this->mediaFilter !== 'all') {
             $query = $this->applyMediaFilter($query);
+        }
+
+        // ETAP: Data status filter (2026-02-04)
+        if (!empty($this->dataStatusFilter) || !empty($this->issueTypeFilters)) {
+            $query = $this->applyDataStatusFilter($query);
+        }
+
+        return $query;
+    }
+
+    /**
+     * Apply data status filter
+     *
+     * ETAP: Product Status Column Enhancement (2026-02-04)
+     * Filters products by their data integrity status
+     *
+     * @param Builder $query
+     * @return Builder
+     */
+    private function applyDataStatusFilter(Builder $query): Builder
+    {
+        // Filter by specific issue types
+        if (!empty($this->issueTypeFilters)) {
+            foreach ($this->issueTypeFilters as $issueType) {
+                switch ($issueType) {
+                    case 'zero_price':
+                        // Products with zero price in active price groups
+                        $query->whereHas('prices', function ($q) {
+                            $q->whereHas('priceGroup', fn($pq) => $pq->where('is_active', true))
+                              ->where('price_net', '<=', 0);
+                        });
+                        break;
+
+                    case 'low_stock':
+                        // Products below minimum stock in default warehouse
+                        $query->whereHas('stock', function ($q) {
+                            $q->whereHas('warehouse', fn($wq) => $wq->where('is_default', true))
+                              ->whereColumn('quantity', '<', 'minimum_stock')
+                              ->where('minimum_stock', '>', 0);
+                        });
+                        break;
+
+                    case 'no_images':
+                        // Products without any active images
+                        $query->whereDoesntHave('media', fn($q) => $q->where('is_active', true));
+                        break;
+
+                    case 'not_in_prestashop':
+                        // Products not connected to any PrestaShop shop
+                        $query->whereDoesntHave('shopData');
+                        break;
+
+                    case 'discrepancy':
+                        // Products with data discrepancies (has shopData with different values)
+                        // This is a simplified check - full check happens in aggregator
+                        $query->whereHas('shopData', function ($q) {
+                            $q->where('sync_status', '!=', 'synced');
+                        });
+                        break;
+                }
+            }
+        }
+
+        // General filter: only issues or only OK
+        if ($this->dataStatusFilter === 'issues') {
+            // Products with ANY issue - union of all issue conditions
+            $query->where(function ($q) {
+                // Zero price
+                $q->whereHas('prices', function ($pq) {
+                    $pq->whereHas('priceGroup', fn($pg) => $pg->where('is_active', true))
+                       ->where('price_net', '<=', 0);
+                })
+                // OR low stock
+                ->orWhereHas('stock', function ($sq) {
+                    $sq->whereHas('warehouse', fn($wq) => $wq->where('is_default', true))
+                       ->whereColumn('quantity', '<', 'minimum_stock')
+                       ->where('minimum_stock', '>', 0);
+                })
+                // OR no images
+                ->orWhereDoesntHave('media', fn($mq) => $mq->where('is_active', true))
+                // OR not in any shop
+                ->orWhereDoesntHave('shopData');
+            });
+        } elseif ($this->dataStatusFilter === 'ok') {
+            // Products without major issues
+            $query->whereDoesntHave('prices', function ($pq) {
+                $pq->whereHas('priceGroup', fn($pg) => $pg->where('is_active', true))
+                   ->where('price_net', '<=', 0);
+            })
+            ->whereHas('media', fn($mq) => $mq->where('is_active', true))
+            ->whereHas('shopData');
         }
 
         return $query;

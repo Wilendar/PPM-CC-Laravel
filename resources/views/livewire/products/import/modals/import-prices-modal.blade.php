@@ -106,14 +106,14 @@
 
                                 {{-- Price Net --}}
                                 <td class="px-4 py-3">
-                                    <input type="number"
-                                           step="0.01"
-                                           min="0"
-                                           x-model="prices[{{ $group->id }}] ? prices[{{ $group->id }}].net : ''"
-                                           @input="calculateGross({{ $group->id }})"
-                                           wire:model.live="modalPrices.{{ $group->id }}.net"
-                                           @class([
-                                               'w-full border text-sm rounded-lg px-3 py-2 text-right',
+                                            <input type="number"
+                                                   step="0.01"
+                                                   min="0"
+                                           x-model="prices[{{ $group->id }}].net"
+                                            @input="calculateGross({{ $group->id }})"
+                                            wire:model.live="modalPrices.{{ $group->id }}.net"
+                                            @class([
+                                                'w-full border text-sm rounded-lg px-3 py-2 text-right',
                                                'bg-gray-700 border-gray-600 text-white focus:ring-blue-500 focus:border-blue-500' => $isEditable,
                                                'bg-gray-800 border-gray-700 text-gray-400 cursor-not-allowed' => !$isEditable,
                                            ])
@@ -123,14 +123,14 @@
 
                                 {{-- Price Gross --}}
                                 <td class="px-4 py-3">
-                                    <input type="number"
-                                           step="0.01"
-                                           min="0"
-                                           x-model="prices[{{ $group->id }}] ? prices[{{ $group->id }}].gross : ''"
-                                           @input="calculateNet({{ $group->id }})"
-                                           wire:model.live="modalPrices.{{ $group->id }}.gross"
-                                           @class([
-                                               'w-full border text-sm rounded-lg px-3 py-2 text-right',
+                                            <input type="number"
+                                                   step="0.01"
+                                                   min="0"
+                                           x-model="prices[{{ $group->id }}].gross"
+                                            @input="calculateNet({{ $group->id }})"
+                                            wire:model.live="modalPrices.{{ $group->id }}.gross"
+                                            @class([
+                                                'w-full border text-sm rounded-lg px-3 py-2 text-right',
                                                'bg-gray-700 border-gray-600 text-white focus:ring-blue-500 focus:border-blue-500' => $isEditable,
                                                'bg-gray-800 border-gray-700 text-gray-400 cursor-not-allowed' => !$isEditable,
                                            ])

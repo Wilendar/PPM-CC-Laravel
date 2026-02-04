@@ -137,28 +137,19 @@
         </select>
     </td>
 
-    {{-- CENA DETAL (base_price) - NOWA KOLUMNA OPCJONALNA --}}
+    {{-- CENA (FAZA 9.4) - klik otwiera modal cen --}}
     <td class="px-2 py-2">
-        @if($editingProductId === $product->id && $editingField === 'base_price')
-            <div class="flex items-center gap-1">
-                <input type="number"
-                       wire:model="editValue"
-                       wire:keydown.enter="saveInlineEdit"
-                       wire:keydown.escape="cancelEditing"
-                       wire:blur="saveInlineEdit"
-                       class="form-input-dark-sm w-16 text-xs text-right"
-                       step="0.01"
-                       min="0"
-                       placeholder="0.00"
-                       autofocus>
-                <span class="text-gray-500 text-xs">zl</span>
-            </div>
-        @else
-            <button wire:click="startEditing({{ $product->id }}, 'base_price')"
-                    class="text-left text-xs text-gray-400 hover:text-white hover:underline whitespace-nowrap">
-                {{ number_format($product->base_price ?? 0, 2, ',', ' ') }} zl
-            </button>
-        @endif
+        <div class="import-price-cell"
+             wire:click="openImportPricesModal({{ $product->id }})"
+             title="Kliknij aby edytowac ceny">
+            @if($product->base_price !== null)
+                <span class="import-price-cell-value">
+                    {{ number_format((float) $product->base_price, 2, ',', ' ') }} zl
+                </span>
+            @else
+                <span class="import-price-cell-empty">brak</span>
+            @endif
+        </div>
     </td>
 
     {{-- KATEGORIE - inline dropdowny --}}
@@ -265,9 +256,332 @@
         @endif
     </td>
 
-    {{-- SKLEPY - inline multi-select --}}
+    {{-- PUBLIKACJA - interaktywny dropdown ERPConnection + PrestaShop (FAZA 9.3 - zastepuje Sklepy) --}}
     <td class="px-2 py-2 relative">
-        @include('livewire.products.import.partials.inline-shop-select', ['product' => $product])
+        @php
+            $pubTargets = $product->publication_targets ?? [];
+            $erpConnectionIds = $pubTargets['erp_connections'] ?? [];
+            $psShops = $pubTargets['prestashop_shops'] ?? [];
+
+            // Get active ERP connections (cached in trait)
+            $activeErpConnections = $this->getActiveErpConnections();
+            $allShops = \App\Models\PrestaShopShop::where('is_active', true)->orderBy('name')->get();
+
+            // FIX: ALWAYS ensure default ERP is in the list
+            $defaultErpId = null;
+            foreach ($activeErpConnections as $conn) {
+                if ($conn['is_default']) {
+                    $defaultErpId = $conn['id'];
+                    break;
+                }
+            }
+            if ($defaultErpId && !in_array($defaultErpId, $erpConnectionIds, true)) {
+                $erpConnectionIds[] = $defaultErpId;
+            }
+
+            // Prepare shop category counts for Alpine state (badge Kat!/Kat OK)
+            $shopCategoryCounts = [];
+            foreach ($allShops as $s) {
+                $shopCategoryCounts[$s->id] = count($product->shop_categories[(string)$s->id] ?? []);
+            }
+        @endphp
+
+        <div x-data="{
+                open: false,
+                 dropdownTop: 0,
+                 dropdownLeft: 0,
+                 productId: {{ $product->id }},
+                 shopCategoryCounts: @js($shopCategoryCounts),
+                 openDropdown() {
+                     const rect = this.$refs.trigger.getBoundingClientRect();
+
+                     const enterpriseCard = this.$el.closest('.enterprise-card');
+                     const cardStyles = enterpriseCard ? getComputedStyle(enterpriseCard) : null;
+                     const cardHasBackdrop = !!enterpriseCard && cardStyles && cardStyles.backdropFilter && cardStyles.backdropFilter !== 'none';
+                     const cbRect = cardHasBackdrop ? enterpriseCard.getBoundingClientRect() : { top: 0, left: 0, width: window.innerWidth, height: window.innerHeight };
+
+                     const padding = 10;
+                     const estimatedMenuWidth = this.$refs.menu?.offsetWidth || 260;
+                     const estimatedMenuHeight = this.$refs.menu?.offsetHeight || 320;
+
+                     // NOTE: .enterprise-card uses backdrop-filter which creates a containing block for position:fixed in Chrome.
+                     // We must calculate coordinates relative to that element (not the viewport), otherwise dropdown renders off-screen.
+                     let left = rect.left - cbRect.left;
+                     let top = rect.bottom - cbRect.top + 4;
+
+                     // Open upward if not enough space below
+                     if (top + estimatedMenuHeight > cbRect.height - padding) {
+                         top = rect.top - cbRect.top - estimatedMenuHeight - 4;
+                     }
+
+                     // Clamp inside containing block / viewport
+                     left = Math.max(padding, Math.min(left, cbRect.width - estimatedMenuWidth - padding));
+                     top = Math.max(padding, Math.min(top, cbRect.height - estimatedMenuHeight - padding));
+
+                     this.dropdownTop = top;
+                     this.dropdownLeft = left;
+                     this.open = true;
+
+                     // Re-measure after open (real menu size) and clamp again
+                     this.$nextTick(() => {
+                         const menuW = this.$refs.menu?.offsetWidth || estimatedMenuWidth;
+                         const menuH = this.$refs.menu?.offsetHeight || estimatedMenuHeight;
+
+                         let finalLeft = rect.left - cbRect.left;
+                         let finalTop = rect.bottom - cbRect.top + 4;
+                         if (finalTop + menuH > cbRect.height - padding) {
+                             finalTop = rect.top - cbRect.top - menuH - 4;
+                         }
+
+                         finalLeft = Math.max(padding, Math.min(finalLeft, cbRect.width - menuW - padding));
+                         finalTop = Math.max(padding, Math.min(finalTop, cbRect.height - menuH - padding));
+
+                         this.dropdownLeft = finalLeft;
+                         this.dropdownTop = finalTop;
+                     });
+                 },
+                 closeDropdown() {
+                     this.open = false;
+                 },
+                closeIfNotModal(e) {
+                    if (e.target.closest('.import-category-picker-modal-overlay')) return;
+                    if (e.target.closest('.import-targets-dropdown-menu-fixed')) return;
+                    this.open = false;
+                },
+                hasCats(shopId) {
+                    return (this.shopCategoryCounts[shopId] || 0) > 0;
+                },
+                hasErp(id) { return (Alpine.store('pub_{{ $product->id }}')?.erpIds || []).includes(id); },
+                hasPs(id) { return (Alpine.store('pub_{{ $product->id }}')?.psIds || []).includes(id); },
+                toggleErp(id) {
+                    const s = Alpine.store('pub_{{ $product->id }}');
+                    if (!s) return;
+                    if (s.erpIds.includes(id)) {
+                        s.erpIds = s.erpIds.filter(x => x !== id);
+                    } else {
+                        s.erpIds = [...s.erpIds, id];
+                    }
+                },
+                togglePs(id) {
+                    const s = Alpine.store('pub_{{ $product->id }}');
+                    if (!s) return;
+                    if (s.psIds.includes(id)) {
+                        s.psIds = s.psIds.filter(x => x !== id);
+                    } else {
+                        s.psIds = [...s.psIds, id];
+                    }
+                },
+                erpCount() { return (Alpine.store('pub_{{ $product->id }}')?.erpIds || []).length; },
+                psCount() { return (Alpine.store('pub_{{ $product->id }}')?.psIds || []).length; }
+            }"
+            x-init="
+                Alpine.store('pub_{{ $product->id }}', {
+                    erpIds: @js($erpConnectionIds).map(Number),
+                    psIds: @js($psShops).map(Number)
+                });
+            "
+            wire:ignore
+            class="import-targets-dropdown relative"
+            @prestashop-categories-saved.window="
+                if ($event.detail && $event.detail.productId == productId) {
+                    shopCategoryCounts[$event.detail.shopId] = $event.detail.categoryCount;
+                }
+            ">
+            {{-- Trigger: badges --}}
+            <button type="button"
+                    x-on:click="open ? closeDropdown() : openDropdown()"
+                    x-ref="trigger"
+                    class="import-publication-badges-container cursor-pointer hover:opacity-80 transition-opacity">
+                {{-- ERP badges --}}
+                @foreach($activeErpConnections as $conn)
+                    <span x-show="hasErp({{ $conn['id'] }})"
+                          x-cloak
+                          class="import-publication-badge import-publication-badge-erp">
+                        {{ $conn['instance_name'] }}
+                        @if($conn['is_default'])
+                            <span class="import-publication-badge-default-marker">*</span>
+                        @endif
+                    </span>
+                @endforeach
+                <span x-show="erpCount() === 0"
+                      x-cloak
+                      class="import-publication-badge import-publication-badge-erp opacity-30">
+                    +ERP
+                </span>
+
+                {{-- PrestaShop badges --}}
+                @foreach($allShops as $psBadgeShop)
+                    <span x-show="hasPs({{ $psBadgeShop->id }})"
+                          x-cloak
+                          class="import-publication-badge"
+                          :class="hasCats({{ $psBadgeShop->id }}) ? 'import-publication-badge-ps-ok' : 'import-publication-badge-ps-warning'">
+                        <span class="text-[10px]" x-text="hasCats({{ $psBadgeShop->id }}) ? '✅' : '⚠️'"></span>
+                        {{ Str::limit($psBadgeShop->name, 10) }}
+                    </span>
+                @endforeach
+                <span x-show="psCount() === 0"
+                      x-cloak
+                      class="import-publication-badge import-publication-badge-prestashop opacity-30">
+                    +PS
+                </span>
+            </button>
+
+            {{-- Dropdown --}}
+            {{-- NO x-teleport - breaks Livewire snapshots! Use fixed positioning instead --}}
+            <div x-show="open" x-cloak x-ref="menu"
+                 x-transition:enter="transition ease-out duration-100"
+                 x-transition:enter-start="opacity-0 scale-95"
+                 x-transition:enter-end="opacity-100 scale-100"
+                 class="import-targets-dropdown-menu-fixed"
+                 :style="`top: ${dropdownTop}px; left: ${dropdownLeft}px;`"
+                 @resize.window="if (open) openDropdown()"
+                 @scroll.window="if (open) openDropdown()"
+                 @click.outside="closeIfNotModal($event)">
+
+                    {{-- ERP --}}
+                    @if(count($activeErpConnections) > 0)
+                        <div class="px-3 py-1">
+                            <span class="text-xs text-gray-500 uppercase">Systemy ERP</span>
+                        </div>
+                        @foreach($activeErpConnections as $conn)
+                            @php
+                                $isDefault = $conn['is_default'];
+                            @endphp
+                            <label class="import-targets-dropdown-item"
+                                   :class="{ 'import-targets-dropdown-item-active': hasErp({{ $conn['id'] }}) }">
+                                <input type="checkbox"
+                                       :checked="hasErp({{ $conn['id'] }})"
+                                       @if($isDefault) disabled @endif
+                                       @if(!$isDefault)
+                                           @click.stop.prevent="toggleErp({{ $conn['id'] }}); $wire.toggleErpConnection({{ $product->id }}, {{ $conn['id'] }});"
+                                       @endif
+                                       class="form-checkbox-dark w-3.5 h-3.5 {{ $isDefault ? 'opacity-60 cursor-not-allowed' : '' }}">
+                                <span class="flex items-center gap-1">
+                                    {{ $conn['instance_name'] }}
+                                    @if($isDefault)
+                                        <span class="import-publication-badge-default-label">DOMYSLNY</span>
+                                    @endif
+                                </span>
+                            </label>
+                        @endforeach
+                    @endif
+
+                    {{-- PrestaShop --}}
+                    @if($allShops->count() > 0)
+                        <div class="border-t border-gray-700 my-1"></div>
+                        <div class="px-3 py-1">
+                            <span class="text-xs text-gray-500 uppercase">PrestaShop</span>
+                        </div>
+                        @foreach($allShops as $shop)
+                            <div class="import-targets-dropdown-item flex items-center justify-between"
+                                 :class="{ 'import-targets-dropdown-item-active': hasPs({{ $shop->id }}) }">
+                                <label class="flex items-center gap-2 cursor-pointer flex-1"
+                                       @click.stop.prevent="togglePs({{ $shop->id }}); $wire.togglePrestaShopShop({{ $product->id }}, {{ $shop->id }});">
+                                    <input type="checkbox"
+                                           :checked="hasPs({{ $shop->id }})"
+                                           class="form-checkbox-dark w-3.5 h-3.5 pointer-events-none">
+                                    <span>{{ $shop->name }}</span>
+                                </label>
+
+                                {{-- Category picker button (only if shop selected) --}}
+                                <button type="button"
+                                        x-show="hasPs({{ $shop->id }})"
+                                        x-cloak
+                                        @click.stop.prevent="$dispatch('openPrestaShopCategoryPicker', { productId: {{ $product->id }}, shopId: {{ $shop->id }} })"
+                                        class="ml-2 px-1.5 py-0.5 rounded text-[10px] font-medium transition-colors"
+                                        :class="hasCats({{ $shop->id }})
+                                            ? 'bg-green-900/50 text-green-300 border border-green-600'
+                                            : 'bg-yellow-900/50 text-yellow-400 border border-yellow-600'"
+                                        title="Wybierz kategorie dla {{ $shop->name }}">
+                                    <span class="inline-flex items-center gap-0.5"
+                                          x-text="hasCats({{ $shop->id }}) ? '✅ Kat OK' : '⚠️ Kat!'"></span>
+                                </button>
+                            </div>
+                        @endforeach
+                    @endif
+
+                     <div class="border-t border-gray-700 mt-1 px-3 py-2 flex justify-end">
+                         <button x-on:click="closeDropdown()" class="text-xs text-gray-400 hover:text-white">Zamknij</button>
+                     </div>
+                 </div>
+             </div>
+         </div>
+     </td>
+
+    {{-- DATA PUBLIKACJI (FAZA 9.3) --}}
+    <td class="px-2 py-2">
+        @php
+            $pubStatus = $product->publish_status ?? 'draft';
+        @endphp
+        @if($pubStatus === 'published')
+            <span class="text-xs text-gray-500">
+                {{ $product->published_at?->format('d.m H:i') ?? '-' }}
+            </span>
+        @else
+            <input type="datetime-local"
+                   value="{{ $product->scheduled_publish_at?->format('Y-m-d\\TH:i') }}"
+                   wire:change="schedulePublication({{ $product->id }}, $event.target.value)"
+                   class="import-schedule-input"
+                   title="Zaplanuj date publikacji">
+        @endif
+    </td>
+
+    {{-- PUBLIKUJ button (FAZA 9.3) --}}
+    <td class="px-2 py-2 text-center">
+        @php
+            $canPublish = ($product->completion_percentage ?? 0) === 100;
+            $hasSchedule = !empty($product->scheduled_publish_at);
+        @endphp
+        @if($pubStatus === 'published')
+            <span class="import-publish-btn import-publish-btn-published">Opublikowano</span>
+        @elseif($pubStatus === 'publishing')
+            <span class="import-publish-btn import-publish-btn-publishing">
+                <svg class="animate-spin h-3 w-3 inline mr-1" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                </svg>
+                Publikowanie
+            </span>
+        @elseif($pubStatus === 'failed')
+            <button wire:click="publishWithTargets({{ $product->id }})"
+                    class="import-publish-btn import-publish-btn-failed" title="Ponow probe">
+                Blad - ponow
+            </button>
+        @elseif($hasSchedule && $pubStatus === 'scheduled')
+            <div x-data="{ hovering: false }" class="inline-block"
+                 x-on:mouseenter="hovering = true"
+                 x-on:mouseleave="hovering = false">
+                <span x-show="!hovering"
+                      class="import-publish-btn import-publish-btn-scheduled import-countdown"
+                      x-data="{ targetTime: '{{ $product->scheduled_publish_at->toIso8601String() }}' }"
+                      x-text="(() => {
+                          const diff = new Date(targetTime) - new Date();
+                          if (diff <= 0) return 'Teraz...';
+                          const d = Math.floor(diff/86400000);
+                          const h = Math.floor((diff%86400000)/3600000);
+                          const m = Math.floor((diff%3600000)/60000);
+                          if (d > 0) return d+'d '+h+'h';
+                          if (h > 0) return h+'h '+m+'m';
+                          return m+'m';
+                      })()"
+                      title="Zaplanowana publikacja: {{ $product->scheduled_publish_at->format('d.m.Y H:i') }}">
+                </span>
+                <button x-show="hovering"
+                        x-cloak
+                        wire:click="cancelScheduledPublication({{ $product->id }})"
+                        class="import-publish-btn import-publish-btn-failed"
+                        title="Anuluj zaplanowana publikacje">
+                    Anuluj
+                </button>
+            </div>
+        @else
+            <button wire:click="publishWithTargets({{ $product->id }})"
+                    class="import-publish-btn {{ $canPublish ? 'import-publish-btn-ready' : 'import-publish-btn-disabled' }}"
+                    @if(!$canPublish) disabled @endif
+                    title="{{ $canPublish ? 'Publikuj na wybrane cele' : 'Produkt nie jest gotowy (wymagane 100%)' }}">
+                Publikuj
+            </button>
+        @endif
     </td>
 
     {{-- STATUS gotowosci --}}
@@ -411,6 +725,16 @@
             </button>
 
             <div class="w-px h-4 bg-gray-700 mx-0.5"></div>
+
+            {{-- Edytuj (FAZA 9.2) --}}
+            <button wire:click="openImportModal({{ $product->id }})"
+                    class="p-1.5 text-gray-400 hover:text-white hover:bg-gray-700/50 rounded transition-colors"
+                    title="Edytuj podstawowe dane">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                          d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                </svg>
+            </button>
 
             {{-- Duplikuj --}}
             <button wire:click="duplicateProduct({{ $product->id }})"

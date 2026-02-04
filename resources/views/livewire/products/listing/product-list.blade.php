@@ -213,6 +213,11 @@
                         </div>
                     </div>
 
+                    {{-- ETAP: Product Status Filters (2026-02-04) --}}
+                    <div class="mt-4">
+                        @include('livewire.products.listing.partials.status-filters')
+                    </div>
+
                     {{-- Filter Actions --}}
                     @if($hasFilters)
                         <div class="mt-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
@@ -464,13 +469,13 @@
                                     Status
                                 </th>
 
-                                {{-- ETAP_07 FAZA 3: PrestaShop Sync Status Column --}}
-                                <th class="px-6 py-3 text-left text-xs font-medium text-muted uppercase tracking-wider">
+                                {{-- ETAP: Product Status Column (2026-02-04) - Replaces PrestaShop Sync --}}
+                                <th class="px-3 py-3 text-left text-xs font-medium text-muted uppercase tracking-wider">
                                     <div class="flex items-center">
-                                        <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
+                                        <svg class="w-4 h-4 mr-1 text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
                                         </svg>
-                                        PrestaShop Sync
+                                        Zgodność
                                     </div>
                                 </th>
 
@@ -624,71 +629,11 @@
                                         </button>
                                     </td>
 
-                                    {{-- ETAP_07 FAZA 3: PrestaShop Sync Status --}}
-                                    {{-- CRITICAL FIX 2025-10-07: Changed from syncStatuses to shopData --}}
-                                    {{-- shopData = shop associations (current config), syncStatuses = sync operation history --}}
-                                    <td class="px-6 py-4">
-                                        @if($product->shopData->isNotEmpty())
-                                            @php
-                                                // Mapowanie emoji dla statusów
-                                                $statusEmojis = [
-                                                    'synced' => '🟢',
-                                                    'error' => '🔴',
-                                                    'syncing' => '🔄️',
-                                                    'pending' => '🕒',
-                                                    'conflict' => '🟡',
-                                                    'disabled' => '⚫',
-                                                ];
-
-                                                // Mapowanie labelek
-                                                $statusLabels = [
-                                                    'synced' => 'Sync OK',
-                                                    'error' => 'Błąd',
-                                                    'syncing' => 'Sync...',
-                                                    'pending' => 'Oczekuje',
-                                                    'conflict' => 'Konflikt',
-                                                    'disabled' => 'Wyłączone',
-                                                ];
-
-                                                // Oblicz główny status na podstawie priorytetu (error > syncing > conflict > pending > synced > disabled)
-                                                $statuses = $product->shopData->pluck('sync_status')->toArray();
-
-                                                if (in_array('error', $statuses)) {
-                                                    $overallStatus = 'error';
-                                                } elseif (in_array('syncing', $statuses)) {
-                                                    $overallStatus = 'syncing';
-                                                } elseif (in_array('conflict', $statuses)) {
-                                                    $overallStatus = 'conflict';
-                                                } elseif (in_array('pending', $statuses)) {
-                                                    $overallStatus = 'pending';
-                                                } elseif (in_array('synced', $statuses) && count(array_unique($statuses)) === 1) {
-                                                    $overallStatus = 'synced';
-                                                } elseif (in_array('disabled', $statuses) && count(array_unique($statuses)) === 1) {
-                                                    $overallStatus = 'disabled';
-                                                } else {
-                                                    $overallStatus = 'pending'; // fallback
-                                                }
-                                            @endphp
-
-                                            <div class="flex flex-col gap-1">
-                                                {{-- Główny status (priorytetowy) --}}
-                                                <div class="sync-status-badge sync-status-{{ $overallStatus }}">
-                                                    {{ $statusEmojis[$overallStatus] ?? '⚪' }} {{ $statusLabels[$overallStatus] ?? 'Unknown' }}
-                                                </div>
-
-                                                {{-- Lista sklepów (FIXED: używa shopData zamiast syncStatuses) --}}
-                                                @foreach($product->shopData as $shopData)
-                                                    <div class="text-sm opacity-75">
-                                                        {{ $statusEmojis[$shopData->sync_status] ?? '⚪' }} {{ $shopData->shop->name ?? 'Unknown' }}
-                                                    </div>
-                                                @endforeach
-                                            </div>
-                                        @else
-                                            <span class="text-xs text-gray-500 italic">
-                                                Brak powiązań ze sklepami
-                                            </span>
-                                        @endif
-                                    </td>
+                                    {{-- ETAP: Product Status Column (2026-02-04) - Replaces PrestaShop Sync Status --}}
+                                    @include('livewire.products.listing.partials.status-column', [
+                                        'product' => $product,
+                                        'status' => $this->productStatuses[$product->id] ?? null
+                                    ])
 
                                     {{-- Updated At --}}
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-muted">

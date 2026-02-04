@@ -152,6 +152,12 @@
                             <div class="resize-handle" x-on:mousedown="startResize($event, 'type')"></div>
                         </th>
 
+                        {{-- MARKA (manufacturer_id) --}}
+                        <th class="px-2 w-24 relative resizable-column" data-column-id="manufacturer" style="width: 96px; min-width: 80px;">
+                            <span class="text-xs text-gray-400">Marka</span>
+                            <div class="resize-handle" x-on:mousedown="startResize($event, 'manufacturer')"></div>
+                        </th>
+
                         {{-- CENA - klik otwiera modal cen (FAZA 9.4) --}}
                         <th class="px-2 w-20 relative resizable-column" data-column-id="price" style="width: 80px; min-width: 60px;">
                             <span class="text-xs text-gray-400">Cena</span>
@@ -226,7 +232,7 @@
                         @include('livewire.products.import.partials.product-row', ['product' => $product])
                     @empty
                         <tr>
-                            <td colspan="15" class="text-center py-12">
+                            <td colspan="16" class="text-center py-12">
                                 <div class="text-gray-400">
                                     <svg class="w-12 h-12 mx-auto mb-4 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"

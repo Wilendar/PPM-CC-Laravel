@@ -50,6 +50,11 @@ class ProductParametersManager extends Component
             'icon' => 'trash',
             'description' => 'Wykrywaj i usuwaj osierocone dane zakłócające integralność bazy',
         ],
+        'status-monitoring' => [
+            'label' => 'Monitorowanie zgodności',
+            'icon' => 'shield-check',
+            'description' => 'Konfiguruj monitorowanie zgodności danych produktów z integracjami',
+        ],
     ];
 
     /**
