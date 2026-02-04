@@ -128,6 +128,9 @@ class ProductStatusAggregator
         // Check variant issues
         $this->checkVariantIssues($product, $status);
 
+        // Collect ALL connected integrations (for showing OK status too)
+        $this->collectConnectedIntegrations($product, $status);
+
         return $status;
     }
 
@@ -377,6 +380,46 @@ class ProductStatusAggregator
                 }
             }
         }
+    }
+
+    /**
+     * Collect ALL connected integrations (shops and ERPs)
+     * This allows status column to show all integrations, not just those with issues
+     */
+    private function collectConnectedIntegrations(Product $product, ProductStatusDTO $status): void
+    {
+        // Collect PrestaShop shops
+        if ($product->relationLoaded('shopData')) {
+            foreach ($product->shopData as $shopData) {
+                $shop = $shopData->shop ?? null;
+                if ($shop) {
+                    $status->addConnectedShop(
+                        $shopData->shop_id,
+                        $shop->name ?? "Sklep #{$shopData->shop_id}",
+                        $shop->label_color ?? '06b6d4',
+                        $shop->label_icon ?? 'shopping-cart'
+                    );
+                }
+            }
+        }
+
+        // Collect ERP connections
+        if ($product->relationLoaded('erpData')) {
+            foreach ($product->erpData as $erpData) {
+                $erp = $erpData->erpConnection ?? null;
+                if ($erp) {
+                    $status->addConnectedErp(
+                        $erpData->erp_connection_id,
+                        $erp->instance_name ?? "ERP #{$erpData->erp_connection_id}",
+                        $erp->label_color ?? 'f97316',
+                        $erp->label_icon ?? 'database'
+                    );
+                }
+            }
+        }
+
+        // Finalize hasIssues flags based on collected issues
+        $status->finalizeConnectedIntegrations();
     }
 
     /**

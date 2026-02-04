@@ -1,4 +1,0 @@
-﻿SKU;"Marka pojazdu";"Model pojazdu";"Rok od";"Rok do";"SKU pojazdu";"Typ dopasowania";Zrodlo;Zweryfikowane;Uwagi
-PROD-EXAMPLE-001;Yamaha;MT-09;2011;2021;VEH-001;Zamiennik;Manual;NIE;"Przykladowa uwaga dla wiersza 1"
-PROD-EXAMPLE-002;Kawasaki;"Ninja 650";2012;2022;VEH-002;Performance;Import;TAK;"Przykladowa uwaga dla wiersza 2"
-PROD-EXAMPLE-003;Honda;"CBR 600 RR";2013;2023;VEH-003;Oryginal;Producent;NIE;"Przykladowa uwaga dla wiersza 3"

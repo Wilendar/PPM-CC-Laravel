@@ -88,6 +88,18 @@ class ProductStatusDTO
      */
     public array $metadata = [];
 
+    /**
+     * All connected PrestaShop shops (regardless of issues)
+     * @var array<int, array{name: string, color: string, icon: string, hasIssues: bool}>
+     */
+    public array $connectedShops = [];
+
+    /**
+     * All connected ERP systems (regardless of issues)
+     * @var array<int, array{name: string, color: string, icon: string, hasIssues: bool}>
+     */
+    public array $connectedErps = [];
+
     public function __construct(int $productId)
     {
         $this->productId = $productId;
@@ -153,6 +165,75 @@ class ProductStatusDTO
     {
         $this->metadata[$key] = $value;
         return $this;
+    }
+
+    /**
+     * Add connected shop (for showing all integrations in status column)
+     */
+    public function addConnectedShop(int $shopId, string $name, string $color = '06b6d4', string $icon = 'shopping-cart'): self
+    {
+        $this->connectedShops[$shopId] = [
+            'name' => $name,
+            'color' => $color,
+            'icon' => $icon,
+            'hasIssues' => isset($this->shopIssues[$shopId]),
+        ];
+        return $this;
+    }
+
+    /**
+     * Add connected ERP (for showing all integrations in status column)
+     */
+    public function addConnectedErp(int $erpId, string $name, string $color = 'f97316', string $icon = 'database'): self
+    {
+        $this->connectedErps[$erpId] = [
+            'name' => $name,
+            'color' => $color,
+            'icon' => $icon,
+            'hasIssues' => isset($this->erpIssues[$erpId]),
+        ];
+        return $this;
+    }
+
+    /**
+     * Update hasIssues flag for all connected integrations
+     * (call after all issues have been added)
+     */
+    public function finalizeConnectedIntegrations(): self
+    {
+        foreach ($this->connectedShops as $shopId => &$shop) {
+            $shop['hasIssues'] = isset($this->shopIssues[$shopId]);
+        }
+        foreach ($this->connectedErps as $erpId => &$erp) {
+            $erp['hasIssues'] = isset($this->erpIssues[$erpId]);
+        }
+        return $this;
+    }
+
+    /**
+     * Get shops without any issues
+     * @return array<int, array>
+     */
+    public function getShopsWithoutIssues(): array
+    {
+        return array_filter($this->connectedShops, fn($shop) => !$shop['hasIssues']);
+    }
+
+    /**
+     * Get ERPs without any issues
+     * @return array<int, array>
+     */
+    public function getErpsWithoutIssues(): array
+    {
+        return array_filter($this->connectedErps, fn($erp) => !$erp['hasIssues']);
+    }
+
+    /**
+     * Check if product has any connected integrations
+     */
+    public function hasConnectedIntegrations(): bool
+    {
+        return !empty($this->connectedShops) || !empty($this->connectedErps);
     }
 
     /**
@@ -313,6 +394,8 @@ class ProductStatusDTO
             'shop_issues' => $this->shopIssues,
             'erp_issues' => $this->erpIssues,
             'variant_issues' => $this->variantIssues,
+            'connected_shops' => $this->connectedShops,
+            'connected_erps' => $this->connectedErps,
             'metadata' => $this->metadata,
             'severity' => $this->getSeverity(),
             'issue_count' => $this->getIssueCount(),

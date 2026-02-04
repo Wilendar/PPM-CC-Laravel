@@ -1,4 +1,0 @@
-﻿SKU;"Cecha: Engine Type [lista]";"Cecha: Power (kW) [liczba]";"Cecha: Weight (kg) [liczba]";"Cecha: Length (mm) [liczba]";"Cecha: Width (mm) [liczba]";"Cecha: Height (mm) [liczba]";"Cecha: Diameter (mm) [liczba]";"Cecha: Thread Size";"Cecha: Waterproof [TAK/NIE]";"Cecha: Warranty Period (months) [liczba]"
-PROD-EXAMPLE-001;"Wartosc 1";100;100;100;100;100;100;"Wartosc 1";NIE;100
-PROD-EXAMPLE-002;"Wartosc 2";200;200;200;200;200;200;"Wartosc 2";TAK;200
-PROD-EXAMPLE-003;"Wartosc 3";300;300;300;300;300;300;"Wartosc 3";NIE;300

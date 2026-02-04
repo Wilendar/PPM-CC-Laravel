@@ -1,73 +1,155 @@
 # ============================================
-# MINIMAL .gitignore - Private Repository
-# Only ESSENTIAL technical ignores
-# Documentation & project files ARE TRACKED for Claude Code CLI @ mentions
+# PPM-CC-Laravel .gitignore
+# Clean repository - only source code tracked
 # ============================================
 
-# Laravel Dependencies (MUST ignore - too large)
+# ============================================
+# LARAVEL STANDARD
+# ============================================
+
+# Dependencies
 /vendor/
 /node_modules/
 
-# Environment Secrets (MUST ignore - security)
+# Environment
 /.env
 /.env.*
+!/.env.example
 
-# Build Artifacts (MUST ignore - generated files)
+# Build Artifacts
 /public/build/
 /public/hot
 /public/storage
+
+# Bootstrap Cache
 /bootstrap/cache/*.php
 
-# Runtime Data (MUST ignore - application generated)
+# Storage (runtime data)
 /storage/app/containers/
 /storage/app/products/images/
 /storage/app/imports/
 /storage/app/exports/
 /storage/logs/*.log
 /storage/*.key
+/storage/backups/
 
-# IDE & OS (personal preferences)
+# ============================================
+# IDE & OS
+# ============================================
 /.idea/
 /.vscode/
 .DS_Store
+Thumbs.db
 *.swp
 *.swo
 
-# Testing (generated files)
+# ============================================
+# TESTING
+# ============================================
 /tests/coverage/
-/.phpunit.cache
+/.phpunit.cache/
 /.phpunit.result.cache
+/.phpstan.cache
+/.php-cs-fixer.cache
 
 # ============================================
-# NOTE: Following ARE TRACKED in git (for Claude Code CLI):
-# ✅ CLAUDE.md, AGENTS.md - project instructions
-# ✅ .claude/ - agent system configuration
-# ✅ Plan_Projektu/ - ETAP tracking
-_DOCS/ - project documentation (including credentials for private repo)
-_ISSUES_FIXES/ - knowledge base
-_TOOLS/ - development scripts
-_AGENT_REPORTS/ - agent work reports
-References/ - UI mockups
-_OTHER/
-_TEMP/
-_TEST/
-Plan_Projektu copy/
-_ARCHIVE/
-_BACKUP/
-_DIAGNOSTICS/
-_REPORTS/
+# CLAUDE CODE CACHE (CRITICAL!)
 # ============================================
-/_TEMP
-_TEMP/recent_logs.txt
-_TEMP/recent_logs.txt
-nul
+tmpclaude-*-cwd
+
+# ============================================
+# DEBUG/TEST FILES IN ROOT
+# ============================================
+
+# Debug artifacts (files without extension)
+/nul
+/id
+/ppm_id
+/prestashop_product_id
+/product-
+/shop
+/shop-
+/language[0]
+/name
+/name-
+/name}n;
+/_ul*
+/echo
+
+# Test/debug PHP scripts
+/test_*.php
+/debug_*.php
+/check_*.php
+/fix_*.php
+/run_*.php
+/verify_*.php
+/reset_*.php
+
+# Python debug scripts
+/count_*.py
+/check_*.py
+
+# Temporary files
+/_BACKUP_*
+/_TEMP_*
+/_WORKING_*
+/temp_*.txt
+/temp_*.log
+/temp_*.blade.php
+/category-form-server.blade.php
+
+# Duplicates
+/CLAUDE\ —\ kopia.md
+/GEMINI.md
+/*.sln
+
+# Debug images
+/*.png
+
+# Install scripts
+/dotnet-install.ps1
+
+# Shell scripts (deploy helpers - keep locally)
+/upload_*.sh
+
+# ============================================
+# WORKING FOLDERS (not source code)
+# ============================================
+/_TEMP/
+/_TEST/
+/_OTHER/
+/_ARCHIVE/
+/_BACKUP/
+/_DIAGNOSTICS/
+/_REPORTS/
+/_AGENT_REPORTS/
+/Plan_Projektu\ copy/
+
+# ============================================
+# ORCHESTRATION & MCP
+# ============================================
 /.subtask/
-/_AGENT_REPORTS
-/_TOOLS
-/Plan_Projektu
-/_TOOLS
-/_TOOLS/SubiektGT_REST_API_DotNet
+/.parallel-work/
+/.ma-orchestrator/
+/.playwright-mcp/
+/.Release_docs/
 
+# ============================================
+# .NET BUILD (SubiektGT API)
+# ============================================
+/_TOOLS/SubiektGT_REST_API_DotNet/bin/
+/_TOOLS/SubiektGT_REST_API_DotNet/obj/
+/_TOOLS/SubiektGT_REST_API_DotNet/publish/
+/_TOOLS/SubiektApi_backup/logs/
+*.cache
 
-# PAOS Parallel Orchestration
-.parallel-work/
+# ============================================
+# TRACKED FILES (for Claude Code CLI):
+# - CLAUDE.md, AGENTS.md - project instructions
+# - .claude/ - agent system configuration
+# - Plan_Projektu/ - ETAP tracking (NOT "copy")
+# - _DOCS/ - project documentation
+# - _ISSUES_FIXES/ - knowledge base
+# - _TOOLS/ (source code only, not build artifacts)
+# - References/ - UI mockups
+# ============================================
