@@ -43,24 +43,31 @@
 
 <div x-data="{
         open: false,
-        position: 'bottom',
-        checkPosition() {
+        popoverStyle: {},
+        updatePosition() {
             const btn = this.$refs.trigger;
             const rect = btn.getBoundingClientRect();
             const spaceBelow = window.innerHeight - rect.bottom;
-            this.position = spaceBelow < 300 ? 'top' : 'bottom';
+            const showAbove = spaceBelow < 300;
+
+            this.popoverStyle = {
+                position: 'fixed',
+                left: rect.left + 'px',
+                top: showAbove ? 'auto' : (rect.bottom + 8) + 'px',
+                bottom: showAbove ? (window.innerHeight - rect.top + 8) + 'px' : 'auto',
+                zIndex: 99999
+            };
         }
      }"
-     @mouseenter="checkPosition(); open = true"
+     @mouseenter="updatePosition(); open = true"
      @mouseleave="open = false"
-     class="relative inline-flex"
-     :class="{ 'z-[9999]': open }">
+     class="relative inline-flex">
 
     {{-- Trigger Button - Shows summary icon --}}
     <button type="button"
             x-ref="trigger"
             class="inline-flex items-center justify-center w-6 h-6 rounded border {{ $severityConfig['bg'] }} {{ $severityConfig['border'] }} {{ $severityConfig['text'] }} cursor-pointer transition-all hover:scale-105"
-            @click.stop="checkPosition(); open = !open">
+            @click.stop="updatePosition(); open = !open">
         @if($hasIssues)
             {{-- Warning/Error icon with count --}}
             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -77,20 +84,23 @@
         @endif
     </button>
 
-    {{-- Popover Content --}}
-    <div x-show="open"
-         x-transition:enter="transition ease-out duration-200"
-         x-transition:enter-start="opacity-0"
-         x-transition:enter-end="opacity-100"
-         x-transition:leave="transition ease-in duration-150"
-         x-transition:leave-start="opacity-100"
-         x-transition:leave-end="opacity-0"
-         @click.stop
-         class="absolute z-[100] left-0 w-72"
-         :class="position === 'top' ? 'bottom-full mb-2' : 'top-full mt-2'"
-         style="display: none;">
+    {{-- Popover Content (teleported to body for overflow escape) --}}
+    <template x-teleport="body">
+        <div x-show="open"
+             x-transition:enter="transition ease-out duration-200"
+             x-transition:enter-start="opacity-0"
+             x-transition:enter-end="opacity-100"
+             x-transition:leave="transition ease-in duration-150"
+             x-transition:leave-start="opacity-100"
+             x-transition:leave-end="opacity-0"
+             @click.stop
+             @mouseenter="open = true"
+             @mouseleave="open = false"
+             class="w-72"
+             :style="popoverStyle"
+             style="display: none;">
 
-        <div class="bg-gray-800 rounded-lg shadow-xl border border-gray-700 overflow-hidden">
+            <div class="bg-gray-800 rounded-lg shadow-xl border border-gray-700 overflow-hidden">
             {{-- Header --}}
             <div class="px-3 py-2 border-b border-gray-700 {{ $severityConfig['bg'] }}">
                 <h4 class="text-sm font-medium text-white flex items-center gap-2">
@@ -227,4 +237,5 @@
             @endif
         </div>
     </div>
+    </template>
 </div>
