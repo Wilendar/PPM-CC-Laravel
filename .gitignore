@@ -135,6 +135,17 @@ tmpclaude-*-cwd
 /.Release_docs/
 
 # ============================================
+# _TOOLS DEBUG/TEST FILES
+# ============================================
+/_TOOLS/debug_*.php
+/_TOOLS/test_*.php
+/_TOOLS/fix_*.php
+/_TOOLS/check_*.php
+/_TOOLS/add_*.php
+/_TOOLS/create_*.php
+/_TOOLS/prepare_*.php
+
+# ============================================
 # .NET BUILD (SubiektGT API)
 # ============================================
 /_TOOLS/SubiektGT_REST_API_DotNet/bin/
