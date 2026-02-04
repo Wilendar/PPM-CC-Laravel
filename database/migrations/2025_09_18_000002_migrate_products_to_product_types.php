@@ -22,31 +22,42 @@ return new class extends Migration
      */
     public function up(): void
     {
-        // Step 1: Add new product_type_id column
-        Schema::table('products', function (Blueprint $table) {
-            $table->unsignedBigInteger('product_type_id')->nullable()->after('slug');
-            $table->foreign('product_type_id')->references('id')->on('product_types')->onDelete('set null');
-            $table->index('product_type_id', 'idx_products_product_type_id');
-        });
+        // Step 1: Add new product_type_id column (skip if already exists)
+        if (!Schema::hasColumn('products', 'product_type_id')) {
+            Schema::table('products', function (Blueprint $table) {
+                $table->unsignedBigInteger('product_type_id')->nullable()->after('slug');
+                $table->foreign('product_type_id')->references('id')->on('product_types')->onDelete('set null');
+                $table->index('product_type_id', 'idx_products_product_type_id');
+            });
+        }
 
         // Step 2: Migrate existing data
         $this->migrateExistingData();
 
-        // Step 3: Remove old ENUM column and rename new column
-        Schema::table('products', function (Blueprint $table) {
-            // Rename old column to backup
-            $table->renameColumn('product_type', 'product_type_old');
-        });
+        // Step 3: Remove old ENUM column and rename new column (skip if already done)
+        if (Schema::hasColumn('products', 'product_type') && !Schema::hasColumn('products', 'product_type_old')) {
+            Schema::table('products', function (Blueprint $table) {
+                // Rename old column to backup
+                $table->renameColumn('product_type', 'product_type_old');
+            });
+        }
 
-        // Step 4: Make product_type_id non-nullable and add index
-        Schema::table('products', function (Blueprint $table) {
+        // Step 4: Make product_type_id non-nullable and add index (skip if already done)
+        if (Schema::hasColumn('products', 'product_type_id')) {
             // Set default product type for any remaining null values
             DB::table('products')->whereNull('product_type_id')->update([
                 'product_type_id' => ProductType::where('slug', 'inne')->first()?->id ?? 1
             ]);
 
-            $table->unsignedBigInteger('product_type_id')->nullable(false)->change();
-        });
+            // Try to make non-nullable if not already
+            try {
+                Schema::table('products', function (Blueprint $table) {
+                    $table->unsignedBigInteger('product_type_id')->nullable(false)->change();
+                });
+            } catch (\Exception $e) {
+                // Column might already be non-nullable
+            }
+        }
     }
 
     /**

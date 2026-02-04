@@ -158,6 +158,9 @@ class PrestaShopShop extends Model
         'css_files',
         'js_files',
         'files_scanned_at',
+        // ETAP_10: Customizable label colors/icons
+        'label_color',
+        'label_icon',
     ];
 
     /**
@@ -936,5 +939,101 @@ class PrestaShopShop extends Model
     public function getEnabledJsFilesCount(): int
     {
         return count($this->getEnabledJsFiles());
+    }
+
+    // ==========================================
+    // ETAP_10: Customizable Label Colors & Icons
+    // ==========================================
+
+    /**
+     * Default label color for PrestaShop shops
+     */
+    public const DEFAULT_LABEL_COLOR = '#06b6d4'; // cyan-500
+
+    /**
+     * Default label icon for PrestaShop shops
+     */
+    public const DEFAULT_LABEL_ICON = 'shopping-cart';
+
+    /**
+     * Available label colors for selection
+     */
+    public static function getAvailableLabelColors(): array
+    {
+        return [
+            '#ef4444' => 'Czerwony',
+            '#f97316' => 'Pomaranczowy',
+            '#f59e0b' => 'Bursztynowy',
+            '#eab308' => 'Zolty',
+            '#84cc16' => 'Limonkowy',
+            '#22c55e' => 'Zielony',
+            '#14b8a6' => 'Morski',
+            '#06b6d4' => 'Cyjan',
+            '#3b82f6' => 'Niebieski',
+            '#6366f1' => 'Indygo',
+            '#8b5cf6' => 'Fioletowy',
+            '#d946ef' => 'Magenta',
+            '#ec4899' => 'Rozowy',
+            '#64748b' => 'Szary',
+        ];
+    }
+
+    /**
+     * Available label icons for selection
+     */
+    public static function getAvailableLabelIcons(): array
+    {
+        return [
+            'shopping-cart' => 'Koszyk',
+            'store' => 'Sklep',
+            'globe' => 'Globus',
+            'tag' => 'Etykieta',
+            'credit-card' => 'Karta',
+            'truck' => 'Ciezarowka',
+            'box' => 'Paczka',
+            'star' => 'Gwiazdka',
+            'heart' => 'Serce',
+            'lightning-bolt' => 'Blyskawica',
+            'sparkles' => 'Iskierki',
+            'badge-check' => 'Odznaka',
+        ];
+    }
+
+    /**
+     * Get the effective label color (custom or default)
+     */
+    public function getLabelColorAttribute(): string
+    {
+        return $this->attributes['label_color'] ?? self::DEFAULT_LABEL_COLOR;
+    }
+
+    /**
+     * Get the effective label icon (custom or default)
+     */
+    public function getLabelIconAttribute(): string
+    {
+        return $this->attributes['label_icon'] ?? self::DEFAULT_LABEL_ICON;
+    }
+
+    /**
+     * Get CSS inline styles for label badge
+     */
+    public function getLabelBadgeStyleAttribute(): string
+    {
+        $color = $this->label_color;
+        return "background-color: {$color}20; color: {$color}; border-color: {$color}50;";
+    }
+
+    /**
+     * Get label data for display in other components
+     */
+    public function getLabelDataAttribute(): array
+    {
+        return [
+            'name' => $this->name,
+            'color' => $this->label_color,
+            'icon' => $this->label_icon,
+            'url' => $this->url,
+        ];
     }
 }

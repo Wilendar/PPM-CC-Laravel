@@ -162,9 +162,9 @@ class Sessions extends Component
     // SESSION DETAILS
     // ==========================================
 
-    public function showSessionDetails($sessionId)
+    public function viewSessionDetails($sessionId)
     {
-        $this->selectedSession = UserSession::with(['user', 'auditLogs'])
+        $this->selectedSession = UserSession::with(['user'])
             ->findOrFail($sessionId);
         $this->showSessionDetails = true;
     }

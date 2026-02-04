@@ -7,6 +7,7 @@ use Livewire\WithPagination;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Url;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\On;
 use App\Models\PendingProduct;
 use App\Models\ImportSession;
 use App\Models\ProductType;
@@ -27,6 +28,8 @@ class ProductImportPanel extends Component
     use Traits\ImportPanelActions;
     use Traits\ImportPanelBulkOperations;
     use Traits\ImportPanelCategoryShopTrait;
+    use Traits\ImportPanelPermissionTrait;
+    use Traits\ImportPanelPublicationTrait;
 
     /**
      * Pagination settings
@@ -60,6 +63,10 @@ class ProductImportPanel extends Component
 
     /**
      * Listen for events from modals
+     *
+     * NOTE: 'importCompleted' is handled via #[On('importCompleted')] attribute
+     * on handleImportCompleted(). Do NOT add it here to avoid double-firing
+     * which caused the modal to not reopen after import (E2 bug).
      */
     protected $listeners = [
         'skuImportCompleted' => 'handleSkuImportCompleted',
@@ -209,6 +216,57 @@ class ProductImportPanel extends Component
     }
 
     /**
+     * Handle unified import modal completion
+     */
+    #[On('importCompleted')]
+    public function handleImportCompleted(int $count): void
+    {
+        $this->dispatch('flash-message', [
+            'type' => 'success',
+            'message' => "Zaimportowano {$count} produktow",
+        ]);
+        $this->closeModal();
+        $this->resetPage();
+    }
+
+    /**
+     * Handle PrestaShop categories saved event (BUG#3 fix - FAZA 9.7b)
+     *
+     * NOTE: Event is handled by Alpine.js in product-row.blade.php
+     * to update badges dynamically without Livewire re-render.
+     * This prevents "Snapshot missing" errors and preserves dropdown state.
+     *
+     * The handler below uses skipRender() to avoid full component refresh
+     * while still allowing the event to propagate to Alpine listeners.
+     */
+    #[On('prestashop-categories-saved')]
+    public function handlePrestashopCategoriesSaved(int $productId, int $shopId, int $categoryCount): void
+    {
+        // Skip Livewire re-render - Alpine handles UI update via @prestashop-categories-saved.window
+        $this->skipRender();
+    }
+
+    /**
+     * Open the unified import modal (FAZA 9.2)
+     * Replaces openSKUPasteModal() and openCSVImportModal()
+     *
+     * NOTE: Named parameter MUST match child's openModal(?int $pendingProductId)
+     */
+    public function openImportModal(?int $editProductId = null): void
+    {
+        $this->activeModal = 'product-import';
+        $this->dispatch('openImportModal', pendingProductId: $editProductId);
+    }
+
+    /**
+     * Open import prices modal for a product (FAZA 9.4)
+     */
+    public function openImportPricesModal(int $productId): void
+    {
+        $this->dispatch('openImportPricesModal', productId: $productId);
+    }
+
+    /**
      * Open modal by name
      */
     public function openModal(string $modal): void
@@ -220,6 +278,8 @@ class ProductImportPanel extends Component
             $this->dispatch('openSkuModal');
         } elseif ($modal === 'csv-import') {
             $this->dispatch('openCsvImportModal');
+        } elseif ($modal === 'product-import') {
+            $this->dispatch('openImportModal');
         }
     }
 

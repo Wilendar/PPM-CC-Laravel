@@ -215,15 +215,22 @@ class ERPServiceManager
 
     /**
      * Get all supported ERP types.
+     * ETAP_10: Delegates to ERPConnection::getErpTypeLabels() for centralized labels.
      *
      * @return array<string, string> ERP types with labels
      */
     public static function getSupportedERPTypes(): array
     {
-        return [
-            ERPConnection::ERP_BASELINKER => 'BaseLinker',
-            ERPConnection::ERP_SUBIEKT_GT => 'Subiekt GT',
-            ERPConnection::ERP_DYNAMICS => 'Microsoft Dynamics',
+        // Filter only actively supported types
+        $supportedTypes = [
+            ERPConnection::ERP_BASELINKER,
+            ERPConnection::ERP_SUBIEKT_GT,
+            ERPConnection::ERP_DYNAMICS,
         ];
+
+        return array_intersect_key(
+            ERPConnection::getErpTypeLabels(),
+            array_flip($supportedTypes)
+        );
     }
 }

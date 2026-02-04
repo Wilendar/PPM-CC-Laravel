@@ -240,7 +240,7 @@
                                         </span>
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                        <button wire:click="showSessionDetails({{ $session->id }})"
+                                        <button wire:click="viewSessionDetails({{ $session->id }})"
                                             class="text-[#e0ac7e] hover:text-[#d49a6a] mr-3">
                                             Szczegoly
                                         </button>
@@ -411,12 +411,12 @@
 
     {{-- Session Details Modal --}}
     @if($showSessionDetails && $selectedSession)
-        <div class="fixed inset-0 z-50 overflow-y-auto" x-data x-show="true">
-            <div class="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+        <div class="fixed inset-0 z-[60] overflow-y-auto" x-data x-show="true">
+            <div class="flex items-center justify-center min-h-screen px-4 pt-20 pb-20 text-center sm:p-0 sm:pt-24">
                 <div class="fixed inset-0 transition-opacity" aria-hidden="true">
                     <div class="absolute inset-0 bg-gray-900 opacity-75"></div>
                 </div>
-                <div class="inline-block align-bottom bg-gray-800 rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full border border-gray-700">
+                <div class="inline-block align-middle bg-gray-800 rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:max-w-lg sm:w-full border border-gray-700 relative">
                     <div class="px-6 py-4 border-b border-gray-700 flex items-center justify-between">
                         <h3 class="text-lg font-medium text-white">Szczegoly Sesji</h3>
                         <button wire:click="closeSessionDetails" class="text-gray-400 hover:text-gray-200">

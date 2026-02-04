@@ -18,6 +18,9 @@ class EventServiceProvider extends ServiceProvider
         \App\Events\AttributeValueCreated::class => [
             \App\Listeners\SyncNewAttributeValueWithPrestaShops::class,
         ],
+        \Illuminate\Auth\Events\Login::class => [
+            \App\Listeners\CreateUserSession::class,
+        ],
     ];
 
     /**

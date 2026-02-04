@@ -1,11 +1,10 @@
 {{-- ETAP_06 FAZA 5: Shop picker dropdown dla inline editing --}}
-{{-- x-teleport to body to escape overflow/transform issues --}}
+{{-- NO x-teleport - breaks Livewire snapshots! Use high z-index + fixed positioning instead --}}
 @php
     $pickerId = 'shop-picker-' . $product->id;
     $productId = $product->id;
 @endphp
 
-<template x-teleport="body">
     <div id="{{ $pickerId }}"
          class="shop-picker-dropdown"
          x-data="{
@@ -146,4 +145,3 @@
         </div>
     </div>
     </div>
-</template>

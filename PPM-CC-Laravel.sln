@@ -1,0 +1,32 @@
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.5.2.0
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "_TOOLS", "_TOOLS", "{93FC3CD8-078C-9BD6-592E-0954E51B99DB}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "SubiektGT_REST_API_DotNet", "SubiektGT_REST_API_DotNet", "{0D8CF6F9-9240-6737-6A7A-836E3544F641}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SubiektApi", "_TOOLS\SubiektGT_REST_API_DotNet\SubiektApi.csproj", "{E0309768-0D5C-F535-B558-D5505933611A}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{E0309768-0D5C-F535-B558-D5505933611A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E0309768-0D5C-F535-B558-D5505933611A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E0309768-0D5C-F535-B558-D5505933611A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E0309768-0D5C-F535-B558-D5505933611A}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{0D8CF6F9-9240-6737-6A7A-836E3544F641} = {93FC3CD8-078C-9BD6-592E-0954E51B99DB}
+		{E0309768-0D5C-F535-B558-D5505933611A} = {0D8CF6F9-9240-6737-6A7A-836E3544F641}
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {7760F5B2-3B67-4AB4-8AFF-157ABED17F05}
+	EndGlobalSection
+EndGlobal

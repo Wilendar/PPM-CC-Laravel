@@ -256,7 +256,14 @@
       "mcp__chrome-devtools__list_pages",
       "mcp__chrome-devtools__navigate_page",
       "mcp__plugin_playwright_playwright__browser_fill_form",
-      "mcp__plugin_playwright_playwright__browser_select_option"
+      "mcp__plugin_playwright_playwright__browser_select_option",
+      "Read(//d/OneDrive - MPP TRADE/Obrazy/Zrzuty ekranu/**)",
+      "Read(//c/Users/kamil/.subtask/workspaces/D--Skrypty-PPM-CC-Laravel--9/**)",
+      "Read(//c/Users/kamil/.subtask/workspaces/D--Skrypty-PPM-CC-Laravel--12/**)",
+      "Bash(git merge:*)",
+      "Bash(Select-String -Pattern \"scan\")",
+      "Skill(integration-labels)",
+      "Read(//c/Users/kamil/.claude/**)"
     ],
     "deny": [],
     "ask": []

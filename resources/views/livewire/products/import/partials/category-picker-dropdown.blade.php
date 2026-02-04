@@ -1,12 +1,11 @@
 {{-- ETAP_06 FAZA 5: Category picker - 3 kaskadowe dropdowny (L3 -> L4 -> L5) --}}
 {{-- Baza (L1) i Wszystko (L2) sa auto-includowane przy zapisie --}}
-{{-- x-teleport to body to escape overflow/transform issues --}}
+{{-- NO x-teleport - breaks Livewire snapshots! Use high z-index + fixed positioning instead --}}
 @php
     $pickerId = 'category-picker-' . $product->id;
     $productId = $product->id;
 @endphp
 
-<template x-teleport="body">
     <div id="{{ $pickerId }}"
          class="import-dropdown-fixed-container"
          x-data="{
@@ -81,7 +80,7 @@
 
         {{-- Level 3 dropdown (pierwszy widoczny poziom) --}}
         <div>
-            <label class="block text-xs font-medium text-gray-400 mb-1">Kategoria glowna</label>
+            <label class="block text-xs font-medium text-gray-400 mb-1">Kategoria L3</label>
             <select wire:model.live="selectedL3"
                     class="form-select-dark w-full text-sm">
                 <option value="">-- wybierz --</option>
@@ -94,7 +93,7 @@
         {{-- Level 4 dropdown (zalezny od L3) --}}
         @if($selectedL3 && $categoriesL4->isNotEmpty())
             <div>
-                <label class="block text-xs font-medium text-gray-400 mb-1">Podkategoria</label>
+                <label class="block text-xs font-medium text-gray-400 mb-1">Kategoria L4</label>
                 <select wire:model.live="selectedL4"
                         class="form-select-dark w-full text-sm">
                     <option value="">-- wybierz (opcjonalnie) --</option>
@@ -108,7 +107,7 @@
         {{-- Level 5 dropdown (zalezny od L4) --}}
         @if($selectedL4 && $categoriesL5->isNotEmpty())
             <div>
-                <label class="block text-xs font-medium text-gray-400 mb-1">Szczegolowa kategoria</label>
+                <label class="block text-xs font-medium text-gray-400 mb-1">Kategoria L5</label>
                 <select wire:model.live="selectedL5"
                         class="form-select-dark w-full text-sm">
                     <option value="">-- wybierz (opcjonalnie) --</option>
@@ -168,4 +167,3 @@
         </div>
     </div>
     </div>
-</template>

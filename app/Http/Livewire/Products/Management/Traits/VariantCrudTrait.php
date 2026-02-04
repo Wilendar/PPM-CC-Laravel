@@ -70,6 +70,9 @@ trait VariantCrudTrait
     /** @var array Shop-specific variant overrides: [shopId => [variantId => overrideData]] */
     public array $shopVariantOverrides = [];
 
+    /** @var string Variant price display mode in list: 'gross' (default) or 'net' */
+    public string $variantPriceDisplayMode = 'gross';
+
     /*
     |--------------------------------------------------------------------------
     | PENDING VARIANTS SYSTEM (2025-12-04)
@@ -1038,6 +1041,15 @@ trait VariantCrudTrait
             Log::error('Toggle variant status failed', ['error' => $e->getMessage()]);
             session()->flash('error', 'Blad podczas zmiany statusu wariantu.');
         }
+    }
+
+    /**
+     * Toggle variant price display mode between 'gross' and 'net'
+     * Used by the price column header switch in variants tab
+     */
+    public function toggleVariantPriceDisplayMode(): void
+    {
+        $this->variantPriceDisplayMode = $this->variantPriceDisplayMode === 'gross' ? 'net' : 'gross';
     }
 
     /**
@@ -2434,9 +2446,10 @@ trait VariantCrudTrait
                 'pendingDelete' => false,
                 'operation_type' => 'PENDING_CREATE',
 
-                // Price/stock if available
-                'price' => $prices['price'] ?? ($baseVariant->price ?? 0),
-                'quantity' => $stock['quantity'] ?? ($baseVariant->quantity ?? 0),
+                // FIX 2026-01-29: Use 'price' and 'stock' property names (blade reads these)
+                // and fetch from Eloquent relations instead of non-existent direct properties
+                'price' => $prices['price'] ?? ($baseVariant ? (float) ($baseVariant->prices->first()?->price ?? 0) : 0),
+                'stock' => $stock['quantity'] ?? ($baseVariant ? (int) $baseVariant->stock->sum('quantity') : 0),
             ];
 
             // Add grouped attributes for display (like default variants)

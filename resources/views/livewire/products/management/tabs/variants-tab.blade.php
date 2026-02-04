@@ -217,7 +217,17 @@
                             Nazwa/Atrybuty
                         </th>
                         <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
-                            Cena
+                            {{-- ETAP_14: Price display mode toggle (Brutto/Netto) --}}
+                            <div class="flex items-center space-x-2">
+                                <span>Cena</span>
+                                <button type="button"
+                                        wire:click="toggleVariantPriceDisplayMode"
+                                        class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium transition-colors
+                                               {{ $variantPriceDisplayMode === 'gross' ? 'bg-blue-900/50 text-blue-300 border border-blue-600' : 'bg-gray-700 text-gray-400 border border-gray-600' }}"
+                                        title="Kliknij aby przelaczac Brutto/Netto">
+                                    {{ $variantPriceDisplayMode === 'gross' ? 'BRUTTO' : 'NETTO' }}
+                                </button>
+                            </div>
                         </th>
                         <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
                             Stan
@@ -566,24 +576,30 @@
                             <td class="px-4 py-4">
                                 @php
                                     // PENDING VARIANTS: Pending creates don't have prices yet
-                                    $priceValue = 0;
+                                    $priceValueNet = 0;
                                     $priceModifier = 0;
                                     if (!$isPendingCreate) {
                                         // Check if model (has relationLoaded) or stdClass from API
                                         $hasRelationMethod = is_object($variant) && method_exists($variant, 'relationLoaded');
                                         if ($hasRelationMethod && $variant->relationLoaded('prices') && $variant->prices instanceof \Illuminate\Database\Eloquent\Collection) {
-                                            $priceValue = (float) ($variant->prices->first()?->price ?? 0);
+                                            $priceValueNet = (float) ($variant->prices->first()?->price ?? 0);
                                         } elseif (is_numeric($variant->price ?? null)) {
-                                            $priceValue = (float) $variant->price;
+                                            $priceValueNet = (float) $variant->price;
                                         }
                                         $priceModifier = is_numeric($variant->price_modifier ?? null) ? (float) $variant->price_modifier : 0;
                                     }
+
+                                    // ETAP_14: Calculate display price based on mode (Brutto/Netto)
+                                    $taxRate = $this->tax_rate ?? 23;
+                                    $displayPrice = $variantPriceDisplayMode === 'gross'
+                                        ? $priceValueNet * (1 + $taxRate / 100)
+                                        : $priceValueNet;
                                 @endphp
                                 @if($isPendingCreate)
                                     <div class="text-xs text-gray-500 italic">Po zapisie</div>
                                 @elseif($isPendingDelete)
                                     <div class="text-sm font-medium text-gray-500 line-through">
-                                        {{ number_format($priceValue, 2, ',', ' ') }} PLN
+                                        {{ number_format($displayPrice, 2, ',', ' ') }} PLN
                                     </div>
                                 @else
                                     {{-- ETAP_14: Clickable price opens prices modal --}}
@@ -591,7 +607,7 @@
                                             wire:click="openVariantPricesModal({{ $variant->id }})"
                                             class="variant-price-btn text-sm font-medium text-gray-300 hover:text-white"
                                             title="Kliknij aby edytowac ceny wariantu">
-                                        {{ number_format($priceValue, 2, ',', ' ') }} PLN
+                                        {{ number_format($displayPrice, 2, ',', ' ') }} PLN
                                         <svg class="w-3 h-3 ml-1 inline opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/>
                                         </svg>

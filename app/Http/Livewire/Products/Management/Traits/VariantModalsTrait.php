@@ -147,8 +147,23 @@ trait VariantModalsTrait
         try {
             DB::beginTransaction();
 
+            $taxRate = $this->tax_rate ?? 23;
+
             foreach ($this->variantModalPrices as $groupId => $priceData) {
                 $netPrice = (float) ($priceData['net'] ?? 0);
+                $grossPrice = (float) ($priceData['gross'] ?? 0);
+
+                // FIX 2026-01-28: Fallback - if net=0 but gross>0, calculate net from gross
+                // This handles the case when user edits gross field and $wire.set() doesn't sync before save
+                if ($netPrice <= 0 && $grossPrice > 0) {
+                    $netPrice = $grossPrice / (1 + $taxRate / 100);
+                    Log::debug('Calculated net price from gross', [
+                        'group_id' => $groupId,
+                        'gross' => $grossPrice,
+                        'net' => $netPrice,
+                        'tax_rate' => $taxRate,
+                    ]);
+                }
 
                 if ($netPrice > 0) {
                     $this->updateVariantPrice(

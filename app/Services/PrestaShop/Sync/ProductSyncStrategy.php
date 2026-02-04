@@ -17,7 +17,9 @@ use App\Models\ProductDescription;
 use App\Models\PrestaShopShop;
 use App\Models\ProductShopData;
 use App\Models\SyncLog;
+use App\Models\ShopVariant;
 use App\Exceptions\PrestaShopAPIException;
+use App\Jobs\PrestaShop\SyncShopVariantsToPrestaShopJob;
 
 /**
  * Product Sync Strategy
@@ -334,6 +336,10 @@ class ProductSyncStrategy implements ISyncStrategy
             // NEW (2025-12-09): ETAP_05d FAZA 4.5 - Sync vehicle compatibilities
             Log::debug('[SYNC DEBUG] Starting compatibility sync');
             $this->syncCompatibilitiesIfEnabled($model, $shop, $externalId, $client);
+
+            // NEW (2026-01-28): Auto-dispatch variant sync if product has shop variants
+            Log::debug('[SYNC DEBUG] Checking for variant sync');
+            $this->dispatchVariantSyncIfNeeded($model, $shop, $externalId);
 
             // NEW (2025-12-11): ETAP_07f FAZA 8.2 - Mark visual description as synced
             Log::debug('[SYNC DEBUG] Marking visual description as synced');
@@ -1381,6 +1387,81 @@ class ProductSyncStrategy implements ISyncStrategy
         } catch (\Exception $e) {
             // Log error but don't fail product sync (non-blocking)
             Log::error('[VISUAL DESC SYNC] Failed to mark visual description as synced (non-fatal)', [
+                'product_id' => $product->id,
+                'shop_id' => $shop->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    /**
+     * Dispatch variant sync job if product has shop variants (FIX 2026-01-28)
+     *
+     * PROBLEM SOLVED: Product sync was completing without syncing variants because
+     * SyncShopVariantsToPrestaShopJob was only dispatched on manual "commit" action.
+     *
+     * SOLUTION: Auto-dispatch variant sync after product sync completes if:
+     * - Product has variants (is variant master)
+     * - Shop has variant overrides for this product
+     *
+     * Non-blocking: errors are logged but don't fail the product sync.
+     *
+     * @param Product $product PPM Product
+     * @param PrestaShopShop $shop Target shop
+     * @param int $externalId PrestaShop product ID
+     */
+    protected function dispatchVariantSyncIfNeeded(Product $product, PrestaShopShop $shop, int $externalId): void
+    {
+        try {
+            // Check if product is a variant master (has variants)
+            if (!$product->isVariantMaster()) {
+                Log::debug('[VARIANT SYNC] Product is not a variant master, skipping', [
+                    'product_id' => $product->id,
+                    'shop_id' => $shop->id,
+                ]);
+                return;
+            }
+
+            // Check if product has any shop variant overrides for this shop
+            $shopVariantCount = ShopVariant::where('product_id', $product->id)
+                ->where('shop_id', $shop->id)
+                ->count();
+
+            // Also check default variants that should be synced
+            $defaultVariantCount = $product->variants()->count();
+
+            if ($shopVariantCount === 0 && $defaultVariantCount === 0) {
+                Log::debug('[VARIANT SYNC] No variants to sync', [
+                    'product_id' => $product->id,
+                    'shop_id' => $shop->id,
+                    'shop_variant_count' => $shopVariantCount,
+                    'default_variant_count' => $defaultVariantCount,
+                ]);
+                return;
+            }
+
+            Log::info('[VARIANT SYNC] Dispatching variant sync job after product sync', [
+                'product_id' => $product->id,
+                'shop_id' => $shop->id,
+                'prestashop_product_id' => $externalId,
+                'shop_variant_count' => $shopVariantCount,
+                'default_variant_count' => $defaultVariantCount,
+            ]);
+
+            // Dispatch the variant sync job
+            SyncShopVariantsToPrestaShopJob::dispatch(
+                $product->id,
+                $shop->id
+            );
+
+            Log::info('[VARIANT SYNC] Variant sync job dispatched successfully', [
+                'product_id' => $product->id,
+                'shop_id' => $shop->id,
+            ]);
+
+        } catch (\Exception $e) {
+            // Log error but don't fail product sync (non-blocking)
+            Log::error('[VARIANT SYNC] Failed to dispatch variant sync job (non-fatal)', [
                 'product_id' => $product->id,
                 'shop_id' => $shop->id,
                 'error' => $e->getMessage(),

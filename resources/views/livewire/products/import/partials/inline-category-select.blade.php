@@ -42,11 +42,11 @@
 
     // Level labels for placeholder
     $levelLabels = [
-        3 => 'Kategoria glowna',
-        4 => 'Podkategoria',
-        5 => 'Szczegolowa',
-        6 => 'Poziom 6',
-        7 => 'Poziom 7',
+        3 => 'Kategoria L3',
+        4 => 'Kategoria L4',
+        5 => 'Kategoria L5',
+        6 => 'Kategoria L6',
+        7 => 'Kategoria L7',
     ];
     $levelLabel = $levelLabels[$level] ?? "Poziom $level";
 @endphp
@@ -64,10 +64,6 @@
          level: {{ $level }},
          parentId: {{ $parentCategoryId ?? 'null' }},
          categories: {{ Js::from($categories->map(fn($c) => ['id' => $c->id, 'name' => $c->name])) }},
-         btnRect: null,
-         updatePosition() {
-             this.btnRect = this.$refs.triggerBtn.getBoundingClientRect();
-         },
          get filteredCategories() {
              if (!this.search.trim()) return this.categories;
              const q = this.search.toLowerCase();
@@ -103,12 +99,12 @@
              this.showCreateForm = false;
          }
      }"
-     @keydown.escape.window="if(open) { open = false; search = ''; showCreateForm = false; }">
+     @keydown.escape.window="if(open) { open = false; search = ''; showCreateForm = false; }"
+     @click.outside="open = false">
 
     {{-- Trigger button --}}
     <button type="button"
-            x-ref="triggerBtn"
-            @click="updatePosition(); open = !open; if(open) $nextTick(() => $refs.searchInput?.focus())"
+            @click="open = !open; if(open) $nextTick(() => $refs.searchInput?.focus())"
             @if($isDisabled) disabled @endif
             class="inline-cat-trigger group flex items-center gap-1 px-2 py-1 rounded text-xs transition-all
                    {{ $isDisabled ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer' }}
@@ -135,20 +131,18 @@
         </svg>
     </button>
 
-    {{-- Dropdown menu - teleported to body to escape overflow:hidden --}}
-    <template x-teleport="body">
-        <div x-show="open"
-             x-cloak
-             @click.outside="open = false; search = ''; showCreateForm = false"
-             x-transition:enter="transition ease-out duration-100"
-             x-transition:enter-start="opacity-0 scale-95"
-             x-transition:enter-end="opacity-100 scale-100"
-             x-transition:leave="transition ease-in duration-75"
-             x-transition:leave-start="opacity-100 scale-100"
-             x-transition:leave-end="opacity-0 scale-95"
-             class="inline-cat-dropdown fixed z-[9999] w-56 bg-gray-800 border border-gray-600 rounded-lg shadow-xl"
-             :style="btnRect ? `top: ${btnRect.bottom + 4}px; left: ${Math.max(8, Math.min(btnRect.left, window.innerWidth - 240))}px;` : ''"
-             style="display: none;">
+    {{-- Dropdown menu - absolute positioning (reliable after modal close) --}}
+    {{-- NO x-teleport - breaks Livewire snapshots in child components --}}
+    <div x-show="open"
+         x-cloak
+         x-transition:enter="transition ease-out duration-100"
+         x-transition:enter-start="opacity-0 scale-95"
+         x-transition:enter-end="opacity-100 scale-100"
+         x-transition:leave="transition ease-in duration-75"
+         x-transition:leave-start="opacity-100 scale-100"
+         x-transition:leave-end="opacity-0 scale-95"
+         class="inline-cat-dropdown absolute left-0 top-full mt-1 w-56 bg-gray-800 border border-gray-600 rounded-lg shadow-xl"
+         style="z-index: 9999;">
 
         {{-- Search input --}}
         <div class="p-2 border-b border-gray-700">
@@ -265,6 +259,5 @@
                 </div>
             </div>
         @endif
-        </div>
-    </template>
+    </div>
 </div>

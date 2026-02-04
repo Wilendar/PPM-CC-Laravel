@@ -101,15 +101,15 @@
         </svg>
     </button>
 
-    <template x-teleport="body">
+    {{-- NO x-teleport - breaks Livewire snapshots! Use high z-index + fixed positioning instead --}}
         <div x-show="open"
              x-transition:enter="transition ease-out duration-100"
              x-transition:enter-start="opacity-0 scale-95"
              x-transition:enter-end="opacity-100 scale-100"
              @click.outside="open = false; search = ''; showCreateForm = false"
-             class="fixed z-[9999] w-56 bg-gray-800 border border-gray-600 rounded-lg shadow-xl"
-             :style="btnRect ? `top: ${btnRect.bottom + 4}px; left: ${btnRect.left}px;` : ''"
-             style="display: none;">
+             class="fixed w-56 bg-gray-800 border border-gray-600 rounded-lg shadow-xl"
+             style="z-index: 9999;"
+             :style="btnRect ? `top: ${btnRect.bottom + 4}px; left: ${btnRect.left}px;` : ''">
 
             {{-- Search input --}}
             <div class="p-2 border-b border-gray-700">
@@ -215,5 +215,4 @@
                 </div>
             @endif
         </div>
-    </template>
 </div>

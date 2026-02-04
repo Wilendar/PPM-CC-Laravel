@@ -172,5 +172,10 @@
     "code-review@claude-plugins-official": true,
     "playwright@claude-plugins-official": true
   },
-  "spinnerTipsEnabled": false
+  "spinnerTipsEnabled": false,
+  "permissions": {
+    "additionalDirectories": [
+      "d:\\Skrypty\\PPM-CC-Laravel\\.claude\\skills"
+    ]
+  }
 }

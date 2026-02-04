@@ -10,6 +10,7 @@ use App\Services\ERP\BaselinkerService;
 use App\Services\ERP\SubiektGTService;
 use App\Services\ERP\DynamicsService;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\Support\Facades\Log;
 
 /**
  * ERPManager Livewire Component
@@ -307,6 +308,9 @@ class ERPManager extends Component
             'notify_on_errors' => true,
             'notify_on_sync_complete' => false, // was missing
             'notify_on_auth_expire' => true,
+            // ETAP_10: Label customization
+            'label_color' => null,
+            'label_icon' => null,
         ];
         $this->resetERPSpecificConfig();
     }
@@ -399,6 +403,24 @@ class ERPManager extends Component
     {
         if ($this->wizardStep > 1) {
             $this->wizardStep--;
+        }
+    }
+
+    /**
+     * Go to specific wizard step (for edit mode navigation).
+     */
+    public function goToWizardStep(int $step)
+    {
+        // Only allow in edit mode or for going back to completed steps
+        if ($this->editingConnectionId || $step <= $this->wizardStep) {
+            if ($step >= 1 && $step <= 4) {
+                $this->wizardStep = $step;
+
+                // If going to step 3, run auth test
+                if ($step === 3) {
+                    $this->testAuthentication();
+                }
+            }
         }
     }
 
@@ -844,6 +866,9 @@ class ERPManager extends Component
             'notify_on_errors' => $connection->notify_on_errors,
             'notify_on_sync_complete' => $connection->notify_on_sync_complete ?? false,
             'notify_on_auth_expire' => $connection->notify_on_auth_expire,
+            // ETAP_10: Label customization
+            'label_color' => $connection->getAttributes()['label_color'] ?? null,
+            'label_icon' => $connection->getAttributes()['label_icon'] ?? null,
         ];
 
         // Load ERP-specific config
@@ -1615,6 +1640,61 @@ class ERPManager extends Component
         } else {
             $this->dispatch('notify', type: 'info', message: 'Wszystkie poziomy cenowe ERP sa juz zmapowane');
         }
+    }
+
+    // =========================================================================
+    // GRUPA D: DEFAULT ERP MANAGEMENT
+    // =========================================================================
+
+    /**
+     * Set an ERP connection as the default.
+     * Only ONE connection can be default at a time.
+     * Also sets priority=1 on the default connection.
+     *
+     * @param int $connectionId ERPConnection ID to set as default
+     */
+    public function setAsDefaultErp(int $connectionId): void
+    {
+        $connection = ERPConnection::findOrFail($connectionId);
+
+        \DB::transaction(function () use ($connection) {
+            // Unset is_default on ALL connections
+            ERPConnection::where('is_default', true)
+                ->where('id', '!=', $connection->id)
+                ->update(['is_default' => false]);
+
+            // Set this connection as default with priority 1
+            $connection->update([
+                'is_default' => true,
+                'priority' => 1,
+            ]);
+        });
+
+        Log::info('ERPManager: Default ERP set', [
+            'connection_id' => $connection->id,
+            'instance_name' => $connection->instance_name,
+        ]);
+
+        session()->flash('success', "Polaczenie '{$connection->instance_name}' ustawione jako domyslne ERP.");
+    }
+
+    /**
+     * Remove default status from an ERP connection.
+     *
+     * @param int $connectionId ERPConnection ID
+     */
+    public function removeDefaultErp(int $connectionId): void
+    {
+        $connection = ERPConnection::findOrFail($connectionId);
+
+        $connection->update(['is_default' => false]);
+
+        Log::info('ERPManager: Default ERP removed', [
+            'connection_id' => $connection->id,
+            'instance_name' => $connection->instance_name,
+        ]);
+
+        session()->flash('success', "Domyslny status usuniety z '{$connection->instance_name}'.");
     }
 
     /**

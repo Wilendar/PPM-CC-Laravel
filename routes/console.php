@@ -355,6 +355,17 @@ Schedule::call(function () use ($shouldSyncNow, $dispatchSyncJob) {
   ->withoutOverlapping();
 
 // ==========================================
+// IMPORT PANEL: SCHEDULED PUBLICATION
+// ==========================================
+// FAZA 9.5: Auto-publish pending products at scheduled_publish_at time
+
+Schedule::command('import:publish-scheduled')
+    ->everyMinute()
+    ->withoutOverlapping()
+    ->runInBackground()
+    ->name('import-publish-scheduled');
+
+// ==========================================
 // FUTURE TASKS (PLACEHOLDER)
 // ==========================================
 

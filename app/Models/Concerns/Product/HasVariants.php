@@ -140,6 +140,18 @@ trait HasVariants
         return $this->has_variants && $this->variants()->exists();
     }
 
+    /**
+     * Check if product is a variant master (has variants to sync)
+     *
+     * FIX 2026-01-28: Added for ProductSyncStrategy::dispatchVariantSyncIfNeeded()
+     *
+     * @return bool True if product has is_variant_master flag AND has actual variants
+     */
+    public function isVariantMaster(): bool
+    {
+        return $this->is_variant_master && $this->variants()->exists();
+    }
+
     // NOTE: Shop variant methods (shopVariants, shopVariantsForShop, getVariantsForShop)
     // are implemented in HasMultiStore trait to avoid duplication
 

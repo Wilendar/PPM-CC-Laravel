@@ -18,7 +18,7 @@
 - ImportManager (`/admin/shops/import`) = import Z PrestaShop DO PPM
 - **NOWY SYSTEM** (`/admin/products/import`) = tworzenie produktow W PPM → eksport NA PrestaShop
 
-**Status ETAPU:** 🛠️ W TRAKCIE - FAZA 1-6.5 ukonczone (90%)
+**Status ETAPU:** 🛠️ W TRAKCIE - FAZA 1-6.5, 9 ukonczone (95%)
 **Szacowany czas:** 50 godzin (35h zuzyte)
 **Priorytet:** WYSOKI
 **Zaleznosci:** ETAP_05_Produkty.md, ETAP_07_Prestashop_API.md (sync jobs)
@@ -112,6 +112,7 @@ app/Services/Import/
 - ✅ FAZA 6.5. ROZBUDOWA PANELU - NOWE KOLUMNY I FUNKCJE (resizable columns, marka, cena, opisy)
 - FAZA 7. HISTORIA I AUDYT
 - FAZA 8. TESTOWANIE I OPTYMALIZACJA
+- ✅ FAZA 9. REDESIGN PANELU IMPORTU (zunifikowany modal, modal cen, publikacja, scheduler, uprawnienia)
 
 ---
 
@@ -685,6 +686,96 @@ Modele zawierają już podstawową logikę walidacji i completion tracking.
   - ✅ 6.5.6.4 Chrome DevTools MCP verification
       └──📁 PLIK: _TOOLS/screenshots/faza65_import_panel_initial.jpg
       └──📁 PLIK: _TOOLS/screenshots/faza65_description_modal.jpg
+
+---
+
+### ✅ FAZA 9: REDESIGN PANELU IMPORTU (UKONCZONA 2026-02-02)
+
+**Plan:** `Plan_Projektu/misty-dazzling-pie.md`
+
+- **✅ 9.1 Infrastruktura (DB + Model + Config + Permissions)**
+  - ✅ 9.1.1 Migracja: add_import_redesign_fields_to_pending_products
+    └── 📁 PLIK: database/migrations/2026_02_02_120000_add_import_redesign_fields_to_pending_products.php
+    - ✅ Nowe kolumny: cn_code, material, defect_symbol, application, split_payment, shop_internet, is_variant_master
+    - ✅ Nowe kolumny JSON: price_data, publication_targets
+    - ✅ Nowe kolumny: scheduled_publish_at, publish_status (draft/scheduled/publishing/published/failed)
+  - ✅ 9.1.2 Config import.php (ERP primary config)
+    └── 📁 PLIK: config/import.php
+  - ✅ 9.1.3 Config permissions/import.php (11 permissions P1-P11)
+    └── 📁 PLIK: config/permissions/import.php
+  - ✅ 9.1.4 Aktualizacja PendingProduct model (+fillable, +casts, publication_targets)
+    └── 📁 PLIK: app/Models/PendingProduct.php
+  - ✅ 9.1.5 ImportPanelPermissionTrait (11 metod uprawnien per kolumna/akcja)
+    └── 📁 PLIK: app/Http/Livewire/Products/Import/Traits/ImportPanelPermissionTrait.php
+
+- **✅ 9.2 Zunifikowany Modal Importu (CSV + Column)**
+  - ✅ 9.2.1 ProductImportModal.php (glowny komponent z 2 trybami)
+    └── 📁 PLIK: app/Http/Livewire/Products/Import/Modals/ProductImportModal.php
+  - ✅ 9.2.2 Trait'y modalowe (8 plikow)
+    └── 📁 PLIK: .../Modals/Traits/ImportModalCsvModeTrait.php
+    └── 📁 PLIK: .../Modals/Traits/ImportModalColumnModeTrait.php
+    └── 📁 PLIK: .../Modals/Traits/ImportModalSwitchesTrait.php
+    └── 📁 PLIK: .../Modals/Traits/CsvFileUploadTrait.php
+    └── 📁 PLIK: .../Modals/Traits/CsvColumnMappingTrait.php
+    └── 📁 PLIK: .../Modals/Traits/CsvPreviewTrait.php
+    └── 📁 PLIK: .../Modals/Traits/SkuPasteParsingTrait.php
+    └── 📁 PLIK: .../Modals/Traits/SkuPasteViewModeTrait.php
+  - ✅ 9.2.3 Blade views (modal + 6 partials)
+    └── 📁 PLIK: resources/views/livewire/products/import/modals/product-import-modal.blade.php
+    └── 📁 PLIK: .../modals/partials/csv-mode.blade.php
+    └── 📁 PLIK: .../modals/partials/column-mode.blade.php
+    └── 📁 PLIK: .../modals/partials/csv-upload-zone.blade.php
+    └── 📁 PLIK: .../modals/partials/csv-column-mapping.blade.php
+    └── 📁 PLIK: .../modals/partials/csv-preview-table.blade.php
+    └── 📁 PLIK: .../modals/partials/csv-import-result.blade.php
+  - ✅ 9.2.4 Przelaczniki: Sklep Internetowy, Podzielona platnosc, Produkt Wariantowy
+  - ✅ 9.2.5 Przycisk "Importuj produkty" zastepujacy "Wklej SKU" + "Import CSV"
+
+- **✅ 9.3 Redesign Tabeli**
+  - ✅ 9.3.1 Usuniecie kolumny "Marka" (dane w modalu importu)
+  - ✅ 9.3.2 Zmiana "Sklepy" → "Publikacja" z badge'ami ERP + PrestaShop
+  - ✅ 9.3.3 Nowa kolumna "Publikuj" z maszyna stanow (draft/scheduled/publishing/published/failed)
+  - ✅ 9.3.4 Klik "Cena" otwiera ImportPricesModal zamiast inline edit
+  - ✅ 9.3.5 ImportPanelPublicationTrait
+    └── 📁 PLIK: app/Http/Livewire/Products/Import/Traits/ImportPanelPublicationTrait.php
+  - ✅ 9.3.6 CSS import-panel.css (badges, countdown, publish states)
+    └── 📁 PLIK: resources/css/products/import-panel.css
+
+- **✅ 9.4 Modal Cen (ImportPricesModal)**
+  - ✅ 9.4.1 ImportPricesModal.php - tabela grup cenowych z lock/unlock
+    └── 📁 PLIK: app/Http/Livewire/Products/Import/Modals/ImportPricesModal.php
+    └── 📁 PLIK: resources/views/livewire/products/import/modals/import-prices-modal.blade.php
+  - ✅ 9.4.2 10 grup cenowych z bazy (Detaliczna, MRF-MPP, Szkolka-Komis-Drop, itd.)
+  - ✅ 9.4.3 Auto-kalkulacja netto/brutto z Alpine.js
+  - ✅ 9.4.4 Zapis do price_data JSON, sync base_price z grupy domyslnej
+  - ✅ 9.4.5 PublicationTargetService
+    └── 📁 PLIK: app/Services/Import/PublicationTargetService.php
+
+- **✅ 9.5 Scheduler Auto-publikacji**
+  - ✅ 9.5.1 PublishScheduledProducts command
+    └── 📁 PLIK: app/Console/Commands/PublishScheduledProducts.php
+  - ✅ 9.5.2 Rejestracja w routes/console.php (everyMinute)
+
+- **✅ 9.6 Deployment + Testy (2026-02-02)**
+  - ✅ 9.6.1 npm run build (import-panel-C2mrGhhj.css)
+  - ✅ 9.6.2 Deploy 30+ plikow via pscp do Hostido
+  - ✅ 9.6.3 Migracja uruchomiona (po fixie avatar migration blocker)
+  - ✅ 9.6.4 RolePermissionSeeder: 11 permissions "Panel Importu"
+  - ✅ 9.6.5 Cache clear + composer dump-autoload
+  - ✅ 9.6.6 Chrome verification: wizualna + funkcjonalna
+    - ✅ Przycisk "Importuj produkty" → zunifikowany modal (CSV + Kolumnowy)
+    - ✅ Tryb CSV: stepper, textarea, upload, parsuj dane
+    - ✅ Tryb Kolumnowy: dynamiczne kolumny, dodawanie wierszy
+    - ✅ Klik "Cena" → ImportPricesModal z 10 grupami cenowymi
+    - ✅ Lock/unlock mechanizm
+    - ✅ Przycisk "Publikuj": ready (100%) = aktywny button, disabled (<100%) = span
+    - ✅ Kolumna "Publikacja" z badge PPM
+    - ✅ Brak bledow konsoli
+
+**BLEDY NAPRAWIONE:**
+- ✅ Avatar migration blocker (manualne dodanie do tabeli migrations)
+- ✅ Livewire RootTagMissingFromViewException (brak root HTML tag w import-prices-modal)
+- ✅ TypeError: Cannot assign string to float (explicit (float) cast w $taxRate)
 
 ---
 

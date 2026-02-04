@@ -91,6 +91,7 @@ class ERPConnection extends Model
         'instance_name',
         'description',
         'is_active',
+        'is_default',
         'priority',
         'connection_config',
         'auth_status',
@@ -138,6 +139,8 @@ class ERPConnection extends Model
         'notify_on_errors',
         'notify_on_sync_complete',
         'notify_on_auth_expire',
+        'label_color',
+        'label_icon',
     ];
 
     /**
@@ -145,6 +148,7 @@ class ERPConnection extends Model
      */
     protected $casts = [
         'is_active' => 'boolean',
+        'is_default' => 'boolean',
         'auto_sync_products' => 'boolean',
         'auto_sync_stock' => 'boolean',
         'auto_sync_prices' => 'boolean',
@@ -225,6 +229,18 @@ class ERPConnection extends Model
     public const FREQ_DAILY = 'daily';
 
     /**
+     * ERP Type Labels for display (ETAP_10: Integration Labels)
+     * Centralized human-readable names - use these instead of hardcoding!
+     */
+    public const ERP_TYPE_LABELS = [
+        self::ERP_BASELINKER => 'BaseLinker',
+        self::ERP_SUBIEKT_GT => 'Subiekt GT',
+        self::ERP_DYNAMICS => 'Microsoft Dynamics',
+        self::ERP_INSERT => 'InsERT',
+        self::ERP_CUSTOM => 'Customowy',
+    ];
+
+    /**
      * Get available sync frequency options (ETAP_08 FAZA 3.1-3.2)
      *
      * @return array<string, string>
@@ -249,6 +265,28 @@ class ERPConnection extends Model
     public static function getFrequencyLabel(string $frequency): string
     {
         return self::getFrequencyOptions()[$frequency] ?? $frequency;
+    }
+
+    /**
+     * Get ERP type labels for UI (ETAP_10: Integration Labels)
+     * Use this instead of hardcoding ERP names in views/services!
+     *
+     * @return array<string, string>
+     */
+    public static function getErpTypeLabels(): array
+    {
+        return self::ERP_TYPE_LABELS;
+    }
+
+    /**
+     * Get single ERP type label
+     *
+     * @param string $erpType
+     * @return string
+     */
+    public static function getErpTypeLabel(string $erpType): string
+    {
+        return self::ERP_TYPE_LABELS[$erpType] ?? ucfirst(str_replace('_', ' ', $erpType));
     }
 
     /**
@@ -576,6 +614,14 @@ class ERPConnection extends Model
     }
 
     /**
+     * Scope: default ERP connection (only one can be default)
+     */
+    public function scopeDefault($query)
+    {
+        return $query->where('is_default', true);
+    }
+
+    /**
      * Scope to get connections by ERP type.
      */
     public function scopeByType($query, string $erpType)
@@ -641,5 +687,113 @@ class ERPConnection extends Model
     public function scopeDynamics($query)
     {
         return $query->byType(self::ERP_DYNAMICS);
+    }
+
+    /**
+     * Default label colors by ERP type
+     */
+    public const LABEL_COLORS = [
+        self::ERP_BASELINKER => '#f97316', // orange-500
+        self::ERP_SUBIEKT_GT => '#ea580c', // orange-600
+        self::ERP_DYNAMICS => '#c2410c',   // orange-700
+        self::ERP_INSERT => '#9a3412',     // orange-800
+        self::ERP_CUSTOM => '#78350f',     // orange-900
+    ];
+
+    /**
+     * Default label icons by ERP type
+     */
+    public const LABEL_ICONS = [
+        self::ERP_BASELINKER => 'link',
+        self::ERP_SUBIEKT_GT => 'database',
+        self::ERP_DYNAMICS => 'cloud',
+        self::ERP_INSERT => 'server',
+        self::ERP_CUSTOM => 'cog',
+    ];
+
+    /**
+     * Available label colors for selection
+     */
+    public static function getAvailableLabelColors(): array
+    {
+        return [
+            '#ef4444' => 'Czerwony',
+            '#f97316' => 'Pomaranczowy',
+            '#f59e0b' => 'Bursztynowy',
+            '#eab308' => 'Zolty',
+            '#84cc16' => 'Limonkowy',
+            '#22c55e' => 'Zielony',
+            '#14b8a6' => 'Morski',
+            '#06b6d4' => 'Cyjan',
+            '#3b82f6' => 'Niebieski',
+            '#6366f1' => 'Indygo',
+            '#8b5cf6' => 'Fioletowy',
+            '#d946ef' => 'Magenta',
+            '#ec4899' => 'Rozowy',
+            '#64748b' => 'Szary',
+        ];
+    }
+
+    /**
+     * Available label icons for selection
+     */
+    public static function getAvailableLabelIcons(): array
+    {
+        return [
+            'database' => 'Baza danych',
+            'cloud' => 'Chmura',
+            'server' => 'Serwer',
+            'link' => 'Link',
+            'cog' => 'Zebatka',
+            'cube' => 'Kostka',
+            'archive' => 'Archiwum',
+            'folder' => 'Folder',
+            'shopping-cart' => 'Koszyk',
+            'tag' => 'Etykieta',
+            'briefcase' => 'Teczka',
+            'building' => 'Budynek',
+        ];
+    }
+
+    /**
+     * Get the effective label color (custom or default)
+     */
+    public function getLabelColorAttribute(): string
+    {
+        return $this->attributes['label_color']
+            ?? self::LABEL_COLORS[$this->erp_type]
+            ?? '#f97316';
+    }
+
+    /**
+     * Get the effective label icon (custom or default)
+     */
+    public function getLabelIconAttribute(): string
+    {
+        return $this->attributes['label_icon']
+            ?? self::LABEL_ICONS[$this->erp_type]
+            ?? 'database';
+    }
+
+    /**
+     * Get CSS classes for label badge
+     */
+    public function getLabelBadgeClassesAttribute(): string
+    {
+        $color = $this->label_color;
+        return "background-color: {$color}20; color: {$color}; border-color: {$color}50;";
+    }
+
+    /**
+     * Get label data for display in other components
+     */
+    public function getLabelDataAttribute(): array
+    {
+        return [
+            'name' => $this->instance_name,
+            'color' => $this->label_color,
+            'icon' => $this->label_icon,
+            'erp_type' => $this->erp_type,
+        ];
     }
 }

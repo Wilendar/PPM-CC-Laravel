@@ -1,0 +1,331 @@
+/**
+ * Scan Products Panel Styles
+ *
+ * ETAP_10 FAZA 3: Product Scan System - UI Styles
+ *
+ * File follows PPM Styling Playbook:
+ * - NO inline styles
+ * - Colors via CSS custom properties
+ * - Dark theme consistent with admin panel
+ */
+
+/* ==========================================
+ * PANEL CONTAINER
+ * ========================================== */
+
+.scan-products-panel {
+    min-height: 100vh;
+}
+
+/* ==========================================
+ * TABS NAVIGATION
+ * ========================================== */
+
+.scan-products-panel .tab-active {
+    background-color: var(--mpp-primary);
+    color: var(--color-gray-900);
+}
+
+.scan-products-panel .tab-inactive {
+    color: var(--color-gray-400);
+}
+
+.scan-products-panel .tab-inactive:hover {
+    color: var(--color-white);
+    background-color: var(--color-gray-800);
+}
+
+/* ==========================================
+ * SOURCE SELECTOR
+ * ========================================== */
+
+.source-selector-item {
+    transition: all 0.15s ease;
+}
+
+.source-selector-item:hover {
+    background-color: var(--color-gray-700);
+}
+
+.source-selector-item.selected {
+    background-color: rgba(224, 172, 126, 0.2);
+    border-color: rgba(224, 172, 126, 0.3);
+}
+
+/* Source type icons */
+.source-icon-subiekt {
+    background-color: rgba(147, 51, 234, 0.2);
+    color: #a78bfa;
+}
+
+.source-icon-baselinker {
+    background-color: rgba(37, 99, 235, 0.2);
+    color: #60a5fa;
+}
+
+.source-icon-dynamics {
+    background-color: rgba(5, 150, 105, 0.2);
+    color: #34d399;
+}
+
+.source-icon-prestashop {
+    background-color: rgba(236, 72, 153, 0.2);
+    color: #f472b6;
+}
+
+/* ==========================================
+ * SCAN PROGRESS
+ * ========================================== */
+
+.scan-progress-bar {
+    height: 8px;
+    border-radius: 4px;
+    background-color: var(--color-gray-700);
+    overflow: hidden;
+}
+
+.scan-progress-fill {
+    height: 100%;
+    border-radius: 4px;
+    background: linear-gradient(90deg, var(--ppm-primary), var(--ppm-primary-dark));
+    transition: width 0.3s ease;
+}
+
+.scan-progress-stats {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0.75rem;
+}
+
+.scan-progress-stat {
+    text-align: center;
+    padding: 0.5rem;
+    border-radius: 0.375rem;
+}
+
+.scan-progress-stat-total {
+    background-color: rgba(107, 114, 128, 0.2);
+}
+
+.scan-progress-stat-matched {
+    background-color: rgba(5, 150, 105, 0.15);
+    border: 1px solid rgba(5, 150, 105, 0.3);
+}
+
+.scan-progress-stat-unmatched {
+    background-color: rgba(245, 158, 11, 0.15);
+    border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.scan-progress-stat-errors {
+    background-color: rgba(239, 68, 68, 0.15);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+/* ==========================================
+ * RESULTS TABLE
+ * ========================================== */
+
+.results-table {
+    width: 100%;
+    font-size: 0.75rem;
+}
+
+.results-table th {
+    padding: 0.5rem 0.75rem;
+    text-align: left;
+    font-weight: 500;
+    color: var(--color-gray-300);
+    background-color: rgba(75, 85, 99, 0.5);
+    border-bottom: 1px solid var(--color-gray-600);
+}
+
+.results-table td {
+    padding: 0.5rem 0.75rem;
+    border-bottom: 1px solid rgba(75, 85, 99, 0.5);
+}
+
+.results-table tr:hover {
+    background-color: rgba(75, 85, 99, 0.3);
+}
+
+/* Status badges */
+.badge-matched {
+    background-color: rgba(5, 150, 105, 0.2);
+    color: #34d399;
+    border: 1px solid rgba(5, 150, 105, 0.3);
+}
+
+.badge-unmatched {
+    background-color: rgba(245, 158, 11, 0.2);
+    color: #fbbf24;
+    border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.badge-conflict {
+    background-color: rgba(239, 68, 68, 0.2);
+    color: #f87171;
+    border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.badge-multiple {
+    background-color: rgba(37, 99, 235, 0.2);
+    color: #60a5fa;
+    border: 1px solid rgba(37, 99, 235, 0.3);
+}
+
+/* Resolution badges */
+.badge-pending {
+    background-color: rgba(245, 158, 11, 0.2);
+    color: #fbbf24;
+    border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.badge-linked {
+    background-color: rgba(5, 150, 105, 0.2);
+    color: #34d399;
+    border: 1px solid rgba(5, 150, 105, 0.3);
+}
+
+.badge-created {
+    background-color: rgba(37, 99, 235, 0.2);
+    color: #60a5fa;
+    border: 1px solid rgba(37, 99, 235, 0.3);
+}
+
+.badge-ignored {
+    background-color: rgba(107, 114, 128, 0.2);
+    color: #9ca3af;
+    border: 1px solid rgba(107, 114, 128, 0.3);
+}
+
+.badge-error {
+    background-color: rgba(239, 68, 68, 0.2);
+    color: #f87171;
+    border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+/* ==========================================
+ * BULK ACTIONS TOOLBAR
+ * ========================================== */
+
+.bulk-actions-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.75rem;
+    background-color: var(--color-gray-800);
+    border: 1px solid var(--color-gray-700);
+    border-radius: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+.bulk-actions-toolbar .search-input {
+    padding-left: 2rem;
+    padding-right: 0.75rem;
+    background-color: var(--color-gray-700);
+    border: 1px solid var(--color-gray-600);
+}
+
+.bulk-actions-toolbar .search-input:focus {
+    border-color: var(--mpp-primary);
+    outline: none;
+}
+
+/* ==========================================
+ * HISTORY LIST
+ * ========================================== */
+
+.history-item {
+    padding: 1rem;
+    transition: background-color 0.15s ease;
+}
+
+.history-item:hover {
+    background-color: rgba(75, 85, 99, 0.3);
+}
+
+.history-item-icon {
+    width: 2.5rem;
+    height: 2.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 0.5rem;
+}
+
+.history-item-icon-completed {
+    background-color: rgba(5, 150, 105, 0.2);
+}
+
+.history-item-icon-failed {
+    background-color: rgba(239, 68, 68, 0.2);
+}
+
+.history-item-icon-running {
+    background-color: rgba(37, 99, 235, 0.2);
+}
+
+.history-item-icon-pending {
+    background-color: rgba(245, 158, 11, 0.2);
+}
+
+.history-item-icon-cancelled {
+    background-color: rgba(107, 114, 128, 0.2);
+}
+
+/* ==========================================
+ * EMPTY STATES
+ * ========================================== */
+
+.empty-state {
+    text-align: center;
+    padding: 3rem 1rem;
+}
+
+.empty-state-icon {
+    width: 4rem;
+    height: 4rem;
+    margin: 0 auto 1rem;
+    color: var(--color-gray-500);
+}
+
+.empty-state-title {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--color-white);
+    margin-bottom: 0.5rem;
+}
+
+.empty-state-description {
+    font-size: 0.75rem;
+    color: var(--color-gray-400);
+}
+
+/* ==========================================
+ * RESPONSIVE ADJUSTMENTS
+ * ========================================== */
+
+@media (max-width: 1024px) {
+    .scan-progress-stats {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .bulk-actions-toolbar {
+        flex-direction: column;
+        align-items: stretch;
+    }
+}
+
+@media (max-width: 640px) {
+    .scan-progress-stats {
+        grid-template-columns: 1fr;
+    }
+
+    .history-item {
+        flex-direction: column;
+        gap: 1rem;
+    }
+}

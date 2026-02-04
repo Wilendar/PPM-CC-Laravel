@@ -63,7 +63,18 @@ use Illuminate\Support\Str;
  * @property int|null $import_session_id
  * @property int $imported_by
  * @property \Carbon\Carbon|null $imported_at
+ * @property string|null $cn_code
+ * @property string|null $material
+ * @property string|null $defect_symbol
+ * @property string|null $application
+ * @property bool $split_payment
+ * @property bool $shop_internet
+ * @property bool $is_variant_master
+ * @property array|null $price_data
  * @property \Carbon\Carbon|null $published_at
+ * @property \Carbon\Carbon|null $scheduled_publish_at
+ * @property array|null $publication_targets
+ * @property string $publish_status
  * @property int|null $published_as_product_id
  * @property \Carbon\Carbon $created_at
  * @property \Carbon\Carbon $updated_at
@@ -90,7 +101,7 @@ class PendingProduct extends Model
 
     /**
      * Required fields for publication
-     * FAZA 6.5.5: manufacturer_id (FK) is REQUIRED
+     * FAZA 9.1: publication_targets replaces shop_ids
      */
     public const REQUIRED_FIELDS = [
         'sku',
@@ -98,7 +109,7 @@ class PendingProduct extends Model
         'manufacturer_id',
         'category_ids',
         'product_type_id',
-        'shop_ids',
+        'publication_targets',
     ];
 
     /**
@@ -157,6 +168,17 @@ class PendingProduct extends Model
         'skip_images',
         'skip_descriptions',
         'skip_history',
+        'cn_code',
+        'material',
+        'defect_symbol',
+        'application',
+        'split_payment',
+        'shop_internet',
+        'is_variant_master',
+        'price_data',
+        'scheduled_publish_at',
+        'publication_targets',
+        'publish_status',
         'import_session_id',
         'imported_by',
         'imported_at',
@@ -184,6 +206,12 @@ class PendingProduct extends Model
             'skip_images' => 'boolean',
             'skip_descriptions' => 'boolean',
             'skip_history' => 'array',
+            'price_data' => 'array',
+            'publication_targets' => 'array',
+            'split_payment' => 'boolean',
+            'shop_internet' => 'boolean',
+            'is_variant_master' => 'boolean',
+            'scheduled_publish_at' => 'datetime',
             'weight' => 'decimal:3',
             'height' => 'decimal:2',
             'width' => 'decimal:2',
@@ -534,6 +562,8 @@ class PendingProduct extends Model
      * - temp_media_paths: check images array inside
      * - compatibility_data: check compatibilities array inside
      * - feature_data: check features array inside
+     * - publication_targets: check erp_connections or prestashop_shops (+ legacy erp_primary)
+     * - price_data: check groups array inside
      */
     protected function isFieldComplete(string $field): bool
     {
@@ -554,22 +584,34 @@ class PendingProduct extends Model
             }
 
             // Special handling for nested structures
-            // temp_media_paths has 'images' key with actual data
             if ($field === 'temp_media_paths') {
                 $images = $value['images'] ?? [];
                 return !empty($images);
             }
 
-            // compatibility_data has 'compatibilities' key with actual data
             if ($field === 'compatibility_data') {
                 $compatibilities = $value['compatibilities'] ?? [];
                 return !empty($compatibilities);
             }
 
-            // feature_data has 'features' key with actual data
             if ($field === 'feature_data') {
                 $features = $value['features'] ?? [];
                 return !empty($features);
+            }
+
+            // GRUPA D: publication_targets - needs erp_connections or prestashop_shops
+            // Backward compat: also accepts legacy erp_primary boolean
+            if ($field === 'publication_targets') {
+                $hasErpConnections = !empty($value['erp_connections']);
+                $hasLegacyErp = !empty($value['erp_primary']);
+                $hasShops = !empty($value['prestashop_shops']);
+                return $hasErpConnections || $hasLegacyErp || $hasShops;
+            }
+
+            // FAZA 9.1: price_data - needs groups with at least one price
+            if ($field === 'price_data') {
+                $groups = $value['groups'] ?? [];
+                return !empty($groups);
             }
         }
 
@@ -632,15 +674,21 @@ class PendingProduct extends Model
             'category_ids' => 'Kategorie',
             'product_type_id' => 'Typ produktu',
             'shop_ids' => 'Sklepy',
+            'publication_targets' => 'Publikacja',
             'temp_media_paths' => 'Zdjecia',
             'short_description' => 'Krotki opis',
             'long_description' => 'Pelny opis',
             'manufacturer' => 'Producent',
             'manufacturer_id' => 'Marka',
             'base_price' => 'Cena bazowa',
+            'price_data' => 'Ceny grup cenowych',
             'variant_data' => 'Warianty',
             'compatibility_data' => 'Dopasowania',
             'feature_data' => 'Cechy',
+            'cn_code' => 'Kod CN',
+            'material' => 'Material',
+            'defect_symbol' => 'Symbol z wada',
+            'application' => 'Zastosowanie',
             default => $field,
         };
     }
@@ -653,11 +701,13 @@ class PendingProduct extends Model
 
     /**
      * Check if product can be published
+     * FAZA 9.1: Added publish_status check
      */
     public function canPublish(): bool
     {
         return $this->is_ready_for_publish
-            && is_null($this->published_at);
+            && is_null($this->published_at)
+            && in_array($this->publish_status ?? 'draft', ['draft', 'scheduled', 'failed']);
     }
 
     /**

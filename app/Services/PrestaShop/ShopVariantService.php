@@ -564,6 +564,13 @@ class ShopVariantService
             ->get()
             ->keyBy('prestashop_combination_id');
 
+        // FIX 2026-01-29: Load local PPM variants with prices and stock
+        // so PrestaShop Tab shows identical prices/stock as ERP/Default Tab
+        $localVariants = $product->variants()
+            ->with(['prices', 'stock'])
+            ->get()
+            ->keyBy('id');
+
         foreach ($combinations as $combination) {
             $psId = (int) ($combination['id'] ?? $combination['id_product_attribute'] ?? 0);
 
@@ -575,13 +582,29 @@ class ShopVariantService
             $psSku = $combination['reference'] ?? '';
             $localVariantId = $override?->variant_id;
 
-            // If SKU is empty and we have a local variant, use local variant's SKU
-            if (empty($psSku) && $localVariantId) {
-                $localVariant = $product->variants->firstWhere('id', $localVariantId);
-                if ($localVariant) {
-                    $psSku = $localVariant->sku ?? '';
-                }
+            // FIX 2026-01-29: Find local PPM variant (by ID or SKU fallback)
+            $localVariant = $localVariantId
+                ? $localVariants->get($localVariantId)
+                : null;
+
+            // Fallback: match by SKU when no direct link exists
+            if (!$localVariant && !empty($psSku)) {
+                $localVariant = $localVariants->firstWhere('sku', $psSku);
             }
+
+            // If SKU is empty and we have a local variant, use local variant's SKU
+            if (empty($psSku) && $localVariant) {
+                $psSku = $localVariant->sku ?? '';
+            }
+
+            // FIX 2026-01-29: Get price and stock from local PPM variant
+            // This ensures PrestaShop Tab shows identical data as ERP/Default Tab
+            $localPrice = $localVariant
+                ? (float) ($localVariant->prices->first()?->price ?? 0)
+                : 0;
+            $localStock = $localVariant
+                ? (int) $localVariant->stock->sum('quantity')
+                : (int) ($combination['quantity'] ?? 0);
 
             $variantData = [
                 'id' => $override?->variant_id ?? 'ps_' . $psId,
@@ -592,8 +615,10 @@ class ShopVariantService
                 'is_active' => (bool) ($combination['active'] ?? true),
                 'is_default' => (bool) ($combination['default_on'] ?? false),
                 'position' => (int) ($combination['position'] ?? 0),
+                'price' => $localPrice,
                 'price_impact' => (float) ($combination['price'] ?? 0),
                 'weight_impact' => (float) ($combination['weight'] ?? 0),
+                'stock' => $localStock,
                 'quantity' => (int) ($combination['quantity'] ?? 0),
                 'minimal_quantity' => (int) ($combination['minimal_quantity'] ?? 1),
                 'attributes' => $this->extractCombinationAttributes($combination, $attributeNamesMap),

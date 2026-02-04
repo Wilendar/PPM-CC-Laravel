@@ -591,8 +591,10 @@ class ProductList extends Component
      */
     public function showProductPreview(int $productId): void
     {
-        $this->selectedProduct = Product::with(['productType', 'shopData.shop'])
-                                      ->find($productId);
+        $this->selectedProduct = Product::with([
+            'productType',
+            'shopData.shop:id,name,label_color,label_icon',
+        ])->find($productId);
 
         if (!$this->selectedProduct) {
             $this->dispatch('error', message: 'Produkt nie został znaleziony');

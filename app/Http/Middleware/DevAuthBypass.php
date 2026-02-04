@@ -37,7 +37,9 @@ class DevAuthBypass
             $adminUser = User::find(8);
 
             if ($adminUser) {
-                Auth::login($adminUser);
+                // CRITICAL: Użyj setUser() zamiast login() - NIE odpala eventu Login!
+                // Auth::login() odpala event Login który tworzy nową sesję przy każdym request!
+                Auth::setUser($adminUser);
             }
         }
 

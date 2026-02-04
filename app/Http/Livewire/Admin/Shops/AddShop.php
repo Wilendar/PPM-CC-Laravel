@@ -89,7 +89,11 @@ class AddShop extends Component
     public ?string $scanStatus = null;
     public string $scanMessage = '';
     public bool $isScanning = false;
-    
+
+    // ETAP_10: Label customization (2026-02-03)
+    public ?string $labelColor = null;
+    public ?string $labelIcon = null;
+
     // Validation messages
     protected $messages = [
         'shopName.required' => 'Nazwa sklepu jest wymagana',
@@ -198,6 +202,10 @@ class AddShop extends Component
         $this->scanStatus = null;
         $this->scanMessage = '';
         $this->isScanning = false;
+
+        // ETAP_10: Label customization
+        $this->labelColor = null;
+        $this->labelIcon = null;
     }
 
     public function loadShopData()
@@ -262,6 +270,10 @@ class AddShop extends Component
         $notificationSettings = $shop->notification_settings ?? [];
         $this->notifyOnSyncErrors = $notificationSettings['notify_on_errors'] ?? true;
         $this->notifyOnSyncComplete = $notificationSettings['notify_on_complete'] ?? false;
+
+        // ETAP_10: Label customization
+        $this->labelColor = $shop->getAttributes()['label_color'] ?? null;
+        $this->labelIcon = $shop->getAttributes()['label_icon'] ?? null;
 
         // ✅ FIX BUG#11c: Load existing price group mappings from database
         $this->priceGroupMappings = [];
@@ -1269,6 +1281,9 @@ class AddShop extends Component
                 'css_files' => !empty($this->scannedCssFiles) ? $this->scannedCssFiles : null,
                 'js_files' => !empty($this->scannedJsFiles) ? $this->scannedJsFiles : null,
                 'files_scanned_at' => !empty($this->scannedCssFiles) || !empty($this->scannedJsFiles) ? now() : null,
+                // ETAP_10: Label customization
+                'label_color' => $this->labelColor,
+                'label_icon' => $this->labelIcon,
             ];
 
             if ($this->isEditing) {

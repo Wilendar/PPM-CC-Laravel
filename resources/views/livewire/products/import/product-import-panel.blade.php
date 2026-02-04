@@ -25,19 +25,14 @@
                 </div>
             </div>
 
-            {{-- Right: Import buttons --}}
+            {{-- Right: Import button (FAZA 9.2 - unified modal) --}}
             <div class="flex items-center gap-2">
-                <button wire:click="openModal('sku-paste')" class="btn-enterprise-primary btn-sm flex items-center gap-1.5">
+                <button wire:click="openImportModal()" class="btn-enterprise-primary btn-sm flex items-center gap-1.5">
                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                              d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
                     </svg>
-                    Wklej SKU
-                </button>
-                <button wire:click="openModal('csv-import')" class="btn-enterprise-secondary btn-sm flex items-center gap-1.5">
-                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
-                    </svg>
-                    Import CSV
+                    Importuj produkty
                 </button>
             </div>
         </div>
@@ -120,7 +115,7 @@
     <div class="enterprise-card overflow-hidden" x-data="resizableTable('import-panel')" data-resizable-table>
         {{-- Reset widths button --}}
         <div class="flex items-center justify-end px-4 py-2 border-b border-gray-700/50">
-            <button @click="resetWidths()" class="text-xs text-gray-500 hover:text-gray-300 transition-colors">
+            <button x-on:click="resetWidths()" class="text-xs text-gray-500 hover:text-gray-300 transition-colors">
                 <svg class="w-3 h-3 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
                 </svg>
@@ -143,30 +138,24 @@
                                 SKU
                                 @include('livewire.products.import.partials.sort-indicator', ['field' => 'sku'])
                             </div>
-                            <div class="resize-handle" @mousedown="startResize($event, 'sku')"></div>
+                            <div class="resize-handle" x-on:mousedown="startResize($event, 'sku')"></div>
                         </th>
                         <th class="px-2 cursor-pointer hover:bg-gray-700/50 relative resizable-column" data-column-id="name" style="width: 140px; min-width: 100px;">
                             <div class="flex items-center gap-1" wire:click="sortBy('name')">
                                 Nazwa
                                 @include('livewire.products.import.partials.sort-indicator', ['field' => 'name'])
                             </div>
-                            <div class="resize-handle" @mousedown="startResize($event, 'name')"></div>
+                            <div class="resize-handle" x-on:mousedown="startResize($event, 'name')"></div>
                         </th>
                         <th class="px-2 w-24 relative resizable-column" data-column-id="type" style="width: 96px; min-width: 80px;">
                             <span class="text-xs">Typ</span>
-                            <div class="resize-handle" @mousedown="startResize($event, 'type')"></div>
+                            <div class="resize-handle" x-on:mousedown="startResize($event, 'type')"></div>
                         </th>
 
-                        {{-- MARKA - NOWA KOLUMNA OBOWIAZKOWA --}}
-                        <th class="px-2 w-24 relative resizable-column" data-column-id="manufacturer" style="width: 96px; min-width: 70px;">
-                            <span class="text-xs text-amber-400">Marka*</span>
-                            <div class="resize-handle" @mousedown="startResize($event, 'manufacturer')"></div>
-                        </th>
-
-                        {{-- CENA DETAL - NOWA KOLUMNA OPCJONALNA --}}
+                        {{-- CENA - klik otwiera modal cen (FAZA 9.4) --}}
                         <th class="px-2 w-20 relative resizable-column" data-column-id="price" style="width: 80px; min-width: 60px;">
                             <span class="text-xs text-gray-400">Cena</span>
-                            <div class="resize-handle" @mousedown="startResize($event, 'price')"></div>
+                            <div class="resize-handle" x-on:mousedown="startResize($event, 'price')"></div>
                         </th>
 
                         {{-- KATEGORIE - 4 kolumny z bulk actions --}}
@@ -183,7 +172,7 @@
                             @else
                                 <span class="text-gray-400">Kategoria</span>
                             @endif
-                            <div class="resize-handle" @mousedown="startResize($event, 'cat_l3')"></div>
+                            <div class="resize-handle" x-on:mousedown="startResize($event, 'cat_l3')"></div>
                         </th>
                         <th class="px-1 w-24 text-xs relative resizable-column" data-column-id="cat_l4" style="width: 96px; min-width: 70px;">
                             @if($hasSelection)
@@ -194,7 +183,7 @@
                             @else
                                 <span class="text-gray-400">Podkat.</span>
                             @endif
-                            <div class="resize-handle" @mousedown="startResize($event, 'cat_l4')"></div>
+                            <div class="resize-handle" x-on:mousedown="startResize($event, 'cat_l4')"></div>
                         </th>
                         <th class="px-1 w-24 text-xs relative resizable-column" data-column-id="cat_l5" style="width: 96px; min-width: 70px;">
                             @if($hasSelection)
@@ -205,20 +194,23 @@
                             @else
                                 <span class="text-gray-400">Szczeg.</span>
                             @endif
-                            <div class="resize-handle" @mousedown="startResize($event, 'cat_l5')"></div>
+                            <div class="resize-handle" x-on:mousedown="startResize($event, 'cat_l5')"></div>
                         </th>
                         <th class="px-1 w-8 text-xs text-center text-gray-500">+</th>
 
-                        <th class="px-1 w-24 relative resizable-column" data-column-id="shops" style="width: 96px; min-width: 70px;">
-                            @if($hasSelection)
-                                <div class="flex items-center gap-1">
-                                    <span class="text-gray-500 text-xs">Sklepy</span>
-                                    @include('livewire.products.import.partials.bulk-shop-dropdown')
-                                </div>
-                            @else
-                                <span class="text-gray-400 text-xs">Sklepy</span>
-                            @endif
-                            <div class="resize-handle" @mousedown="startResize($event, 'shops')"></div>
+                        {{-- PUBLIKACJA (FAZA 9.3 - zastepuje Sklepy) --}}
+                        <th class="px-1 w-28 relative resizable-column" data-column-id="publication" style="width: 112px; min-width: 80px;">
+                            <span class="text-gray-400 text-xs">Publikacja</span>
+                            <div class="resize-handle" x-on:mousedown="startResize($event, 'publication')"></div>
+                        </th>
+                        {{-- DATA PUBLIKACJI (FAZA 9.3) --}}
+                        <th class="px-2 w-36 relative resizable-column" data-column-id="schedule" style="width: 144px; min-width: 110px;">
+                            <span class="text-gray-400 text-xs">Data publikacji</span>
+                            <div class="resize-handle" x-on:mousedown="startResize($event, 'schedule')"></div>
+                        </th>
+                        {{-- PUBLIKUJ button (FAZA 9.3) --}}
+                        <th class="px-2 w-24 text-center">
+                            <span class="text-gray-400 text-xs">Publikuj</span>
                         </th>
                         <th class="px-2 w-16 text-center cursor-pointer hover:bg-gray-700/50" wire:click="sortBy('completion_percentage')">
                             <div class="flex items-center justify-center gap-1 text-xs">
@@ -234,7 +226,7 @@
                         @include('livewire.products.import.partials.product-row', ['product' => $product])
                     @empty
                         <tr>
-                            <td colspan="14" class="text-center py-12">
+                            <td colspan="15" class="text-center py-12">
                                 <div class="text-gray-400">
                                     <svg class="w-12 h-12 mx-auto mb-4 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -242,7 +234,7 @@
                                     </svg>
                                     <p class="text-lg font-medium mb-2">Brak produktow do wyswietlenia</p>
                                     <p class="text-sm">
-                                        Uzyj przycisku "Wklej SKU" lub "Import CSV" aby dodac produkty
+                                        Uzyj przycisku "Importuj produkty" aby dodac produkty
                                     </p>
                                 </div>
                             </td>
@@ -272,12 +264,21 @@
         @endif
     </div>
 
-    {{-- Modal: Wklejanie SKU (FAZA 3) --}}
+    {{-- Modal: Zunifikowany import (FAZA 9.2) - CSV + Column mode --}}
+    @livewire('products.import.modals.product-import-modal', key('product-import-modal'))
+
+    {{-- Modal: Ceny per grupa (FAZA 9.4) --}}
+    @livewire('products.import.modals.import-prices-modal', key('import-prices-modal'))
+
+    {{-- Modal: PrestaShop Category Picker (FAZA 9.7b Feature #8) --}}
+    @livewire('products.import.modals.presta-shop-category-picker-modal', key('presta-shop-category-picker-modal'))
+
+    {{-- Modal: Wklejanie SKU (FAZA 3 - legacy) --}}
     @if($activeModal === 'sku-paste')
         @livewire('products.import.modals.s-k-u-paste-modal', key('sku-paste-modal'))
     @endif
 
-    {{-- Modal: Import CSV/Excel (FAZA 4) - renderowany ZAWSZE, widocznosc przez showModal --}}
+    {{-- Modal: Import CSV/Excel (FAZA 4 - legacy) --}}
     @livewire('products.import.modals.c-s-v-import-modal', key('csv-import-modal'))
 
     {{-- Modal: Warianty (FAZA 5.4) --}}

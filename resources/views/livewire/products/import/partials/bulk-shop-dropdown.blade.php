@@ -24,14 +24,14 @@
         </svg>
     </button>
 
-    <template x-teleport="body">
+    {{-- NO x-teleport - breaks Livewire snapshots! Use high z-index + fixed positioning instead --}}
         <div x-show="open"
              x-transition
              @click.outside="open = false"
-             class="fixed z-[9999] w-52 max-h-64 overflow-y-auto
+             class="fixed w-52 max-h-64 overflow-y-auto
                     bg-gray-800 border border-gray-600 rounded-lg shadow-xl"
-             :style="btnRect ? `top: ${btnRect.bottom + 4}px; left: ${Math.max(0, btnRect.right - 208)}px;` : ''"
-             style="display: none;">
+             style="z-index: 9999;"
+             :style="btnRect ? `top: ${btnRect.bottom + 4}px; left: ${Math.max(0, btnRect.right - 208)}px;` : ''">
 
             <div class="px-3 py-2 border-b border-gray-700 text-sm text-gray-400">
                 Ustaw dla {{ count($selectedIds ?? []) }} produktow
@@ -62,5 +62,4 @@
                 </button>
             </div>
         </div>
-    </template>
 </div>

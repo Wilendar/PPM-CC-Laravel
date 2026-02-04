@@ -27,7 +27,8 @@
         'resources/css/admin/feature-browser.css',
         'resources/css/components/category-picker.css',
         'resources/css/products/compatibility-tiles.css',
-        'resources/css/admin/supplier-panel.css'
+        'resources/css/admin/supplier-panel.css',
+        'resources/css/products/import-panel.css'
     ])
 
     {{-- Alpine.js is included with Livewire 3.x - no need to load separately --}}
@@ -761,6 +762,17 @@
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 4a2 2 0 114 0v1a1 1 0 001 1h3a1 1 0 011 1v3a1 1 0 01-1 1h-1a2 2 0 100 4h1a1 1 0 011 1v3a1 1 0 01-1 1h-3a1 1 0 01-1-1v-1a2 2 0 10-4 0v1a1 1 0 01-1 1H7a1 1 0 01-1-1v-3a1 1 0 00-1-1H4a2 2 0 110-4h1a1 1 0 001-1V7a1 1 0 011-1h3a1 1 0 001-1V4z"></path>
                                     </svg>
                                     <span x-show="!sidebarCollapsed" x-transition class="whitespace-nowrap">Integracje ERP</span>
+                                </a>
+                                <!-- Product Scan System - ETAP_10 -->
+                                <a href="/admin/scan-products" class="flex items-center px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-700 hover:text-white transition-colors duration-200 {{ request()->is('admin/scan-products*') ? 'bg-gray-700 text-white' : '' }}"
+                                   :title="sidebarCollapsed ? 'Skanowanie Produktów' : ''"
+                                   :class="{ 'justify-center': sidebarCollapsed }">
+                                    <svg class="w-4 h-4 flex-shrink-0"
+                                         :class="{ 'mr-0': sidebarCollapsed, 'mr-3': !sidebarCollapsed }"
+                                         fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                                    </svg>
+                                    <span x-show="!sidebarCollapsed" x-transition class="whitespace-nowrap">Skanowanie Produktów</span>
                                 </a>
                             </div>
 

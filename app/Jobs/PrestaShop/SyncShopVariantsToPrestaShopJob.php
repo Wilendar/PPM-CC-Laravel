@@ -3,6 +3,7 @@
 namespace App\Jobs\PrestaShop;
 
 use App\Models\Product;
+use App\Models\ProductVariant;
 use App\Models\ShopVariant;
 use App\Models\PrestaShopShop;
 use App\Models\AttributeType;
@@ -192,7 +193,8 @@ class SyncShopVariantsToPrestaShopJob implements ShouldQueue
                     $this->handleAddOperation($client, $shopVariant, $prestashopProductId);
                 } else {
                     $shopVariant->prestashop_combination_id = $combinationId;
-                    $this->handleOverrideOperation($client, $shopVariant);
+                    // FIX 2026-01-28: Pass prestashopProductId for 404 fallback to ADD
+                    $this->handleOverrideOperation($client, $shopVariant, $prestashopProductId);
                 }
                 break;
 
@@ -259,6 +261,10 @@ class SyncShopVariantsToPrestaShopJob implements ShouldQueue
                 }
             }
 
+            // FIX 2026-01-29: Sync price and stock from PPM to PrestaShop after creating combination
+            $this->syncVariantPrice($client, $shopVariant, $prestashopProductId, $combinationId);
+            $this->syncVariantStock($client, $shopVariant, $prestashopProductId, $combinationId);
+
             $shopVariant->markAsSynced($combinationId);
 
             Log::info('[SyncShopVariantsJob] ADD successful', [
@@ -272,10 +278,14 @@ class SyncShopVariantsToPrestaShopJob implements ShouldQueue
 
     /**
      * Handle OVERRIDE operation - update existing combination
+     *
+     * FIX 2026-01-28: Added $prestashopProductId for 404 fallback to ADD operation
+     * When combination doesn't exist in PrestaShop (404), clear ID and create new
      */
     protected function handleOverrideOperation(
         PrestaShop8Client $client,
-        ShopVariant $shopVariant
+        ShopVariant $shopVariant,
+        int $prestashopProductId
     ): void {
         $combinationId = $shopVariant->prestashop_combination_id;
 
@@ -306,8 +316,31 @@ class SyncShopVariantsToPrestaShopJob implements ShouldQueue
             $updates['active'] = $variantData['is_active'] ? 1 : 0;
         }
 
+        // FIX 2026-01-28: Try to update, if 404 - fallback to ADD operation
         if (!empty($updates)) {
-            $client->updateCombination($combinationId, $updates);
+            try {
+                $client->updateCombination($combinationId, $updates);
+            } catch (\Exception $e) {
+                // Check if this is a 404 error (combination doesn't exist)
+                if ($this->isCombinationNotFoundError($e)) {
+                    Log::warning('[SyncShopVariantsJob] OVERRIDE 404 - combination not found, falling back to ADD', [
+                        'shop_variant_id' => $shopVariant->id,
+                        'old_combination_id' => $combinationId,
+                        'error' => $e->getMessage(),
+                    ]);
+
+                    // Clear stale combination ID
+                    $shopVariant->prestashop_combination_id = null;
+                    $shopVariant->save();
+
+                    // Fallback to ADD operation
+                    $this->handleAddOperation($client, $shopVariant, $prestashopProductId);
+                    return;
+                }
+
+                // Re-throw other errors
+                throw $e;
+            }
         }
 
         // Update attributes if provided
@@ -324,7 +357,20 @@ class SyncShopVariantsToPrestaShopJob implements ShouldQueue
             ]);
 
             if (!empty($attributeIds)) {
-                $client->setCombinationAttributes($combinationId, $attributeIds);
+                try {
+                    $client->setCombinationAttributes($combinationId, $attributeIds);
+                } catch (\Exception $e) {
+                    if ($this->isCombinationNotFoundError($e)) {
+                        Log::warning('[SyncShopVariantsJob] setCombinationAttributes 404 - falling back to ADD', [
+                            'shop_variant_id' => $shopVariant->id,
+                        ]);
+                        $shopVariant->prestashop_combination_id = null;
+                        $shopVariant->save();
+                        $this->handleAddOperation($client, $shopVariant, $prestashopProductId);
+                        return;
+                    }
+                    throw $e;
+                }
             }
         }
 
@@ -334,9 +380,26 @@ class SyncShopVariantsToPrestaShopJob implements ShouldQueue
             $imageIds = array_column($images, 'prestashop_image_id');
             $imageIds = array_filter($imageIds);
             if (!empty($imageIds)) {
-                $client->setCombinationImages($combinationId, $imageIds);
+                try {
+                    $client->setCombinationImages($combinationId, $imageIds);
+                } catch (\Exception $e) {
+                    if ($this->isCombinationNotFoundError($e)) {
+                        Log::warning('[SyncShopVariantsJob] setCombinationImages 404 - falling back to ADD', [
+                            'shop_variant_id' => $shopVariant->id,
+                        ]);
+                        $shopVariant->prestashop_combination_id = null;
+                        $shopVariant->save();
+                        $this->handleAddOperation($client, $shopVariant, $prestashopProductId);
+                        return;
+                    }
+                    throw $e;
+                }
             }
         }
+
+        // FIX 2026-01-29: Sync price and stock from PPM to PrestaShop after updating combination
+        $this->syncVariantPrice($client, $shopVariant, $prestashopProductId, $combinationId);
+        $this->syncVariantStock($client, $shopVariant, $prestashopProductId, $combinationId);
 
         $shopVariant->markAsSynced();
 
@@ -344,6 +407,34 @@ class SyncShopVariantsToPrestaShopJob implements ShouldQueue
             'shop_variant_id' => $shopVariant->id,
             'prestashop_combination_id' => $combinationId,
         ]);
+    }
+
+    /**
+     * Check if exception is a "combination not found" (404) error
+     *
+     * FIX 2026-01-28: Helper method for 404 detection
+     */
+    protected function isCombinationNotFoundError(\Exception $e): bool
+    {
+        $message = strtolower($e->getMessage());
+
+        // Check for common 404 patterns
+        if (str_contains($message, '404')) {
+            return true;
+        }
+        if (str_contains($message, 'not found')) {
+            return true;
+        }
+        if (str_contains($message, 'combination') && str_contains($message, 'does not exist')) {
+            return true;
+        }
+
+        // Check if it's a GuzzleHttp 404 response
+        if ($e instanceof \GuzzleHttp\Exception\ClientException) {
+            return $e->getResponse()?->getStatusCode() === 404;
+        }
+
+        return false;
     }
 
     /**
@@ -371,6 +462,146 @@ class SyncShopVariantsToPrestaShopJob implements ShouldQueue
             ]);
         } else {
             throw new \Exception("Failed to delete combination {$combinationId}");
+        }
+    }
+
+    /**
+     * Sync variant price from PPM to PrestaShop as price_impact
+     *
+     * FIX 2026-01-29: Prices were not synced correctly. PrestaShop uses
+     * price_impact (delta) = variant_absolute_price - product_base_price.
+     * This method calculates the correct delta and updates the combination.
+     *
+     * @param PrestaShop8Client $client PrestaShop API client
+     * @param ShopVariant $shopVariant Shop variant being synced
+     * @param int $prestashopProductId PrestaShop product ID
+     * @param int $combinationId PrestaShop combination ID
+     */
+    protected function syncVariantPrice(
+        PrestaShop8Client $client,
+        ShopVariant $shopVariant,
+        int $prestashopProductId,
+        int $combinationId
+    ): void {
+        try {
+            // Load the PPM variant with prices relation
+            $localVariant = ProductVariant::with('prices')->find($shopVariant->variant_id);
+
+            if (!$localVariant) {
+                Log::warning('[SyncShopVariantsJob] Cannot sync price - local variant not found', [
+                    'shop_variant_id' => $shopVariant->id,
+                    'variant_id' => $shopVariant->variant_id,
+                ]);
+                return;
+            }
+
+            // Get the PPM variant absolute price (net, first price group)
+            $variantPrice = (float) ($localVariant->prices->first()?->price ?? 0);
+
+            if ($variantPrice <= 0) {
+                Log::debug('[SyncShopVariantsJob] Variant has no price, skipping price sync', [
+                    'variant_id' => $localVariant->id,
+                    'variant_sku' => $localVariant->sku,
+                ]);
+                return;
+            }
+
+            // Get the PrestaShop base product price (tax-excluded)
+            $psProduct = $client->getProduct($prestashopProductId);
+            $basePrice = (float) ($psProduct['product']['price'] ?? 0);
+
+            // Calculate price_impact (delta)
+            $priceImpact = round($variantPrice - $basePrice, 6);
+
+            // Update the combination's price field (which is price_impact)
+            $client->updateCombination($combinationId, [
+                'price' => $priceImpact,
+            ]);
+
+            Log::info('[SyncShopVariantsJob] Price synced to PrestaShop', [
+                'combination_id' => $combinationId,
+                'variant_sku' => $localVariant->sku,
+                'variant_absolute_price' => $variantPrice,
+                'ps_base_price' => $basePrice,
+                'price_impact' => $priceImpact,
+            ]);
+
+        } catch (\Exception $e) {
+            // Log but don't fail the whole sync - price sync is secondary
+            Log::error('[SyncShopVariantsJob] Failed to sync variant price', [
+                'combination_id' => $combinationId,
+                'prestashop_product_id' => $prestashopProductId,
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    /**
+     * Sync variant stock from PPM to PrestaShop
+     *
+     * FIX 2026-01-29: Stock was never synced to PrestaShop for combinations.
+     * PrestaShop stores variant stock in stock_availables table
+     * with id_product_attribute = combination ID.
+     *
+     * @param PrestaShop8Client $client PrestaShop API client
+     * @param ShopVariant $shopVariant Shop variant being synced
+     * @param int $prestashopProductId PrestaShop product ID
+     * @param int $combinationId PrestaShop combination ID
+     */
+    protected function syncVariantStock(
+        PrestaShop8Client $client,
+        ShopVariant $shopVariant,
+        int $prestashopProductId,
+        int $combinationId
+    ): void {
+        try {
+            // Load the PPM variant with stock relation
+            $localVariant = ProductVariant::with('stock')->find($shopVariant->variant_id);
+
+            if (!$localVariant) {
+                Log::warning('[SyncShopVariantsJob] Cannot sync stock - local variant not found', [
+                    'shop_variant_id' => $shopVariant->id,
+                    'variant_id' => $shopVariant->variant_id,
+                ]);
+                return;
+            }
+
+            // Calculate total stock across all warehouses
+            $totalStock = (int) $localVariant->stock->sum('quantity');
+
+            // Find the stock_available record in PrestaShop for this combination
+            $stockAvailable = $client->getStockForCombination($prestashopProductId, $combinationId);
+
+            if (!$stockAvailable || !isset($stockAvailable['id'])) {
+                Log::warning('[SyncShopVariantsJob] No stock_available found in PrestaShop for combination', [
+                    'prestashop_product_id' => $prestashopProductId,
+                    'combination_id' => $combinationId,
+                    'total_stock' => $totalStock,
+                ]);
+                return;
+            }
+
+            $stockAvailableId = (int) $stockAvailable['id'];
+            $currentPsQuantity = (int) ($stockAvailable['quantity'] ?? 0);
+
+            // Update stock in PrestaShop (include required id_product and id_product_attribute)
+            $client->updateStock($stockAvailableId, $totalStock, $prestashopProductId, $combinationId);
+
+            Log::info('[SyncShopVariantsJob] Stock synced to PrestaShop', [
+                'combination_id' => $combinationId,
+                'stock_available_id' => $stockAvailableId,
+                'old_quantity' => $currentPsQuantity,
+                'new_quantity' => $totalStock,
+                'variant_sku' => $localVariant->sku,
+            ]);
+
+        } catch (\Exception $e) {
+            // Log but don't fail the whole sync - stock sync is secondary
+            Log::error('[SyncShopVariantsJob] Failed to sync variant stock', [
+                'combination_id' => $combinationId,
+                'prestashop_product_id' => $prestashopProductId,
+                'error' => $e->getMessage(),
+            ]);
         }
     }
 
@@ -542,5 +773,366 @@ class SyncShopVariantsToPrestaShopJob implements ShouldQueue
 
         $this->markAllAsFailed($exception->getMessage());
         $this->broadcastCompletion(false);
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | AUTO-CREATE ATTRIBUTE GROUPS & VALUES (FIX 2026-01-28)
+    |--------------------------------------------------------------------------
+    |
+    | When syncing variants to PrestaShop and attribute group "Rozmiar" doesn't
+    | exist in PrestaShop, automatically create it via API and save mapping.
+    |
+    */
+
+    /**
+     * Ensure AttributeValue has mapping to PrestaShop, create if missing
+     *
+     * FIX 2026-01-28: Auto-creates missing attribute groups and values in PrestaShop
+     *
+     * @param PrestaShop8Client $client PrestaShop API client
+     * @param int $attributeValueId PPM AttributeValue ID
+     * @param int $shopId PrestaShop shop ID
+     * @return int|null PrestaShop ps_attribute.id_attribute or null on failure
+     */
+    protected function ensureAttributeValueMapped(
+        PrestaShop8Client $client,
+        int $attributeValueId,
+        int $shopId
+    ): ?int {
+        try {
+            // Get AttributeValue with its type
+            $attributeValue = AttributeValue::with('attributeType')->find($attributeValueId);
+
+            if (!$attributeValue || !$attributeValue->attributeType) {
+                Log::error('[SyncShopVariantsJob] AttributeValue or AttributeType not found', [
+                    'attribute_value_id' => $attributeValueId,
+                ]);
+                return null;
+            }
+
+            $attributeType = $attributeValue->attributeType;
+
+            // 1. Ensure attribute group exists in PrestaShop
+            $psGroupId = $this->ensureAttributeGroupMapped($client, $attributeType, $shopId);
+
+            if (!$psGroupId) {
+                Log::error('[SyncShopVariantsJob] Failed to ensure attribute group mapping', [
+                    'attribute_type_id' => $attributeType->id,
+                    'attribute_type_name' => $attributeType->name,
+                    'shop_id' => $shopId,
+                ]);
+                return null;
+            }
+
+            // 2. Check if value already exists in PrestaShop
+            $existingValueId = $this->findPrestaShopAttributeValue($client, $psGroupId, $attributeValue->label);
+
+            if ($existingValueId) {
+                // Save mapping and return
+                $this->saveAttributeValueMapping($attributeValueId, $shopId, $existingValueId);
+                return $existingValueId;
+            }
+
+            // 3. Create new attribute value in PrestaShop
+            $psValueId = $this->createPrestaShopAttributeValue($client, $psGroupId, $attributeValue);
+
+            if ($psValueId) {
+                $this->saveAttributeValueMapping($attributeValueId, $shopId, $psValueId);
+                return $psValueId;
+            }
+
+            return null;
+
+        } catch (\Exception $e) {
+            Log::error('[SyncShopVariantsJob] ensureAttributeValueMapped failed', [
+                'attribute_value_id' => $attributeValueId,
+                'shop_id' => $shopId,
+                'error' => $e->getMessage(),
+            ]);
+            return null;
+        }
+    }
+
+    /**
+     * Ensure AttributeType has mapping to PrestaShop attribute group
+     *
+     * @param PrestaShop8Client $client PrestaShop API client
+     * @param AttributeType $attributeType PPM AttributeType model
+     * @param int $shopId PrestaShop shop ID
+     * @return int|null PrestaShop ps_attribute_group.id_attribute_group or null
+     */
+    protected function ensureAttributeGroupMapped(
+        PrestaShop8Client $client,
+        AttributeType $attributeType,
+        int $shopId
+    ): ?int {
+        try {
+            // Check existing mapping
+            $existingMapping = DB::table('prestashop_attribute_group_mapping')
+                ->where('attribute_type_id', $attributeType->id)
+                ->where('prestashop_shop_id', $shopId)
+                ->where('is_synced', true)
+                ->first();
+
+            if ($existingMapping && $existingMapping->prestashop_attribute_group_id) {
+                return (int) $existingMapping->prestashop_attribute_group_id;
+            }
+
+            // Search for existing group in PrestaShop by name
+            $existingGroupId = $this->findPrestaShopAttributeGroup($client, $attributeType->name);
+
+            if ($existingGroupId) {
+                // Save mapping
+                $this->saveAttributeGroupMapping($attributeType->id, $shopId, $existingGroupId);
+                return $existingGroupId;
+            }
+
+            // Create new group in PrestaShop
+            $newGroupId = $this->createPrestaShopAttributeGroup($client, $attributeType);
+
+            if ($newGroupId) {
+                $this->saveAttributeGroupMapping($attributeType->id, $shopId, $newGroupId);
+
+                Log::info('[SyncShopVariantsJob] Created new attribute group in PrestaShop', [
+                    'attribute_type_name' => $attributeType->name,
+                    'prestashop_group_id' => $newGroupId,
+                    'shop_id' => $shopId,
+                ]);
+
+                return $newGroupId;
+            }
+
+            return null;
+
+        } catch (\Exception $e) {
+            Log::error('[SyncShopVariantsJob] ensureAttributeGroupMapped failed', [
+                'attribute_type_id' => $attributeType->id,
+                'shop_id' => $shopId,
+                'error' => $e->getMessage(),
+            ]);
+            return null;
+        }
+    }
+
+    /**
+     * Find existing attribute group in PrestaShop by name
+     *
+     * @param PrestaShop8Client $client
+     * @param string $name Group name to search
+     * @return int|null PrestaShop group ID or null
+     */
+    protected function findPrestaShopAttributeGroup(PrestaShop8Client $client, string $name): ?int
+    {
+        try {
+            $response = $client->getAttributeGroups([
+                'display' => 'full',
+                'filter[name]' => "[{$name}]",
+            ]);
+
+            if (!isset($response['product_options']) || empty($response['product_options'])) {
+                return null;
+            }
+
+            $groups = $response['product_options'];
+
+            // Handle single result vs array
+            if (isset($groups['id'])) {
+                return (int) $groups['id'];
+            }
+
+            if (isset($groups[0]['id'])) {
+                return (int) $groups[0]['id'];
+            }
+
+            return null;
+
+        } catch (\Exception $e) {
+            Log::warning('[SyncShopVariantsJob] findPrestaShopAttributeGroup failed', [
+                'name' => $name,
+                'error' => $e->getMessage(),
+            ]);
+            return null;
+        }
+    }
+
+    /**
+     * Create new attribute group in PrestaShop
+     *
+     * @param PrestaShop8Client $client
+     * @param AttributeType $attributeType
+     * @return int|null New PrestaShop group ID
+     */
+    protected function createPrestaShopAttributeGroup(PrestaShop8Client $client, AttributeType $attributeType): ?int
+    {
+        try {
+            $groupType = $attributeType->display_type === 'color' ? 'color' : 'select';
+            $isColorGroup = $attributeType->display_type === 'color' ? '1' : '0';
+
+            $groupData = [
+                'is_color_group' => $isColorGroup,
+                'group_type' => $groupType,
+                'name' => [
+                    ['id' => 1, 'value' => $attributeType->name],
+                ],
+                'public_name' => [
+                    ['id' => 1, 'value' => $attributeType->name],
+                ],
+            ];
+
+            $response = $client->createAttributeGroup($groupData);
+
+            if (isset($response['product_option']['id'])) {
+                return (int) $response['product_option']['id'];
+            }
+
+            return null;
+
+        } catch (\Exception $e) {
+            Log::error('[SyncShopVariantsJob] createPrestaShopAttributeGroup failed', [
+                'attribute_type_name' => $attributeType->name,
+                'error' => $e->getMessage(),
+            ]);
+            return null;
+        }
+    }
+
+    /**
+     * Find existing attribute value in PrestaShop by group ID and label
+     *
+     * @param PrestaShop8Client $client
+     * @param int $groupId PrestaShop attribute group ID
+     * @param string $label Value label to search
+     * @return int|null PrestaShop attribute value ID or null
+     */
+    protected function findPrestaShopAttributeValue(PrestaShop8Client $client, int $groupId, string $label): ?int
+    {
+        try {
+            $response = $client->getAttributeValues([
+                'display' => 'full',
+                'filter[id_attribute_group]' => $groupId,
+                'filter[name]' => "[{$label}]",
+            ]);
+
+            if (!isset($response['product_option_values']) || empty($response['product_option_values'])) {
+                return null;
+            }
+
+            $values = $response['product_option_values'];
+
+            // Handle single result vs array
+            if (isset($values['id'])) {
+                return (int) $values['id'];
+            }
+
+            if (isset($values[0]['id'])) {
+                return (int) $values[0]['id'];
+            }
+
+            return null;
+
+        } catch (\Exception $e) {
+            Log::warning('[SyncShopVariantsJob] findPrestaShopAttributeValue failed', [
+                'group_id' => $groupId,
+                'label' => $label,
+                'error' => $e->getMessage(),
+            ]);
+            return null;
+        }
+    }
+
+    /**
+     * Create new attribute value in PrestaShop
+     *
+     * @param PrestaShop8Client $client
+     * @param int $groupId PrestaShop attribute group ID
+     * @param AttributeValue $attributeValue PPM AttributeValue
+     * @return int|null New PrestaShop attribute value ID
+     */
+    protected function createPrestaShopAttributeValue(
+        PrestaShop8Client $client,
+        int $groupId,
+        AttributeValue $attributeValue
+    ): ?int {
+        try {
+            $valueData = [
+                'id_attribute_group' => $groupId,
+                'name' => [
+                    ['id' => 1, 'value' => $attributeValue->label],
+                ],
+            ];
+
+            // Add color if this is a color attribute
+            if (!empty($attributeValue->color_hex)) {
+                $valueData['color'] = $attributeValue->color_hex;
+            }
+
+            $response = $client->createAttributeValue($valueData);
+
+            if (isset($response['product_option_value']['id'])) {
+                Log::info('[SyncShopVariantsJob] Created new attribute value in PrestaShop', [
+                    'attribute_value_label' => $attributeValue->label,
+                    'prestashop_value_id' => $response['product_option_value']['id'],
+                    'group_id' => $groupId,
+                ]);
+
+                return (int) $response['product_option_value']['id'];
+            }
+
+            return null;
+
+        } catch (\Exception $e) {
+            Log::error('[SyncShopVariantsJob] createPrestaShopAttributeValue failed', [
+                'attribute_value_label' => $attributeValue->label,
+                'group_id' => $groupId,
+                'error' => $e->getMessage(),
+            ]);
+            return null;
+        }
+    }
+
+    /**
+     * Save attribute group mapping to database
+     */
+    protected function saveAttributeGroupMapping(int $attributeTypeId, int $shopId, int $psGroupId): void
+    {
+        DB::table('prestashop_attribute_group_mapping')->updateOrInsert(
+            [
+                'attribute_type_id' => $attributeTypeId,
+                'prestashop_shop_id' => $shopId,
+            ],
+            [
+                'prestashop_attribute_group_id' => $psGroupId,
+                'prestashop_label' => null, // Will be filled on next sync
+                'sync_status' => 'synced',
+                'sync_notes' => 'Auto-created during variant sync',
+                'is_synced' => true,
+                'last_synced_at' => now(),
+                'updated_at' => now(),
+            ]
+        );
+    }
+
+    /**
+     * Save attribute value mapping to database
+     */
+    protected function saveAttributeValueMapping(int $attributeValueId, int $shopId, int $psAttributeId): void
+    {
+        DB::table('prestashop_attribute_value_mapping')->updateOrInsert(
+            [
+                'attribute_value_id' => $attributeValueId,
+                'prestashop_shop_id' => $shopId,
+            ],
+            [
+                'prestashop_attribute_id' => $psAttributeId,
+                'prestashop_label' => null, // Will be filled on next sync
+                'prestashop_color' => null,
+                'sync_status' => 'synced',
+                'sync_notes' => 'Auto-created during variant sync',
+                'is_synced' => true,
+                'last_synced_at' => now(),
+                'updated_at' => now(),
+            ]
+        );
     }
 }

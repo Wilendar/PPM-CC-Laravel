@@ -4,6 +4,8 @@ namespace App\Services\Import;
 
 use App\Models\PendingProduct;
 use App\Models\Product;
+use App\Models\ProductPrice;
+use App\Models\PriceGroup;
 use App\Models\PublishHistory;
 use App\Models\Category;
 use App\Models\ProductShopData;
@@ -75,22 +77,25 @@ class ProductPublicationService
                 // 1. Create Product
                 $product = $this->createProductFromPending($pendingProduct);
 
-                // 2. Assign categories
+                // 2. Create price entries from price_data
+                $this->createPriceEntries($product, $pendingProduct);
+
+                // 3. Assign categories
                 $this->assignCategories($product, $pendingProduct);
 
-                // 3. Create shop data entries
+                // 4. Create shop data entries
                 $this->createShopData($product, $pendingProduct);
 
-                // 4. Handle media (if any)
+                // 5. Handle media (if any)
                 $this->handleMedia($product, $pendingProduct);
 
-                // 5. Mark pending product as published
+                // 6. Mark pending product as published
                 $pendingProduct->markAsPublished($product);
 
-                // 6. Create publish history record
+                // 7. Create publish history record
                 $this->createPublishHistory($pendingProduct, $product);
 
-                // 7. Dispatch sync jobs if requested
+                // 8. Dispatch sync jobs if requested
                 if ($dispatchSyncJobs) {
                     $this->dispatchSyncJobs($product, $pendingProduct->shop_ids ?? []);
                 }
@@ -205,6 +210,20 @@ class ProductPublicationService
         $product->supplier_code = $pendingProduct->supplier_code;
         $product->ean = $pendingProduct->ean;
 
+        // FAZA 9.4: New product fields from import redesign
+        $product->cn_code = $pendingProduct->cn_code;
+        $product->material = $pendingProduct->material;
+        $product->defect_symbol = $pendingProduct->defect_symbol;
+        $product->application = $pendingProduct->application;
+        $product->split_payment = $pendingProduct->split_payment ?? false;
+        $product->shop_internet = $pendingProduct->shop_internet ?? false;
+        $product->is_variant_master = $pendingProduct->is_variant_master ?? false;
+
+        // Relationships
+        $product->manufacturer_id = $pendingProduct->manufacturer_id;
+        $product->supplier_id = $pendingProduct->supplier_id;
+        $product->importer_id = $pendingProduct->importer_id;
+
         // Dimensions
         $product->weight = $pendingProduct->weight ?? 0;
         $product->height = $pendingProduct->height;
@@ -235,6 +254,52 @@ class ProductPublicationService
         $product->save();
 
         return $product;
+    }
+
+    /**
+     * Create ProductPrice entries from PendingProduct price_data
+     *
+     * FAZA 9.4: Maps price_data JSON to ProductPrice per group.
+     */
+    protected function createPriceEntries(Product $product, PendingProduct $pendingProduct): void
+    {
+        $priceData = $pendingProduct->price_data ?? [];
+        $groups = $priceData['groups'] ?? [];
+
+        if (empty($groups)) {
+            return;
+        }
+
+        foreach ($groups as $groupId => $prices) {
+            $netPrice = $prices['net'] ?? null;
+            $grossPrice = $prices['gross'] ?? null;
+
+            if ($netPrice === null && $grossPrice === null) {
+                continue;
+            }
+
+            // Verify price group exists
+            $priceGroup = PriceGroup::find($groupId);
+            if (!$priceGroup) {
+                continue;
+            }
+
+            ProductPrice::updateOrCreate(
+                [
+                    'product_id' => $product->id,
+                    'price_group_id' => $groupId,
+                ],
+                [
+                    'net_price' => $netPrice ?? 0,
+                    'gross_price' => $grossPrice ?? 0,
+                ]
+            );
+        }
+
+        Log::debug('ProductPublicationService: Price entries created', [
+            'product_id' => $product->id,
+            'groups_count' => count($groups),
+        ]);
     }
 
     /**

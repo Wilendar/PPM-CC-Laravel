@@ -42,6 +42,47 @@ return [
             'after_commit' => false,
         ],
 
+        /*
+        |--------------------------------------------------------------------------
+        | Product Scan Queue (ETAP_10)
+        |--------------------------------------------------------------------------
+        |
+        | Dedicated queue for product scanning jobs. These jobs can be long-running
+        | (up to 1 hour) and process large datasets (20k+ products).
+        |
+        | Jobs using this queue:
+        | - ScanProductLinksJob
+        | - ScanMissingInPpmJob
+        | - ScanMissingInSourceJob
+        |
+        | Run worker: php artisan queue:work database --queue=scan --timeout=3700
+        |
+        */
+        'scan' => [
+            'driver' => 'database',
+            'table' => 'jobs',
+            'queue' => 'scan',
+            'retry_after' => 3700, // 1 hour + 100s buffer
+            'after_commit' => true,
+        ],
+
+        /*
+        |--------------------------------------------------------------------------
+        | ERP Sync Queue
+        |--------------------------------------------------------------------------
+        |
+        | Dedicated queue for ERP synchronization jobs.
+        | Run worker: php artisan queue:work database --queue=erp-sync --timeout=3700
+        |
+        */
+        'erp-sync' => [
+            'driver' => 'database',
+            'table' => 'jobs',
+            'queue' => 'erp-sync',
+            'retry_after' => 3700,
+            'after_commit' => true,
+        ],
+
         'beanstalkd' => [
             'driver' => 'beanstalkd',
             'host' => 'localhost',

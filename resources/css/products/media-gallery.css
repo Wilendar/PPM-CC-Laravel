@@ -206,45 +206,106 @@
 }
 
 /* ==========================================================================
-   3. UPLOAD ZONE
+   3. UPLOAD ZONE - Enhanced visibility for drag & drop
    ========================================================================== */
 
 .media-upload-zone {
-    border: 2px dashed var(--color-border);
-    border-radius: 0.5rem;
-    padding: 2rem;
+    /* PROMINENT border - thicker, lighter color for better visibility */
+    border: 3px dashed #6b7280;
+    border-radius: 0.75rem;
+    padding: 2rem 1.5rem;
     text-align: center;
-    background-color: var(--color-bg-secondary);
-    transition: border-color 0.2s, background-color 0.2s;
+    /* Subtle gradient background for depth */
+    background: linear-gradient(
+        135deg,
+        rgba(55, 65, 81, 0.3) 0%,
+        rgba(31, 41, 55, 0.5) 100%
+    );
+    transition: border-color 0.2s, background-color 0.2s, box-shadow 0.2s;
     cursor: pointer;
+    /* Inner shadow for inset look */
+    box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.2);
 }
 
-.media-upload-zone:hover,
+.media-upload-zone:hover {
+    /* Bright primary border on hover */
+    border-color: #e0ac7e;
+    background: linear-gradient(
+        135deg,
+        rgba(224, 172, 126, 0.1) 0%,
+        rgba(55, 65, 81, 0.4) 100%
+    );
+    box-shadow:
+        inset 0 2px 8px rgba(0, 0, 0, 0.2),
+        0 0 20px rgba(224, 172, 126, 0.15);
+}
+
 .media-upload-zone.is-dragover {
-    border-color: var(--color-primary);
-    background-color: var(--color-primary-light);
+    /* VERY VISIBLE state when dragging files over */
+    border-color: #22c55e;
+    border-style: solid;
+    background: linear-gradient(
+        135deg,
+        rgba(34, 197, 94, 0.15) 0%,
+        rgba(34, 197, 94, 0.05) 100%
+    );
+    box-shadow:
+        inset 0 2px 8px rgba(0, 0, 0, 0.2),
+        0 0 30px rgba(34, 197, 94, 0.25);
+    animation: pulse-dropzone 1s ease-in-out infinite;
+}
+
+@keyframes pulse-dropzone {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.005); }
 }
 
 .media-upload-zone.is-disabled {
     opacity: 0.5;
     cursor: not-allowed;
+    border-color: #4b5563;
 }
 
 .media-upload-zone-icon {
-    width: 3rem;
-    height: 3rem;
+    width: 3.5rem;
+    height: 3.5rem;
     margin: 0 auto 1rem;
-    color: var(--color-text-secondary);
+    /* Brighter icon color */
+    color: #9ca3af;
+    transition: color 0.2s, transform 0.2s;
+}
+
+.media-upload-zone:hover .media-upload-zone-icon {
+    color: #e0ac7e;
+    transform: translateY(-2px);
+}
+
+.media-upload-zone.is-dragover .media-upload-zone-icon {
+    color: #22c55e;
+    transform: translateY(-4px) scale(1.1);
 }
 
 .media-upload-zone-text {
-    color: var(--color-text-secondary);
+    /* Brighter text for better readability */
+    color: #d1d5db;
+    font-size: 1rem;
+    font-weight: 500;
     margin-bottom: 0.5rem;
 }
 
+.media-upload-zone:hover .media-upload-zone-text {
+    color: #e0ac7e;
+}
+
+.media-upload-zone.is-dragover .media-upload-zone-text {
+    color: #4ade80;
+}
+
 .media-upload-zone-hint {
-    font-size: 0.75rem;
-    color: var(--color-text-tertiary);
+    font-size: 0.8rem;
+    /* Better contrast for hint text */
+    color: #9ca3af;
+    margin-top: 0.25rem;
 }
 
 .media-upload-input {

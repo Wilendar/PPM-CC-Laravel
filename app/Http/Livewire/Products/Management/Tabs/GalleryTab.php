@@ -175,27 +175,28 @@ class GalleryTab extends Component
         try {
             $mediaManager = app(MediaManager::class);
 
-            $dto = MediaUploadDTO::forProduct(
-                productId: $this->productId,
-                files: $files,
-                generateThumbnails: true,
-                convertToWebp: true
+            // Use uploadMultiple with correct parameters
+            $uploadedMedia = $mediaManager->uploadMultiple(
+                $files,
+                'App\\Models\\Product',
+                $this->productId,
+                [
+                    'convert_to_webp' => true,
+                    'generate_thumbnails' => true,
+                    'set_first_as_primary' => false,
+                ]
             );
 
-            $results = $mediaManager->uploadMultiple($dto);
+            $successCount = $uploadedMedia->count();
 
-            $success = count(array_filter($results, fn($r) => $r['success']));
-            foreach ($results as $r) {
-                if (!$r['success'] && isset($r['error'])) {
-                    $this->uploadErrors[] = $r['error'];
-                }
+            if ($successCount > 0) {
+                $this->dispatch('notify', ['type' => 'success', 'message' => "Dodano {$successCount} zdjec"]);
             }
 
-            if ($success > 0) {
-                $this->dispatch('notify', ['type' => 'success', 'message' => "Dodano {$success} zdjec"]);
-            }
-
-            Log::info('[GALLERY TAB] Upload completed', ['product_id' => $this->productId, 'success' => $success]);
+            Log::info('[GALLERY TAB] Upload completed', [
+                'product_id' => $this->productId,
+                'success' => $successCount,
+            ]);
 
         } catch (\Exception $e) {
             Log::error('[GALLERY TAB] Upload failed', ['error' => $e->getMessage()]);

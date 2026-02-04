@@ -354,26 +354,88 @@ class PrestaShop8Client extends BasePrestaShopClient
      * Update product stock
      *
      * FIX (2025-11-13): PrestaShop Web Service API requires XML for PUT requests
+     * FIX (2026-01-29): Use GET-MERGE-PUT pattern. PrestaShop requires ALL fields
+     * (id_product, id_product_attribute, depends_on_stock, etc.) in PUT body.
      *
      * @param int $stockId PrestaShop stock_available ID
      * @param int $quantity New quantity
+     * @param int|null $productId PrestaShop product ID (unused, kept for BC)
+     * @param int|null $productAttributeId PrestaShop combination ID (unused, kept for BC)
      * @return array Updated stock data
      * @throws \App\Exceptions\PrestaShopAPIException
      */
-    public function updateStock(int $stockId, int $quantity): array
+    public function updateStock(int $stockId, int $quantity, ?int $productId = null, ?int $productAttributeId = null): array
     {
-        // CRITICAL: Inject id for UPDATE operation
-        $xmlBody = $this->arrayToXml([
-            'stock_available' => [
-                'id' => $stockId,
-                'quantity' => $quantity
-            ]
-        ]);
+        // GET existing stock_available record with all fields (display=full is required!)
+        $response = $this->makeRequest('GET', "/stock_availables/{$stockId}?display=full");
+
+        // FIX 2026-01-29: PS API returns stock_availables (plural) with array, even for single ID
+        $existing = $response['stock_available']
+            ?? $response['stock_availables'][0]
+            ?? $response['stock_availables']
+            ?? null;
+
+        if (!$existing || !isset($existing['id'])) {
+            throw new \App\Exceptions\PrestaShopAPIException(
+                "Stock available {$stockId} not found"
+            );
+        }
+
+        // Update only the quantity
+        $existing['quantity'] = $quantity;
+
+        // Remove read-only/nested fields that could cause issues
+        unset($existing['associations']);
+
+        $xmlBody = $this->arrayToXml(['stock_available' => $existing]);
 
         return $this->makeRequest('PUT', "/stock_availables/{$stockId}", [], [
             'body' => $xmlBody,
             'headers' => ['Content-Type' => 'application/xml'],
         ]);
+    }
+
+    /**
+     * Get stock_available for a specific combination (variant)
+     *
+     * FIX 2026-01-29: Needed to sync variant stock from PPM to PrestaShop
+     * PrestaShop stores variant stock separately in stock_availables
+     * with id_product_attribute = combination ID
+     *
+     * @param int $productId PrestaShop product ID
+     * @param int $combinationId PrestaShop combination ID (id_product_attribute)
+     * @return array|null Stock available record or null
+     */
+    public function getStockForCombination(int $productId, int $combinationId): ?array
+    {
+        // FIX 2026-01-29: PrestaShop API returns 400 with multiple filters in URL.
+        // Approach: Get all stock_availables for product with display=full,
+        // then filter locally by id_product_attribute (combination ID).
+        $response = $this->makeRequest(
+            'GET',
+            "/stock_availables?filter[id_product]={$productId}&display=full"
+        );
+
+        $stockAvailables = $response['stock_availables'] ?? $response['stock_available'] ?? [];
+
+        // Normalize: single result comes as object, multiple as array
+        if (isset($stockAvailables['id'])) {
+            $stockAvailables = [$stockAvailables];
+        }
+
+        if (!is_array($stockAvailables) || empty($stockAvailables)) {
+            return null;
+        }
+
+        // Find the stock_available matching the combination ID
+        foreach ($stockAvailables as $stock) {
+            $stockCombinationId = (int) ($stock['id_product_attribute'] ?? 0);
+            if ($stockCombinationId === $combinationId) {
+                return $stock;
+            }
+        }
+
+        return null;
     }
 
     /**

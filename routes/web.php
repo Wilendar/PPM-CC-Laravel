@@ -434,6 +434,14 @@ Route::prefix('admin')->name('admin.')->middleware($adminMiddleware)->group(func
     Route::get('/integrations', \App\Http\Livewire\Admin\ERP\ERPManager::class)->name('integrations');
 
     // ==========================================
+    // PRODUCT SCAN SYSTEM - ETAP_10
+    // ==========================================
+
+    // Product Scanning and Linking Panel
+    Route::get('/scan-products', \App\Http\Livewire\Admin\Scan\ScanProductsPanel::class)
+        ->name('scan-products');
+
+    // ==========================================
     // SESSION MANAGEMENT - FAZA C User Management
     // ==========================================
     Route::get('/sessions', \App\Http\Livewire\Admin\Sessions::class)->name('sessions');

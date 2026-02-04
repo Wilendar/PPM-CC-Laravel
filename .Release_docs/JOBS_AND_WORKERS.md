@@ -1,9 +1,9 @@
 # PPM - Jobs & Workers Documentation
 
-> **Wersja:** 1.3
-> **Data:** 2026-01-27
+> **Wersja:** 1.5
+> **Data:** 2026-02-02
 > **Status:** Production Ready
-> **Changelog:** ETAP_08 FAZA 7 - Extended Fields Bidirectional Sync (Producent, Kod dostawcy, checkboxy)
+> **Changelog:** ETAP_15 - BusinessPartner Management + Variant Field Inheritance
 
 ---
 
@@ -22,22 +22,61 @@
 
 ## 1. Podsumowanie
 
-PPM-CC-Laravel wykorzystuje **49 zdefiniowanych JOBow** zorganizowanych w 9 kategorii funkcjonalnych.
+PPM-CC-Laravel wykorzystuje **49 zdefiniowanych JOBow** zorganizowanych w 9 kategorii funkcjonalnych + serwisy sync (SubiektGTService).
 
 ### Statystyki
 
 | Kategoria | Ilosc | Glowne funkcje |
 |-----------|-------|----------------|
 | System | 5 | Backup, Maintenance, Notifications, Reports |
-| PrestaShop Sync | 11 | Product/Category/Attribute sync |
+| PrestaShop Sync | 11 | Product/Category/Attribute/Variant sync |
 | Media | 3 | Upload, conversion, PS push |
-| ERP | 7 | Baselinker, Subiekt GT (dynamic sync), Dynamics |
+| ERP | 7 | Baselinker, Subiekt GT (dynamic sync + variant inheritance), Dynamics |
 | VisualEditor | 5 | Description sync, templates |
 | Features | 3 | Feature sync to PrestaShop |
 | Categories | 1 | Bulk category operations |
 | Products | 3 | Category assignment |
 | Import/Pull | 3 | Data import (PS, Subiekt GT change detection) |
 | **RAZEM** | **49** | |
+
+### Serwisy sync (nie-jobowe)
+
+| Serwis | Przeznaczenie |
+|--------|---------------|
+| SubiektGTService | Push/Pull produktow + wariantow z dziedziczeniem pol (ETAP_15) |
+| ShopVariantService | Mapowanie wariantow PPM ↔ PrestaShop combinations |
+| PrestaShop8Client | API client dla PrestaShop Web Services |
+| SubiektRestApiClient | REST API client dla sapi.mpptrade.pl |
+
+### Nowe w v1.5 (ETAP_15 - BusinessPartner + Variant Field Inheritance)
+
+- **BusinessPartner Panel** - Nowy panel `/admin/suppliers` z zakladkami DOSTAWCA/PRODUCENT/IMPORTER/BRAK
+- **BusinessPartner Model** - Unified model z type field (supplier/manufacturer/importer) zastepujacy oddzielne tabele
+- **ProductForm FK Fields** - 3 nowe dropdowny w formularzu produktu: Dostawca, Producent, Importer (supplier_id, manufacturer_id, importer_id)
+- **Variant Field Inheritance (Subiekt GT)** - `buildVariantSyncData()` dziedziczy WSZYSTKIE pola rozszerzone z master produktu:
+  - Producent (`manufacturer_id` → `tw_IdProducenta` via BusinessPartner → kh_Id)
+  - Dostawca (`supplier_id` → `tw_IdPodstDostawca` via BusinessPartner → kh_Id)
+  - Kod CN (`cn_code` → `tw_Pole5`)
+  - Material (`material` → `tw_Pole1`)
+  - Symbol z wada (`defect_symbol` → `tw_Pole3`)
+  - Zastosowanie (`application` → `tw_Pole4`)
+  - Sklep internetowy (`shop_internet` → `tw_SklepInternet`)
+  - Mechanizm podzielonej platnosci (`split_payment` → `tw_MechanizmPodzielonejPlatnosci`)
+  - Kod dostawcy (`supplier_code` → `tw_DostSymbol`)
+  - Kod EAN (`ean` → `tw_PodstKodKresk`) - wariant nie ma wlasnego EAN w PPM
+- **mapExtendedFields() reuse** - Warianty uzyja tej samej metody co master products (zero duplikacji kodu)
+- **resolveBusinessPartnerToSubiektContractor()** - Resolver PPM BusinessPartner ID → Subiekt GT kh_Id (kontrahent)
+- **FIX: ProductForm save paths** - manufacturer_id/supplier_id/importer_id dodane do 5 metod zapisu (saveProduct, saveAndClose, quickSave, duplicateProduct, createProduct)
+
+### Nowe w v1.4 (ETAP_14 - Variant Price & Stock Sync)
+
+- **syncVariantPrice()** - Nowa metoda w `SyncShopVariantsToPrestaShopJob` synchronizujaca ceny wariantow do PrestaShop jako `price_impact` (delta = cena_wariantu - cena_bazowa_produktu)
+- **syncVariantStock()** - Nowa metoda synchronizujaca stany magazynowe wariantow do PrestaShop via `stock_availables` API
+- **getStockForCombination()** - Nowa metoda w `PrestaShop8Client` pobierajaca `stock_available` dla konkretnej kombinacji (id_product_attribute)
+- **updateStock() GET-MERGE-PUT** - Przepisany `PrestaShop8Client::updateStock()` na wzorzec GET→MERGE→PUT (PS API wymaga WSZYSTKICH pol w PUT)
+- **ShopVariantService** - `mapCombinationsToVariants()` teraz laduje lokalne warianty PPM z cenami/stanami (identyczne dane w PrestaShop Tab i Default Tab)
+- **VariantModalsTrait** - Nowe modale do edycji cen i stanow wariantow (klikalne ceny/stany w liscie wariantow)
+- **VariantCrudTrait FIX** - `getShopOverridesForDisplay()` poprawione mapowanie `quantity` → `stock` z relacji Eloquent
 
 ### Nowe w v1.3 (ETAP_08 FAZA 7 - Extended Fields)
 
@@ -505,12 +544,47 @@ Przeznaczenie:
 - Uzywa Bus::batch()
 ```
 
+#### SyncShopVariantsToPrestaShopJob (ETAP_14)
+```
+Sciezka: app/Jobs/PrestaShop/SyncShopVariantsToPrestaShopJob.php
+Kolejka: default
+Timeout: 300s
+Tries: 3
+
+Przeznaczenie:
+- Synchronizacja wariantow produktu (combinations) do PrestaShop
+- Obsluga operacji ADD/OVERRIDE/DELETE per wariant
+- Sync cen jako price_impact (delta od ceny bazowej produktu)
+- Sync stanow magazynowych via stock_availables API
+
+Dane wejsciowe:
+- int $productId
+- int $shopId
+- ?string $preGeneratedJobId
+
+Metody pomocnicze (FIX 2026-01-29):
+- syncVariantPrice() - Oblicza price_impact = variant_price - base_price,
+  aktualizuje combination.price w PrestaShop
+- syncVariantStock() - Pobiera stock_available dla combination,
+  aktualizuje ilosc przez GET-MERGE-PUT pattern
+
+Wylanie z handleAddOperation() i handleOverrideOperation():
+1. Tworzenie/aktualizacja combination (atrybuty, obrazy)
+2. syncVariantPrice() - sync ceny
+3. syncVariantStock() - sync stanu
+4. markAsSynced()
+
+Serwisy:
+- PrestaShop8Client::getStockForCombination()
+- PrestaShop8Client::updateStock() (GET-MERGE-PUT)
+- PrestaShop8Client::updateCombination()
+```
+
 #### Inne PrestaShop Jobs
 - `DeleteProductFromPrestaShop` - Usuwanie produktu
 - `BulkImportProducts` - Batch import z PS
 - `AnalyzeMissingCategories` - Analiza brakujacych kategorii
 - `PullSingleProductFromPrestaShop` - Pull jednego produktu
-- `SyncShopVariantsToPrestaShopJob` - Sync wariantow
 - `SyncProductsJob` - Legacy batch sync
 - `ExpirePendingCategoryPreview` - Wygasanie preview kategorii
 
@@ -581,6 +655,8 @@ Unique: 1h
 Przeznaczenie:
 - Synchronizacja produktu PPM -> ERP
 - Obsluguje: Baselinker, Subiekt GT, Dynamics
+- Subiekt GT: warianty traktowane jako oddzielne produkty (tw__Towar)
+- Subiekt GT: warianty dziedzicza pola z master produktu (ETAP_15)
 
 Dane wejsciowe:
 - Product $product
@@ -590,6 +666,14 @@ Dane wejsciowe:
   * stock_columns: ['quantity', 'minimum']
   * sync_prices: true/false
   * sync_stock: true/false
+
+Subiekt GT Variant Sync (ETAP_15):
+- Wywoluje SubiektGTService::syncProductVariantsToSubiekt()
+- Warianty tworzone/aktualizowane jako osobne tw__Towar w Subiekt
+- tw_Pole8 = parent_sku (link do master produktu)
+- Warianty dziedzicza z master: producent, dostawca, KodCN, material,
+  symbol z wada, zastosowanie, shop_internet, split_payment,
+  kod dostawcy, EAN
 
 Tracking:
 - Updates ProductErpData.sync_status
@@ -633,10 +717,52 @@ Rate Limiting:
 ```
 Sciezka: app/Jobs/ERP/SubiektGTSyncJob.php
 Kolejka: erp_default
-Status: PLACEHOLDER (do implementacji)
+Status: PLACEHOLDER (sync odbywa sie przez SyncProductToERP + SubiektGTService)
 
 Przeznaczenie:
-- Sync z Subiekt GT przez REST API
+- Legacy placeholder - zawsze failuje z komunikatem "not yet implemented"
+- FAKTYCZNA synchronizacja odbywa sie przez:
+  * SyncProductToERP -> SubiektGTService::pushProductToSubiekt()
+  * PullProductsFromSubiektGT -> SubiektGTService::pullProductDataFromErp()
+
+UWAGA: Caly sync Subiekt GT jest obslugiwany przez SubiektGTService
+(~4700 linii), NIE przez ten job placeholder.
+```
+
+#### SubiektGTService - Variant Sync Methods (ETAP_15)
+```
+Sciezka: app/Services/ERP/SubiektGTService.php
+
+syncProductVariantsToSubiekt(ERPConnection, Product):
+- Iteruje warianty produktu master (is_variant_master = true)
+- Dla kazdego wariantu: buildVariantSyncData() -> createProduct/updateProductBySku
+- Sprawdza istnienie wariantu w Subiekt (productExists)
+- tw_Pole8 = parent_sku (link do master)
+
+buildVariantSyncData(ProductVariant, parentSku, ?Product, config):
+- Pola wlasne wariantu: name, pole8 (parent link), is_active
+- Pola dziedziczone z master (via mapExtendedFields()):
+  * manufacturer_id -> manufacturer_contractor_id (kh_Id w Subiekt)
+  * supplier_id -> supplier_contractor_id (kh_Id w Subiekt)
+  * cn_code -> pole5 (tw_Pole5)
+  * material -> pole1 (tw_Pole1)
+  * defect_symbol -> pole3 (tw_Pole3)
+  * application -> pole4 (tw_Pole4)
+  * shop_internet -> shop_internet (tw_SklepInternet)
+  * split_payment -> split_payment (tw_MechanizmPodzielonejPlatnosci)
+  * supplier_code -> supplier_code (tw_DostSymbol)
+- EAN z master produktu (wariant nie ma wlasnego EAN w PPM)
+- Reuse: mapExtendedFields() - ta sama metoda co dla master products
+
+resolveBusinessPartnerToSubiektContractor(int bpId, config):
+- Zamienia PPM BusinessPartner.id na Subiekt kh_Id (kontrahent)
+- Uzywa business_partner.subiekt_contractor_id jesli ustawione
+- Fallback: wyszukiwanie po nazwie w kh__Kontrahent
+
+OGRANICZENIA Subiekt GT:
+- tw_IdPodstDostawca (supplier) - dostepne
+- tw_IdProducenta (manufacturer) - dostepne
+- Importer - BRAK odpowiednika w Subiekt GT
 ```
 
 #### Inne ERP Jobs
@@ -679,6 +805,40 @@ Performance Metrics:
 - 13 SKU batch fetch: 0.08s (prices), 0.19s (stock)
 - Sequential fetch: ~92s (110x wolniej)
 - Parallel efficiency: ~95% (minimal overhead)
+```
+
+#### Variant Field Inheritance Map (ETAP_15 - PPM → Subiekt GT)
+```
+Warianty w Subiekt GT sa oddzielnymi produktami (tw__Towar).
+Dziedzicza WSZYSTKIE pola rozszerzone z master produktu PPM.
+
+Mapowanie pol (buildVariantSyncData -> mapExtendedFields -> buildProductWriteBody):
+
+| PPM Product Field  | PHP Key                    | Subiekt GT Column              | API PascalCase              |
+|--------------------|----------------------------|--------------------------------|-----------------------------|
+| name (variant own) | name                       | tw_Nazwa                       | Name                        |
+| sku (variant own)  | sku                        | tw_Symbol                      | (URL param)                 |
+| is_active (own)    | is_active                  | tw_Aktywny                     | IsActive                    |
+| --- pole8 link     | pole8                      | tw_Pole8                       | Pole8                       |
+| ean (master)       | ean                        | tw_PodstKodKresk               | Ean                         |
+| material (master)  | pole1                      | tw_Pole1                       | Pole1                       |
+| defect_symbol (m)  | pole3                      | tw_Pole3                       | Pole3                       |
+| application (m)    | pole4                      | tw_Pole4                       | Pole4                       |
+| cn_code (master)   | pole5                      | tw_Pole5                       | Pole5                       |
+| supplier_code (m)  | supplier_code              | tw_DostSymbol                  | SupplierCode                |
+| shop_internet (m)  | shop_internet              | tw_SklepInternet               | ShopInternet                |
+| split_payment (m)  | split_payment              | tw_MechanizmPodzielonejPlatnosci | SplitPayment              |
+| supplier_id (m)    | supplier_contractor_id     | tw_IdPodstDostawca             | SupplierContractorId        |
+| manufacturer_id(m) | manufacturer_contractor_id | tw_IdProducenta                | ManufacturerContractorId    |
+| importer_id (m)    | --- BRAK w Subiekt GT ---  | ---                            | ---                         |
+
+(m) = dziedziczone z master produktu
+Resolver: PPM BusinessPartner.id -> subiekt_contractor_id -> kh_Id w kh__Kontrahent
+
+Implementacja:
+- SubiektGTService::buildVariantSyncData() (linia ~4401)
+- SubiektGTService::mapExtendedFields() (linia ~3413)
+- SubiektRestApiClient::buildProductWriteBody() (linia ~485)
 ```
 
 ---
@@ -815,7 +975,15 @@ Job Types (ETAP_08 FAZA 6):
 | tw_SklepInternet | shop_internet | Widocznosc w sklepie internetowym |
 | tw_MechanizmPodzielonejPlatnosci | split_payment | Mechanizm podzielonej platnosci |
 
-**Implementacja:** `SubiektGTService::updateProductBasicDataFromErp()`
+**Product FK (BusinessPartner - ETAP_15):**
+| Subiekt GT | PPM Field | Opis |
+|------------|-----------|------|
+| tw_IdPodstDostawca (kh_Id) | supplier_id (BusinessPartner) | Dostawca (kontrahent w Subiekt) |
+| tw_IdProducenta (kh_Id) | manufacturer_id (BusinessPartner) | Producent (kontrahent w Subiekt) |
+| --- BRAK --- | importer_id (BusinessPartner) | Importer (brak odpowiednika w Subiekt GT) |
+
+**PUSH:** `SubiektGTService::mapExtendedFields()` + `resolveBusinessPartnerToSubiektContractor()`
+**PULL:** `SubiektGTService::updateProductBasicDataFromErp()`
 
 ### BATCH PARALLEL FETCH (ETAP_08 FAZA 7) ###
 

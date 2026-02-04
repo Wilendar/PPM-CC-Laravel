@@ -2,27 +2,27 @@
     
     <!-- Animated Background Elements with MPP TRADE Colors -->
     <div class="absolute inset-0 overflow-hidden pointer-events-none">
-        <div class="absolute -top-32 -right-32 w-64 h-64 rounded-full blur-3xl animate-pulse" style="background: radial-gradient(circle, rgba(224, 172, 126, 0.1), rgba(209, 151, 90, 0.05));"></div>
-        <div class="absolute -bottom-32 -left-32 w-64 h-64 rounded-full blur-3xl animate-pulse" style="background: radial-gradient(circle, rgba(209, 151, 90, 0.1), rgba(224, 172, 126, 0.05)); animation-delay: 2s;"></div>
-        <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-96 h-96 rounded-full blur-3xl animate-pulse" style="background: radial-gradient(circle, rgba(224, 172, 126, 0.05), rgba(209, 151, 90, 0.03)); animation-delay: 4s;"></div>
+        <div class="absolute -top-32 -right-32 w-64 h-64 shop-wizard-blob shop-wizard-blob-primary"></div>
+        <div class="absolute -bottom-32 -left-32 w-64 h-64 shop-wizard-blob shop-wizard-blob-secondary" style="animation-delay: 2s;"></div>
+        <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-96 h-96 shop-wizard-blob shop-wizard-blob-center" style="animation-delay: 4s;"></div>
     </div>
     
     <!-- Page Header -->
-    <div class="relative backdrop-blur-xl shadow-2xl" style="background: linear-gradient(135deg, rgba(31, 41, 55, 0.95), rgba(17, 24, 39, 0.95)); border-bottom: 1px solid rgba(224, 172, 126, 0.3); z-index: 10000;">
+    <div class="relative backdrop-blur-xl shadow-2xl shop-wizard-header">
         <div class="max-w-7xl mx-auto px-6 sm:px-8 lg:px-12">
             <div class="flex items-center justify-between h-24">
                 <div class="flex items-center">
                     <!-- Logo and Title -->
                     <div class="flex-shrink-0">
-                        <div class="relative w-12 h-12 rounded-xl flex items-center justify-center shadow-lg transform transition-transform duration-300 hover:scale-105" style="background: linear-gradient(45deg, #e0ac7e, #d1975a);">
+                        <div class="relative w-12 h-12 rounded-xl flex items-center justify-center shadow-lg shop-wizard-icon">
                             <svg class="w-7 h-7 text-white relative z-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
                             </svg>
-                            <div class="absolute inset-0 rounded-xl opacity-75 blur animate-pulse" style="background: linear-gradient(45deg, #e0ac7e, #d1975a);"></div>
+                            <div class="absolute inset-0 rounded-xl shop-wizard-icon-glow"></div>
                         </div>
                     </div>
                     <div class="ml-4 flex-1 min-w-0">
-                        <h1 class="text-xl font-bold tracking-tight" style="color: #e0ac7e !important;">
+                        <h1 class="text-xl font-bold tracking-tight shop-wizard-title">
                             DODAJ NOWY SKLEP PRESTASHOP
                         </h1>
                         <p class="text-xs font-medium text-gray-400 tracking-wide">
@@ -32,11 +32,8 @@
                 </div>
                 
                 <!-- Back Button -->
-                <a href="{{ route('admin.shops') }}" 
-                   class="relative inline-flex items-center px-6 py-3 border border-transparent text-sm font-bold rounded-lg text-white transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl"
-                   style="background: linear-gradient(45deg, rgba(224, 172, 126, 0.8), rgba(209, 151, 90, 0.8)); border: 1px solid rgba(224, 172, 126, 0.5);"
-                   onmouseover="this.style.background='linear-gradient(45deg, rgba(209, 151, 90, 0.9), rgba(194, 132, 73, 0.9))'"
-                   onmouseout="this.style.background='linear-gradient(45deg, rgba(224, 172, 126, 0.8), rgba(209, 151, 90, 0.8))'">
+                <a href="{{ route('admin.shops') }}"
+                   class="relative inline-flex items-center px-6 py-3 text-sm font-bold rounded-lg text-white transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl shop-wizard-btn-primary">
                     <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
                     </svg>
@@ -68,8 +65,7 @@
                     <div class="flex items-center">
                         <div class="relative">
                             <div class="w-12 h-12 rounded-full flex items-center justify-center font-semibold transition-all duration-300 shadow-lg
-                                @if ($i <= $currentStep) text-white @else text-gray-400 @endif"
-                                style="@if ($i <= $currentStep) background: linear-gradient(45deg, #e0ac7e, #d1975a); @else background: rgba(75, 85, 99, 0.6); border: 2px solid rgba(156, 163, 175, 0.3); @endif">
+                                @if ($i <= $currentStep) shop-wizard-step-active @else shop-wizard-step-inactive @endif">
                                 @if ($i < $currentStep)
                                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
@@ -83,8 +79,7 @@
                             </div>
                         </div>
                         @if ($i < $totalSteps)
-                            <div class="w-16 h-1 mx-4 rounded transition-all duration-300"
-                                style="@if ($i < $currentStep) background: linear-gradient(90deg, #e0ac7e, #d1975a); @else background: rgba(75, 85, 99, 0.6); @endif"></div>
+                            <div class="w-16 h-1 mx-4 rounded transition-all duration-300 @if ($i < $currentStep) shop-wizard-connector-done @else shop-wizard-connector-pending @endif"></div>
                         @endif
                     </div>
                 @endfor
@@ -111,8 +106,7 @@
         @endif
 
         <!-- Main Content Card -->
-        <div class="relative backdrop-blur-xl shadow-2xl rounded-xl border p-8" 
-             style="background: linear-gradient(135deg, rgba(31, 41, 55, 0.95), rgba(17, 24, 39, 0.95)); border: 1px solid rgba(224, 172, 126, 0.3);">
+        <div class="relative backdrop-blur-xl shadow-2xl rounded-xl border p-8 shop-wizard-content">
         
         <!-- Step Content -->
         <div class="mb-8">
@@ -153,13 +147,80 @@
                             Opis sklepu
                         </label>
                         <textarea id="shopDescription"
-                                  wire:model.defer="shopDescription" 
+                                  wire:model.defer="shopDescription"
                                   rows="4"
-                                  class="w-full px-4 py-3 bg-gray-800 bg-opacity-60 border border-gray-600 text-white rounded-lg focus:ring-2 focus:ring-[#e0ac7e] focus:border-[#e0ac7e] transition-all duration-200 placeholder-gray-400" 
+                                  class="w-full px-4 py-3 bg-gray-800 bg-opacity-60 border border-gray-600 text-white rounded-lg focus:ring-2 focus:ring-[#e0ac7e] focus:border-[#e0ac7e] transition-all duration-200 placeholder-gray-400"
                                   placeholder="Opcjonalny opis sklepu dla łatwiejszej identyfikacji..."></textarea>
-                        @error('shopDescription') 
-                            <p class="text-red-400 text-sm mt-1">{{ $message }}</p> 
+                        @error('shopDescription')
+                            <p class="text-red-400 text-sm mt-1">{{ $message }}</p>
                         @enderror
+                    </div>
+
+                    {{-- ETAP_10: Label Customization --}}
+                    <div class="pt-4 border-t border-gray-700">
+                        <h4 class="text-sm font-medium text-white mb-3">Personalizacja etykiety</h4>
+                        <p class="text-xs text-gray-400 mb-4">Kolor i ikona wyswietlane w kolumnie Powiazania</p>
+
+                        <div class="grid grid-cols-2 gap-4">
+                            {{-- Label Color --}}
+                            <div>
+                                <label class="block text-xs font-medium text-gray-300 mb-2">Kolor etykiety</label>
+                                <div class="grid grid-cols-7 gap-1">
+                                    @foreach(\App\Models\PrestaShopShop::getAvailableLabelColors() as $color => $name)
+                                        <button type="button"
+                                                wire:click="$set('labelColor', '{{ $color }}')"
+                                                class="w-6 h-6 rounded border-2 transition-all duration-150 {{ ($labelColor ?? '') === $color ? 'border-white scale-110' : 'border-transparent hover:border-gray-500' }}"
+                                                style="background-color: {{ $color }}"
+                                                title="{{ $name }}">
+                                        </button>
+                                    @endforeach
+                                </div>
+                                @if($labelColor)
+                                    @php
+                                        $iconSvgPaths = [
+                                            'database' => 'M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4',
+                                            'cloud' => 'M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z',
+                                            'server' => 'M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01',
+                                            'link' => 'M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1',
+                                            'cog' => 'M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z M15 12a3 3 0 11-6 0 3 3 0 016 0z',
+                                            'cube' => 'M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4',
+                                            'archive' => 'M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4',
+                                            'folder' => 'M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z',
+                                            'shopping-cart' => 'M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z',
+                                            'tag' => 'M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z',
+                                            'briefcase' => 'M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z',
+                                            'building' => 'M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4',
+                                            'store' => 'M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17',
+                                        ];
+                                        $iconPath = $iconSvgPaths[$labelIcon] ?? null;
+                                    @endphp
+                                    <div class="mt-2 flex items-center gap-2">
+                                        <span class="text-xs text-gray-400">Wybrany:</span>
+                                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs border"
+                                              style="background-color: {{ $labelColor }}20; color: {{ $labelColor }}; border-color: {{ $labelColor }}50;">
+                                            @if($iconPath)
+                                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="{{ $iconPath }}"/>
+                                                </svg>
+                                            @endif
+                                            {{ $shopName ?: 'Nazwa sklepu' }}
+                                        </span>
+                                    </div>
+                                @endif
+                            </div>
+
+                            {{-- Label Icon --}}
+                            <div>
+                                <label class="block text-xs font-medium text-gray-300 mb-2">Ikona etykiety</label>
+                                <select wire:model.live="labelIcon"
+                                        class="w-full px-3 py-2 text-sm bg-gray-700 border border-gray-600 rounded text-white focus:outline-none focus:ring-2 focus:ring-[#e0ac7e]">
+                                    <option value="">Domyslna (koszyk)</option>
+                                    @foreach(\App\Models\PrestaShopShop::getAvailableLabelIcons() as $icon => $name)
+                                        <option value="{{ $icon }}">{{ $name }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -522,8 +583,7 @@
                             <button wire:click="fetchPrestashopPriceGroups"
                                     wire:loading.attr="disabled"
                                     wire:target="fetchPrestashopPriceGroups"
-                                    class="relative px-6 py-3 text-white rounded-lg transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl flex items-center justify-center mx-auto font-medium"
-                                    style="background: linear-gradient(45deg, rgba(224, 172, 126, 0.8), rgba(209, 151, 90, 0.8)); border: 1px solid rgba(224, 172, 126, 0.5);">
+                                    class="relative px-6 py-3 text-white rounded-lg transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl flex items-center justify-center mx-auto shop-wizard-btn-primary">
                                 <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" wire:loading.remove wire:target="fetchPrestashopPriceGroups">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
                                 </svg>
@@ -1227,22 +1287,16 @@
 
             <div class="flex space-x-3">
                 @if ($currentStep < $totalSteps)
-                    <button wire:click="nextStep" 
-                            class="relative px-6 py-3 text-white rounded-lg transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl flex items-center font-medium"
-                            style="background: linear-gradient(45deg, rgba(224, 172, 126, 0.8), rgba(209, 151, 90, 0.8)); border: 1px solid rgba(224, 172, 126, 0.5);"
-                            onmouseover="this.style.background='linear-gradient(45deg, rgba(209, 151, 90, 0.9), rgba(194, 132, 73, 0.9))'"
-                            onmouseout="this.style.background='linear-gradient(45deg, rgba(224, 172, 126, 0.8), rgba(209, 151, 90, 0.8))'">
+                    <button wire:click="nextStep"
+                            class="relative px-6 py-3 text-white rounded-lg transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl flex items-center shop-wizard-btn-primary">
                         Następny krok
                         <svg class="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path>
                         </svg>
                     </button>
                 @else
-                    <button wire:click="saveShop" 
-                            class="relative px-8 py-3 text-white rounded-lg transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl flex items-center font-medium"
-                            style="background: linear-gradient(45deg, rgba(34, 197, 94, 0.8), rgba(22, 163, 74, 0.8)); border: 1px solid rgba(34, 197, 94, 0.5);"
-                            onmouseover="this.style.background='linear-gradient(45deg, rgba(22, 163, 74, 0.9), rgba(21, 128, 61, 0.9))'"
-                            onmouseout="this.style.background='linear-gradient(45deg, rgba(34, 197, 94, 0.8), rgba(22, 163, 74, 0.8))'">
+                    <button wire:click="saveShop"
+                            class="relative px-8 py-3 text-white rounded-lg transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl flex items-center shop-wizard-btn-success">
                         <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
                         </svg>
