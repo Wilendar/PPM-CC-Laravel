@@ -386,6 +386,9 @@
         </div>
     </div>
 
+    {{-- Sync Status Polling - refreshes integration status badges after job completion --}}
+    <div wire:poll.5s="checkSyncJobStatuses"></div>
+
     {{-- Real-Time Progress Tracking - wire:poll MUST be outside @if to work! --}}
     <div wire:poll.3s="checkForPendingCategoryPreviews">
         @if(!empty($this->activeJobProgress))

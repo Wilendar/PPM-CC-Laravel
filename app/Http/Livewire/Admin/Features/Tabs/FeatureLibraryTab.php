@@ -11,10 +11,9 @@ use Livewire\Attributes\Computed;
 use Livewire\Component;
 
 /**
- * FeatureLibraryTab - 2-Column Feature Library Management
+ * FeatureLibraryTab - Expandable Tree Feature Library Management
  *
- * Left column: Feature Groups
- * Right column: Feature Types of selected group
+ * Single-column expandable tree with groups and features inline
  *
  * ETAP_07e Features Panel Redesign
  */
@@ -25,9 +24,9 @@ class FeatureLibraryTab extends Component
     // ========================================
 
     /**
-     * Currently selected group ID
+     * Array of expanded group IDs
      */
-    public ?int $selectedGroupId = null;
+    public array $expandedGroups = [];
 
     /**
      * Search query for features
@@ -67,7 +66,7 @@ class FeatureLibraryTab extends Component
     // ========================================
 
     /**
-     * Get all feature groups with counts
+     * Get all feature groups with counts and features inline (for tree view)
      */
     #[Computed]
     public function groups(): Collection
@@ -76,6 +75,11 @@ class FeatureLibraryTab extends Component
             ->withCount('featureTypes')
             ->withCount(['featureTypes as used_features_count' => function ($query) {
                 $query->whereHas('productFeatures');
+            }])
+            ->with(['featureTypes' => function ($query) {
+                $query->withCount('productFeatures')
+                      ->orderBy('position')
+                      ->orderBy('name');
             }])
             ->ordered()
             ->get()
@@ -90,74 +94,62 @@ class FeatureLibraryTab extends Component
                     'features_count' => $group->feature_types_count,
                     'used_features_count' => $group->used_features_count,
                     'vehicle_filter' => $group->vehicle_type_filter,
+                    // Features inline for tree view
+                    'features' => $group->featureTypes->map(function ($type) {
+                        return [
+                            'id' => $type->id,
+                            'name' => $type->name,
+                            'code' => $type->code,
+                            'value_type' => $type->value_type,
+                            'unit' => $type->unit,
+                            'products_count' => $type->product_features_count,
+                            'placeholder' => $type->input_placeholder,
+                            'conditional' => $type->conditional_group,
+                            'is_active' => $type->is_active,
+                        ];
+                    })->toArray(),
                 ];
             });
     }
 
-    /**
-     * Get feature types for selected group
-     */
-    #[Computed]
-    public function featureTypes(): Collection
-    {
-        if (!$this->selectedGroupId) {
-            return collect();
-        }
-
-        $query = FeatureType::query()
-            ->where('feature_group_id', $this->selectedGroupId)
-            ->withCount('productFeatures')
-            ->orderBy('position')
-            ->orderBy('name');
-
-        // Apply search filter
-        if (!empty($this->searchQuery)) {
-            $search = '%' . $this->searchQuery . '%';
-            $query->where(function ($q) use ($search) {
-                $q->where('name', 'like', $search)
-                  ->orWhere('code', 'like', $search);
-            });
-        }
-
-        return $query->get()->map(function (FeatureType $type) {
-            return [
-                'id' => $type->id,
-                'name' => $type->name,
-                'code' => $type->code,
-                'value_type' => $type->value_type,
-                'unit' => $type->unit,
-                'products_count' => $type->product_features_count,
-                'placeholder' => $type->input_placeholder,
-                'conditional' => $type->conditional_group,
-                'is_active' => $type->is_active,
-            ];
-        });
-    }
-
-    /**
-     * Get currently selected group data
-     */
-    #[Computed]
-    public function selectedGroup(): ?array
-    {
-        if (!$this->selectedGroupId) {
-            return null;
-        }
-
-        return $this->groups->firstWhere('id', $this->selectedGroupId);
-    }
-
     // ========================================
-    // GROUP SELECTION
+    // TREE EXPANSION METHODS
     // ========================================
 
     /**
-     * Select a feature group
+     * Toggle group expansion
      */
-    public function selectGroup(int $groupId): void
+    public function toggleGroup(int $groupId): void
     {
-        $this->selectedGroupId = $groupId;
-        $this->searchQuery = '';
+        if (in_array($groupId, $this->expandedGroups)) {
+            $this->expandedGroups = array_values(array_diff($this->expandedGroups, [$groupId]));
+        } else {
+            $this->expandedGroups[] = $groupId;
+        }
+    }
+
+    /**
+     * Expand all groups
+     */
+    public function expandAll(): void
+    {
+        $this->expandedGroups = $this->groups->pluck('id')->toArray();
+    }
+
+    /**
+     * Collapse all groups
+     */
+    public function collapseAll(): void
+    {
+        $this->expandedGroups = [];
+    }
+
+    /**
+     * Check if group is expanded
+     */
+    public function isGroupExpanded(int $groupId): bool
+    {
+        return in_array($groupId, $this->expandedGroups);
     }
 
     // ========================================
@@ -170,7 +162,7 @@ class FeatureLibraryTab extends Component
     public function openFeatureTypeModal(?int $groupId = null): void
     {
         $this->resetFeatureTypeForm();
-        $this->featureTypeGroupId = $groupId ?? $this->selectedGroupId;
+        $this->featureTypeGroupId = $groupId;
         $this->showFeatureTypeModal = true;
     }
 
@@ -402,9 +394,9 @@ class FeatureLibraryTab extends Component
 
             $group->delete();
 
-            // Clear selection if deleted group was selected
-            if ($this->selectedGroupId === $groupId) {
-                $this->selectedGroupId = null;
+            // Remove from expanded groups if was expanded
+            if (in_array($groupId, $this->expandedGroups)) {
+                $this->expandedGroups = array_values(array_diff($this->expandedGroups, [$groupId]));
             }
 
             $this->dispatch('notify', type: 'success', message: 'Grupa usunieta.');

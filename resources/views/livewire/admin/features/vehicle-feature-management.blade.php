@@ -11,6 +11,11 @@
 
     {{-- TAB NAVIGATION --}}
     <div class="feature-tabs">
+        <button wire:click="setTab('browser')"
+                class="feature-tabs__tab {{ $activeTab === 'browser' ? 'active' : '' }}">
+            <span class="feature-tabs__tab-icon">🔍</span>
+            <span>Przegladarka Cech</span>
+        </button>
         <button wire:click="setTab('library')"
                 class="feature-tabs__tab {{ $activeTab === 'library' ? 'active' : '' }}">
             <span class="feature-tabs__tab-icon">📚</span>
@@ -20,11 +25,6 @@
                 class="feature-tabs__tab {{ $activeTab === 'templates' ? 'active' : '' }}">
             <span class="feature-tabs__tab-icon">📋</span>
             <span>Szablony Cech</span>
-        </button>
-        <button wire:click="setTab('browser')"
-                class="feature-tabs__tab {{ $activeTab === 'browser' ? 'active' : '' }}">
-            <span class="feature-tabs__tab-icon">🔍</span>
-            <span>Przegladarka Cech</span>
         </button>
     </div>
 

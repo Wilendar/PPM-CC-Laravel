@@ -19,6 +19,7 @@
     $percentage = $product->completion_percentage ?? 0;
     $isReady = $product->is_ready_for_publish ?? false;
 
+    $effectiveCategoryMaxLevel = $effectiveCategoryMaxLevel ?? ($this->effectiveCategoryMaxLevel ?? 5);
 @endphp
 
 <tr class="border-b border-gray-700/50 hover:bg-gray-800/30 transition-colors"
@@ -174,35 +175,73 @@
         ])
     </td>
 
-    {{-- L6 (KAT L6) --}}
+    {{-- L6-L8 - ukryte do czasu klikniecia "+" (dodaje kolumny krokowo) --}}
     <td class="px-2 py-2 relative">
-        @include('livewire.products.import.partials.inline-category-select', [
-            'product' => $product,
-            'level' => 6,
-            'disabled' => !$selectedL5,
-            'parentCategoryId' => $selectedL5?->id
-        ])
+        @if($effectiveCategoryMaxLevel >= 6)
+            @include('livewire.products.import.partials.inline-category-select', [
+                'product' => $product,
+                'level' => 6,
+                'disabled' => !$selectedL5,
+                'parentCategoryId' => $selectedL5?->id
+            ])
+        @else
+            <button type="button"
+                    wire:click="expandCategoryColumns"
+                    class="inline-flex items-center justify-center w-7 h-7 rounded text-gray-500
+                           bg-gray-700/30 hover:bg-gray-700/50 hover:text-green-400 transition-colors"
+                    title="Pokaż KAT L6">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                </svg>
+            </button>
+        @endif
     </td>
 
-    {{-- L7 (KAT L7) --}}
-    <td class="px-2 py-2 relative">
-        @include('livewire.products.import.partials.inline-category-select', [
-            'product' => $product,
-            'level' => 7,
-            'disabled' => !$selectedL6,
-            'parentCategoryId' => $selectedL6?->id
-        ])
-    </td>
+    @if($effectiveCategoryMaxLevel >= 6)
+        <td class="px-2 py-2 relative">
+            @if($effectiveCategoryMaxLevel >= 7)
+                @include('livewire.products.import.partials.inline-category-select', [
+                    'product' => $product,
+                    'level' => 7,
+                    'disabled' => !$selectedL6,
+                    'parentCategoryId' => $selectedL6?->id
+                ])
+            @else
+                <button type="button"
+                        wire:click="expandCategoryColumns"
+                        class="inline-flex items-center justify-center w-7 h-7 rounded text-gray-500
+                               bg-gray-700/30 hover:bg-gray-700/50 hover:text-green-400 transition-colors"
+                        title="Pokaż KAT L7">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                    </svg>
+                </button>
+            @endif
+        </td>
+    @endif
 
-    {{-- L8 (KAT L8) --}}
-    <td class="px-2 py-2 relative">
-        @include('livewire.products.import.partials.inline-category-select', [
-            'product' => $product,
-            'level' => 8,
-            'disabled' => !$selectedL7,
-            'parentCategoryId' => $selectedL7?->id
-        ])
-    </td>
+    @if($effectiveCategoryMaxLevel >= 7)
+        <td class="px-2 py-2 relative">
+            @if($effectiveCategoryMaxLevel >= 8)
+                @include('livewire.products.import.partials.inline-category-select', [
+                    'product' => $product,
+                    'level' => 8,
+                    'disabled' => !$selectedL7,
+                    'parentCategoryId' => $selectedL7?->id
+                ])
+            @else
+                <button type="button"
+                        wire:click="expandCategoryColumns"
+                        class="inline-flex items-center justify-center w-7 h-7 rounded text-gray-500
+                               bg-gray-700/30 hover:bg-gray-700/50 hover:text-green-400 transition-colors"
+                        title="Pokaż KAT L8">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                    </svg>
+                </button>
+            @endif
+        </td>
+    @endif
 
     {{-- PUBLIKACJA - interaktywny dropdown ERPConnection + PrestaShop (FAZA 9.3 - zastepuje Sklepy) --}}
     <td class="px-2 py-2 relative">

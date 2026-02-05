@@ -10480,6 +10480,22 @@ class ProductForm extends Component
             ]);
 
             $dispatchedCount = 0;
+
+            // FIX 2026-02-05: Set "early sync flags" in cache BEFORE dispatch
+            // This allows ProductList to show "syncing" icon immediately,
+            // before the SyncJob record is created in the queue worker's handle()
+            $earlySyncFlags = [];
+            foreach ($shops as $shop) {
+                $earlySyncFlags[] = ['type' => 'shop', 'target_id' => $shop->id, 'created_at' => now()->timestamp];
+            }
+            if (!empty($earlySyncFlags)) {
+                \Illuminate\Support\Facades\Cache::put(
+                    "product_sync_pending:{$this->product->id}",
+                    $earlySyncFlags,
+                    60 // TTL: 60 seconds - enough for job to start and create SyncJob
+                );
+            }
+
             foreach ($shops as $shop) {
                 \App\Jobs\PrestaShop\SyncProductToPrestaShop::dispatch(
                     $this->product,

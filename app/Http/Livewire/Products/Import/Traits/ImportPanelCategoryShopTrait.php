@@ -489,6 +489,11 @@ trait ImportPanelCategoryShopTrait
                 'new_cats' => $newCats,
             ]);
 
+            // UI: jezeli dane dogonily wymuszony poziom, zdejmij wymuszenie
+            if (method_exists($this, 'syncCategoryForcedMaxLevel')) {
+                $this->syncCategoryForcedMaxLevel();
+            }
+
         } catch (\Exception $e) {
             Log::error('Failed to set category for level', [
                 'product_id' => $productId,

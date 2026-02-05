@@ -147,6 +147,10 @@ class ProductList extends Component
     // CRITICAL: MUST be public for Livewire to track across poll cycles!
     public array $shownPreviewIds = []; // Preview IDs that have been shown (prevents duplicate modal opens)
 
+    // FIX 2026-02-05: Track active sync job count for polling refresh
+    // CRITICAL: MUST be public for Livewire to persist across poll cycles!
+    public ?int $previousActiveSyncJobCount = null;
+
     // Computed
     public bool $hasFilters = false;
 
@@ -3203,6 +3207,60 @@ class ProductList extends Component
 
             break; // Show only one modal at a time
         }
+    }
+
+    /**
+     * Check and refresh sync job statuses (polling mechanism)
+     *
+     * FIX 2026-02-05: ProductList sync status not refreshing after job completion
+     *
+     * Called by wire:poll to check if any active sync jobs have completed.
+     * If so, clears the computed productStatuses cache to force re-fetch.
+     *
+     * Problem: #[Computed] productStatuses was cached and not refreshed after
+     * SyncJob status changed from 'running' to 'completed'.
+     *
+     * Solution: Track active job IDs, poll for status changes, reset computed cache.
+     *
+     * @return void
+     */
+    public function checkSyncJobStatuses(): void
+    {
+        // Get current page product IDs
+        $paginator = $this->products;
+        if ($paginator->isEmpty()) {
+            return;
+        }
+
+        $productIds = $paginator->getCollection()->pluck('id')->toArray();
+
+        // Check for active sync jobs for these products
+        $activeJobs = \App\Models\SyncJob::whereIn('source_id', $productIds)
+            ->where('source_type', \App\Models\SyncJob::TYPE_PPM)
+            ->whereIn('status', [\App\Models\SyncJob::STATUS_PENDING, \App\Models\SyncJob::STATUS_RUNNING])
+            ->count();
+
+        // DEBUG: Log every poll call to verify it's working
+        Log::debug('[SYNC STATUS POLL] Checking sync statuses', [
+            'active_jobs' => $activeJobs,
+            'previous_count' => $this->previousActiveSyncJobCount,
+            'products_on_page' => count($productIds),
+        ]);
+
+        // Compare with previous count to detect changes
+        if ($this->previousActiveSyncJobCount !== null && $activeJobs !== $this->previousActiveSyncJobCount) {
+            // Job count changed - some jobs completed or started
+            // Clear computed cache to force refresh of productStatuses
+            unset($this->productStatuses);
+
+            Log::info('[SYNC STATUS POLL] Sync job count changed, refreshing statuses', [
+                'previous' => $this->previousActiveSyncJobCount,
+                'current' => $activeJobs,
+                'product_ids_sample' => array_slice($productIds, 0, 5),
+            ]);
+        }
+
+        $this->previousActiveSyncJobCount = $activeJobs;
     }
 
     /**

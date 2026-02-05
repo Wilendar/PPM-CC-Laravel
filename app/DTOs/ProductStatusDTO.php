@@ -90,15 +90,33 @@ class ProductStatusDTO
 
     /**
      * All connected PrestaShop shops (regardless of issues)
-     * @var array<int, array{name: string, color: string, icon: string, hasIssues: bool}>
+     * @var array<int, array{name: string, color: string, icon: string, hasIssues: bool, syncStatus: string|null}>
      */
     public array $connectedShops = [];
 
     /**
      * All connected ERP systems (regardless of issues)
-     * @var array<int, array{name: string, color: string, icon: string, hasIssues: bool}>
+     * @var array<int, array{name: string, color: string, icon: string, hasIssues: bool, syncStatus: string|null}>
      */
     public array $connectedErps = [];
+
+    /**
+     * Sync status constants
+     */
+    public const SYNC_STATUS_PENDING = 'pending';
+    public const SYNC_STATUS_RUNNING = 'running';
+    public const SYNC_STATUS_NONE = null;
+
+    /**
+     * Flag indicating product is within import grace period
+     * When true, validation issues should not be displayed - show loading icon instead
+     */
+    public bool $isAwaitingValidation = false;
+
+    /**
+     * Timestamp when grace period expires (for UI display)
+     */
+    public ?\DateTimeInterface $gracePeriodExpiresAt = null;
 
     public function __construct(int $productId)
     {
@@ -169,28 +187,42 @@ class ProductStatusDTO
 
     /**
      * Add connected shop (for showing all integrations in status column)
+     *
+     * @param int $shopId Shop ID
+     * @param string $name Shop name
+     * @param string $color Hex color (without #)
+     * @param string $icon Icon name
+     * @param string|null $syncStatus Active sync status ('pending', 'running', or null)
      */
-    public function addConnectedShop(int $shopId, string $name, string $color = '06b6d4', string $icon = 'shopping-cart'): self
+    public function addConnectedShop(int $shopId, string $name, string $color = '06b6d4', string $icon = 'shopping-cart', ?string $syncStatus = null): self
     {
         $this->connectedShops[$shopId] = [
             'name' => $name,
             'color' => $color,
             'icon' => $icon,
             'hasIssues' => isset($this->shopIssues[$shopId]),
+            'syncStatus' => $syncStatus,
         ];
         return $this;
     }
 
     /**
      * Add connected ERP (for showing all integrations in status column)
+     *
+     * @param int $erpId ERP connection ID
+     * @param string $name ERP instance name
+     * @param string $color Hex color (without #)
+     * @param string $icon Icon name
+     * @param string|null $syncStatus Active sync status ('pending', 'running', or null)
      */
-    public function addConnectedErp(int $erpId, string $name, string $color = 'f97316', string $icon = 'database'): self
+    public function addConnectedErp(int $erpId, string $name, string $color = 'f97316', string $icon = 'database', ?string $syncStatus = null): self
     {
         $this->connectedErps[$erpId] = [
             'name' => $name,
             'color' => $color,
             'icon' => $icon,
             'hasIssues' => isset($this->erpIssues[$erpId]),
+            'syncStatus' => $syncStatus,
         ];
         return $this;
     }
@@ -198,14 +230,17 @@ class ProductStatusDTO
     /**
      * Update hasIssues flag for all connected integrations
      * (call after all issues have been added)
+     * Note: syncStatus is preserved from addConnectedShop/addConnectedErp
      */
     public function finalizeConnectedIntegrations(): self
     {
         foreach ($this->connectedShops as $shopId => &$shop) {
             $shop['hasIssues'] = isset($this->shopIssues[$shopId]);
+            // syncStatus is already set, preserve it
         }
         foreach ($this->connectedErps as $erpId => &$erp) {
             $erp['hasIssues'] = isset($this->erpIssues[$erpId]);
+            // syncStatus is already set, preserve it
         }
         return $this;
     }
@@ -234,6 +269,24 @@ class ProductStatusDTO
     public function hasConnectedIntegrations(): bool
     {
         return !empty($this->connectedShops) || !empty($this->connectedErps);
+    }
+
+    /**
+     * Check if any integration has active sync job
+     */
+    public function hasActiveSyncJob(): bool
+    {
+        foreach ($this->connectedShops as $shop) {
+            if (!empty($shop['syncStatus'])) {
+                return true;
+            }
+        }
+        foreach ($this->connectedErps as $erp) {
+            if (!empty($erp['syncStatus'])) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**

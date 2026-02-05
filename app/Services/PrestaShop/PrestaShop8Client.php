@@ -1717,30 +1717,82 @@ class PrestaShop8Client extends BasePrestaShopClient
         try {
             $url = $this->buildUrl("/images/products/{$productId}");
 
+            // Get current images BEFORE upload (for fallback detection)
+            $imagesBefore = [];
+            try {
+                $imagesBefore = $this->getProductImages($productId);
+            } catch (\Exception $e) {
+                // Ignore errors getting images before
+            }
+
             // PrestaShop Image API requires multipart/form-data
             $response = \Illuminate\Support\Facades\Http::withBasicAuth($this->shop->api_key, '')
                 ->timeout($this->timeout)
                 ->attach('image', file_get_contents($imagePath), $filename)
                 ->post($url);
 
+            // Parse response body
+            $body = $response->body();
+            $result = [];
+
+            // Check if response contains deprecation warning (modules with deprecated hooks)
+            // These can cause HTTP 500 even when upload succeeds!
+            $hasDeprecationWarning = str_contains($body, 'deprecated') ||
+                                     str_contains($body, 'E_USER_DEPRECATED') ||
+                                     str_contains($body, '#16384');
+
+            // For HTTP errors, try fallback detection if it's a deprecation warning
             if (!$response->successful()) {
-                \Log::error('[IMAGE API] Failed to upload image', [
+                if ($hasDeprecationWarning) {
+                    \Log::warning('[IMAGE API] HTTP error with deprecation warning, trying fallback detection', [
+                        'product_id' => $productId,
+                        'status' => $response->status(),
+                        'deprecation_module' => $this->extractDeprecationModule($body),
+                    ]);
+
+                    // Wait a moment for PrestaShop to process
+                    usleep(300000); // 300ms
+
+                    // Check if image was actually uploaded
+                    try {
+                        $imagesAfter = $this->getProductImages($productId);
+                        $beforeIds = array_map(fn($img) => is_array($img) ? ($img['id'] ?? 0) : (int)$img, $imagesBefore);
+                        $afterIds = array_map(fn($img) => is_array($img) ? ($img['id'] ?? 0) : (int)$img, $imagesAfter);
+
+                        $newIds = array_diff($afterIds, $beforeIds);
+
+                        if (!empty($newIds)) {
+                            $newImageId = (int) reset($newIds);
+                            \Log::info('[IMAGE API] Image uploaded despite HTTP error (deprecation warning)', [
+                                'product_id' => $productId,
+                                'image_id' => $newImageId,
+                                'shop_id' => $this->shop->id,
+                                'http_status' => $response->status(),
+                                'deprecation_module' => $this->extractDeprecationModule($body),
+                            ]);
+                            return ['id' => $newImageId];
+                        }
+                    } catch (\Exception $e) {
+                        \Log::warning('[IMAGE API] Fallback detection failed', [
+                            'error' => $e->getMessage(),
+                        ]);
+                    }
+                }
+
+                // Real HTTP error - throw exception
+                \Log::error('[IMAGE API] Failed to upload image (HTTP error)', [
                     'product_id' => $productId,
                     'status' => $response->status(),
-                    'body' => $response->body(),
+                    'body' => substr($body, 0, 500),
                 ]);
 
                 throw new \App\Exceptions\PrestaShopAPIException(
-                    'Image upload failed: ' . $response->body(),
+                    'Image upload failed: ' . $body,
                     $response->status()
                 );
             }
 
-            // Parse response to get image ID
-            $body = $response->body();
-            $result = [];
-
-            // Try JSON first
+            // Try to extract image ID from successful response
             $json = json_decode($body, true);
             if ($json && isset($json['image']['id'])) {
                 $result = ['id' => (int) $json['image']['id']];
@@ -1752,13 +1804,69 @@ class PrestaShop8Client extends BasePrestaShopClient
                 }
             }
 
-            \Log::info('[IMAGE API] Image uploaded successfully', [
+            // If we got image ID, success
+            if (!empty($result['id'])) {
+                \Log::info('[IMAGE API] Image uploaded successfully', [
+                    'product_id' => $productId,
+                    'image_id' => $result['id'],
+                    'shop_id' => $this->shop->id,
+                ]);
+                return $result;
+            }
+
+            // HTTP 200 but no image ID - try fallback
+            // PrestaShop modules with deprecated hooks can cause XML errors in response
+            // but upload may still succeed
+            $hasDeprecationWarning = str_contains($body, 'deprecated') ||
+                                     str_contains($body, 'E_USER_DEPRECATED') ||
+                                     str_contains($body, '#16384');
+
+            if ($hasDeprecationWarning) {
+                \Log::warning('[IMAGE API] Response contains deprecation warning, checking if upload succeeded', [
+                    'product_id' => $productId,
+                    'shop_id' => $this->shop->id,
+                ]);
+
+                // Wait a moment for PrestaShop to process
+                usleep(500000); // 500ms
+
+                // Get images AFTER upload and compare
+                try {
+                    $imagesAfter = $this->getProductImages($productId);
+                    $beforeIds = array_map(fn($img) => is_array($img) ? ($img['id'] ?? 0) : (int)$img, $imagesBefore);
+                    $afterIds = array_map(fn($img) => is_array($img) ? ($img['id'] ?? 0) : (int)$img, $imagesAfter);
+
+                    // Find new image ID
+                    $newIds = array_diff($afterIds, $beforeIds);
+
+                    if (!empty($newIds)) {
+                        $newImageId = (int) reset($newIds);
+                        \Log::info('[IMAGE API] Image uploaded (detected via fallback after deprecation warning)', [
+                            'product_id' => $productId,
+                            'image_id' => $newImageId,
+                            'shop_id' => $this->shop->id,
+                            'deprecation_module' => $this->extractDeprecationModule($body),
+                        ]);
+                        return ['id' => $newImageId];
+                    }
+                } catch (\Exception $e) {
+                    \Log::warning('[IMAGE API] Could not verify upload via fallback', [
+                        'error' => $e->getMessage(),
+                    ]);
+                }
+            }
+
+            // No image ID found and no fallback success - treat as error
+            \Log::error('[IMAGE API] Upload failed - no image ID in response', [
                 'product_id' => $productId,
-                'image_id' => $result['id'] ?? null,
+                'body' => substr($body, 0, 500),
                 'shop_id' => $this->shop->id,
             ]);
 
-            return $result;
+            throw new \App\Exceptions\PrestaShopAPIException(
+                'Image upload failed: ' . $body,
+                $response->status()
+            );
 
         } catch (\App\Exceptions\PrestaShopAPIException $e) {
             throw $e;
@@ -1774,6 +1882,17 @@ class PrestaShop8Client extends BasePrestaShopClient
                 $e
             );
         }
+    }
+
+    /**
+     * Extract module name from deprecation warning
+     */
+    private function extractDeprecationModule(string $body): ?string
+    {
+        if (preg_match('/in module "([^"]+)"/', $body, $matches)) {
+            return $matches[1];
+        }
+        return null;
     }
 
     /**

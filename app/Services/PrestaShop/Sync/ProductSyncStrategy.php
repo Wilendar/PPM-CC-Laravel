@@ -864,16 +864,44 @@ class ProductSyncStrategy implements ISyncStrategy
                 }
             }
 
+            // FIX 2026-02-05: Always use REPLACE ALL strategy even without pending changes
+            // Per user request: "zawsze uploaduj zdjecia z PPM aby uniknac bledow z istniejacymi zdjeciami"
+            // This ensures images are always fresh from PPM, avoiding mapping mismatch issues
             if (empty($shopChanges)) {
-                Log::debug('[MEDIA SYNC] No pending checkbox changes, checking cover image sync', [
+                Log::info('[MEDIA SYNC] No pending checkbox changes, using REPLACE ALL for currently assigned media', [
                     'product_id' => $product->id,
                     'shop_id' => $shop->id,
                 ]);
 
-                // ETAP_07d (2025-12-02): Even without checkbox changes, sync cover image
-                // This handles case when user changes primary image without checkbox changes
-                $this->syncCoverImageIfNeeded($product, $shop, $externalId);
-                return;
+                // Build shopChanges from currently mapped media (treat as 'sync' action)
+                // This will cause REPLACE ALL to delete and re-upload all assigned images
+                $storeKey = "store_{$shop->id}";
+                $allMedia = \App\Models\Media::where('mediable_type', Product::class)
+                    ->where('mediable_id', $product->id)
+                    ->active()
+                    ->get();
+
+                foreach ($allMedia as $media) {
+                    $mapping = $media->prestashop_mapping[$storeKey] ?? [];
+                    if (!empty($mapping['ps_image_id'])) {
+                        // Media is currently synced - include it for re-upload
+                        $shopChanges[$media->id] = 'sync';
+                    }
+                }
+
+                if (empty($shopChanges)) {
+                    Log::debug('[MEDIA SYNC] No media assigned to shop, nothing to sync', [
+                        'product_id' => $product->id,
+                        'shop_id' => $shop->id,
+                    ]);
+                    return;
+                }
+
+                Log::info('[MEDIA SYNC] Built shopChanges from existing mappings for REPLACE ALL', [
+                    'product_id' => $product->id,
+                    'shop_id' => $shop->id,
+                    'media_count' => count($shopChanges),
+                ]);
             }
 
             Log::info('[MEDIA SYNC] Shop-specific changes found', [

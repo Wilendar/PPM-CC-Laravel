@@ -174,13 +174,55 @@
         </div>
     </div>
 
+    {{-- Import Grace Period --}}
+    <div class="bg-gray-800/50 rounded-lg p-5 border border-yellow-700/30">
+        <h4 class="text-sm font-semibold text-white mb-4 flex items-center gap-2">
+            <svg class="w-5 h-5 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+            Okres karencji po imporcie
+        </h4>
+
+        <p class="text-sm text-gray-400 mb-4">
+            Nowo utworzone produkty nie beda walidowane przez okreslony czas po utworzeniu.
+            W tym czasie zamiast bledow walidacji wyswietlana jest ikona <span class="text-yellow-400">🔄</span> (oczekiwanie na pelny import).
+        </p>
+
+        <div class="flex flex-wrap items-center gap-6">
+            <div class="flex items-center gap-2">
+                <label class="text-sm text-gray-400">Czas karencji (sekundy):</label>
+                <input type="number"
+                       wire:model.live="importGracePeriodSeconds"
+                       min="0"
+                       max="600"
+                       step="10"
+                       class="w-24 px-2 py-1 text-sm bg-gray-900 border border-gray-600 rounded text-white focus:border-yellow-500 focus:ring-yellow-500/20">
+                <span class="text-xs text-gray-500">({{ $importGracePeriodSeconds >= 60 ? floor($importGracePeriodSeconds / 60) . ' min ' . ($importGracePeriodSeconds % 60) . 's' : $importGracePeriodSeconds . 's' }})</span>
+            </div>
+
+            <div class="text-xs text-gray-500 flex items-center gap-1">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+                Ustaw 0 aby wylaczyc karencje
+            </div>
+        </div>
+
+        <div class="mt-4 p-3 bg-yellow-900/20 rounded-lg border border-yellow-700/30">
+            <p class="text-xs text-yellow-300/80">
+                <strong>Tip:</strong> Jezeli import produktow z plikiem XLSX trwa dlugo (np. wiele zdjec),
+                ustaw wiekszy czas karencji aby uniknac falszywych alertow o brakujacych danych.
+            </p>
+        </div>
+    </div>
+
     {{-- Cache Settings --}}
     <div class="bg-gray-800/50 rounded-lg p-5 border border-gray-700">
         <h4 class="text-sm font-semibold text-white mb-4 flex items-center gap-2">
             <svg class="w-5 h-5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
             </svg>
-            Wydajność (Cache)
+            Wydajnosc (Cache)
         </h4>
 
         <div class="flex flex-wrap items-center gap-6">

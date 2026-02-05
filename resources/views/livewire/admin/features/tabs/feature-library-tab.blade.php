@@ -5,191 +5,87 @@
             <span class="text-2xl">&#128218;</span>
             <div>
                 <h3 class="text-h3">Biblioteka Cech</h3>
-                <p class="text-sm text-gray-400">Zarzadzaj grupami i cechami produktow</p>
+                <p class="text-sm text-gray-400">
+                    {{ $this->groups->count() }} grup | {{ $this->groups->sum('features_count') }} cech
+                </p>
             </div>
         </div>
         <div class="flex items-center gap-3">
-            <button wire:click="openFeatureGroupModal" class="btn-enterprise-secondary btn-sm">
-                + Grupa
-            </button>
-            <button wire:click="openFeatureTypeModal" class="btn-enterprise-primary btn-sm">
-                + Cecha
-            </button>
+            <button wire:click="expandAll" class="btn-enterprise-ghost btn-sm">Rozwin wszystko</button>
+            <button wire:click="collapseAll" class="btn-enterprise-ghost btn-sm">Zwin wszystko</button>
+            <button wire:click="openFeatureGroupModal" class="btn-enterprise-secondary btn-sm">+ Grupa</button>
+            <button wire:click="openFeatureTypeModal" class="btn-enterprise-primary btn-sm">+ Cecha</button>
         </div>
     </div>
 
-    {{-- 2-COLUMN LAYOUT --}}
-    <div class="feature-library__columns">
-        {{-- LEFT COLUMN: Groups --}}
-        <div class="feature-browser__column feature-browser__column--groups">
-            <div class="feature-browser__column-header">
-                <span class="font-medium">GRUPY CECH</span>
-                <span class="text-xs text-gray-400">{{ $this->groups->count() }}</span>
-            </div>
-            <div class="feature-browser__column-content">
-                @foreach($this->groups as $group)
-                    <div wire:key="group-{{ $group['id'] }}"
-                         class="feature-library__group-item {{ $selectedGroupId === $group['id'] ? 'active' : '' }}">
-                        {{-- Group Button --}}
-                        <button wire:click="selectGroup({{ $group['id'] }})"
-                                class="flex-1 flex items-center gap-2 text-left">
-                            @if($group['icon'])
-                                <span class="text-sm {{ $group['colorClasses'] ?? '' }}">
-                                    @switch($group['icon'])
-                                        @case('engine') &#9881; @break
-                                        @case('ruler') &#128207; @break
-                                        @case('wheel') &#9899; @break
-                                        @case('brake') &#128376; @break
-                                        @case('suspension') &#8597; @break
-                                        @case('electric') &#9889; @break
-                                        @case('fuel') &#9981; @break
-                                        @case('document') &#128196; @break
-                                        @case('car') &#128663; @break
-                                        @case('gear') &#9881; @break
-                                        @case('info') &#8505; @break
-                                        @default &#128204;
-                                    @endswitch
-                                </span>
-                            @endif
-                            <span class="truncate flex-1">{{ $group['name'] }}</span>
-                        </button>
+    {{-- EXPANDABLE TREE --}}
+    <div class="feature-tree">
+        @foreach($this->groups as $group)
+            <div wire:key="group-{{ $group['id'] }}" class="feature-tree__group">
+                {{-- Group Header (clickable) --}}
+                <div class="feature-tree__group-header" wire:click="toggleGroup({{ $group['id'] }})">
+                    <span class="feature-tree__expand-icon {{ $this->isGroupExpanded($group['id']) ? 'expanded' : '' }}">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                        </svg>
+                    </span>
+                    <span class="feature-tree__group-icon">
+                        @switch($group['icon'])
+                            @case('engine') &#9881; @break
+                            @case('electric') &#9889; @break
+                            @case('fuel') &#9981; @break
+                            @case('ruler') &#128207; @break
+                            @case('wheel') &#9899; @break
+                            @case('brake') &#128376; @break
+                            @case('suspension') &#8597; @break
+                            @case('document') &#128196; @break
+                            @case('car') &#128663; @break
+                            @case('gear') &#9881; @break
+                            @case('info') &#8505; @break
+                            @default &#128193;
+                        @endswitch
+                    </span>
+                    <span class="feature-tree__group-name">{{ $group['name'] }}</span>
+                    @if($group['vehicle_filter'])
+                        <span class="feature-tree__badge feature-tree__badge--warning">
+                            {{ $group['vehicle_filter'] === 'elektryczne' ? '&#9889;' : '&#9981;' }}
+                        </span>
+                    @endif
+                    <span class="feature-tree__badge">{{ $group['features_count'] }}</span>
 
-                        {{-- Group Actions --}}
-                        <div class="flex items-center gap-1">
-                            @if($group['vehicle_filter'])
-                                <span class="text-xs px-1.5 py-0.5 rounded bg-yellow-500/20 text-yellow-400" title="Warunkowa: {{ $group['vehicle_filter'] }}">
-                                    @if($group['vehicle_filter'] === 'elektryczne')
-                                        ⚡
-                                    @else
-                                        ⛽
-                                    @endif
-                                </span>
-                            @endif
-                            <span class="feature-browser__badge {{ $group['used_features_count'] > 0 ? 'feature-browser__badge--active' : '' }}">
-                                {{ $group['features_count'] }}
-                            </span>
-                            <button wire:click="editFeatureGroup({{ $group['id'] }})"
-                                    class="p-1 text-blue-400 hover:text-blue-300 opacity-0 group-hover:opacity-100 transition-opacity"
-                                    title="Edytuj grupe">
-                                &#9998;
-                            </button>
-                            <button wire:click="deleteFeatureGroup({{ $group['id'] }})"
-                                    wire:confirm="Usunac grupe {{ $group['name'] }}?"
-                                    class="p-1 text-red-400 hover:text-red-300 opacity-0 group-hover:opacity-100 transition-opacity"
-                                    title="Usun grupe">
-                                &#128465;
-                            </button>
-                        </div>
+                    {{-- Group Actions (stop propagation) --}}
+                    <div class="feature-tree__actions" wire:click.stop>
+                        <button wire:click="editFeatureGroup({{ $group['id'] }})" class="feature-tree__action-btn" title="Edytuj">&#9998;</button>
+                        <button wire:click="deleteFeatureGroup({{ $group['id'] }})" wire:confirm="Usunac grupe {{ $group['name'] }}?" class="feature-tree__action-btn feature-tree__action-btn--danger" title="Usun">&#128465;</button>
                     </div>
-                @endforeach
-            </div>
-            <div class="feature-browser__column-footer">
-                {{ $this->groups->sum('features_count') }} cech lacznie
-            </div>
-        </div>
-
-        {{-- RIGHT COLUMN: Features of selected group --}}
-        <div class="feature-browser__column feature-browser__column--features" style="flex: 2;">
-            @if($selectedGroupId && $this->selectedGroup)
-                {{-- Features Header --}}
-                <div class="feature-browser__column-header">
-                    <div class="flex items-center gap-2">
-                        <span class="font-medium">CECHY GRUPY:</span>
-                        <span class="text-gray-300">{{ $this->selectedGroup['name'] }}</span>
-                    </div>
-                    <button wire:click="openFeatureTypeModal({{ $selectedGroupId }})"
-                            class="text-xs text-green-400 hover:text-green-300">
-                        + Dodaj ceche
-                    </button>
                 </div>
 
-                {{-- Search --}}
-                <div class="p-2 border-b border-gray-700">
-                    <input type="text"
-                           wire:model.live.debounce.300ms="searchQuery"
-                           class="form-input form-input-sm w-full"
-                           placeholder="Szukaj cechy...">
-                </div>
-
-                {{-- Features List --}}
-                <div class="feature-browser__column-content">
-                    @forelse($this->featureTypes as $feature)
-                        <div wire:key="feature-{{ $feature['id'] }}"
-                             class="feature-library__feature-item group">
-                            <div class="flex items-center gap-3 flex-1 min-w-0">
-                                <div class="flex flex-col flex-1 min-w-0">
-                                    <span class="font-medium truncate">{{ $feature['name'] }}</span>
-                                    <span class="text-xs text-gray-500 truncate">{{ $feature['code'] }}</span>
-                                </div>
-                            </div>
-
-                            <div class="flex items-center gap-2">
-                                {{-- Unit badge --}}
+                {{-- Features List (collapsible) --}}
+                @if($this->isGroupExpanded($group['id']))
+                    <div class="feature-tree__features">
+                        @forelse($group['features'] as $feature)
+                            <div wire:key="feature-{{ $feature['id'] }}" class="feature-tree__feature-item">
+                                <span class="feature-tree__feature-name">{{ $feature['name'] }}</span>
+                                <span class="feature-tree__feature-code text-gray-500">{{ $feature['code'] }}</span>
                                 @if($feature['unit'])
-                                    <span class="text-xs px-1.5 py-0.5 rounded bg-gray-700 text-gray-400">
-                                        {{ $feature['unit'] }}
-                                    </span>
+                                    <span class="feature-tree__badge feature-tree__badge--small">{{ $feature['unit'] }}</span>
                                 @endif
-
-                                {{-- Type badge --}}
-                                <span class="text-xs px-2 py-0.5 rounded bg-gray-700 text-gray-300">
-                                    {{ $feature['value_type'] }}
-                                </span>
-
-                                {{-- Products count badge --}}
-                                <span class="feature-browser__badge feature-browser__badge--small {{ $feature['products_count'] > 0 ? 'feature-browser__badge--active' : 'feature-browser__badge--zero' }}">
+                                <span class="feature-tree__badge feature-tree__badge--small">{{ $feature['value_type'] }}</span>
+                                <span class="feature-tree__badge feature-tree__badge--small {{ $feature['products_count'] > 0 ? 'feature-tree__badge--active' : '' }}">
                                     {{ $feature['products_count'] }} prod.
                                 </span>
-
-                                {{-- Conditional badge --}}
-                                @if($feature['conditional'])
-                                    <span class="text-xs px-1.5 py-0.5 rounded bg-yellow-500/20 text-yellow-400" title="Warunkowa: {{ $feature['conditional'] }}">
-                                        @if($feature['conditional'] === 'elektryczne')
-                                            ⚡
-                                        @else
-                                            ⛽
-                                        @endif
-                                    </span>
-                                @endif
-
-                                {{-- Actions --}}
-                                <button wire:click="editFeatureType({{ $feature['id'] }})"
-                                        class="p-1 text-blue-400 hover:text-blue-300 opacity-0 group-hover:opacity-100 transition-opacity"
-                                        title="Edytuj ceche">
-                                    &#9998;
-                                </button>
-                                <button wire:click="deleteFeatureType({{ $feature['id'] }})"
-                                        wire:confirm="Usunac ceche {{ $feature['name'] }}?"
-                                        class="p-1 text-red-400 hover:text-red-300 opacity-0 group-hover:opacity-100 transition-opacity"
-                                        title="Usun ceche">
-                                    &#128465;
-                                </button>
+                                <div class="feature-tree__actions">
+                                    <button wire:click="editFeatureType({{ $feature['id'] }})" class="feature-tree__action-btn" title="Edytuj">&#9998;</button>
+                                    <button wire:click="deleteFeatureType({{ $feature['id'] }})" wire:confirm="Usunac ceche {{ $feature['name'] }}?" class="feature-tree__action-btn feature-tree__action-btn--danger" title="Usun">&#128465;</button>
+                                </div>
                             </div>
-                        </div>
-                    @empty
-                        <div class="feature-browser__empty-state">
-                            <span class="text-4xl mb-2">&#128196;</span>
-                            <p>{{ $searchQuery ? 'Brak wynikow dla "' . $searchQuery . '"' : 'Brak cech w tej grupie' }}</p>
-                            <button wire:click="openFeatureTypeModal({{ $selectedGroupId }})"
-                                    class="mt-3 btn-enterprise-secondary btn-sm">
-                                + Dodaj pierwsza ceche
-                            </button>
-                        </div>
-                    @endforelse
-                </div>
-
-                {{-- Footer stats --}}
-                <div class="feature-browser__column-footer">
-                    {{ $this->featureTypes->count() }} cech |
-                    {{ $this->featureTypes->where('products_count', '>', 0)->count() }} uzywanych
-                </div>
-            @else
-                <div class="feature-browser__empty-state">
-                    <span class="text-4xl mb-2">&#128072;</span>
-                    <p>Wybierz grupe z lewej kolumny</p>
-                </div>
-            @endif
-        </div>
+                        @empty
+                            <div class="feature-tree__empty">Brak cech w grupie</div>
+                        @endforelse
+                    </div>
+                @endif
+            </div>
+        @endforeach
     </div>
 
     {{-- FEATURE TYPE MODAL --}}

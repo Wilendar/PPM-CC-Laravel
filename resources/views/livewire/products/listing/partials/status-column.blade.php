@@ -22,27 +22,63 @@
 <td class="px-3 py-2" @click.stop>
     <div class="flex flex-wrap items-center gap-1 max-w-[200px]">
         @if($status)
-            {{-- Main popover trigger with full details --}}
-            <x-product-status-popover :status="$status" :product="$product" />
+            {{-- GRACE PERIOD: Awaiting validation state --}}
+            @if($status->isAwaitingValidation)
+                <span class="inline-flex items-center gap-1 px-2 py-1 rounded text-xs bg-yellow-900/30 text-yellow-400 border border-yellow-700/50"
+                      title="Oczekiwanie na pelny import - walidacja za {{ $status->gracePeriodExpiresAt ? $status->gracePeriodExpiresAt->diffForHumans() : 'chwile' }}">
+                    <svg class="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+                        <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                    </svg>
+                    <span class="hidden sm:inline">Import...</span>
+                </span>
 
-            {{-- Global issues as icons (if any) --}}
-            @if($status->globalIssues[ProductStatusDTO::ISSUE_ZERO_PRICE] ?? false)
-                <x-product-status-icon type="zero_price" />
-            @endif
+                {{-- Still show connected integrations during grace period --}}
+                @if($status->hasConnectedIntegrations())
+                    @foreach($status->connectedShops as $shopId => $shopInfo)
+                        <x-integration-status-badge
+                            :name="$shopInfo['name']"
+                            :color="'#' . ltrim($shopInfo['color'], '#')"
+                            :icon="$shopInfo['icon']"
+                            :hasIssues="false"
+                            :issues="[]"
+                            type="shop"
+                        />
+                    @endforeach
+                    @foreach($status->connectedErps as $erpId => $erpInfo)
+                        <x-integration-status-badge
+                            :name="$erpInfo['name']"
+                            :color="'#' . ltrim($erpInfo['color'], '#')"
+                            :icon="$erpInfo['icon']"
+                            :hasIssues="false"
+                            :issues="[]"
+                            type="erp"
+                        />
+                    @endforeach
+                @endif
+            @else
+                {{-- NORMAL: Standard validation display --}}
 
-            @if($status->globalIssues[ProductStatusDTO::ISSUE_LOW_STOCK] ?? false)
-                <x-product-status-icon type="low_stock" />
-            @endif
+                {{-- Main popover trigger with full details --}}
+                <x-product-status-popover :status="$status" :product="$product" />
 
-            @if($status->globalIssues[ProductStatusDTO::ISSUE_NO_IMAGES] ?? false)
-                <x-product-status-icon type="no_images" />
-            @endif
+                {{-- Global issues as icons (if any) --}}
+                @if($status->globalIssues[ProductStatusDTO::ISSUE_ZERO_PRICE] ?? false)
+                    <x-product-status-icon type="zero_price" />
+                @endif
 
-            @if($status->globalIssues[ProductStatusDTO::ISSUE_NOT_IN_PRESTASHOP] ?? false)
-                <x-product-status-icon type="not_in_prestashop" />
-            @endif
+                @if($status->globalIssues[ProductStatusDTO::ISSUE_LOW_STOCK] ?? false)
+                    <x-product-status-icon type="low_stock" />
+                @endif
 
-            {{-- ALL connected integrations (always show, with OK checkmark or issue count) --}}
+                @if($status->globalIssues[ProductStatusDTO::ISSUE_NO_IMAGES] ?? false)
+                    <x-product-status-icon type="no_images" />
+                @endif
+
+                @if($status->globalIssues[ProductStatusDTO::ISSUE_NOT_IN_PRESTASHOP] ?? false)
+                    <x-product-status-icon type="not_in_prestashop" />
+                @endif
+
+                {{-- ALL connected integrations (always show, with OK checkmark, issue count, or sync status) --}}
             @if($status->hasConnectedIntegrations())
                 {{-- Connected shops --}}
                 @foreach($status->connectedShops as $shopId => $shopInfo)
@@ -52,6 +88,7 @@
                         :icon="$shopInfo['icon']"
                         :hasIssues="$shopInfo['hasIssues']"
                         :issues="$status->shopIssues[$shopId] ?? []"
+                        :syncStatus="$shopInfo['syncStatus'] ?? null"
                         type="shop"
                     />
                 @endforeach
@@ -64,6 +101,7 @@
                         :icon="$erpInfo['icon']"
                         :hasIssues="$erpInfo['hasIssues']"
                         :issues="$status->erpIssues[$erpId] ?? []"
+                        :syncStatus="$erpInfo['syncStatus'] ?? null"
                         type="erp"
                     />
                 @endforeach
@@ -76,10 +114,11 @@
                 </span>
             @endif
 
-            {{-- Variant issues summary --}}
-            @if(!empty($status->variantIssues))
-                <x-product-status-icon type="variant_issues" :count="count($status->variantIssues)" />
-            @endif
+                {{-- Variant issues summary --}}
+                @if(!empty($status->variantIssues))
+                    <x-product-status-icon type="variant_issues" :count="count($status->variantIssues)" />
+                @endif
+            @endif {{-- END: Normal validation display --}}
         @else
             {{-- Loading/No data state --}}
             <span class="inline-flex items-center px-2 py-1 rounded text-xs bg-gray-700/50 text-gray-400">

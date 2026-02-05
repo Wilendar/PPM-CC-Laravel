@@ -206,6 +206,57 @@ Domyślnie: **Cyan (#06b6d4)** - wyróżnia sklepy od integracji ERP.
 
 ---
 
+## Sync Job Status Display (v1.2.0)
+
+### Stany Badge
+
+| Stan | Kolor | Ikona | Opis |
+|------|-------|-------|------|
+| OK | Integration color | ✓ Checkmark | Brak problemów |
+| Issues | Integration color | Liczba | Liczba problemów do rozwiązania |
+| Pending | Amber (#f59e0b) | ⏳ Spinner | Oczekuje na synchronizację |
+| Running | Amber (#f59e0b) | 🔄 Rotating | Synchronizacja w toku |
+
+### Priorytet wyświetlania
+
+Sync status ma priorytet nad issues:
+```
+Syncing (pending/running) > Issues > OK
+```
+
+### Użycie komponentu z syncStatus
+
+```blade
+<x-integration-status-badge
+    :name="$shopInfo['name']"
+    :color="'#' . ltrim($shopInfo['color'], '#')"
+    :icon="$shopInfo['icon']"
+    :hasIssues="$shopInfo['hasIssues']"
+    :issues="$status->shopIssues[$shopId] ?? []"
+    :syncStatus="$shopInfo['syncStatus'] ?? null"
+    type="shop"
+/>
+```
+
+### Dostępne wartości syncStatus
+
+| Wartość | Stała | Opis |
+|---------|-------|------|
+| `null` | `ProductStatusDTO::SYNC_STATUS_NONE` | Brak aktywnego joba |
+| `'pending'` | `ProductStatusDTO::SYNC_STATUS_PENDING` | Job oczekuje w kolejce |
+| `'running'` | `ProductStatusDTO::SYNC_STATUS_RUNNING` | Job jest wykonywany |
+
+### Źródło danych
+
+`ProductStatusAggregator::getActiveSyncJobsForProduct()` sprawdza tabelę `sync_jobs`:
+- `source_id` = product_id
+- `source_type` = 'ppm'
+- `status` IN ('pending', 'running')
+- `target_type` = 'prestashop' (dla sklepów) lub ERP type (dla ERP)
+- `target_id` = shop_id lub erp_connection_id
+
+---
+
 ## Wzorzec Eager Loading
 
 ```php
@@ -348,6 +399,15 @@ System automatycznie invaliduje cache `ProductStatusAggregator` gdy zmienia się
 
 ## Changelog
 
+### v1.2.0 (2026-02-05)
+- **Sync Job Status Display** - Badges now show active sync status (pending/running)
+- New `syncStatus` parameter in `integration-status-badge` component
+- Yellow/amber colored badges with spinner for syncing integrations
+- `ProductStatusDTO` extended with `syncStatus` field and `SYNC_STATUS_*` constants
+- `ProductStatusAggregator::getActiveSyncJobsForProduct()` - checks for pending/running jobs
+- Tooltip shows sync status: "Oczekuje na synchronizację" / "Synchronizacja w toku"
+- Syncing state takes visual priority over issues state
+
 ### v1.1.0 (2026-02-05)
 - Automatic cache invalidation when label_color or label_icon changes
 - New methods in ProductStatusAggregator: `invalidateCacheForShop()`, `invalidateCacheForErp()`
@@ -371,7 +431,12 @@ System automatycznie invaliduje cache `ProductStatusAggregator` gdy zmienia się
 |------|------|
 | `app/Models/ERPConnection.php` | Model z accessorami |
 | `app/Models/PrestaShopShop.php` | Model z accessorami |
+| `app/Models/SyncJob.php` | Model jobów synchronizacji |
+| `app/DTOs/ProductStatusDTO.php` | DTO z syncStatus i stałymi |
+| `app/Services/Product/ProductStatusAggregator.php` | Agregator statusów + getActiveSyncJobsForProduct() |
 | `app/Http/Livewire/Admin/ERP/ERPManager.php` | UI konfiguracji |
+| `resources/views/components/integration-status-badge.blade.php` | Komponent badge z syncStatus |
+| `resources/views/livewire/products/listing/partials/status-column.blade.php` | Kolumna statusu w ProductList |
 | `resources/views/livewire/admin/erp/erp-manager.blade.php` | Blade view |
 | `app/Jobs/Scan/ScanProductLinksJob.php` | Job z serializacją |
 | `app/Jobs/Scan/ScanMissingInSourceJob.php` | Job z eager loading |

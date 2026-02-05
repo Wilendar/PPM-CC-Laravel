@@ -1,6 +1,6 @@
 {{--
     Integration Status Badge Component
-    Displays a compact badge for per-integration status (OK or issues)
+    Displays a compact badge for per-integration status (OK, issues, or syncing)
 
     Uses label_color and label_icon from ERPConnection/PrestaShopShop
     per INTEGRATION_LABELS.md specification
@@ -11,6 +11,7 @@
     @param bool $hasIssues - Whether the integration has issues (default: true for backward compat)
     @param array $issues - Array of issue types ['basic', 'desc', 'physical', 'images']
     @param string $type - 'shop' or 'erp'
+    @param string|null $syncStatus - Active sync status ('pending', 'running', or null)
 
     Usage (with issues):
     <x-integration-status-badge
@@ -32,12 +33,24 @@
         type="shop"
     />
 
+    Usage (syncing):
+    <x-integration-status-badge
+        :name="$shop->name"
+        :color="$shop->label_color"
+        :icon="$shop->label_icon"
+        :hasIssues="false"
+        :issues="[]"
+        type="shop"
+        syncStatus="running"
+    />
+
     @since 2026-02-04
+    @updated 2026-02-05 - Added syncStatus support for active sync jobs
     @see .Release_docs/INTEGRATION_LABELS.md
     @see Plan_Projektu/synthetic-mixing-thunder.md (section 11.7)
 --}}
 
-@props(['name', 'color', 'icon', 'hasIssues' => true, 'issues' => [], 'type' => 'shop'])
+@props(['name', 'color', 'icon', 'hasIssues' => true, 'issues' => [], 'type' => 'shop', 'syncStatus' => null])
 
 @php
     // Issue labels in Polish
@@ -50,8 +63,19 @@
         'compatibility' => 'Dopasowania',
     ];
 
+    // Sync status labels
+    $syncStatusLabels = [
+        'pending' => 'Oczekuje na synchronizację',
+        'running' => 'Synchronizacja w toku',
+    ];
+
+    // Determine state: syncing takes priority over issues
+    $isSyncing = !empty($syncStatus) && in_array($syncStatus, ['pending', 'running']);
+
     // Build tooltip text based on status
-    if ($hasIssues && !empty($issues)) {
+    if ($isSyncing) {
+        $tooltipText = "{$name}: " . ($syncStatusLabels[$syncStatus] ?? 'Synchronizacja...');
+    } elseif ($hasIssues && !empty($issues)) {
         $tooltipIssues = collect($issues)
             ->map(fn($issue) => $issueLabels[$issue] ?? $issue)
             ->join(', ');
@@ -63,9 +87,18 @@
     // Default color if not provided
     $color = $color ?? ($type === 'shop' ? '#06b6d4' : '#f97316');
 
-    // Style adjustments for OK vs issues state
-    $bgOpacity = $hasIssues ? '30' : '15';
-    $borderOpacity = $hasIssues ? '60' : '40';
+    // Style adjustments based on state
+    // Syncing: use yellow/amber tones
+    if ($isSyncing) {
+        $bgOpacity = '25';
+        $borderOpacity = '50';
+        // Use amber color for syncing state
+        $syncColor = '#f59e0b';
+    } else {
+        $bgOpacity = $hasIssues ? '30' : '15';
+        $borderOpacity = $hasIssues ? '60' : '40';
+        $syncColor = null;
+    }
 
     // Icon SVG paths based on icon name
     $iconPaths = [
@@ -83,21 +116,47 @@
     $iconPath = $iconPaths[$icon] ?? $iconPaths['cog'];
 @endphp
 
-<span class="inline-flex items-center justify-center gap-0.5 h-6 px-1.5 rounded text-xs cursor-help transition-colors hover:opacity-80"
-      style="background-color: {{ $color }}{{ $bgOpacity }}; color: {{ $color }}; border: 1px solid {{ $color }}{{ $borderOpacity }};"
-      title="{{ $tooltipText }}">
-    {{-- Integration icon --}}
-    <svg class="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="{{ $iconPath }}"/>
-    </svg>
-
-    {{-- Status: checkmark (OK) or issue count --}}
-    @if($hasIssues && count($issues) > 0)
-        <span class="font-semibold text-[10px] leading-none">{{ count($issues) }}</span>
-    @else
-        {{-- Checkmark for OK status --}}
+@if($isSyncing)
+    {{-- SYNCING STATE: yellow/amber badge with spinner --}}
+    <span class="inline-flex items-center justify-center gap-0.5 h-6 px-1.5 rounded text-xs cursor-help transition-colors hover:opacity-80"
+          style="background-color: {{ $syncColor }}{{ $bgOpacity }}; color: {{ $syncColor }}; border: 1px solid {{ $syncColor }}{{ $borderOpacity }};"
+          title="{{ $tooltipText }}">
+        {{-- Integration icon --}}
         <svg class="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/>
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="{{ $iconPath }}"/>
         </svg>
-    @endif
-</span>
+
+        {{-- Spinner icon for syncing --}}
+        <svg class="w-3.5 h-3.5 flex-shrink-0 animate-spin" fill="none" viewBox="0 0 24 24">
+            @if($syncStatus === 'pending')
+                {{-- Clock icon for pending --}}
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+            @else
+                {{-- Rotating arrows for running --}}
+                <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+            @endif
+        </svg>
+    </span>
+@else
+    {{-- NORMAL STATE: OK or issues --}}
+    <span class="inline-flex items-center justify-center gap-0.5 h-6 px-1.5 rounded text-xs cursor-help transition-colors hover:opacity-80"
+          style="background-color: {{ $color }}{{ $bgOpacity }}; color: {{ $color }}; border: 1px solid {{ $color }}{{ $borderOpacity }};"
+          title="{{ $tooltipText }}">
+        {{-- Integration icon --}}
+        <svg class="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="{{ $iconPath }}"/>
+        </svg>
+
+        {{-- Status: checkmark (OK) or issue count --}}
+        @if($hasIssues && count($issues) > 0)
+            <span class="font-semibold text-[10px] leading-none">{{ count($issues) }}</span>
+        @else
+            {{-- Checkmark for OK status --}}
+            <svg class="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/>
+            </svg>
+        @endif
+    </span>
+@endif

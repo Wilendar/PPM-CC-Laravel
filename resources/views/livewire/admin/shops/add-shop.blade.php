@@ -23,7 +23,7 @@
                     </div>
                     <div class="ml-4 flex-1 min-w-0">
                         <h1 class="text-xl font-bold tracking-tight shop-wizard-title">
-                            DODAJ NOWY SKLEP PRESTASHOP
+                            {{ $isEditing ? 'EDYTUJ SKLEP PRESTASHOP' : 'DODAJ NOWY SKLEP PRESTASHOP' }}
                         </h1>
                         <p class="text-xs font-medium text-gray-400 tracking-wide">
                             {{ $stepDescription }}
@@ -64,16 +64,33 @@
                 @for ($i = 1; $i <= $totalSteps; $i++)
                     <div class="flex items-center">
                         <div class="relative">
-                            <div class="w-12 h-12 rounded-full flex items-center justify-center font-semibold transition-all duration-300 shadow-lg
-                                @if ($i <= $currentStep) shop-wizard-step-active @else shop-wizard-step-inactive @endif">
-                                @if ($i < $currentStep)
-                                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-                                    </svg>
-                                @else
-                                    {{ $i }}
-                                @endif
-                            </div>
+                            {{-- W trybie edycji: kroki klikalne (bez walidacji poprzednich) --}}
+                            @if ($isEditing)
+                                <button type="button"
+                                        wire:click="$set('currentStep', {{ $i }})"
+                                        class="w-12 h-12 rounded-full flex items-center justify-center font-semibold transition-all duration-300 shadow-lg cursor-pointer hover:scale-110 hover:ring-2 hover:ring-[#e0ac7e] hover:ring-offset-2 hover:ring-offset-gray-900
+                                            @if ($i <= $currentStep) shop-wizard-step-active @else shop-wizard-step-inactive @endif">
+                                    @if ($i < $currentStep)
+                                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                                        </svg>
+                                    @else
+                                        {{ $i }}
+                                    @endif
+                                </button>
+                            @else
+                                {{-- W trybie dodawania: kroki NIE są klikalne --}}
+                                <div class="w-12 h-12 rounded-full flex items-center justify-center font-semibold transition-all duration-300 shadow-lg
+                                    @if ($i <= $currentStep) shop-wizard-step-active @else shop-wizard-step-inactive @endif">
+                                    @if ($i < $currentStep)
+                                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                                        </svg>
+                                    @else
+                                        {{ $i }}
+                                    @endif
+                                </div>
+                            @endif
                             <div class="absolute -bottom-8 left-1/2 transform -translate-x-1/2 text-xs font-medium text-gray-300 whitespace-nowrap">
                                 {{ $this->getStepTitle($i) }}
                             </div>
@@ -1275,7 +1292,7 @@
         <div class="flex items-center justify-between pt-6 border-t border-gray-600">
             <div>
                 @if ($currentStep > 1)
-                    <button wire:click="previousStep" 
+                    <button wire:click="previousStep"
                             class="px-6 py-2 bg-gray-700 bg-opacity-60 text-gray-300 rounded-lg hover:bg-gray-600 hover:bg-opacity-80 transition-colors duration-200 flex items-center border border-gray-600">
                         <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
@@ -1286,22 +1303,43 @@
             </div>
 
             <div class="flex space-x-3">
-                @if ($currentStep < $totalSteps)
-                    <button wire:click="nextStep"
-                            class="relative px-6 py-3 text-white rounded-lg transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl flex items-center shop-wizard-btn-primary">
-                        Następny krok
-                        <svg class="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path>
-                        </svg>
-                    </button>
-                @else
+                {{-- TRYB EDYCJI: Przycisk "Zapisz zmiany" dostepny na KAZDYM kroku --}}
+                @if ($isEditing)
+                    @if ($currentStep < $totalSteps)
+                        <button wire:click="nextStep"
+                                class="relative px-6 py-3 text-white rounded-lg transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl flex items-center shop-wizard-btn-primary">
+                            Nastepny krok
+                            <svg class="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path>
+                            </svg>
+                        </button>
+                    @endif
                     <button wire:click="saveShop"
                             class="relative px-8 py-3 text-white rounded-lg transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl flex items-center shop-wizard-btn-success">
                         <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
                         </svg>
-                        Zapisz sklep
+                        Zapisz zmiany
                     </button>
+                @else
+                    {{-- TRYB DODAWANIA: Przycisk "Zapisz" tylko na ostatnim kroku --}}
+                    @if ($currentStep < $totalSteps)
+                        <button wire:click="nextStep"
+                                class="relative px-6 py-3 text-white rounded-lg transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl flex items-center shop-wizard-btn-primary">
+                            Nastepny krok
+                            <svg class="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path>
+                            </svg>
+                        </button>
+                    @else
+                        <button wire:click="saveShop"
+                                class="relative px-8 py-3 text-white rounded-lg transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl flex items-center shop-wizard-btn-success">
+                            <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                            </svg>
+                            Zapisz sklep
+                        </button>
+                    @endif
                 @endif
             </div>
         </div>

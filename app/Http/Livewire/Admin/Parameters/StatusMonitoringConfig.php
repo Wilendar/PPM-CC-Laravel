@@ -58,6 +58,13 @@ class StatusMonitoringConfig extends Component
     public int $cacheTtl = 300; // 5 minutes
 
     /**
+     * Import grace period - czas oczekiwania na pelny import przed walidacja
+     * Nowo utworzone produkty nie beda walidowane przez ten czas (sekundy)
+     * Ikona 🔄 bedzie wyswietlana zamiast bledow walidacji
+     */
+    public int $importGracePeriodSeconds = 60;
+
+    /**
      * Load configuration on mount
      */
     public function mount(): void
@@ -84,6 +91,9 @@ class StatusMonitoringConfig extends Component
         // Load cache settings
         $this->cacheEnabled = $config['cache_enabled'] ?? true;
         $this->cacheTtl = $config['cache_ttl'] ?? 300;
+
+        // Load import grace period
+        $this->importGracePeriodSeconds = $config['import_grace_period_seconds'] ?? 60;
     }
 
     /**
@@ -110,6 +120,7 @@ class StatusMonitoringConfig extends Component
             ],
             'cache_enabled' => $this->cacheEnabled,
             'cache_ttl' => $this->cacheTtl,
+            'import_grace_period_seconds' => $this->importGracePeriodSeconds,
         ];
 
         $aggregator->updateConfig($config);
@@ -139,6 +150,7 @@ class StatusMonitoringConfig extends Component
 
         $this->cacheEnabled = true;
         $this->cacheTtl = 300;
+        $this->importGracePeriodSeconds = 60;
 
         $this->saveConfig();
     }

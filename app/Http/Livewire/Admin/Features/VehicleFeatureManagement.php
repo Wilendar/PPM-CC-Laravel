@@ -56,9 +56,30 @@ class VehicleFeatureManagement extends Component
     // ========================================
 
     /**
-     * Active tab: 'library' | 'templates' | 'browser'
+     * Active tab: 'browser' | 'library' | 'templates'
+     * Default: 'browser' (Przeglądarka Cech - najczęściej używana)
      */
-    public string $activeTab = 'library';
+    public string $activeTab = 'browser';
+
+    /**
+     * Expanded group IDs for feature library tree view
+     */
+    public array $expandedGroups = [];
+
+    /**
+     * Selected group ID for 2-column library view
+     */
+    public ?int $selectedGroupId = null;
+
+    /**
+     * Search query for feature types in library
+     */
+    public string $searchQuery = '';
+
+    /**
+     * Filter for templates tab
+     */
+    public string $filter = 'all';
 
     /**
      * Set active tab
@@ -71,13 +92,112 @@ class VehicleFeatureManagement extends Component
     }
 
     // ========================================
+    // FEATURE LIBRARY TREE VIEW METHODS
+    // ========================================
+
+    /**
+     * Toggle group expansion state
+     */
+    public function toggleGroup(int $groupId): void
+    {
+        if (in_array($groupId, $this->expandedGroups)) {
+            $this->expandedGroups = array_values(array_filter(
+                $this->expandedGroups,
+                fn($id) => $id !== $groupId
+            ));
+        } else {
+            $this->expandedGroups[] = $groupId;
+        }
+    }
+
+    /**
+     * Check if group is expanded
+     */
+    public function isGroupExpanded(int $groupId): bool
+    {
+        return in_array($groupId, $this->expandedGroups);
+    }
+
+    /**
+     * Expand all groups
+     */
+    public function expandAll(): void
+    {
+        $this->expandedGroups = collect($this->featureLibrary)
+            ->pluck('id')
+            ->toArray();
+    }
+
+    /**
+     * Collapse all groups
+     */
+    public function collapseAll(): void
+    {
+        $this->expandedGroups = [];
+    }
+
+    /**
+     * Select group for 2-column library view
+     */
+    public function selectGroup(int $groupId): void
+    {
+        $this->selectedGroupId = $groupId;
+    }
+
+    /**
+     * Get selected group data (computed property)
+     */
+    public function getSelectedGroupProperty(): ?array
+    {
+        if (!$this->selectedGroupId) {
+            return null;
+        }
+
+        $groups = $this->getGroupsProperty();
+        return $groups->firstWhere('id', $this->selectedGroupId);
+    }
+
+    /**
+     * Get feature types for selected group (computed property)
+     */
+    public function getFeatureTypesProperty(): Collection
+    {
+        if (!$this->selectedGroupId) {
+            return collect([]);
+        }
+
+        $query = FeatureType::where('feature_group_id', $this->selectedGroupId)
+            ->where('is_active', true)
+            ->orderBy('position');
+
+        if (!empty($this->searchQuery)) {
+            $query->where(function ($q) {
+                $q->where('name', 'like', '%' . $this->searchQuery . '%')
+                    ->orWhere('code', 'like', '%' . $this->searchQuery . '%');
+            });
+        }
+
+        return $query->get()->map(fn($f) => [
+            'id' => $f->id,
+            'name' => $f->name,
+            'code' => $f->code,
+            'value_type' => $f->value_type,
+            'unit' => $f->unit,
+            'products_count' => $f->productFeatures()->count(),
+            'conditional' => $f->conditional_group,
+        ]);
+    }
+
+    // ========================================
     // TEMPLATE MANAGEMENT
     // ========================================
 
     /**
      * Show/hide template editor modal
+     * Alias: showTemplateModal (used in blade templates)
      */
     public bool $showTemplateEditor = false;
+    public bool $showTemplateModal = false; // Alias for blade
 
     /**
      * Currently editing template ID (null = new template)
@@ -125,8 +245,10 @@ class VehicleFeatureManagement extends Component
 
     /**
      * Show/hide feature type editor modal
+     * Alias: showFeatureTypeModal (used in blade templates)
      */
     public bool $showFeatureTypeEditor = false;
+    public bool $showFeatureTypeModal = false; // Alias for blade
 
     /**
      * Currently editing feature type ID (null = new)
@@ -150,8 +272,10 @@ class VehicleFeatureManagement extends Component
 
     /**
      * Show/hide feature group editor modal
+     * Alias: showFeatureGroupModal (used in blade templates)
      */
     public bool $showFeatureGroupEditor = false;
+    public bool $showFeatureGroupModal = false; // Alias for blade
 
     /**
      * Currently editing feature group ID (null = new)
@@ -303,12 +427,34 @@ class VehicleFeatureManagement extends Component
     {
         $this->reset(['editingTemplateId', 'templateName', 'templateFeatures']);
         $this->showTemplateEditor = true;
+        $this->showTemplateModal = true; // Alias sync
 
         Log::info('VehicleFeatureManagement::openTemplateEditor CALLED', [
             'mode' => 'new',
             'showTemplateEditor' => $this->showTemplateEditor,
         ]);
     }
+
+    /**
+     * Alias for openTemplateEditor (used by templates tab)
+     */
+    public function openTemplateModal(): void
+    {
+        $this->openTemplateEditor();
+    }
+
+    /**
+     * Close template modal (alias for closeTemplateEditor)
+     */
+    public function closeTemplateModal(): void
+    {
+        $this->closeTemplateEditor();
+    }
+
+    /**
+     * Save template (alias for saveTemplate consistency)
+     * Already exists as saveTemplate()
+     */
 
     /**
      * Edit existing template
@@ -330,6 +476,7 @@ class VehicleFeatureManagement extends Component
         }
 
         $this->showTemplateEditor = true;
+        $this->showTemplateModal = true; // Alias sync
     }
 
     /**
@@ -451,6 +598,7 @@ class VehicleFeatureManagement extends Component
     public function closeTemplateEditor(): void
     {
         $this->showTemplateEditor = false;
+        $this->showTemplateModal = false; // Alias sync
         $this->reset(['editingTemplateId', 'templateName', 'templateFeatures']);
     }
 
@@ -590,6 +738,23 @@ class VehicleFeatureManagement extends Component
         $this->resetFeatureTypeForm();
         $this->featureTypeGroupId = $groupId;
         $this->showFeatureTypeEditor = true;
+        $this->showFeatureTypeModal = true; // Alias sync
+    }
+
+    /**
+     * Alias for openFeatureTypeEditor (used by library tab)
+     */
+    public function openFeatureTypeModal(?int $groupId = null): void
+    {
+        $this->openFeatureTypeEditor($groupId);
+    }
+
+    /**
+     * Close feature type modal (alias)
+     */
+    public function closeFeatureTypeModal(): void
+    {
+        $this->closeFeatureTypeEditor();
     }
 
     /**
@@ -614,6 +779,7 @@ class VehicleFeatureManagement extends Component
         $this->featureTypeConditional = $featureType->conditional_group;
 
         $this->showFeatureTypeEditor = true;
+        $this->showFeatureTypeModal = true; // Alias sync
     }
 
     /**
@@ -702,6 +868,7 @@ class VehicleFeatureManagement extends Component
     public function closeFeatureTypeEditor(): void
     {
         $this->showFeatureTypeEditor = false;
+        $this->showFeatureTypeModal = false; // Alias sync
         $this->resetFeatureTypeForm();
     }
 
@@ -731,6 +898,23 @@ class VehicleFeatureManagement extends Component
     {
         $this->resetFeatureGroupForm();
         $this->showFeatureGroupEditor = true;
+        $this->showFeatureGroupModal = true; // Alias sync
+    }
+
+    /**
+     * Alias for openFeatureGroupEditor (used by library tab)
+     */
+    public function openFeatureGroupModal(): void
+    {
+        $this->openFeatureGroupEditor();
+    }
+
+    /**
+     * Close feature group modal (alias)
+     */
+    public function closeFeatureGroupModal(): void
+    {
+        $this->closeFeatureGroupEditor();
     }
 
     /**
@@ -755,6 +939,7 @@ class VehicleFeatureManagement extends Component
         $this->featureGroupSortOrder = $group->sort_order;
 
         $this->showFeatureGroupEditor = true;
+        $this->showFeatureGroupModal = true; // Alias sync
     }
 
     /**
@@ -841,6 +1026,7 @@ class VehicleFeatureManagement extends Component
     public function closeFeatureGroupEditor(): void
     {
         $this->showFeatureGroupEditor = false;
+        $this->showFeatureGroupModal = false; // Alias sync
         $this->resetFeatureGroupForm();
     }
 
@@ -867,6 +1053,131 @@ class VehicleFeatureManagement extends Component
         return FeatureGroup::active()->ordered()->get();
     }
 
+    /**
+     * Get all groups with features for library tree view
+     * Used by feature-library-tab.blade.php
+     */
+    public function getGroupsProperty(): Collection
+    {
+        return FeatureGroup::with('activeFeatureTypes')
+            ->active()
+            ->ordered()
+            ->get()
+            ->map(function (FeatureGroup $group) {
+                return [
+                    'id' => $group->id,
+                    'name' => $group->getDisplayName(),
+                    'code' => $group->code,
+                    'icon' => $group->icon,
+                    'color' => $group->color,
+                    'colorClasses' => $group->getColorClasses(),
+                    'vehicle_filter' => $group->vehicle_type_filter,
+                    'features_count' => $group->activeFeatureTypes->count(),
+                    'used_features_count' => $group->activeFeatureTypes->filter(fn($f) => $f->productFeatures()->count() > 0)->count(),
+                    'features' => $group->activeFeatureTypes->map(fn($f) => [
+                        'id' => $f->id,
+                        'name' => $f->name,
+                        'code' => $f->code,
+                        'value_type' => $f->value_type,
+                        'unit' => $f->unit,
+                        'products_count' => $f->productFeatures()->count(),
+                        'conditional' => $f->conditional_group,
+                    ])->toArray(),
+                ];
+            });
+    }
+
+    /**
+     * Alias for allGroups (used in modals)
+     */
+    public function getAllGroupsProperty(): Collection
+    {
+        return $this->getFeatureGroupsProperty();
+    }
+
+    /**
+     * Get all templates for templates tab
+     * Combines predefined and custom templates
+     */
+    public function getTemplatesProperty(): Collection
+    {
+        return FeatureTemplate::active()
+            ->orderBy('is_predefined', 'desc')
+            ->orderBy('name')
+            ->get()
+            ->map(function (FeatureTemplate $template) {
+                return [
+                    'id' => $template->id,
+                    'name' => $template->name,
+                    'icon' => $template->icon ?? '📋',
+                    'category' => $template->category ?? 'Ogolne',
+                    'is_predefined' => $template->is_predefined,
+                    'features' => $template->features ?? [],
+                    'features_count' => count($template->features ?? []),
+                    'usage_count' => $template->usage_count ?? 0,
+                ];
+            });
+    }
+
+    /**
+     * Get selected template data for preview
+     */
+    public function getSelectedTemplateProperty(): ?array
+    {
+        if (!$this->selectedTemplateId) {
+            return null;
+        }
+
+        $template = FeatureTemplate::find($this->selectedTemplateId);
+        if (!$template) {
+            return null;
+        }
+
+        return [
+            'id' => $template->id,
+            'name' => $template->name,
+            'icon' => $template->icon ?? '📋',
+            'category' => $template->category ?? 'Ogolne',
+            'is_predefined' => $template->is_predefined,
+            'features' => $template->features ?? [],
+            'features_count' => count($template->features ?? []),
+            'usage_count' => $template->usage_count ?? 0,
+        ];
+    }
+
+    /**
+     * Select template for preview
+     */
+    public function selectTemplate(int $templateId): void
+    {
+        $this->selectedTemplateId = $templateId;
+    }
+
+    /**
+     * Duplicate template (create copy as custom)
+     */
+    public function duplicateTemplate(int $templateId): void
+    {
+        try {
+            $original = FeatureTemplate::findOrFail($templateId);
+
+            $copy = FeatureTemplate::create([
+                'name' => $original->name . ' (kopia)',
+                'icon' => $original->icon,
+                'category' => $original->category,
+                'features' => $original->features,
+                'is_predefined' => false,
+                'is_active' => true,
+            ]);
+
+            session()->flash('message', 'Szablon zduplikowany: ' . $copy->name);
+
+        } catch (\Exception $e) {
+            Log::error('Template duplication failed', ['error' => $e->getMessage()]);
+            $this->addError('general', 'Blad duplikowania szablonu: ' . $e->getMessage());
+        }
+    }
+
     // ========================================
     // BULK ASSIGN METHODS
     // ========================================
@@ -874,13 +1185,18 @@ class VehicleFeatureManagement extends Component
     /**
      * Open bulk assign modal
      */
-    public function openBulkAssignModal(): void
+    public function openBulkAssignModal(?int $templateId = null): void
     {
-        $this->reset(['selectedTemplateId', 'bulkAssignScope', 'bulkAssignCategoryId', 'bulkAssignAction']);
+        $this->reset(['bulkAssignScope', 'bulkAssignCategoryId', 'bulkAssignAction']);
+        if ($templateId) {
+            $this->selectedTemplateId = $templateId;
+        }
         $this->showBulkAssignModal = true;
         $this->calculateBulkAssignProductsCount();
 
-        Log::info('VehicleFeatureManagement::openBulkAssignModal CALLED');
+        Log::info('VehicleFeatureManagement::openBulkAssignModal CALLED', [
+            'template_id' => $templateId,
+        ]);
     }
 
     /**

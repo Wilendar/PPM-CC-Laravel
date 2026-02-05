@@ -14,10 +14,10 @@ use Livewire\Attributes\Computed;
 use Livewire\Component;
 
 /**
- * FeatureTemplatesTab - 2-Column Template Management
+ * FeatureTemplatesTab - Card Grid Template Management
  *
- * Left column: Templates list (predefined + custom)
- * Right column: Preview of selected template features
+ * Displays templates as cards with inline Alpine.js preview (expand/collapse)
+ * No server-side selection needed - preview handled by Alpine x-data
  *
  * ETAP_07e Features Panel Redesign
  */
@@ -26,11 +26,6 @@ class FeatureTemplatesTab extends Component
     // ========================================
     // STATE PROPERTIES
     // ========================================
-
-    /**
-     * Currently selected template ID for preview
-     */
-    public ?int $selectedTemplateId = null;
 
     /**
      * Filter: 'all' | 'predefined' | 'custom'
@@ -100,19 +95,6 @@ class FeatureTemplatesTab extends Component
     }
 
     /**
-     * Get selected template data
-     */
-    #[Computed]
-    public function selectedTemplate(): ?array
-    {
-        if (!$this->selectedTemplateId) {
-            return null;
-        }
-
-        return $this->templates->firstWhere('id', $this->selectedTemplateId);
-    }
-
-    /**
      * Get template icon based on name
      */
     private function getTemplateIcon(FeatureTemplate $template): string
@@ -153,18 +135,6 @@ class FeatureTemplatesTab extends Component
         }
 
         return 'uniwersalne';
-    }
-
-    // ========================================
-    // TEMPLATE SELECTION
-    // ========================================
-
-    /**
-     * Select a template for preview
-     */
-    public function selectTemplate(int $templateId): void
-    {
-        $this->selectedTemplateId = $templateId;
     }
 
     // ========================================
@@ -280,10 +250,6 @@ class FeatureTemplatesTab extends Component
 
             $template->delete();
 
-            if ($this->selectedTemplateId === $templateId) {
-                $this->selectedTemplateId = null;
-            }
-
             $this->dispatch('notify', type: 'success', message: 'Szablon usuniety.');
 
         } catch (\Exception $e) {
@@ -341,10 +307,12 @@ class FeatureTemplatesTab extends Component
 
     /**
      * Open bulk assign modal
+     *
+     * @param int $templateId Template ID is REQUIRED (from card button click)
      */
-    public function openBulkAssignModal(?int $templateId = null): void
+    public function openBulkAssignModal(int $templateId): void
     {
-        $this->bulkAssignTemplateId = $templateId ?? $this->selectedTemplateId;
+        $this->bulkAssignTemplateId = $templateId;
         $this->bulkAssignScope = 'all_vehicles';
         $this->bulkAssignCategoryId = null;
         $this->bulkAssignAction = 'add_features';

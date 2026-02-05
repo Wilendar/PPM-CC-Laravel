@@ -8,6 +8,7 @@ use Livewire\Attributes\Layout;
 use Livewire\Attributes\Url;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\On;
+use App\Models\Category;
 use App\Models\PendingProduct;
 use App\Models\ImportSession;
 use App\Models\ProductType;
@@ -45,6 +46,12 @@ class ProductImportPanel extends Component
 
     #[Url]
     public string $sortDirection = 'desc';
+
+    /**
+     * Kategorie - recznie wymuszony najwyzszy widoczny poziom (po kliknieciu "+")
+     * Auto-rozwijanie wynika z danych (effectiveCategoryMaxLevel()).
+     */
+    public ?int $categoryForcedMaxLevel = null;
 
     /**
      * Selected product IDs for bulk operations
@@ -118,6 +125,79 @@ class ProductImportPanel extends Component
             $this->sortDirection = 'asc';
         }
         $this->resetPage();
+    }
+
+    /**
+     * UI: Rozszerz kolumny kategorii o kolejny poziom (L6 -> L7 -> L8)
+     */
+    public function expandCategoryColumns(): void
+    {
+        $current = $this->effectiveCategoryMaxLevel;
+        $this->categoryForcedMaxLevel = min(8, $current + 1);
+    }
+
+    /**
+     * Auto: najwyzszy poziom kategorii wymagany przez dane (na aktualnej stronie tabeli)
+     */
+    #[Computed]
+    public function autoCategoryMaxLevel(): int
+    {
+        $products = $this->pendingProducts;
+        $items = method_exists($products, 'items') ? $products->items() : (array) $products;
+
+        $categoryIds = collect($items)
+            ->pluck('category_ids')
+            ->filter(fn($ids) => is_array($ids) && !empty($ids))
+            ->flatten()
+            ->unique()
+            ->values();
+
+        if ($categoryIds->isEmpty()) {
+            return 5;
+        }
+
+        $maxDbLevel = Category::whereIn('id', $categoryIds)->max('level');
+        if ($maxDbLevel === null) {
+            return 5;
+        }
+
+        $maxUiLevel = (int) $maxDbLevel + 1;
+
+        return max(5, min(8, $maxUiLevel));
+    }
+
+    /**
+     * Efektywny max poziom kolumn kategorii (auto z danych + ewentualne wymuszenie przez "+")
+     */
+    #[Computed]
+    public function effectiveCategoryMaxLevel(): int
+    {
+        $auto = $this->autoCategoryMaxLevel;
+        $forced = $this->categoryForcedMaxLevel !== null
+            ? min(8, max(5, (int) $this->categoryForcedMaxLevel))
+            : 5;
+
+        return max($auto, $forced);
+    }
+
+    /**
+     * Resetuje wymuszenie, gdy dane dogonia wymuszony poziom (zeby kolumny mogly sie ponownie zwijac)
+     */
+    protected function syncCategoryForcedMaxLevel(): void
+    {
+        if ($this->categoryForcedMaxLevel === null) {
+            return;
+        }
+
+        $forced = min(8, max(5, (int) $this->categoryForcedMaxLevel));
+        $auto = $this->autoCategoryMaxLevel;
+
+        if ($auto >= $forced) {
+            $this->categoryForcedMaxLevel = null;
+            return;
+        }
+
+        $this->categoryForcedMaxLevel = $forced;
     }
 
     /**

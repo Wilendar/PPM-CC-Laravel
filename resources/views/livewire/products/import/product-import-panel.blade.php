@@ -164,9 +164,10 @@
                             <div class="resize-handle" x-on:mousedown="startResize($event, 'price')"></div>
                         </th>
 
-                        {{-- KATEGORIE - kolumny L3-L8 (bulk actions dla L3-L5) --}}
+                        {{-- KATEGORIE - L3-L5 + rozszerzane L6-L8 przez "+" --}}
                         @php
                             $hasSelection = count($selectedIds ?? []) > 0;
+                            $effectiveCategoryMaxLevel = $this->effectiveCategoryMaxLevel;
                         @endphp
 
                         <th class="px-1 w-24 text-xs relative resizable-column" data-column-id="cat_l3" style="width: 96px; min-width: 70px;">
@@ -202,18 +203,64 @@
                             @endif
                             <div class="resize-handle" x-on:mousedown="startResize($event, 'cat_l5')"></div>
                         </th>
+
+                        {{-- L6 - ukryte do czasu klikniecia "+" --}}
                         <th class="px-1 w-24 text-xs text-center text-gray-500 relative resizable-column" data-column-id="cat_l6" style="width: 96px; min-width: 70px;">
-                            <span class="text-gray-400">KAT L6</span>
+                            @if($effectiveCategoryMaxLevel >= 6)
+                                <span class="text-gray-400">KAT L6</span>
+                            @else
+                                <button type="button"
+                                        wire:click="expandCategoryColumns"
+                                        class="inline-flex items-center justify-center w-7 h-7 rounded text-gray-500
+                                               bg-gray-700/30 hover:bg-gray-700/50 hover:text-green-400 transition-colors"
+                                        title="Pokaż KAT L6">
+                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                                    </svg>
+                                </button>
+                            @endif
                             <div class="resize-handle" x-on:mousedown="startResize($event, 'cat_l6')"></div>
                         </th>
-                        <th class="px-1 w-24 text-xs text-center text-gray-500 relative resizable-column" data-column-id="cat_l7" style="width: 96px; min-width: 70px;">
-                            <span class="text-gray-400">KAT L7</span>
-                            <div class="resize-handle" x-on:mousedown="startResize($event, 'cat_l7')"></div>
-                        </th>
-                        <th class="px-1 w-24 text-xs text-center text-gray-500 relative resizable-column" data-column-id="cat_l8" style="width: 96px; min-width: 70px;">
-                            <span class="text-gray-400">KAT L8</span>
-                            <div class="resize-handle" x-on:mousedown="startResize($event, 'cat_l8')"></div>
-                        </th>
+
+                        {{-- L7 (placeholder "+" dopoki nie zostanie dodane) --}}
+                        @if($effectiveCategoryMaxLevel >= 6)
+                            <th class="px-1 w-24 text-xs text-center text-gray-500 relative resizable-column" data-column-id="cat_l7" style="width: 96px; min-width: 70px;">
+                                @if($effectiveCategoryMaxLevel >= 7)
+                                    <span class="text-gray-400">KAT L7</span>
+                                @else
+                                    <button type="button"
+                                            wire:click="expandCategoryColumns"
+                                            class="inline-flex items-center justify-center w-7 h-7 rounded text-gray-500
+                                                   bg-gray-700/30 hover:bg-gray-700/50 hover:text-green-400 transition-colors"
+                                            title="Pokaż KAT L7">
+                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                                        </svg>
+                                    </button>
+                                @endif
+                                <div class="resize-handle" x-on:mousedown="startResize($event, 'cat_l7')"></div>
+                            </th>
+                        @endif
+
+                        {{-- L8 (placeholder "+" dopoki nie zostanie dodane) --}}
+                        @if($effectiveCategoryMaxLevel >= 7)
+                            <th class="px-1 w-24 text-xs text-center text-gray-500 relative resizable-column" data-column-id="cat_l8" style="width: 96px; min-width: 70px;">
+                                @if($effectiveCategoryMaxLevel >= 8)
+                                    <span class="text-gray-400">KAT L8</span>
+                                @else
+                                    <button type="button"
+                                            wire:click="expandCategoryColumns"
+                                            class="inline-flex items-center justify-center w-7 h-7 rounded text-gray-500
+                                                   bg-gray-700/30 hover:bg-gray-700/50 hover:text-green-400 transition-colors"
+                                            title="Pokaż KAT L8">
+                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                                        </svg>
+                                    </button>
+                                @endif
+                                <div class="resize-handle" x-on:mousedown="startResize($event, 'cat_l8')"></div>
+                            </th>
+                        @endif
 
                         {{-- PUBLIKACJA (FAZA 9.3 - zastepuje Sklepy) --}}
                         <th class="px-1 w-28 relative resizable-column" data-column-id="publication" style="width: 112px; min-width: 80px;">
@@ -240,10 +287,14 @@
                 </thead>
                 <tbody>
                     @forelse($this->pendingProducts as $product)
-                        @include('livewire.products.import.partials.product-row', ['product' => $product])
+                        @include('livewire.products.import.partials.product-row', [
+                            'product' => $product,
+                            'effectiveCategoryMaxLevel' => $effectiveCategoryMaxLevel,
+                        ])
                     @empty
                         <tr>
-                            <td colspan="18" class="text-center py-12">
+                            <td colspan="{{ 16 + ($effectiveCategoryMaxLevel >= 6 ? 1 : 0) + ($effectiveCategoryMaxLevel >= 7 ? 1 : 0) }}"
+                                class="text-center py-12">
                                 <div class="text-gray-400">
                                     <svg class="w-12 h-12 mx-auto mb-4 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
