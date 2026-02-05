@@ -8,10 +8,12 @@ use App\DTOs\ProductStatusDTO;
 use App\Models\Media;
 use App\Models\Product;
 use App\Models\PriceGroup;
+use App\Models\SyncJob;
 use App\Models\SystemSetting;
 use App\Models\Warehouse;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
 
 /**
  * Service for aggregating product status information for Product List display.
@@ -87,15 +89,23 @@ class ProductStatusAggregator
         // Pre-load shared data
         $this->loadSharedData();
 
+        // Pre-fetch active sync jobs for all products at once (optimization)
+        $productIds = $products->pluck('id')->toArray();
+        $productsWithActiveSyncJobs = $this->getProductIdsWithActiveSyncJobs($productIds);
+
         foreach ($products as $product) {
             $cacheKey = $this->getCacheKey($product);
 
-            if ($this->isCacheEnabled() && Cache::has($cacheKey)) {
+            // Skip cache if product has active sync job (syncing status must be real-time)
+            $hasActiveSyncJob = in_array($product->id, $productsWithActiveSyncJobs);
+
+            if (!$hasActiveSyncJob && $this->isCacheEnabled() && Cache::has($cacheKey)) {
                 $statuses[$product->id] = Cache::get($cacheKey);
             } else {
                 $status = $this->aggregateForProduct($product);
 
-                if ($this->isCacheEnabled()) {
+                // Only cache if no active sync job (syncing products need fresh data)
+                if (!$hasActiveSyncJob && $this->isCacheEnabled()) {
                     Cache::put($cacheKey, $status, self::CACHE_TTL);
                 }
 
@@ -115,6 +125,18 @@ class ProductStatusAggregator
 
         // Ensure shared data is loaded
         $this->loadSharedData();
+
+        // Check if product is within import grace period
+        // If so, skip validation and show "awaiting validation" status
+        if ($this->isWithinGracePeriod($product)) {
+            $status->isAwaitingValidation = true;
+            $status->gracePeriodExpiresAt = $this->getGracePeriodExpiry($product);
+
+            // Still collect connected integrations for display
+            $this->collectConnectedIntegrations($product, $status);
+
+            return $status;
+        }
 
         // Check global issues
         $this->checkGlobalIssues($product, $status);
@@ -385,19 +407,27 @@ class ProductStatusAggregator
     /**
      * Collect ALL connected integrations (shops and ERPs)
      * This allows status column to show all integrations, not just those with issues
+     * Also checks for active sync jobs per integration
      */
     private function collectConnectedIntegrations(Product $product, ProductStatusDTO $status): void
     {
+        // Get active sync jobs for this product (pending or running)
+        $activeSyncJobs = $this->getActiveSyncJobsForProduct($product->id);
+
         // Collect PrestaShop shops
         if ($product->relationLoaded('shopData')) {
             foreach ($product->shopData as $shopData) {
                 $shop = $shopData->shop ?? null;
                 if ($shop) {
+                    // Check if there's an active sync job for this shop
+                    $syncStatus = $activeSyncJobs['shops'][$shopData->shop_id] ?? null;
+
                     $status->addConnectedShop(
                         $shopData->shop_id,
                         $shop->name ?? "Sklep #{$shopData->shop_id}",
                         $shop->label_color ?? '06b6d4',
-                        $shop->label_icon ?? 'shopping-cart'
+                        $shop->label_icon ?? 'shopping-cart',
+                        $syncStatus
                     );
                 }
             }
@@ -408,11 +438,15 @@ class ProductStatusAggregator
             foreach ($product->erpData as $erpData) {
                 $erp = $erpData->erpConnection ?? null;
                 if ($erp) {
+                    // Check if there's an active sync job for this ERP
+                    $syncStatus = $activeSyncJobs['erps'][$erpData->erp_connection_id] ?? null;
+
                     $status->addConnectedErp(
                         $erpData->erp_connection_id,
                         $erp->instance_name ?? "ERP #{$erpData->erp_connection_id}",
                         $erp->label_color ?? 'f97316',
-                        $erp->label_icon ?? 'database'
+                        $erp->label_icon ?? 'database',
+                        $syncStatus
                     );
                 }
             }
@@ -420,6 +454,90 @@ class ProductStatusAggregator
 
         // Finalize hasIssues flags based on collected issues
         $status->finalizeConnectedIntegrations();
+    }
+
+    /**
+     * Get product IDs that have active sync jobs (batch query for optimization)
+     *
+     * FIX 2026-02-05: Also checks early sync flags in cache, not just SyncJob records.
+     * Early sync flags are set by ProductForm BEFORE dispatch() to show "syncing" immediately.
+     *
+     * @param array<int> $productIds
+     * @return array<int> Product IDs with active sync jobs or early sync flags
+     */
+    private function getProductIdsWithActiveSyncJobs(array $productIds): array
+    {
+        if (empty($productIds)) {
+            return [];
+        }
+
+        $result = [];
+
+        // 1. Check for early sync flags in cache (set by ProductForm before SyncJob exists)
+        foreach ($productIds as $productId) {
+            $earlySyncFlags = Cache::get("product_sync_pending:{$productId}", []);
+            if (!empty($earlySyncFlags)) {
+                $result[] = $productId;
+            }
+        }
+
+        // 2. Query actual SyncJob records (pending or running)
+        $fromDb = SyncJob::whereIn('source_id', $productIds)
+            ->where('source_type', SyncJob::TYPE_PPM)
+            ->whereIn('status', [SyncJob::STATUS_PENDING, SyncJob::STATUS_RUNNING])
+            ->distinct()
+            ->pluck('source_id')
+            ->toArray();
+
+        // Merge and deduplicate
+        return array_unique(array_merge($result, $fromDb));
+    }
+
+    /**
+     * Get active sync jobs (pending/running) for a product
+     * Returns array with 'shops' and 'erps' keys containing sync status per integration
+     *
+     * Also checks for "early sync flags" set by ProductForm before actual SyncJob is created.
+     * This handles the timing gap between dispatch() and handle() in queue.
+     *
+     * @param int $productId
+     * @return array{shops: array<int, string>, erps: array<int, string>}
+     */
+    private function getActiveSyncJobsForProduct(int $productId): array
+    {
+        $result = ['shops' => [], 'erps' => []];
+
+        // 1. Check for "early sync flags" (set by ProductForm before SyncJob exists)
+        // These flags bridge the gap between dispatch() and when SyncJob is created in handle()
+        $earlySyncFlags = Cache::get("product_sync_pending:{$productId}", []);
+        foreach ($earlySyncFlags as $flag) {
+            if ($flag['type'] === 'shop') {
+                $result['shops'][(int) $flag['target_id']] = 'pending';
+            } elseif ($flag['type'] === 'erp') {
+                $result['erps'][(int) $flag['target_id']] = 'pending';
+            }
+        }
+
+        // 2. Query actual SyncJob records (pending or running)
+        $activeJobs = SyncJob::where('source_id', $productId)
+            ->where('source_type', SyncJob::TYPE_PPM)
+            ->whereIn('status', [SyncJob::STATUS_PENDING, SyncJob::STATUS_RUNNING])
+            ->select(['target_type', 'target_id', 'status'])
+            ->get();
+
+        foreach ($activeJobs as $job) {
+            $syncStatus = $job->status; // 'pending' or 'running'
+
+            if ($job->target_type === SyncJob::TYPE_PRESTASHOP) {
+                // PrestaShop shop sync - override early flag with actual status
+                $result['shops'][(int) $job->target_id] = $syncStatus;
+            } else {
+                // ERP sync (subiekt_gt, baselinker, dynamics)
+                $result['erps'][(int) $job->target_id] = $syncStatus;
+            }
+        }
+
+        return $result;
     }
 
     /**
@@ -603,6 +721,53 @@ class ProductStatusAggregator
     }
 
     /**
+     * Check if product is within import grace period
+     *
+     * Products created recently (within grace period) are not validated
+     * to allow time for complete import (images, prices, etc.)
+     */
+    private function isWithinGracePeriod(Product $product): bool
+    {
+        $gracePeriodSeconds = $this->getImportGracePeriodSeconds();
+
+        if ($gracePeriodSeconds <= 0) {
+            return false;
+        }
+
+        $createdAt = $product->created_at;
+        if (!$createdAt) {
+            return false;
+        }
+
+        $gracePeriodExpiry = $createdAt->copy()->addSeconds($gracePeriodSeconds);
+
+        return now()->lessThan($gracePeriodExpiry);
+    }
+
+    /**
+     * Get grace period expiry timestamp for a product
+     */
+    private function getGracePeriodExpiry(Product $product): ?\DateTimeInterface
+    {
+        $gracePeriodSeconds = $this->getImportGracePeriodSeconds();
+
+        if ($gracePeriodSeconds <= 0 || !$product->created_at) {
+            return null;
+        }
+
+        return $product->created_at->copy()->addSeconds($gracePeriodSeconds);
+    }
+
+    /**
+     * Get import grace period from config (in seconds)
+     */
+    private function getImportGracePeriodSeconds(): int
+    {
+        $config = $this->getConfig();
+        return (int) ($config['import_grace_period_seconds'] ?? 60);
+    }
+
+    /**
      * Check if specific monitoring is enabled
      */
     private function isMonitoringEnabled(string $type): bool
@@ -650,12 +815,24 @@ class ProductStatusAggregator
 
     /**
      * Invalidate cache for product
+     *
+     * FIX 2026-02-05: Cache::forget() doesn't support wildcards!
+     * Must fetch actual product timestamp to build correct cache key.
      */
     public function invalidateCache(int $productId): void
     {
-        // Since cache key includes timestamp, old entries will naturally expire
-        // But we can also clear explicitly if needed
-        Cache::forget(self::CACHE_PREFIX . $productId . '_*');
+        // Get current product to build exact cache key (includes timestamp)
+        $product = \App\Models\Product::select('id', 'updated_at')->find($productId);
+
+        if ($product && $product->updated_at) {
+            $cacheKey = self::CACHE_PREFIX . $product->id . '_' . $product->updated_at->timestamp;
+            Cache::forget($cacheKey);
+
+            Log::debug('[ProductStatusAggregator] Cache invalidated', [
+                'product_id' => $productId,
+                'cache_key' => $cacheKey,
+            ]);
+        }
     }
 
     /**

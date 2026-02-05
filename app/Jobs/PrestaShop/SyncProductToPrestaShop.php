@@ -167,6 +167,19 @@ class SyncProductToPrestaShop implements ShouldQueue, ShouldBeUnique
         // Start job tracking
         $syncJob->start();
 
+        // FIX 2026-02-05: Clear "early sync flag" from cache now that SyncJob exists
+        // This flag was set in ProductForm before dispatch() to enable immediate "syncing" icon
+        $cacheKey = "product_sync_pending:{$this->product->id}";
+        $earlySyncFlags = \Illuminate\Support\Facades\Cache::get($cacheKey, []);
+        $earlySyncFlags = array_filter($earlySyncFlags, function ($flag) {
+            return !($flag['type'] === 'shop' && (int) $flag['target_id'] === $this->shop->id);
+        });
+        if (empty($earlySyncFlags)) {
+            \Illuminate\Support\Facades\Cache::forget($cacheKey);
+        } else {
+            \Illuminate\Support\Facades\Cache::put($cacheKey, array_values($earlySyncFlags), 60);
+        }
+
         // Update pre-generated JobProgress if exists (CompatibilityManagement tracking)
         if ($this->preGeneratedJobId) {
             $this->updateJobProgress('running');
@@ -210,6 +223,10 @@ class SyncProductToPrestaShop implements ShouldQueue, ShouldBeUnique
             // Pass full $result to complete() including synced_data and changed_fields (2025-11-07)
             $syncJob->complete($result);
 
+            // FIX 2026-02-05: Invalidate ProductStatusAggregator cache so ProductList shows updated status immediately
+            // Without this, the 5-minute cache TTL would keep showing "syncing" status after job completion
+            app(\App\Services\Product\ProductStatusAggregator::class)->invalidateCache($this->product->id);
+
             // Update pre-generated JobProgress if exists (CompatibilityManagement tracking)
             if ($this->preGeneratedJobId) {
                 $this->updateJobProgress('completed');
@@ -242,6 +259,9 @@ class SyncProductToPrestaShop implements ShouldQueue, ShouldBeUnique
                 errorDetails: $e->getFile() . ':' . $e->getLine(),
                 stackTrace: $e->getTraceAsString()
             );
+
+            // FIX 2026-02-05: Invalidate ProductStatusAggregator cache so ProductList shows updated status immediately
+            app(\App\Services\Product\ProductStatusAggregator::class)->invalidateCache($this->product->id);
 
             // Update pre-generated JobProgress if exists (CompatibilityManagement tracking)
             if ($this->preGeneratedJobId) {
