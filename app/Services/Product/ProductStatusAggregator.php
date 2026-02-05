@@ -669,6 +669,67 @@ class ProductStatusAggregator
     }
 
     /**
+     * Invalidate cache for products connected to a specific shop
+     *
+     * Called when shop label_color or label_icon changes
+     *
+     * @param int $shopId PrestaShop shop ID
+     * @return int Number of products invalidated
+     */
+    public function invalidateCacheForShop(int $shopId): int
+    {
+        $productIds = \App\Models\ProductShopData::where('shop_id', $shopId)
+            ->pluck('product_id')
+            ->unique()
+            ->toArray();
+
+        foreach ($productIds as $productId) {
+            $this->invalidateCacheByProductId($productId);
+        }
+
+        return count($productIds);
+    }
+
+    /**
+     * Invalidate cache for products connected to a specific ERP
+     *
+     * Called when ERP label_color or label_icon changes
+     *
+     * @param int $erpConnectionId ERP connection ID
+     * @return int Number of products invalidated
+     */
+    public function invalidateCacheForErp(int $erpConnectionId): int
+    {
+        $productIds = \App\Models\ProductErpData::where('erp_connection_id', $erpConnectionId)
+            ->pluck('product_id')
+            ->unique()
+            ->toArray();
+
+        foreach ($productIds as $productId) {
+            $this->invalidateCacheByProductId($productId);
+        }
+
+        return count($productIds);
+    }
+
+    /**
+     * Invalidate cache for a product by ID (using pattern matching)
+     *
+     * Since cache key includes timestamp, we use Cache::getStore() if available
+     * or rely on natural expiration
+     */
+    private function invalidateCacheByProductId(int $productId): void
+    {
+        // Get current product to build exact cache key
+        $product = \App\Models\Product::select('id', 'updated_at')->find($productId);
+
+        if ($product) {
+            $cacheKey = self::CACHE_PREFIX . $product->id . '_' . $product->updated_at->timestamp;
+            Cache::forget($cacheKey);
+        }
+    }
+
+    /**
      * Update configuration
      */
     public function updateConfig(array $config): void

@@ -318,9 +318,41 @@ Skill wymusza:
 1. Sprawdź czy accessor jest zdefiniowany w modelu
 2. Sprawdź czy `LABEL_COLORS` constant zawiera klucz dla danego `erp_type`
 
+### Labels nie aktualizują się po zmianie
+
+**Rozwiązanie:** Od v1.1.0 cache jest automatycznie invalidowany gdy zmienia się `label_color` lub `label_icon` w integracji. Jeśli problem występuje na starszej wersji:
+```bash
+php artisan cache:clear
+```
+
+---
+
+## Cache Invalidation (v1.1.0)
+
+System automatycznie invaliduje cache `ProductStatusAggregator` gdy zmienia się `label_color` lub `label_icon` w:
+- `PrestaShopShop` (sklepy)
+- `ERPConnection` (integracje ERP)
+
+**Mechanizm:**
+1. `ProductStatusCacheObserver` nasłuchuje na event `updated` dla obu modeli
+2. Sprawdza czy zmienił się `label_color` lub `label_icon` (`wasChanged()`)
+3. Jeśli tak - wywołuje `ProductStatusAggregator::invalidateCacheForShop()` lub `invalidateCacheForErp()`
+4. Te metody znajdują wszystkie produkty powiązane z daną integracją i invalidują ich cache
+
+**Pliki:**
+- `app/Observers/ProductStatusCacheObserver.php` - observer z metodami `shopUpdated()` i `erpConnectionUpdated()`
+- `app/Services/Product/ProductStatusAggregator.php` - metody `invalidateCacheForShop()` i `invalidateCacheForErp()`
+- `app/Providers/AppServiceProvider.php` - rejestracja observerów
+
 ---
 
 ## Changelog
+
+### v1.1.0 (2026-02-05)
+- Automatic cache invalidation when label_color or label_icon changes
+- New methods in ProductStatusAggregator: `invalidateCacheForShop()`, `invalidateCacheForErp()`
+- New observer methods: `shopUpdated()`, `erpConnectionUpdated()`
+- No more manual `cache:clear` needed after label changes
 
 ### v1.0.0 (2026-02-03)
 - Initial implementation

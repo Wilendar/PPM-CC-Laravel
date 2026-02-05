@@ -2,6 +2,8 @@
 
 namespace App\Providers;
 
+use App\Models\ERPConnection;
+use App\Models\PrestaShopShop;
 use App\Models\Product;
 use App\Models\ProductErpData;
 use App\Models\ProductMedia;
@@ -68,5 +70,9 @@ class AppServiceProvider extends ServiceProvider
         ProductStock::saved(fn(ProductStock $s) => $observer->stockSaved($s));
         ProductMedia::saved(fn(ProductMedia $m) => $observer->mediaSaved($m));
         ProductVariant::saved(fn(ProductVariant $v) => $observer->variantSaved($v));
+
+        // INTEGRATION_LABELS.md: Invalidate cache when shop/ERP labels change
+        PrestaShopShop::updated(fn(PrestaShopShop $s) => $observer->shopUpdated($s));
+        ERPConnection::updated(fn(ERPConnection $e) => $observer->erpConnectionUpdated($e));
     }
 }

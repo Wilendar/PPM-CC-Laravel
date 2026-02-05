@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Observers;
 
+use App\Models\ERPConnection;
+use App\Models\PrestaShopShop;
 use App\Models\Product;
 use App\Models\ProductErpData;
 use App\Models\ProductMedia;
@@ -106,6 +108,68 @@ class ProductStatusCacheObserver
     public function variantSaved(ProductVariant $variant): void
     {
         $this->invalidateProductCache($variant->product_id);
+    }
+
+    /**
+     * Handle the PrestaShopShop "updated" event.
+     *
+     * Invalidates cache for ALL products connected to this shop
+     * when label_color or label_icon changes (INTEGRATION_LABELS.md support)
+     */
+    public function shopUpdated(PrestaShopShop $shop): void
+    {
+        // Only invalidate if label fields changed
+        if (!$shop->wasChanged(['label_color', 'label_icon'])) {
+            return;
+        }
+
+        try {
+            $aggregator = app(ProductStatusAggregator::class);
+            $count = $aggregator->invalidateCacheForShop($shop->id);
+
+            Log::info('ProductStatusCacheObserver: Shop label changed, invalidated cache', [
+                'shop_id' => $shop->id,
+                'shop_name' => $shop->name,
+                'products_affected' => $count,
+                'changed_fields' => $shop->getChanges(),
+            ]);
+        } catch (\Exception $e) {
+            Log::warning('ProductStatusCacheObserver: Failed to invalidate shop cache', [
+                'shop_id' => $shop->id,
+                'error' => $e->getMessage()
+            ]);
+        }
+    }
+
+    /**
+     * Handle the ERPConnection "updated" event.
+     *
+     * Invalidates cache for ALL products connected to this ERP
+     * when label_color or label_icon changes (INTEGRATION_LABELS.md support)
+     */
+    public function erpConnectionUpdated(ERPConnection $erp): void
+    {
+        // Only invalidate if label fields changed
+        if (!$erp->wasChanged(['label_color', 'label_icon'])) {
+            return;
+        }
+
+        try {
+            $aggregator = app(ProductStatusAggregator::class);
+            $count = $aggregator->invalidateCacheForErp($erp->id);
+
+            Log::info('ProductStatusCacheObserver: ERP label changed, invalidated cache', [
+                'erp_id' => $erp->id,
+                'erp_name' => $erp->instance_name,
+                'products_affected' => $count,
+                'changed_fields' => $erp->getChanges(),
+            ]);
+        } catch (\Exception $e) {
+            Log::warning('ProductStatusCacheObserver: Failed to invalidate ERP cache', [
+                'erp_id' => $erp->id,
+                'error' => $e->getMessage()
+            ]);
+        }
     }
 
     /**
