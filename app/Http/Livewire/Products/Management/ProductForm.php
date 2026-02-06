@@ -6313,6 +6313,9 @@ class ProductForm extends Component
             if ($shop && $shop->connection_status === 'connected' && $shop->is_active) {
                 SyncProductToPrestaShop::dispatch($this->product, $shop, auth()->id());
 
+                // FIX 2026-02-06: Set early sync flag for ProductList badge
+                $this->setEarlySyncFlag($this->product->id, $this->activeShopId);
+
                 Log::info('Auto-dispatched sync job after shop data save', [
                     'product_id' => $this->product->id,
                     'shop_id' => $this->activeShopId,
@@ -6436,6 +6439,9 @@ class ProductForm extends Component
                     // USER_ID FIX (2025-11-07): Pass auth()->id() to capture user who triggered sync
                     SyncProductToPrestaShop::dispatch($this->product, $shop, auth()->id());
 
+                    // FIX 2026-02-06: Set early sync flag for ProductList badge
+                    $this->setEarlySyncFlag($this->product->id, $shop->id);
+
                     $syncResults['success']++;
                     $syncResults['shops'][] = $shop->name;
 
@@ -6517,6 +6523,9 @@ class ProductForm extends Component
             // DISPATCH SYNC JOB - ETAP_07 PrestaShop Integration
             // USER_ID FIX (2025-11-07): Pass auth()->id() to capture user who triggered sync
             SyncProductToPrestaShop::dispatch($this->product, $shop, auth()->id());
+
+            // FIX 2026-02-06: Set early sync flag for ProductList badge
+            $this->setEarlySyncFlag($this->product->id, $this->activeShopId);
 
             // FIX 2025-11-25: Use 'info' not 'success' - actual success shown by Alpine panel after job completes
             $this->dispatch('info', message: "Zaplanowano synchronizację produktu ze sklepem: {$shop->name}");
@@ -7289,6 +7298,9 @@ class ProductForm extends Component
             // Dispatch sync job for single shop
             SyncProductToPrestaShop::dispatch($this->product, $shop, auth()->id());
 
+            // FIX 2026-02-06: Set early sync flag for ProductList badge
+            $this->setEarlySyncFlag($this->product->id, $shopId);
+
             // Set job tracking variables
             $this->activeJobType = 'sync';
             $this->jobCreatedAt = now()->toIso8601String();
@@ -7627,6 +7639,8 @@ class ProductForm extends Component
             // We need SINGLE product to MULTIPLE shops, so dispatch per-shop
             foreach ($shops as $shop) {
                 SyncProductToPrestaShop::dispatch($this->product, $shop, auth()->id());
+                // FIX 2026-02-06: Set early sync flag for ProductList badge
+                $this->setEarlySyncFlag($this->product->id, $shop->id);
             }
 
             // Capture first dispatched job ID for monitoring (approximation)
@@ -8042,6 +8056,9 @@ class ProductForm extends Component
         if ($shop) {
             // USER_ID FIX (2025-11-07): Pass auth()->id() to capture user who triggered sync
             SyncProductToPrestaShop::dispatch($this->product, $shop, auth()->id());
+
+            // FIX 2026-02-06: Set early sync flag for ProductList badge
+            $this->setEarlySyncFlag($this->product->id, $shopId);
 
             Log::info('Sync retry dispatched', [
                 'product_id' => $this->product->id,
@@ -9178,6 +9195,9 @@ class ProductForm extends Component
             if ($shop && $shop->connection_status === 'connected' && $shop->is_active) {
                 \App\Jobs\PrestaShop\SyncProductToPrestaShop::dispatch($this->product, $shop, auth()->id());
 
+                // FIX 2026-02-06: Set early sync flag for ProductList badge
+                $this->setEarlySyncFlag($this->product->id, $shopId);
+
                 // FIX 2025-11-25: Set job tracking variables ONLY if not skipping
                 // When skipJobTracking=true (from saveAndClose), job runs in background
                 // but UI doesn't show progress - allows immediate redirect to product list
@@ -9251,6 +9271,29 @@ class ProductForm extends Component
 
     /**
      * Check if product has active sync job in queue
+     * Set early sync flag in cache for ProductStatusAggregator
+     *
+     * FIX 2026-02-06: Bridges timing gap between dispatch() and SyncJob creation.
+     * ProductStatusAggregator reads this cache to show "syncing" badge immediately
+     * on ProductList, before the queue worker creates the actual SyncJob record.
+     *
+     * @param int $productId
+     * @param int $shopId
+     * @param string $type 'shop' or 'erp'
+     */
+    private function setEarlySyncFlag(int $productId, int $shopId, string $type = 'shop'): void
+    {
+        $cacheKey = "product_sync_pending:{$productId}";
+        $existingFlags = \Illuminate\Support\Facades\Cache::get($cacheKey, []);
+        $existingFlags[] = [
+            'type' => $type,
+            'target_id' => $shopId,
+            'created_at' => now()->timestamp,
+        ];
+        \Illuminate\Support\Facades\Cache::put($cacheKey, $existingFlags, 300);
+    }
+
+    /**
      *
      * ETAP_13: Backend Foundation - Anti-Duplicate Logic
      *
@@ -10481,19 +10524,9 @@ class ProductForm extends Component
 
             $dispatchedCount = 0;
 
-            // FIX 2026-02-05: Set "early sync flags" in cache BEFORE dispatch
-            // This allows ProductList to show "syncing" icon immediately,
-            // before the SyncJob record is created in the queue worker's handle()
-            $earlySyncFlags = [];
+            // FIX 2026-02-06: Use centralized helper for early sync flags
             foreach ($shops as $shop) {
-                $earlySyncFlags[] = ['type' => 'shop', 'target_id' => $shop->id, 'created_at' => now()->timestamp];
-            }
-            if (!empty($earlySyncFlags)) {
-                \Illuminate\Support\Facades\Cache::put(
-                    "product_sync_pending:{$this->product->id}",
-                    $earlySyncFlags,
-                    60 // TTL: 60 seconds - enough for job to start and create SyncJob
-                );
+                $this->setEarlySyncFlag($this->product->id, $shop->id);
             }
 
             foreach ($shops as $shop) {
