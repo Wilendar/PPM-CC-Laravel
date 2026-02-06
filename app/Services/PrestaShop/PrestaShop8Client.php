@@ -23,6 +23,112 @@ class PrestaShop8Client extends BasePrestaShopClient
     }
 
     /**
+     * Detect full PrestaShop version from API
+     *
+     * Tries multiple methods to detect the exact PrestaShop version (e.g., "8.2.1").
+     * This is used to determine feature support like native WebP handling (>= 8.2.1).
+     *
+     * FIX 2026-02-05: Added for conditional WebP conversion - PS 8.2.1+ supports WebP natively
+     *
+     * @return string|null Full version string (e.g., "8.2.1") or null if detection fails
+     */
+    public function detectFullVersion(): ?string
+    {
+        try {
+            // Method 1: Try /api/configurations endpoint for PS_VERSION_DB
+            // This is the most reliable method for getting exact version
+            // FIX 2026-02-05: PrestaShop API requires square brackets around filter value!
+            try {
+                $configResponse = $this->makeRequest('GET', '/configurations?filter[name]=[PS_VERSION_DB]&display=full&output_format=JSON');
+                if (!empty($configResponse['configurations'][0]['value'])) {
+                    $version = $configResponse['configurations'][0]['value'];
+                    Log::info('[PrestaShop8Client] Version detected from configurations', [
+                        'shop_id' => $this->shop->id,
+                        'version' => $version,
+                    ]);
+                    return $version;
+                }
+            } catch (\Exception $e) {
+                // Configurations endpoint might not be accessible - try other methods
+                Log::debug('[PrestaShop8Client] Could not access configurations endpoint', [
+                    'shop_id' => $this->shop->id,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+
+            // Method 2: Try to get from root API with output_format=JSON
+            $url = rtrim($this->shop->url, '/') . $this->getApiBasePath() . '?output_format=JSON';
+
+            $response = \Illuminate\Support\Facades\Http::withBasicAuth($this->shop->api_key, '')
+                ->withHeaders([
+                    'Accept' => 'application/json',
+                    'Output-Format' => 'JSON',
+                ])
+                ->timeout(15)
+                ->get($url);
+
+            if ($response->successful()) {
+                $data = $response->json();
+
+                // Check response header X-Powered-By for version info
+                $poweredBy = $response->header('X-Powered-By');
+                if ($poweredBy && preg_match('/PrestaShop\s*([\d.]+)/i', $poweredBy, $matches)) {
+                    Log::info('[PrestaShop8Client] Version detected from header', [
+                        'shop_id' => $this->shop->id,
+                        'version' => $matches[1],
+                    ]);
+                    return $matches[1];
+                }
+
+                // Check if API response contains version info
+                if (isset($data['prestashop']['version'])) {
+                    Log::info('[PrestaShop8Client] Version detected from API response', [
+                        'shop_id' => $this->shop->id,
+                        'version' => $data['prestashop']['version'],
+                    ]);
+                    return $data['prestashop']['version'];
+                }
+            }
+
+            // Method 3: Fallback - use stored version from shop or default to 8.0.0
+            if ($this->shop->prestashop_version && $this->shop->prestashop_version !== '8') {
+                Log::info('[PrestaShop8Client] Using stored version', [
+                    'shop_id' => $this->shop->id,
+                    'version' => $this->shop->prestashop_version,
+                ]);
+                return $this->shop->prestashop_version;
+            }
+
+            Log::info('[PrestaShop8Client] Could not detect version, using default 8.0.0', [
+                'shop_id' => $this->shop->id,
+            ]);
+            return '8.0.0'; // Safe default for PS 8.x
+
+        } catch (\Exception $e) {
+            Log::error('[PrestaShop8Client] Version detection exception', [
+                'shop_id' => $this->shop->id,
+                'error' => $e->getMessage(),
+            ]);
+            // Return default instead of null to ensure WebP conversion happens for safety
+            return '8.0.0';
+        }
+    }
+
+    /**
+     * Check if this PrestaShop version supports native WebP images
+     *
+     * PrestaShop 8.2.1+ has native WebP support - no need to convert to JPEG.
+     * Earlier versions require JPEG conversion for reliable image handling.
+     *
+     * @return bool True if WebP is natively supported
+     */
+    public function supportsNativeWebP(): bool
+    {
+        $version = $this->shop->prestashop_version ?? $this->detectFullVersion() ?? '8.0.0';
+        return version_compare($version, '8.2.1', '>=');
+    }
+
+    /**
      * Get all products with optional filters
      *
      * @param array $filters Query filters (limit, display, filter, sort)
@@ -2108,6 +2214,82 @@ class PrestaShop8Client extends BasePrestaShopClient
 
         // Return authenticated API URL for image
         return $baseUrl . $apiPath . "/images/products/{$productId}/{$imageId}?ws_key=" . urlencode($this->shop->api_key);
+    }
+
+    /**
+     * Update image positions via custom PPM module endpoint
+     *
+     * Requires ppmimagemanager module installed on PrestaShop shop.
+     * Falls back gracefully if module is not installed (returns false).
+     *
+     * @param int $productId PrestaShop product ID
+     * @param array $positions Map of [ps_image_id => new_position]
+     * @return bool Success
+     */
+    public function updateImagePositions(int $productId, array $positions): bool
+    {
+        $baseUrl = rtrim($this->shop->url, '/');
+        $moduleUrl = $baseUrl . '/module/ppmimagemanager/api';
+
+        // Get API key from shop sync_settings or fallback
+        $syncSettings = $this->shop->sync_settings ?? [];
+        $ppmApiKey = $syncSettings['ppm_module_api_key'] ?? '';
+
+        if (empty($ppmApiKey)) {
+            \Log::warning('[IMAGE API] PPM module API key not configured', [
+                'shop_id' => $this->shop->id,
+            ]);
+            return false;
+        }
+
+        try {
+            $response = \Illuminate\Support\Facades\Http::timeout($this->timeout)
+                ->withHeaders([
+                    'X-PPM-Api-Key' => $ppmApiKey,
+                    'Content-Type' => 'application/json',
+                ])
+                ->post($moduleUrl, [
+                    'action' => 'updatePositions',
+                    'product_id' => $productId,
+                    'positions' => $positions,
+                ]);
+
+            if ($response->successful()) {
+                $data = $response->json();
+                if ($data['success'] ?? false) {
+                    \Log::info('[IMAGE API] Positions updated via PPM module', [
+                        'product_id' => $productId,
+                        'shop_id' => $this->shop->id,
+                        'count' => count($positions),
+                    ]);
+                    return true;
+                }
+            }
+
+            // 404 = module not installed
+            if ($response->status() === 404) {
+                \Log::info('[IMAGE API] PPM module not installed on shop, skipping position update', [
+                    'shop_id' => $this->shop->id,
+                ]);
+                return false;
+            }
+
+            \Log::warning('[IMAGE API] Position update failed', [
+                'product_id' => $productId,
+                'shop_id' => $this->shop->id,
+                'status' => $response->status(),
+                'body' => substr($response->body(), 0, 300),
+            ]);
+            return false;
+
+        } catch (\Exception $e) {
+            \Log::warning('[IMAGE API] Position update request failed (module may not be installed)', [
+                'product_id' => $productId,
+                'shop_id' => $this->shop->id,
+                'error' => $e->getMessage(),
+            ]);
+            return false;
+        }
     }
 
     /**

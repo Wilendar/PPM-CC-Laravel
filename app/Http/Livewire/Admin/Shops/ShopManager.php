@@ -611,6 +611,7 @@ class ShopManager extends Component
     /**
      * Test connection for existing shop.
      * ETAP_07 FAZA 1G - Using PrestaShopSyncService
+     * FIX 2026-02-05: Auto-detect full PrestaShop version during connection test
      */
     public function testConnection($shopId)
     {
@@ -624,18 +625,38 @@ class ShopManager extends Component
             // Use PrestaShopSyncService (ETAP_07)
             $result = $this->syncService->testConnection($shop);
 
+            // FIX 2026-02-05: Detect full version using API client
+            $fullVersion = null;
+            if ($result['success']) {
+                try {
+                    $client = new \App\Services\PrestaShop\PrestaShop8Client($shop);
+                    $fullVersion = $client->detectFullVersion();
+                    Log::info('PrestaShop version detected', [
+                        'shop_id' => $shop->id,
+                        'version' => $fullVersion,
+                    ]);
+                } catch (\Exception $e) {
+                    Log::warning('Could not detect full PS version', [
+                        'shop_id' => $shop->id,
+                        'error' => $e->getMessage(),
+                    ]);
+                    $fullVersion = $result['version'] ?? $shop->prestashop_version;
+                }
+            }
+
             // Update shop connection health
             $shop->update([
                 'last_sync_at' => now(),
                 'sync_status' => $result['success'] ? 'idle' : 'error',
                 'error_message' => $result['success'] ? null : $result['message'],
                 'last_response_time' => $result['details']['execution_time_ms'] ?? null,
-                'prestashop_version' => $result['version'] ?? $shop->prestashop_version,
+                'prestashop_version' => $fullVersion ?? $result['version'] ?? $shop->prestashop_version,
                 'last_connection_test' => now(),
             ]);
 
             if ($result['success']) {
-                session()->flash('success', 'Połączenie z ' . $shop->name . ' jest poprawne! (' . ($result['version'] ?? 'Unknown') . ')');
+                $versionInfo = $fullVersion ? "v{$fullVersion}" : ($result['version'] ?? 'Unknown');
+                session()->flash('success', 'Połączenie z ' . $shop->name . ' jest poprawne! (' . $versionInfo . ')');
                 $this->dispatch('connectionSuccess', ['shop' => $shop->id, 'result' => $result]);
             } else {
                 session()->flash('error', 'Błąd połączenia: ' . $result['message']);
@@ -661,6 +682,59 @@ class ShopManager extends Component
 
         // Force component refresh to show updated response time
         $this->dispatch('connectionTested', $shopId);
+    }
+
+    /**
+     * Detect PrestaShop version for all shops
+     *
+     * FIX 2026-02-05: Force version detection for all existing shops.
+     * Used to populate prestashop_version field which is required for
+     * conditional WebP conversion (PS >= 8.2.1 supports WebP natively).
+     */
+    public function detectVersionsForAllShops()
+    {
+        $shops = PrestaShopShop::all();
+        $updated = 0;
+        $failed = 0;
+
+        foreach ($shops as $shop) {
+            try {
+                $client = new \App\Services\PrestaShop\PrestaShop8Client($shop);
+                $fullVersion = $client->detectFullVersion();
+
+                if ($fullVersion) {
+                    $shop->update(['prestashop_version' => $fullVersion]);
+                    $updated++;
+                    Log::info('Version detected for shop', [
+                        'shop_id' => $shop->id,
+                        'shop_name' => $shop->name,
+                        'version' => $fullVersion,
+                    ]);
+                } else {
+                    $failed++;
+                    Log::warning('Could not detect version for shop', [
+                        'shop_id' => $shop->id,
+                        'shop_name' => $shop->name,
+                    ]);
+                }
+            } catch (\Exception $e) {
+                $failed++;
+                Log::error('Version detection failed for shop', [
+                    'shop_id' => $shop->id,
+                    'shop_name' => $shop->name,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        if ($updated > 0) {
+            session()->flash('success', "Wykryto wersję PrestaShop dla {$updated} sklepów.");
+        }
+        if ($failed > 0) {
+            session()->flash('warning', "Nie udało się wykryć wersji dla {$failed} sklepów.");
+        }
+
+        $this->dispatch('refreshShops');
     }
 
     /**

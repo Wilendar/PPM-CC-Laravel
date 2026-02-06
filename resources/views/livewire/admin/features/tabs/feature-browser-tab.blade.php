@@ -1,15 +1,24 @@
 <div class="feature-browser">
     {{-- HEADER --}}
     <div class="feature-browser__header">
-        <div class="flex items-center gap-3">
-            <span class="text-2xl">📋</span>
+        <div class="flex items-center gap-4">
+            <div class="feature-browser__header-icon">
+                <span class="text-2xl">🔍</span>
+            </div>
             <div>
-                <h3 class="text-h3">Przegladarka Cech</h3>
-                <p class="text-sm text-gray-400">Wybierz grupe i cechy aby zobaczyc produkty</p>
+                <h3 class="text-lg font-semibold text-white">Przeglądarka Cech</h3>
+                <p class="text-sm text-gray-400">Eksploruj cechy i znajdź produkty</p>
             </div>
         </div>
-        <div class="text-sm text-gray-400">
-            {{ $this->groups->count() }} grup | {{ $this->groups->sum('features_count') }} cech
+        <div class="flex items-center gap-4">
+            <div class="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-gray-800/50 border border-gray-700">
+                <span class="text-xs text-gray-400">Grupy:</span>
+                <span class="text-sm font-semibold text-white">{{ $this->groups->count() }}</span>
+            </div>
+            <div class="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-gray-800/50 border border-gray-700">
+                <span class="text-xs text-gray-400">Cechy:</span>
+                <span class="text-sm font-semibold text-white">{{ $this->groups->sum('features_count') }}</span>
+            </div>
         </div>
     </div>
 
@@ -18,33 +27,34 @@
         {{-- LEFT COLUMN: Groups --}}
         <div class="feature-browser__column feature-browser__column--groups">
             <div class="feature-browser__column-header">
-                <span class="font-medium">GRUPY CECH</span>
+                <span class="flex items-center gap-2">
+                    <span class="header-icon">📁</span>
+                    GRUPY CECH
+                </span>
             </div>
             <div class="feature-browser__column-content">
                 @foreach($this->groups as $group)
                     <button wire:key="group-{{ $group['id'] }}"
                             wire:click="selectGroup({{ $group['id'] }})"
                             class="feature-browser__group-item {{ $selectedGroupId === $group['id'] ? 'active' : '' }}">
-                        <div class="flex items-center gap-2 flex-1">
-                            @if($group['icon'])
-                                <span class="text-sm {{ $group['colorClasses'] ?? '' }}">
-                                    @switch($group['icon'])
-                                        @case('engine') ⚙ @break
-                                        @case('ruler') 📏 @break
-                                        @case('wheel') ⚫ @break
-                                        @case('brake') 🛞 @break
-                                        @case('suspension') ↕ @break
-                                        @case('electric') ⚡ @break
-                                        @case('fuel') ⛽ @break
-                                        @case('document') 📄 @break
-                                        @case('car') 🚗 @break
-                                        @default 📌
-                                    @endswitch
-                                </span>
-                            @endif
-                            <span class="truncate">{{ $group['name'] }}</span>
+                        <div class="feature-browser__group-icon">
+                            @switch($group['icon'] ?? '')
+                                @case('engine') ⚙️ @break
+                                @case('ruler') 📏 @break
+                                @case('wheel') ⚫ @break
+                                @case('brake') 🛞 @break
+                                @case('suspension') ↕️ @break
+                                @case('electric') ⚡ @break
+                                @case('fuel') ⛽ @break
+                                @case('document') 📄 @break
+                                @case('car') 🚗 @break
+                                @default 📌
+                            @endswitch
                         </div>
-                        <span class="feature-browser__badge">{{ $group['features_count'] }}</span>
+                        <span class="flex-1 truncate font-medium">{{ $group['name'] }}</span>
+                        <span class="feature-browser__badge {{ $group['features_count'] > 10 ? 'feature-browser__badge--highlight' : '' }}">
+                            {{ $group['features_count'] }}
+                        </span>
                     </button>
                 @endforeach
             </div>
@@ -55,19 +65,21 @@
             @if($selectedGroupId)
                 {{-- Feature Types Header --}}
                 <div class="feature-browser__column-header">
-                    <span class="font-medium">
+                    <span class="flex items-center gap-2">
+                        <span class="header-icon">{{ $selectedFeatureTypeId ? '📋' : '🏷️' }}</span>
                         @if($selectedFeatureTypeId && $this->selectedFeatureType)
                             {{ $this->selectedFeatureType['name'] }}
                             @if($this->selectedFeatureType['unit'])
-                                <span class="text-gray-400">({{ $this->selectedFeatureType['unit'] }})</span>
+                                <span class="text-gray-400 font-normal">({{ $this->selectedFeatureType['unit'] }})</span>
                             @endif
                         @else
                             CECHY GRUPY
                         @endif
                     </span>
                     @if($selectedFeatureTypeId)
-                        <button wire:click="$set('selectedFeatureTypeId', null)" class="text-xs text-gray-400 hover:text-white">
-                            ← Wstecz
+                        <button wire:click="$set('selectedFeatureTypeId', null)"
+                                class="flex items-center gap-1 px-2 py-1 rounded text-xs text-gray-400 hover:text-white hover:bg-gray-700/50 transition-colors">
+                            <span>←</span> Wstecz
                         </button>
                     @endif
                 </div>
@@ -79,18 +91,27 @@
                             <button wire:key="type-{{ $featureType['id'] }}"
                                     wire:click="selectFeatureType({{ $featureType['id'] }})"
                                     class="feature-browser__feature-item">
-                                <div class="flex items-center gap-2 flex-1">
-                                    <span class="truncate">{{ $featureType['name'] }}</span>
+                                <div class="flex items-center gap-2 flex-1 min-w-0">
+                                    <span class="truncate font-medium">{{ $featureType['name'] }}</span>
                                     @if($featureType['unit'])
-                                        <span class="text-xs text-gray-500">({{ $featureType['unit'] }})</span>
+                                        <span class="text-xs text-gray-500 flex-shrink-0">({{ $featureType['unit'] }})</span>
                                     @endif
                                 </div>
-                                <div class="flex items-center gap-2">
-                                    <span class="text-xs px-2 py-0.5 rounded bg-gray-700 text-gray-300">
+                                <div class="flex items-center gap-2 flex-shrink-0">
+                                    @php
+                                        $typeClass = match($featureType['value_type']) {
+                                            'text' => 'feature-browser__type-badge--text',
+                                            'number' => 'feature-browser__type-badge--number',
+                                            'select' => 'feature-browser__type-badge--select',
+                                            'boolean' => 'feature-browser__type-badge--boolean',
+                                            default => ''
+                                        };
+                                    @endphp
+                                    <span class="feature-browser__type-badge {{ $typeClass }}">
                                         {{ $featureType['value_type'] }}
                                     </span>
                                     <span class="feature-browser__badge feature-browser__badge--small {{ $featureType['products_count'] > 0 ? 'feature-browser__badge--active' : 'feature-browser__badge--zero' }}">
-                                        {{ $featureType['products_count'] }} prod.
+                                        {{ $featureType['products_count'] }}
                                     </span>
                                 </div>
                             </button>
@@ -170,8 +191,9 @@
                 </div>
             @else
                 <div class="feature-browser__empty-state">
-                    <span class="text-4xl mb-2">👈</span>
-                    <p>Wybierz grupe z lewej kolumny</p>
+                    <div class="feature-browser__empty-state-icon">👈</div>
+                    <p class="feature-browser__empty-state-text">Wybierz grupę cech</p>
+                    <p class="feature-browser__empty-state-hint">Kliknij grupę w lewej kolumnie</p>
                 </div>
             @endif
         </div>
@@ -179,17 +201,22 @@
         {{-- RIGHT COLUMN: Products --}}
         <div class="feature-browser__column feature-browser__column--products">
             <div class="feature-browser__column-header">
-                <span class="font-medium">PRODUKTY</span>
-                <span class="text-sm text-gray-400">{{ $this->products->count() }} produktow</span>
+                <span class="flex items-center gap-2">
+                    <span class="header-icon">📦</span>
+                    PRODUKTY
+                </span>
+                <span class="feature-browser__badge {{ $this->products->count() > 0 ? 'feature-browser__badge--active' : '' }}">
+                    {{ $this->products->count() }}
+                </span>
             </div>
 
             <div class="feature-browser__column-content">
                 @if($this->products->isNotEmpty())
                     {{-- Search/Filter --}}
-                    <div class="p-2 border-b border-gray-700">
+                    <div class="p-2 border-b border-gray-700/50 mb-2">
                         <input type="text"
-                               placeholder="Szukaj SKU lub nazwy..."
-                               class="form-input form-input-sm w-full"
+                               placeholder="🔍 Szukaj SKU lub nazwy..."
+                               class="form-input-enterprise w-full text-sm"
                                disabled>
                     </div>
 
@@ -197,26 +224,31 @@
                         <button wire:key="product-{{ $product['id'] }}"
                                 wire:click="goToProduct({{ $product['id'] }})"
                                 class="feature-browser__product-item">
+                            <div class="feature-browser__product-avatar">
+                                📦
+                            </div>
                             <div class="flex flex-col flex-1 min-w-0">
-                                <span class="font-mono text-sm text-orange-400 truncate">
+                                <span class="feature-browser__product-sku truncate">
                                     {{ $product['sku'] }}
                                 </span>
-                                <span class="text-xs text-gray-400 truncate">
+                                <span class="feature-browser__product-name truncate">
                                     {{ $product['name'] }}
                                 </span>
                             </div>
-                            <span class="text-gray-500">→</span>
+                            <div class="feature-browser__product-arrow">→</div>
                         </button>
                     @endforeach
                 @elseif(!empty($selectedValueIds) || !empty($selectedCustomValues))
                     <div class="feature-browser__empty-state">
-                        <span class="text-4xl mb-2">📭</span>
-                        <p>Brak produktow z ta wartoscia</p>
+                        <div class="feature-browser__empty-state-icon">📭</div>
+                        <p class="feature-browser__empty-state-text">Brak produktów</p>
+                        <p class="feature-browser__empty-state-hint">Nie znaleziono produktów z wybraną wartością</p>
                     </div>
                 @else
                     <div class="feature-browser__empty-state">
-                        <span class="text-4xl mb-2">☑️</span>
-                        <p>Zaznacz wartosci aby zobaczyc produkty</p>
+                        <div class="feature-browser__empty-state-icon">☑️</div>
+                        <p class="feature-browser__empty-state-text">Wybierz wartości</p>
+                        <p class="feature-browser__empty-state-hint">Zaznacz wartości cechy aby zobaczyć produkty</p>
                     </div>
                 @endif
             </div>

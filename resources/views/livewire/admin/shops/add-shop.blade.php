@@ -263,13 +263,29 @@
                         <label for="apiKey" class="block text-sm font-medium text-white mb-2">
                             Klucz API *
                         </label>
-                        <input type="text" 
+                        <input type="text"
                                id="apiKey"
-                               wire:model.defer="apiKey" 
-                               class="w-full px-4 py-3 bg-gray-800 bg-opacity-60 border border-gray-600 text-white rounded-lg focus:ring-2 focus:ring-[#e0ac7e] focus:border-[#e0ac7e] transition-all duration-200 font-mono placeholder-gray-400" 
+                               wire:model.defer="apiKey"
+                               class="w-full px-4 py-3 bg-gray-800 bg-opacity-60 border border-gray-600 text-white rounded-lg focus:ring-2 focus:ring-[#e0ac7e] focus:border-[#e0ac7e] transition-all duration-200 font-mono placeholder-gray-400"
                                placeholder="Wklej tutaj klucz API z panelu administracyjnego PrestaShop">
-                        @error('apiKey') 
-                            <p class="text-red-400 text-sm mt-1">{{ $message }}</p> 
+                        @error('apiKey')
+                            <p class="text-red-400 text-sm mt-1">{{ $message }}</p>
+                        @enderror
+                    </div>
+
+                    <div>
+                        <label for="prestashopVersionExact" class="block text-sm font-medium text-white mb-2">
+                            Wersja PrestaShop (dokladna)
+                        </label>
+                        <input type="text"
+                               id="prestashopVersionExact"
+                               wire:model.defer="prestashopVersionExact"
+                               class="w-full px-4 py-3 bg-gray-800 bg-opacity-60 border border-gray-600 text-white rounded-lg focus:ring-2 focus:ring-[#e0ac7e] focus:border-[#e0ac7e] transition-all duration-200 placeholder-gray-400"
+                               placeholder="np. 8.2.1"
+                               maxlength="20">
+                        <p class="text-gray-400 text-sm mt-1">Wprowadz wersje PrestaShop (np. 8.2.1). Zostaw puste jesli nieznana.</p>
+                        @error('prestashopVersionExact')
+                            <p class="text-red-400 text-sm mt-1">{{ $message }}</p>
                         @enderror
                     </div>
 
@@ -285,6 +301,21 @@
                         <p class="text-gray-400 text-sm mt-1">Niektóre konfiguracje PrestaShop wymagają dodatkowego sekretu API</p>
                     </div>
 
+                    <div>
+                        <label for="ppmModuleApiKey" class="block text-sm font-medium text-white mb-2">
+                            Klucz API modulu PPM Manager (opcjonalnie)
+                        </label>
+                        <input type="text"
+                               id="ppmModuleApiKey"
+                               wire:model.defer="ppmModuleApiKey"
+                               class="w-full px-4 py-3 bg-gray-800 bg-opacity-60 border border-gray-600 text-white rounded-lg focus:ring-2 focus:ring-[#e0ac7e] focus:border-[#e0ac7e] transition-all duration-200 font-mono placeholder-gray-400"
+                               placeholder="Klucz z konfiguracji modulu PPM Manager">
+                        <p class="text-gray-400 text-sm mt-1">
+                            Klucz API z modulu <span class="text-[#e0ac7e]">PPM Manager</span> zainstalowanego na tym sklepie.
+                            Znajdziesz go w PrestaShop Admin &rarr; Modules &rarr; PPM Manager &rarr; Configure.
+                        </p>
+                    </div>
+
                     <!-- API Info Card -->
                     <div class="bg-blue-900 bg-opacity-20 border border-blue-500 border-opacity-30 rounded-lg p-4 backdrop-blur-sm">
                         <div class="flex">
@@ -294,7 +325,7 @@
                             <div>
                                 <h4 class="text-sm font-medium text-blue-300 mb-1">Jak uzyskać klucz API?</h4>
                                 <p class="text-sm text-blue-200">
-                                    Przejdź do Panelu Administracyjnego PrestaShop → Zaawansowane parametry → Webservice → 
+                                    Przejdź do Panelu Administracyjnego PrestaShop → Zaawansowane parametry → Webservice →
                                     Dodaj nowy klucz z uprawnieniami do Products, Categories, Orders.
                                 </p>
                             </div>
@@ -1228,7 +1259,7 @@
                         </div>
                         <div class="mt-4 p-4 bg-blue-900 bg-opacity-20 border border-blue-500 border-opacity-30 rounded-lg">
                             <p class="text-sm text-blue-200">
-                                <strong>Info:</strong> Webhooks umożliwiają natychmiastową synchronizację gdy dane się zmienią. 
+                                <strong>Info:</strong> Webhooks umożliwiają natychmiastową synchronizację gdy dane się zmienią.
                                 Wymaga dodatkowej konfiguracji w PrestaShop.
                             </p>
                         </div>

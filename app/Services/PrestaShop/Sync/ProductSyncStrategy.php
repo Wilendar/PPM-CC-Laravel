@@ -864,57 +864,10 @@ class ProductSyncStrategy implements ISyncStrategy
                 }
             }
 
-            // FIX 2026-02-05: Always use REPLACE ALL strategy even without pending changes
-            // Per user request: "zawsze uploaduj zdjecia z PPM aby uniknac bledow z istniejacymi zdjeciami"
-            // This ensures images are always fresh from PPM, avoiding mapping mismatch issues
-            if (empty($shopChanges)) {
-                Log::info('[MEDIA SYNC] No pending checkbox changes, using REPLACE ALL for currently assigned media', [
-                    'product_id' => $product->id,
-                    'shop_id' => $shop->id,
-                ]);
-
-                // Build shopChanges from currently mapped media (treat as 'sync' action)
-                // This will cause REPLACE ALL to delete and re-upload all assigned images
-                $storeKey = "store_{$shop->id}";
-                $allMedia = \App\Models\Media::where('mediable_type', Product::class)
-                    ->where('mediable_id', $product->id)
-                    ->active()
-                    ->get();
-
-                foreach ($allMedia as $media) {
-                    $mapping = $media->prestashop_mapping[$storeKey] ?? [];
-                    if (!empty($mapping['ps_image_id'])) {
-                        // Media is currently synced - include it for re-upload
-                        $shopChanges[$media->id] = 'sync';
-                    }
-                }
-
-                if (empty($shopChanges)) {
-                    Log::debug('[MEDIA SYNC] No media assigned to shop, nothing to sync', [
-                        'product_id' => $product->id,
-                        'shop_id' => $shop->id,
-                    ]);
-                    return;
-                }
-
-                Log::info('[MEDIA SYNC] Built shopChanges from existing mappings for REPLACE ALL', [
-                    'product_id' => $product->id,
-                    'shop_id' => $shop->id,
-                    'media_count' => count($shopChanges),
-                ]);
-            }
-
-            Log::info('[MEDIA SYNC] Shop-specific changes found', [
-                'product_id' => $product->id,
-                'shop_id' => $shop->id,
-                'changes' => $shopChanges,
-            ]);
-
             // =================================================================
-            // REPLACE ALL STRATEGY (ETAP_07d)
-            // - Delete ALL images from PrestaShop
-            // - Upload ONLY the selected images
-            // - Set correct cover image based on is_primary
+            // MEDIA SYNC STRATEGY SELECTION
+            // Smart Diff (default): minimal API calls, preserves PS image IDs
+            // Replace All (fallback): delete all + re-upload all
             // =================================================================
 
             // Get ALL media for this product
@@ -926,10 +879,6 @@ class ProductSyncStrategy implements ISyncStrategy
                 ->get();
 
             // Calculate FINAL desired state: which media SHOULD be on PrestaShop
-            // Logic:
-            // - If has 'sync' action → INCLUDE (user checked the checkbox)
-            // - If has 'unsync' action → EXCLUDE (user unchecked the checkbox)
-            // - If no action → keep current state (synced = include, not synced = exclude)
             $storeKey = "store_{$shop->id}";
             $selectedMedia = $allMedia->filter(function($media) use ($storeKey, $shopChanges) {
                 $mediaId = $media->id;
@@ -937,11 +886,9 @@ class ProductSyncStrategy implements ISyncStrategy
                 $isCurrentlySynced = !empty($mapping['ps_image_id']);
 
                 if (isset($shopChanges[$mediaId])) {
-                    // Explicit user action - respect it
                     return $shopChanges[$mediaId] === 'sync';
                 }
 
-                // No change - keep if currently synced
                 return $isCurrentlySynced;
             });
 
@@ -951,30 +898,52 @@ class ProductSyncStrategy implements ISyncStrategy
                 'total_media' => $allMedia->count(),
                 'selected_count' => $selectedMedia->count(),
                 'selected_ids' => $selectedMedia->pluck('id')->toArray(),
+                'has_pending_changes' => !empty($shopChanges),
             ]);
 
-            // Get MediaSyncService
-            $syncService = app(\App\Services\Media\MediaSyncService::class);
+            $strategy = \App\Models\SystemSetting::get('media.sync_strategy', 'smart');
 
-            // Execute REPLACE ALL strategy
-            $result = $syncService->replaceAllImages($product, $shop, $selectedMedia);
+            if ($strategy === 'replace_all') {
+                // Legacy: Delete all + re-upload all (fallback)
+                $syncService = app(\App\Services\Media\MediaSyncService::class);
+                $result = $syncService->replaceAllImages($product, $shop, $selectedMedia);
 
-            Log::info('[MEDIA SYNC] REPLACE ALL strategy completed', [
-                'product_id' => $product->id,
-                'shop_id' => $shop->id,
-                'deleted' => $result['deleted'],
-                'uploaded' => $result['uploaded'],
-                'errors_count' => count($result['errors']),
-                'cover_set' => $result['cover_set'],
-            ]);
+                Log::info('[MEDIA SYNC] REPLACE ALL strategy completed', [
+                    'product_id' => $product->id,
+                    'shop_id' => $shop->id,
+                    'deleted' => $result['deleted'],
+                    'uploaded' => $result['uploaded'],
+                    'errors_count' => count($result['errors']),
+                    'cover_set' => $result['cover_set'],
+                ]);
+            } else {
+                // Smart diff sync (default) - minimal API calls
+                $smartSync = app(\App\Services\Media\SmartMediaSyncService::class);
+                $result = $smartSync->syncImages($product, $shop, $selectedMedia, $shopChanges);
 
-            // ETAP_07d (2025-12-02): Session cleanup moved to ProductForm::dispatchSyncJobsForAllShops()
-            // Session is not available in queue context, so we don't try to update it here
+                if ($result['skipped']) {
+                    Log::info('[MEDIA SYNC] No changes detected, skipping', [
+                        'product_id' => $product->id,
+                        'shop_id' => $shop->id,
+                    ]);
+                    return;
+                }
+
+                Log::info('[MEDIA SYNC] Smart diff strategy completed', [
+                    'product_id' => $product->id,
+                    'shop_id' => $shop->id,
+                    'uploaded' => $result['uploaded'],
+                    'deleted' => $result['deleted'],
+                    'cover_set' => $result['cover_set'],
+                    'positions_updated' => $result['positions_updated'],
+                    'errors_count' => count($result['errors']),
+                ]);
+            }
 
             Log::info('[MEDIA SYNC] Media sync completed for shop', [
                 'product_id' => $product->id,
                 'shop_id' => $shop->id,
-                'strategy' => 'replace_all',
+                'strategy' => $strategy,
                 'result' => $result,
             ]);
 

@@ -104,6 +104,7 @@ class PrestaShopShop extends Model
         'consecutive_failures',
         'last_error_message',
         'prestashop_version',
+        'prestashop_version_exact',
         'version_compatible',
         'supported_features',
         'sync_frequency',

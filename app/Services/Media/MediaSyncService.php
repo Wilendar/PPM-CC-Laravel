@@ -13,6 +13,7 @@ use App\Services\PrestaShop\PrestaShop8Client;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Contracts\Cache\LockTimeoutException;
 
 /**
  * MediaSyncService - PrestaShop Media Synchronization
@@ -299,9 +300,17 @@ class MediaSyncService
             // Previous: Storage::path() used default 'local' disk = WRONG PATH
             $filePath = Storage::disk('public')->path($media->file_path);
 
+            // FIX 2026-02-05: Convert WebP/PNG to JPEG before upload (conditional)
+            // PrestaShop < 8.2.1 doesn't properly handle WebP with .jpg extension
+            // PrestaShop >= 8.2.1 has native WebP support - skip conversion
+            $uploadPath = $this->ensureJpegForUpload($filePath, $shop);
+
             // Upload to PrestaShop
             $this->throttle($shop->id);
-            $response = $client->uploadProductImage($psProductId, $filePath, $media->file_name);
+            $response = $client->uploadProductImage($psProductId, $uploadPath, $media->file_name);
+
+            // Clean up temporary JPEG if created
+            $this->cleanupTempJpeg($filePath, $uploadPath);
 
             if (!$response || !isset($response['id'])) {
                 $media->markSyncError("store_{$shop->id}", 'Upload failed - no image ID returned');
@@ -336,6 +345,11 @@ class MediaSyncService
             return true;
 
         } catch (\Exception $e) {
+            // Clean up temporary file on error
+            if (isset($uploadPath) && isset($filePath)) {
+                $this->cleanupTempJpeg($filePath, $uploadPath);
+            }
+
             Log::error('[MEDIA SYNC] Push failed', [
                 'media_id' => $media->id,
                 'shop_id' => $shop->id,
@@ -489,14 +503,30 @@ class MediaSyncService
             return $result;
         }
 
-        Log::info('[MEDIA REPLACE ALL] Starting replace all strategy', [
+        // FIX 2026-02-05: Add mutex/lock to prevent race condition
+        // When multiple shops sync same product simultaneously, mappings can get corrupted
+        // Lock per product ensures only one REPLACE ALL runs at a time for given product
+        $lockKey = "media_sync_product_{$product->id}";
+        $lock = Cache::lock($lockKey, 120); // 120 seconds max lock time
+
+        Log::info('[MEDIA REPLACE ALL] Acquiring lock for product', [
             'product_id' => $product->id,
-            'ps_product_id' => $psProductId,
             'shop_id' => $shop->id,
-            'media_count' => $selectedMedia->count(),
+            'lock_key' => $lockKey,
         ]);
 
         try {
+            // Wait up to 60 seconds to acquire lock
+            // If another shop sync is running, we wait for it to finish
+            $lock->block(60);
+
+            Log::info('[MEDIA REPLACE ALL] Lock acquired, starting replace all strategy', [
+                'product_id' => $product->id,
+                'ps_product_id' => $psProductId,
+                'shop_id' => $shop->id,
+                'media_count' => $selectedMedia->count(),
+            ]);
+
             $client = $this->getClient($shop);
 
             // STEP 1: Delete ALL existing images from PrestaShop
@@ -542,8 +572,16 @@ class MediaSyncService
                     continue;
                 }
 
+                // FIX 2026-02-05: Convert WebP/PNG to JPEG before upload (conditional)
+                // PrestaShop < 8.2.1 doesn't properly handle WebP with .jpg extension
+                // PrestaShop >= 8.2.1 has native WebP support - skip conversion
+                $uploadPath = $this->ensureJpegForUpload($filePath, $shop);
+
                 try {
-                    $response = $client->uploadProductImage($psProductId, $filePath, $media->file_name);
+                    $response = $client->uploadProductImage($psProductId, $uploadPath, $media->file_name);
+
+                    // Clean up temporary JPEG if created
+                    $this->cleanupTempJpeg($filePath, $uploadPath);
 
                     if (!$response || !isset($response['id'])) {
                         $result['errors'][] = "Upload failed for media ID {$media->id}";
@@ -553,12 +591,13 @@ class MediaSyncService
                     $psImageId = (int) $response['id'];
                     $result['uploaded']++;
 
-                    // Save mapping
+                    // Save mapping (including synced_sort_order for smart diff detection)
                     $media->setPrestaShopMapping($shop->id, [
                         'ps_product_id' => $psProductId,
                         'ps_image_id' => $psImageId,
                         'is_cover' => $media->is_primary,
                         'synced_at' => now()->toIso8601String(),
+                        'synced_sort_order' => $media->sort_order ?? 0,
                     ]);
                     $media->sync_status = 'synced';
                     $media->save();
@@ -575,6 +614,9 @@ class MediaSyncService
                     ]);
 
                 } catch (\Exception $e) {
+                    // Clean up temporary file on error too
+                    $this->cleanupTempJpeg($filePath, $uploadPath);
+
                     $result['errors'][] = "Upload failed for media ID {$media->id}: " . $e->getMessage();
                     Log::error('[MEDIA REPLACE ALL] Upload failed', [
                         'media_id' => $media->id,
@@ -596,12 +638,28 @@ class MediaSyncService
                 ]);
             }
 
+        } catch (LockTimeoutException $e) {
+            // FIX 2026-02-05: Another sync is already running for this product
+            $result['errors'][] = 'Media sync locked - another sync is in progress for this product. Please retry in a moment.';
+            Log::warning('[MEDIA REPLACE ALL] Lock timeout - another sync in progress', [
+                'product_id' => $product->id,
+                'shop_id' => $shop->id,
+                'lock_key' => $lockKey,
+            ]);
+            return $result;
         } catch (\Exception $e) {
             $result['errors'][] = 'Replace all failed: ' . $e->getMessage();
             Log::error('[MEDIA REPLACE ALL] Strategy failed', [
                 'product_id' => $product->id,
                 'shop_id' => $shop->id,
                 'error' => $e->getMessage(),
+            ]);
+        } finally {
+            // FIX 2026-02-05: Always release lock
+            optional($lock)->release();
+            Log::debug('[MEDIA REPLACE ALL] Lock released', [
+                'product_id' => $product->id,
+                'shop_id' => $shop->id,
             ]);
         }
 
@@ -715,4 +773,151 @@ class MediaSyncService
 
         Cache::put($cacheKey, microtime(true), 60);
     }
+
+    /**
+     * Ensure file is a proper JPEG for PrestaShop upload (conditional)
+     *
+     * FIX 2026-02-05: PrestaShop < 8.2.1 doesn't accept WebP with .jpg extension
+     * PrestaShop >= 8.2.1 has native WebP support - skip conversion for those versions.
+     *
+     * This method checks actual file format and converts WebP to JPEG only if needed.
+     *
+     * @param string $filePath Original file path
+     * @param PrestaShopShop $shop Shop to check version for WebP support
+     * @return string Path to JPEG file (may be temporary converted file)
+     */
+    private function ensureJpegForUpload(string $filePath, PrestaShopShop $shop): string
+    {
+        if (!file_exists($filePath)) {
+            return $filePath;
+        }
+
+        // FIX 2026-02-05: Skip conversion for PrestaShop >= 8.2.1 (native WebP support)
+        // Priority: exact version (manual input) > detected version > default
+        $psVersion = $shop->prestashop_version_exact ?? $shop->prestashop_version ?? '8.0.0';
+        $supportsWebP = version_compare($psVersion, '8.2.1', '>=');
+
+        if ($supportsWebP) {
+            Log::debug('[MEDIA SYNC] Skipping WebP conversion - PS >= 8.2.1 supports native WebP', [
+                'shop_id' => $shop->id,
+                'shop_name' => $shop->name,
+                'ps_version' => $psVersion,
+                'file_path' => $filePath,
+            ]);
+            return $filePath;
+        }
+
+        // Detect actual MIME type (not based on extension!)
+        $finfo = new \finfo(FILEINFO_MIME_TYPE);
+        $actualMime = $finfo->file($filePath);
+
+        Log::debug('[MEDIA SYNC] File format detection', [
+            'file_path' => $filePath,
+            'extension' => pathinfo($filePath, PATHINFO_EXTENSION),
+            'actual_mime' => $actualMime,
+            'shop_id' => $shop->id,
+            'ps_version' => $psVersion,
+        ]);
+
+        // If already proper JPEG, return as-is
+        if ($actualMime === 'image/jpeg') {
+            return $filePath;
+        }
+
+        // If WebP (common case) - convert to JPEG for older PrestaShop versions
+        if ($actualMime === 'image/webp' || $actualMime === 'image/png' || $actualMime === 'image/gif') {
+            try {
+                $tempDir = storage_path('app/temp');
+                if (!is_dir($tempDir)) {
+                    mkdir($tempDir, 0755, true);
+                }
+
+                $tempPath = $tempDir . '/' . uniqid('jpeg_') . '.jpg';
+
+                // FIX 2026-02-05: Use native PHP GD functions instead of Intervention Image
+                // This ensures compatibility on all servers without additional dependencies
+                $sourceImage = match ($actualMime) {
+                    'image/webp' => imagecreatefromwebp($filePath),
+                    'image/png' => imagecreatefrompng($filePath),
+                    'image/gif' => imagecreatefromgif($filePath),
+                    default => null,
+                };
+
+                if (!$sourceImage) {
+                    Log::error('[MEDIA SYNC] Failed to load source image for conversion', [
+                        'file_path' => $filePath,
+                        'actual_mime' => $actualMime,
+                        'shop_id' => $shop->id,
+                    ]);
+                    return $filePath;
+                }
+
+                // For PNG with transparency, fill background with white
+                if ($actualMime === 'image/png' || $actualMime === 'image/gif') {
+                    $width = imagesx($sourceImage);
+                    $height = imagesy($sourceImage);
+                    $jpegImage = imagecreatetruecolor($width, $height);
+                    $white = imagecolorallocate($jpegImage, 255, 255, 255);
+                    imagefill($jpegImage, 0, 0, $white);
+                    imagecopy($jpegImage, $sourceImage, 0, 0, 0, 0, $width, $height);
+                    imagedestroy($sourceImage);
+                    $sourceImage = $jpegImage;
+                }
+
+                // Save as JPEG with quality 90
+                $success = imagejpeg($sourceImage, $tempPath, 90);
+                imagedestroy($sourceImage);
+
+                if (!$success || !file_exists($tempPath)) {
+                    Log::error('[MEDIA SYNC] Failed to save converted JPEG', [
+                        'file_path' => $filePath,
+                        'temp_path' => $tempPath,
+                        'shop_id' => $shop->id,
+                    ]);
+                    return $filePath;
+                }
+
+                Log::info('[MEDIA SYNC] Converted image to JPEG for PrestaShop < 8.2.1', [
+                    'original_path' => $filePath,
+                    'original_mime' => $actualMime,
+                    'converted_path' => $tempPath,
+                    'converted_size' => filesize($tempPath),
+                    'shop_id' => $shop->id,
+                    'ps_version' => $psVersion,
+                ]);
+
+                return $tempPath;
+
+            } catch (\Exception $e) {
+                Log::error('[MEDIA SYNC] Failed to convert image to JPEG', [
+                    'file_path' => $filePath,
+                    'error' => $e->getMessage(),
+                    'shop_id' => $shop->id,
+                ]);
+                // Fall back to original file
+                return $filePath;
+            }
+        }
+
+        // Unknown format - return original
+        return $filePath;
+    }
+
+    /**
+     * Clean up temporary JPEG file after upload
+     *
+     * @param string $originalPath Original file path
+     * @param string $usedPath Path that was used for upload
+     */
+    private function cleanupTempJpeg(string $originalPath, string $usedPath): void
+    {
+        // Only delete if it's a temp file we created
+        if ($originalPath !== $usedPath && str_contains($usedPath, 'temp') && file_exists($usedPath)) {
+            @unlink($usedPath);
+            Log::debug('[MEDIA SYNC] Cleaned up temporary JPEG', [
+                'temp_path' => $usedPath,
+            ]);
+        }
+    }
+
 }

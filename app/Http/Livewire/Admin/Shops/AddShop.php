@@ -21,10 +21,11 @@ class AddShop extends Component
     public $shopUrl = '';
     public $shopDescription = '';
     
-    // Step 2: API Credentials  
+    // Step 2: API Credentials
     public $apiKey = '';
     public $apiSecret = '';
     public $prestashopVersion = '8'; // Default PS8
+    public $prestashopVersionExact = ''; // Exact version (e.g. 8.2.1)
     
     // Step 3: Connection Test
     public $connectionStatus = null;
@@ -69,6 +70,7 @@ class AddShop extends Component
     public $syncOnlyActiveProducts = true;
     public $preserveLocalImages = true;
     public $syncMetaData = true;
+    public $ppmModuleApiKey = '';
 
     // ETAP_07f: CSS/JS Sync Configuration (2025-12-16)
     // FTP is REQUIRED for CSS/JS scanning and editing
@@ -104,6 +106,7 @@ class AddShop extends Component
         'apiKey.min' => 'Klucz API musi mieć co najmniej 32 znaki',
         'prestashopVersion.required' => 'Wersja PrestaShop jest wymagana',
         'prestashopVersion.in' => 'Wersja PrestaShop musi być 8 lub 9',
+        'prestashopVersionExact.max' => 'Dokladna wersja PrestaShop nie moze przekraczac 20 znakow',
         // Tax Rules Validation (FAZA 5.1)
         'taxRulesGroup23.required' => 'Grupa podatkowa 23% jest wymagana',
         'taxRulesGroup23.integer' => 'Grupa podatkowa 23% musi być liczbą',
@@ -154,6 +157,7 @@ class AddShop extends Component
         $this->apiKey = '';
         $this->apiSecret = '';
         $this->prestashopVersion = '8';
+        $this->prestashopVersionExact = '';
         
         // Step 3: Connection Test
         $this->connectionStatus = null;
@@ -183,6 +187,7 @@ class AddShop extends Component
         $this->syncOnlyActiveProducts = true;
         $this->preserveLocalImages = true;
         $this->syncMetaData = true;
+        $this->ppmModuleApiKey = '';
 
         // ETAP_07f: CSS/JS Sync Configuration (FTP required)
         $this->enableFtpSync = false;
@@ -233,7 +238,20 @@ class AddShop extends Component
 
         // Step 2: API Credentials
         $this->apiKey = $shop->api_key;
-        $this->prestashopVersion = $shop->prestashop_version;
+        // FIX 2026-02-05: prestashop_version may contain full version (e.g., "8.2.1")
+        // Extract major version (8 or 9) for the select dropdown
+        $storedVersion = $shop->prestashop_version ?? '8';
+        if (in_array($storedVersion, ['8', '9'])) {
+            $this->prestashopVersion = $storedVersion;
+        } else {
+            // Extract major version from full version string (e.g., "8.2.1" -> "8")
+            $this->prestashopVersion = substr($storedVersion, 0, 1);
+            // Also populate exact version if not already set
+            if (empty($shop->prestashop_version_exact)) {
+                $this->prestashopVersionExact = $storedVersion;
+            }
+        }
+        $this->prestashopVersionExact = $shop->prestashop_version_exact ?? $this->prestashopVersionExact ?? '';
 
         // Step 3: Connection Test - reset to allow re-testing
         $this->connectionStatus = null;
@@ -258,6 +276,7 @@ class AddShop extends Component
         $this->preserveLocalImages = $syncSettings['preserve_images'] ?? true;
         $this->syncMetaData = $syncSettings['sync_metadata'] ?? true;
         $this->enableWebhooks = $syncSettings['enable_webhooks'] ?? false;
+        $this->ppmModuleApiKey = $syncSettings['ppm_module_api_key'] ?? '';
 
         // Sync configuration
         $syncConfig = $shop->sync_configuration ?? [];
@@ -419,6 +438,7 @@ class AddShop extends Component
                 $this->validate([
                     'apiKey' => 'required|min:32|max:255',
                     'prestashopVersion' => 'required|in:8,9',
+                    'prestashopVersionExact' => 'nullable|string|max:20',
                 ]);
                 break;
                 
@@ -489,6 +509,44 @@ class AddShop extends Component
                 ]);
 
                 if ($result['success']) {
+                    // FIX 2026-02-05: Auto-detect exact PrestaShop version after successful connection
+                    $detectedExactVersion = null;
+                    try {
+                        // Create temporary shop object for version detection
+                        $tempShop = new PrestaShopShop([
+                            'url' => $this->shopUrl,
+                            'api_key' => $this->apiKey,
+                            'prestashop_version' => $this->prestashopVersion,
+                        ]);
+                        $tempShop->id = 0; // Fake ID for logging
+
+                        $client = new \App\Services\PrestaShop\PrestaShop8Client($tempShop);
+                        $detectedExactVersion = $client->detectFullVersion();
+
+                        if ($detectedExactVersion) {
+                            $this->prestashopVersionExact = $detectedExactVersion;
+                            Log::info('[AddShop] Auto-detected PrestaShop version', [
+                                'shop_url' => $this->shopUrl,
+                                'detected_version' => $detectedExactVersion,
+                            ]);
+                        }
+                    } catch (\Exception $versionException) {
+                        Log::debug('[AddShop] Could not auto-detect exact version', [
+                            'shop_url' => $this->shopUrl,
+                            'error' => $versionException->getMessage(),
+                        ]);
+                    }
+
+                    $versionMessage = $detectedExactVersion
+                        ? "Wykryto wersję {$detectedExactVersion}"
+                        : "Version {$result['prestashop_version']} detected";
+                    $webpInfo = $detectedExactVersion
+                        ? ($this->supportsWebP($detectedExactVersion) ? 'Obsługuje natywnie WebP (>= 8.2.1)' : 'Wymaga konwersji WebP→JPEG (< 8.2.1)')
+                        : 'Compatible version confirmed';
+                    $versionDetails = $detectedExactVersion
+                        ? "Wersja PrestaShop została ustawiona na: {$detectedExactVersion}. {$webpInfo}"
+                        : $webpInfo;
+
                     $this->diagnostics = [
                         [
                             'check' => 'PrestaShop API Connection',
@@ -499,8 +557,8 @@ class AddShop extends Component
                         [
                             'check' => 'PrestaShop Version',
                             'status' => 'success',
-                            'message' => "Version {$result['prestashop_version']} detected",
-                            'details' => 'Compatible version confirmed'
+                            'message' => $versionMessage,
+                            'details' => $versionDetails
                         ],
                         [
                             'check' => 'API Features',
@@ -509,6 +567,18 @@ class AddShop extends Component
                             'details' => implode(', ', $result['supported_features'] ?? [])
                         ]
                     ];
+
+                    // Test PPM Image Manager module connection (if API key configured)
+                    if (!empty($this->ppmModuleApiKey)) {
+                        $this->diagnostics[] = $this->testPpmModuleConnection($client);
+                    } else {
+                        $this->diagnostics[] = [
+                            'check' => 'PPM Manager',
+                            'status' => 'info',
+                            'message' => 'Modul nie skonfigurowany',
+                            'details' => 'Klucz API modulu PPM Manager nie podany - rozszerzone operacje na obrazkach pomijane',
+                        ];
+                    }
 
                     $this->connectionStatus = 'success';
                     $this->connectionMessage = 'Połączenie z sklepem PrestaShop zostało pomyślnie nawiązane!';
@@ -557,6 +627,10 @@ class AddShop extends Component
 
                     // Update PrestaShop version if detected
                     $shop->prestashop_version = $this->prestashopVersion;
+                    // FIX 2026-02-05: Save exact version for WebP support detection
+                    if ($this->prestashopVersionExact) {
+                        $shop->prestashop_version_exact = $this->prestashopVersionExact;
+                    }
                     $shop->version_compatible = true;
                     $shop->save();
 
@@ -1234,6 +1308,7 @@ class AddShop extends Component
                 'description' => $this->shopDescription,
                 'api_key' => $this->apiKey,
                 'prestashop_version' => $this->prestashopVersion,
+                'prestashop_version_exact' => $this->prestashopVersionExact ?: null,
                 'sync_frequency' => $this->syncFrequency,
                 // Tax Rules Mapping (FAZA 5.1 - 2025-11-14)
                 'tax_rules_group_id_23' => $this->taxRulesGroup23,
@@ -1254,6 +1329,7 @@ class AddShop extends Component
                     'preserve_images' => $this->preserveLocalImages,
                     'sync_metadata' => $this->syncMetaData,
                     'enable_webhooks' => $this->enableWebhooks,
+                    'ppm_module_api_key' => $this->ppmModuleApiKey,
                 ],
                 'conflict_resolution' => $this->conflictResolution,
                 'notification_settings' => [
@@ -1410,6 +1486,107 @@ class AddShop extends Component
         ];
 
         return $descriptions[$step] ?? '';
+    }
+
+    /**
+     * Check if PrestaShop version supports native WebP
+     *
+     * FIX 2026-02-05: PS 8.2.1+ supports WebP natively
+     *
+     * @param string $version Full version string (e.g., "8.2.1")
+     * @return bool
+     */
+    private function supportsWebP(string $version): bool
+    {
+        return version_compare($version, '8.2.1', '>=');
+    }
+
+    /**
+     * Test connection to PPM Image Manager module on PrestaShop shop
+     */
+    private function testPpmModuleConnection($client = null): array
+    {
+        $baseUrl = rtrim($this->shopUrl, '/');
+        $moduleUrl = $baseUrl . '/module/ppmimagemanager/api';
+
+        try {
+            $response = \Illuminate\Support\Facades\Http::timeout(10)
+                ->withHeaders([
+                    'X-PPM-Api-Key' => $this->ppmModuleApiKey,
+                    'Content-Type' => 'application/json',
+                ])
+                ->post($moduleUrl, [
+                    'action' => 'ping',
+                ]);
+
+            $data = $response->json();
+            $isModuleJson = is_array($data) && array_key_exists('success', $data);
+
+            // Ping success (v1.1.0+)
+            if ($response->successful() && isset($data['success']) && $data['success'] === true) {
+                $moduleVersion = $data['version'] ?? 'unknown';
+                $displayName = $data['display_name'] ?? 'PPM Manager';
+                return [
+                    'check' => 'PPM Manager',
+                    'status' => 'success',
+                    'message' => $displayName . ' v' . $moduleVersion . ' polaczony',
+                    'details' => 'PS ' . ($data['ps_version'] ?? '?') . ' | Endpoint aktywny',
+                ];
+            }
+
+            // Module responds with JSON but error - module IS installed (old version or wrong action)
+            if ($isModuleJson && in_array($response->status(), [400, 404])) {
+                return [
+                    'check' => 'PPM Manager',
+                    'status' => 'success',
+                    'message' => 'Modul zainstalowany i odpowiada',
+                    'details' => 'Endpoint aktywny (zalecana aktualizacja do v1.1.0 dla pelnej diagnostyki)',
+                ];
+            }
+
+            if ($response->status() === 401) {
+                // Check if module JSON (wrong key) vs web server 401
+                if ($isModuleJson) {
+                    return [
+                        'check' => 'PPM Manager',
+                        'status' => 'error',
+                        'message' => 'Nieprawidlowy klucz API modulu',
+                        'details' => 'Sprawdz klucz w PrestaShop Admin > Modules > PPM Manager > Configure',
+                    ];
+                }
+                return [
+                    'check' => 'PPM Manager',
+                    'status' => 'warning',
+                    'message' => 'Autoryzacja odrzucona (HTTP 401)',
+                    'details' => 'Serwer odrzucil zapytanie - sprawdz konfiguracje',
+                ];
+            }
+
+            // HTTP 404 without JSON = module not installed (web server 404)
+            if ($response->status() === 404 && !$isModuleJson) {
+                return [
+                    'check' => 'PPM Manager',
+                    'status' => 'warning',
+                    'message' => 'Modul nie zainstalowany na tym sklepie',
+                    'details' => 'Zainstaluj modul ppmimagemanager na sklepie PrestaShop',
+                ];
+            }
+
+            return [
+                'check' => 'PPM Manager',
+                'status' => 'warning',
+                'message' => 'Nieoczekiwana odpowiedz (HTTP ' . $response->status() . ')',
+                'details' => substr($response->body(), 0, 200),
+            ];
+
+        } catch (\Exception $e) {
+            return [
+                'check' => 'PPM Manager',
+                'status' => 'warning',
+                'message' => 'Nie mozna polaczyc z modulem',
+                'details' => $e->getMessage(),
+            ];
+        }
     }
 
     public function render()

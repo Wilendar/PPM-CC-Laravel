@@ -1,9 +1,9 @@
 # PPM - Jobs & Workers Documentation
 
-> **Wersja:** 1.5
-> **Data:** 2026-02-02
+> **Wersja:** 1.6
+> **Data:** 2026-02-06
 > **Status:** Production Ready
-> **Changelog:** ETAP_15 - BusinessPartner Management + Variant Field Inheritance
+> **Changelog:** Smart Diff Media Sync - inteligentny sync obrazkow do PrestaShop
 
 ---
 
@@ -30,7 +30,7 @@ PPM-CC-Laravel wykorzystuje **49 zdefiniowanych JOBow** zorganizowanych w 9 kate
 |-----------|-------|----------------|
 | System | 5 | Backup, Maintenance, Notifications, Reports |
 | PrestaShop Sync | 11 | Product/Category/Attribute/Variant sync |
-| Media | 3 | Upload, conversion, PS push |
+| Media | 3 | Upload, conversion, PS push (Smart Diff Sync) |
 | ERP | 7 | Baselinker, Subiekt GT (dynamic sync + variant inheritance), Dynamics |
 | VisualEditor | 5 | Description sync, templates |
 | Features | 3 | Feature sync to PrestaShop |
@@ -47,6 +47,37 @@ PPM-CC-Laravel wykorzystuje **49 zdefiniowanych JOBow** zorganizowanych w 9 kate
 | ShopVariantService | Mapowanie wariantow PPM ↔ PrestaShop combinations |
 | PrestaShop8Client | API client dla PrestaShop Web Services |
 | SubiektRestApiClient | REST API client dla sapi.mpptrade.pl |
+| **SmartMediaSyncService** | Inteligentny diff-based sync obrazkow do PrestaShop (v1.6) |
+| **MediaDiffCalculator** | Oblicza diff desired vs current PS state (v1.6) |
+| **MediaSyncService** | Legacy replace-all sync + metody reuse (upload, delete, cover) |
+
+### Nowe w v1.6 (Smart Diff Media Sync)
+
+- **SmartMediaSyncService** - Nowy serwis orkiestrujacy inteligentny sync obrazkow:
+  - Zamiast `replaceAllImages()` (delete ALL + re-upload ALL) → diff-based sync
+  - **Brak zmian** → SKIP (0 API calls) - najczestszy scenariusz
+  - **Nowe zdjecia** → upload TYLKO nowych (stare IDs stabilne)
+  - **Usuniete zdjecia** → delete TYLKO usunietych z PS
+  - **Zmiana cover** → PATCH cover (1 API call)
+  - **Zmiana sort_order** → position update via custom PS module
+- **MediaDiffCalculator** - Oblicza diff miedzy desired media state a current PS state:
+  - `toUpload` - media bez PS mapping (nowe)
+  - `toDelete` - media z PS mapping ale NIE w desired (usuniete, wlacznie z soft-deleted via `withTrashed()`)
+  - `unchanged` - media z valid PS mapping i w desired
+  - `coverChanged` - detekcja zmiany primary image
+  - `orderChanged` - detekcja zmiany sort_order vs `synced_sort_order` w mapping
+- **MediaSyncDiff DTO** - Immutable DTO z wynikiem diff (`app/DTOs/Media/MediaSyncDiff.php`)
+- **Strategy Toggle** - `SystemSetting::get('media.sync_strategy', 'smart')`:
+  - `smart` (default) → SmartMediaSyncService (diff-based)
+  - `replace_all` → stara logika replaceAllImages (fallback)
+- **synced_sort_order** - Nowe pole w `prestashop_mapping` trackujace sort_order w momencie sync
+- **PPM Manager Module** - Custom PrestaShop module `ppmimagemanager` do update position obrazkow
+  - Endpoint: `POST /module/ppmimagemanager/api`
+  - `PrestaShop8Client::updateImagePositions()` - nowa metoda
+  - Graceful fallback: jesli modul nie zainstalowany → skip position update
+- **FIX: GalleryTab race condition** - `handleBeforeProductSave()` nie wywoluje juz `pushToPrestaShop()` bezposrednio (eliminacja race condition z sync jobem)
+- **FIX: savePendingChangesToShop** - Teraz przekazuje pending media changes z session do sync job (4th param)
+- **FIX: Soft-deleted media detection** - `MediaDiffCalculator::findMediaToDelete()` uzywa `withTrashed()` do wykrywania soft-deleted media z PS mapping
 
 ### Nowe w v1.5 (ETAP_15 - BusinessPartner + Variant Field Inheritance)
 
@@ -321,6 +352,25 @@ Przeznaczenie:
 | `sync.schedule.only_connected` | bool | true | Tylko sklepy z connection_status=connected |
 | `sync.schedule.skip_maintenance` | bool | true | Pomijaj w maintenance mode |
 
+**Media Sync Strategy (v1.6):**
+
+| Klucz | Typ | Domyslnie | Opis |
+|-------|-----|-----------|------|
+| `media.sync_strategy` | enum | smart | `smart` = diff-based, `replace_all` = legacy delete-all/re-upload |
+
+**Zmiana strategii:**
+```php
+SystemSetting::set('media.sync_strategy', 'replace_all'); // fallback
+SystemSetting::set('media.sync_strategy', 'smart');       // default
+```
+
+**PPM Manager Module (PrestaShop - position updates):**
+
+| Klucz | Lokalizacja | Opis |
+|-------|-------------|------|
+| API Key | PS Module Config | Generowany przy instalacji modulu `ppmimagemanager` |
+| Endpoint | `POST /module/ppmimagemanager/api` | Update image positions + cache clear |
+
 **ERPConnection Sync Frequencies (ETAP_08 FAZA 6 - Subiekt GT):**
 
 Kazde ERPConnection ma 3 niezalezne czestotliwosci sync:
@@ -592,6 +642,50 @@ Serwisy:
 
 ### 4.3 Media Jobs
 
+#### Smart Media Sync Architecture (v1.6)
+
+```
+FLOW: ProductForm save -> SyncProductToPrestaShop job -> ProductSyncStrategy
+      -> syncMediaIfEnabled() -> SmartMediaSyncService / replaceAllImages (fallback)
+
+Strategy Toggle: SystemSetting::get('media.sync_strategy', 'smart')
+  'smart'       -> SmartMediaSyncService (diff-based, default)
+  'replace_all' -> MediaSyncService::replaceAllImages() (legacy fallback)
+
+Smart Sync Flow:
+1. MediaDiffCalculator::calculateDiff(desired, shopId) -> MediaSyncDiff
+2. if diff->isEmpty() -> SKIP (0 API calls, log "No changes detected")
+3. toDelete  -> deleteProductImage() per image + clear mapping
+4. toUpload  -> ensureJpegForUpload() + uploadProductImage() + save mapping
+5. coverChanged -> setProductImageCover()
+6. orderChanged -> updateImagePositions() via ppmimagemanager module
+
+Serwisy:
+- SmartMediaSyncService (app/Services/Media/SmartMediaSyncService.php)
+- MediaDiffCalculator (app/Services/Media/MediaDiffCalculator.php)
+- MediaSyncDiff DTO (app/DTOs/Media/MediaSyncDiff.php)
+- MediaSyncService (app/Services/Media/MediaSyncService.php) - reuse metod
+
+Reuse z MediaSyncService:
+- ensureJpegForUpload() - WebP -> JPEG conversion
+- cleanupTempJpeg() - Cleanup temp files
+- throttle() - Rate limiting 500ms
+- getPrestaShopProductId() - PS product ID lookup
+
+Reuse z PrestaShop8Client:
+- deleteProductImage() - Delete single (404=success)
+- uploadProductImage() - Upload + deprecation fallback
+- setProductImageCover() - PATCH cover
+- updateImagePositions() - NEW: via ppmimagemanager module
+
+Edge Cases:
+- PS image usuniety zewnetrznie -> 404 przy delete = sukces, wyczysc mapping
+- Soft-deleted media -> withTrashed() wykrywa i kasuje z PS
+- Race condition -> mutex lock per product (istniejacy pattern)
+- PS module nie zainstalowany -> graceful fail, skip position update
+- Pierwszy sync -> toUpload=ALL, toDelete=empty
+```
+
 #### PushMediaToPrestaShop
 ```
 Sciezka: app/Jobs/Media/PushMediaToPrestaShop.php
@@ -601,7 +695,7 @@ Tries: 3
 Connection: sync (SYNCHRONOUS!)
 
 Przeznaczenie:
-- Upload obrazkow do PrestaShop API
+- Upload obrazkow do PrestaShop API (direct push z GalleryTab)
 - Sortuje: is_primary -> sort_order
 - Generuje UUID dla sync connections
 

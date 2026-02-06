@@ -261,7 +261,7 @@ class GalleryTab extends Component
             foreach ($this->selectedIds as $mediaId) {
                 $media = Media::find($mediaId);
                 if ($media) {
-                    app(MediaManager::class)->delete($media, false, true);
+                    app(MediaManager::class)->delete($media, 'ppm_only', auth()->id());
                     $deleted++;
                 }
             }
@@ -1416,20 +1416,23 @@ class GalleryTab extends Component
     }
 
     /**
-     * Handle before-product-save event - apply pending shop changes synchronously
-     * This ensures all media sync happens BEFORE the product save completes
+     * Handle before-product-save event
+     * FIX 2026-02-06: No longer applies changes directly (race condition with sync job).
+     * Pending media changes are stored in session by toggleShopAssignment()
+     * and passed to the sync job by savePendingChangesToShop/dispatchSyncJobsForAllShops.
      */
     #[On('before-product-save')]
     public function handleBeforeProductSave(): void
     {
         if ($this->hasPendingShopChanges()) {
-            Log::info('[GALLERY TAB] Applying pending shop changes before product save', [
+            Log::info('[GALLERY TAB] Pending shop changes will be handled by sync job', [
                 'product_id' => $this->productId,
                 'pending_count' => count($this->pendingShopChanges),
             ]);
 
-            // Apply pending changes synchronously (no notification dispatch - save will handle feedback)
-            $this->applyPendingShopChangesQuietly();
+            // Clear local state - session still has changes for sync job
+            $this->pendingShopChanges = [];
+            $this->loadSyncStatus();
         }
     }
 

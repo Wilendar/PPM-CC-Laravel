@@ -39,6 +39,22 @@
                     </div>
                 </div>
                 
+                <!-- Detect Versions Button (FIX 2026-02-05) -->
+                <button wire:click="detectVersionsForAllShops"
+                        wire:loading.attr="disabled"
+                        wire:loading.class="opacity-50 cursor-wait"
+                        class="btn-enterprise-secondary mr-3">
+                    <svg wire:loading.remove wire:target="detectVersionsForAllShops" class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path>
+                    </svg>
+                    <svg wire:loading wire:target="detectVersionsForAllShops" class="w-5 h-5 mr-2 animate-spin" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    <span wire:loading.remove wire:target="detectVersionsForAllShops">Wykryj wersje PS</span>
+                    <span wire:loading wire:target="detectVersionsForAllShops">Wykrywanie...</span>
+                </button>
+
                 <!-- Add Shop Button -->
                 <button wire:click="startWizard"
                         class="btn-enterprise-primary">
@@ -232,8 +248,7 @@
             </div>
 
             <!-- Filters and Search -->
-            <div class="backdrop-blur-xl rounded-2xl p-6 shadow-2xl mb-8 relative overflow-hidden" 
-                 class="shop-card-gradient">
+            <div class="backdrop-blur-xl rounded-2xl p-6 shadow-2xl mb-8 relative overflow-hidden shop-card-gradient">
                 <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between space-y-4 lg:space-y-0 lg:space-x-6">
                     <!-- Search -->
                     <div class="flex-1 max-w-md">
@@ -244,16 +259,16 @@
                                 </svg>
                             </div>
                             <input wire:model.debounce.300ms="search"
-                                   type="text" 
-                                   class="block w-full pl-10 pr-3 py-3 border border-gray-600 rounded-lg bg-gray-800 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:border-transparent transition-colors duration-200" 
-                                                                      placeholder="Szukaj sklepów...">
+                                   type="text"
+                                   class="form-input-dark w-full pl-10 pr-3"
+                                   placeholder="Szukaj sklepów...">
                         </div>
                     </div>
 
                     <!-- Status Filter -->
                     <div class="flex-shrink-0">
-                        <select wire:model="statusFilter" 
-                                class="block w-full px-4 py-3 border border-gray-600 rounded-lg bg-gray-800 text-white focus:outline-none focus:ring-2 focus:ring-[#e0ac7e] focus:border-transparent transition-colors duration-200">
+                        <select wire:model="statusFilter"
+                                class="form-select-dark w-full">
                             <option value="all">Wszystkie statusy</option>
                             <option value="active">Aktywne</option>
                             <option value="inactive">Nieaktywne</option>
@@ -265,8 +280,8 @@
 
                     <!-- Sort Options -->
                     <div class="flex-shrink-0">
-                        <select wire:model="sortBy" 
-                                class="block w-full px-4 py-3 border border-gray-600 rounded-lg bg-gray-800 text-white focus:outline-none focus:ring-2 focus:ring-[#e0ac7e] focus:border-transparent transition-colors duration-200">
+                        <select wire:model="sortBy"
+                                class="form-select-dark w-full">
                             <option value="name">Sortuj: Nazwa</option>
                             <option value="created_at">Sortuj: Data dodania</option>
                             <option value="last_sync_at">Sortuj: Ostatnia sync</option>
@@ -288,13 +303,12 @@
             </div>
 
             <!-- Shops List -->
-            <div class="backdrop-blur-xl rounded-2xl shadow-2xl relative overflow-hidden" 
-                 class="shop-card-gradient">
+            <div class="backdrop-blur-xl rounded-2xl shadow-2xl relative overflow-hidden shop-card-gradient">
                  
                 <!-- Header -->
-                <div class="px-6 py-4 border-b" class="border-mpp-accent">
+                <div class="px-6 py-4 border-b border-mpp-accent">
                     <h3 class="text-lg font-bold text-white flex items-center">
-                        <svg class="w-5 h-5 mr-2" class="text-mpp-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg class="w-5 h-5 mr-2 text-mpp-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path>
                         </svg>
                         <span class="text-mpp-primary">Lista Sklepów</span>
@@ -308,7 +322,7 @@
                         <div class="hidden lg:block overflow-x-auto">
                             <table class="min-w-full">
                                 <thead class="bg-gray-800 bg-opacity-50">
-                                    <tr class="border-b" class="border-mpp-accent">
+                                    <tr class="border-b border-mpp-accent">
                                         <th wire:click="sortBy('name')" 
                                             class="px-6 py-4 text-left text-sm font-medium text-gray-300 uppercase tracking-wider cursor-pointer hover:text-white transition-colors duration-200">
                                             <div class="flex items-center space-x-1">
@@ -354,15 +368,15 @@
                                             <div class="flex items-center">
                                                 <div class="mr-4">
                                                     @if($shop->is_active)
-                                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                                                            <svg class="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                                        <span class="sm-badge sm-badge--success">
+                                                            <svg fill="currentColor" viewBox="0 0 20 20">
                                                                 <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
                                                             </svg>
                                                             Aktywny
                                                         </span>
                                                     @else
-                                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                                                            <svg class="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                                        <span class="sm-badge sm-badge--neutral">
+                                                            <svg fill="currentColor" viewBox="0 0 20 20">
                                                                 <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"></path>
                                                             </svg>
                                                             Nieaktywny
@@ -388,40 +402,40 @@
                                         <td class="px-6 py-4 whitespace-nowrap">
                                             @switch($shop->connection_status)
                                                 @case('connected')
-                                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                                                        <svg class="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                                    <span class="sm-badge sm-badge--success">
+                                                        <svg fill="currentColor" viewBox="0 0 20 20">
                                                             <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
                                                         </svg>
                                                         Połączony
                                                     </span>
                                                     @break
                                                 @case('disconnected')
-                                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                                                        <svg class="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                                    <span class="sm-badge sm-badge--neutral">
+                                                        <svg fill="currentColor" viewBox="0 0 20 20">
                                                             <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"></path>
                                                         </svg>
                                                         Brak połączenia
                                                     </span>
                                                     @break
                                                 @case('error')
-                                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                                                        <svg class="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                                    <span class="sm-badge sm-badge--danger">
+                                                        <svg fill="currentColor" viewBox="0 0 20 20">
                                                             <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"></path>
                                                         </svg>
                                                         Błąd połączenia
                                                     </span>
                                                     @break
                                                 @case('maintenance')
-                                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
-                                                        <svg class="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                                    <span class="sm-badge sm-badge--warning">
+                                                        <svg fill="currentColor" viewBox="0 0 20 20">
                                                             <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path>
                                                         </svg>
                                                         Konserwacja
                                                     </span>
                                                     @break
                                                 @default
-                                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                                                        <svg class="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                                    <span class="sm-badge sm-badge--neutral">
+                                                        <svg fill="currentColor" viewBox="0 0 20 20">
                                                             <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"></path>
                                                         </svg>
                                                         Nieznany status
@@ -434,11 +448,11 @@
                                         <td class="px-6 py-4 whitespace-nowrap">
                                             @if($shop->prestashop_version)
                                                 @if($shop->version_compatible)
-                                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                                    <span class="sm-badge sm-badge--success">
                                                         v{{ $shop->prestashop_version }}
                                                     </span>
                                                 @else
-                                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                                                    <span class="sm-badge sm-badge--warning">
                                                         v{{ $shop->prestashop_version }}
                                                     </span>
                                                 @endif
@@ -498,17 +512,17 @@
                                         <td class="px-6 py-4 whitespace-nowrap">
                                             <div class="flex items-center space-x-2">
                                                 <!-- Details Button -->
-                                                <button wire:click="showDetails({{ $shop->id }})" 
-                                                        class="p-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors duration-200" 
+                                                <button wire:click="showDetails({{ $shop->id }})"
+                                                        class="btn-enterprise-info btn-enterprise-sm btn-enterprise-icon"
                                                         title="Szczegóły">
                                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                                                     </svg>
                                                 </button>
-                                                
+
                                                 <!-- Test Connection Button -->
-                                                <button wire:click="testConnection({{ $shop->id }})" 
-                                                        class="p-2 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg transition-colors duration-200"
+                                                <button wire:click="testConnection({{ $shop->id }})"
+                                                        class="btn-enterprise-cyan btn-enterprise-sm btn-enterprise-icon"
                                                         wire:loading.attr="disabled"
                                                         wire:target="testConnection({{ $shop->id }})"
                                                         title="Test połączenia">
@@ -522,8 +536,8 @@
                                                 </button>
 
                                                 <!-- Sync Button -->
-                                                <button wire:click="syncShop({{ $shop->id }})" 
-                                                        class="p-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors duration-200"
+                                                <button wire:click="syncShop({{ $shop->id }})"
+                                                        class="btn-enterprise-success btn-enterprise-sm btn-enterprise-icon"
                                                         wire:loading.attr="disabled"
                                                         wire:target="syncShop({{ $shop->id }})"
                                                         title="Synchronizuj">
@@ -537,8 +551,8 @@
                                                 </button>
 
                                                 <!-- Toggle Status Button -->
-                                                <button wire:click="toggleShopStatus({{ $shop->id }})" 
-                                                        class="p-2 @if($shop->is_active) bg-yellow-600 hover:bg-yellow-700 @else bg-green-600 hover:bg-green-700 @endif text-white rounded-lg transition-colors duration-200"
+                                                <button wire:click="toggleShopStatus({{ $shop->id }})"
+                                                        class="@if($shop->is_active) btn-enterprise-warning @else btn-enterprise-success @endif btn-enterprise-sm btn-enterprise-icon"
                                                         title="@if($shop->is_active) Dezaktywuj @else Aktywuj @endif">
                                                     @if($shop->is_active)
                                                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -552,8 +566,8 @@
                                                 </button>
 
                                                 <!-- Edit Button -->
-                                                <button wire:click="editShop({{ $shop->id }})" 
-                                                        class="p-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg transition-colors duration-200"
+                                                <button wire:click="editShop({{ $shop->id }})"
+                                                        class="btn-enterprise-warning btn-enterprise-sm btn-enterprise-icon"
                                                         title="Edytuj sklep">
                                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
@@ -561,8 +575,8 @@
                                                 </button>
 
                                                 <!-- Delete Button -->
-                                                <button wire:click="confirmDeleteShop({{ $shop->id }})" 
-                                                        class="p-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors duration-200"
+                                                <button wire:click="confirmDeleteShop({{ $shop->id }})"
+                                                        class="btn-enterprise-danger btn-enterprise-sm btn-enterprise-icon"
                                                         title="Usuń sklep">
                                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
@@ -579,45 +593,30 @@
                         <!-- Mobile Cards -->
                         <div class="block lg:hidden space-y-4 p-6">
                             @foreach($shops as $shop)
-                            <div class="backdrop-blur-xl rounded-2xl p-6 shadow-2xl relative overflow-hidden" 
-                                 class="shop-panel-gradient">
+                            <div class="backdrop-blur-xl rounded-2xl p-6 shadow-2xl relative overflow-hidden shop-panel-gradient">
                                 <!-- Shop Header -->
                                 <div class="flex items-center justify-between mb-4">
                                     <div class="flex items-center space-x-3">
                                         @if($shop->is_active)
-                                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                                                Aktywny
-                                            </span>
+                                            <span class="sm-badge sm-badge--success">Aktywny</span>
                                         @else
-                                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                                                Nieaktywny
-                                            </span>
+                                            <span class="sm-badge sm-badge--neutral">Nieaktywny</span>
                                         @endif
                                         @switch($shop->connection_status)
                                             @case('connected')
-                                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                                                    Połączony
-                                                </span>
+                                                <span class="sm-badge sm-badge--success">Połączony</span>
                                                 @break
                                             @case('disconnected')
-                                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                                                    Brak połączenia
-                                                </span>
+                                                <span class="sm-badge sm-badge--neutral">Brak połączenia</span>
                                                 @break
                                             @case('error')
-                                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                                                    Błąd
-                                                </span>
+                                                <span class="sm-badge sm-badge--danger">Błąd</span>
                                                 @break
                                             @case('maintenance')
-                                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
-                                                    Konserwacja
-                                                </span>
+                                                <span class="sm-badge sm-badge--warning">Konserwacja</span>
                                                 @break
                                             @default
-                                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                                                    Nieznany
-                                                </span>
+                                                <span class="sm-badge sm-badge--neutral">Nieznany</span>
                                         @endswitch
                                     </div>
                                 </div>
@@ -681,14 +680,14 @@
 
                                 <!-- Action Buttons -->
                                 <div class="flex items-center space-x-2 mt-6 pt-4 border-t border-gray-600">
-                                    <button wire:click="showDetails({{ $shop->id }})" 
-                                            class="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded-lg transition-colors duration-200">
+                                    <button wire:click="showDetails({{ $shop->id }})"
+                                            class="btn-enterprise-info btn-enterprise-sm btn-enterprise-icon">
                                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                                         </svg>
                                     </button>
-                                    <button wire:click="testConnection({{ $shop->id }})" 
-                                            class="px-3 py-2 bg-cyan-600 hover:bg-cyan-700 text-white text-xs font-medium rounded-lg transition-colors duration-200"
+                                    <button wire:click="testConnection({{ $shop->id }})"
+                                            class="btn-enterprise-cyan btn-enterprise-sm btn-enterprise-icon"
                                             wire:loading.attr="disabled"
                                             wire:target="testConnection({{ $shop->id }})"
                                             title="Test połączenia">
@@ -696,8 +695,8 @@
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0"></path>
                                         </svg>
                                     </button>
-                                    <button wire:click="syncShop({{ $shop->id }})" 
-                                            class="px-3 py-2 bg-green-600 hover:bg-green-700 text-white text-xs font-medium rounded-lg transition-colors duration-200"
+                                    <button wire:click="syncShop({{ $shop->id }})"
+                                            class="btn-enterprise-success btn-enterprise-sm btn-enterprise-icon"
                                             wire:loading.attr="disabled"
                                             wire:target="syncShop({{ $shop->id }})"
                                             title="Synchronizuj">
@@ -705,15 +704,15 @@
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
                                         </svg>
                                     </button>
-                                    <button wire:click="editShop({{ $shop->id }})" 
-                                            class="px-3 py-2 bg-yellow-600 hover:bg-yellow-700 text-white text-xs font-medium rounded-lg transition-colors duration-200"
+                                    <button wire:click="editShop({{ $shop->id }})"
+                                            class="btn-enterprise-warning btn-enterprise-sm btn-enterprise-icon"
                                             title="Edytuj sklep">
                                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
                                         </svg>
                                     </button>
-                                    <button wire:click="confirmDeleteShop({{ $shop->id }})" 
-                                            class="px-3 py-2 bg-red-600 hover:bg-red-700 text-white text-xs font-medium rounded-lg transition-colors duration-200"
+                                    <button wire:click="confirmDeleteShop({{ $shop->id }})"
+                                            class="btn-enterprise-danger btn-enterprise-sm btn-enterprise-icon"
                                             title="Usuń sklep">
                                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
@@ -725,7 +724,7 @@
                         </div>
 
                         <!-- Pagination -->
-                        <div class="px-6 py-4 border-t" class="border-mpp-accent">
+                        <div class="px-6 py-4 border-t border-mpp-accent">
                             {{ $shops->links() }}
                         </div>
 
@@ -745,9 +744,8 @@
                             </p>
                             @if(!$search && $statusFilter === 'all')
                             <div class="mt-6">
-                                <button wire:click="startWizard" 
-                                        class="inline-flex items-center px-6 py-3 border border-transparent text-sm font-medium rounded-lg text-white transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl"
-                                        class="shop-icon-gradient-mpp">
+                                <button wire:click="startWizard"
+                                        class="inline-flex items-center px-6 py-3 border border-transparent text-sm font-medium rounded-lg text-white transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl shop-icon-gradient-mpp">
                                     <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
                                     </svg>
@@ -801,7 +799,7 @@
                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     <!-- Basic Information -->
                     <div class="space-y-4">
-                        <div class="backdrop-blur-xl rounded-xl p-4" class="shop-panel-gradient">
+                        <div class="backdrop-blur-xl rounded-xl p-4 shop-panel-gradient">
                             <h4 class="text-lg font-semibold text-white mb-3">Podstawowe informacje</h4>
 
                             <dl class="space-y-3">
@@ -827,13 +825,9 @@
                                     <dt class="text-sm font-medium text-gray-400">Status</dt>
                                     <dd class="text-sm">
                                         @if($selectedShop->is_active)
-                                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                                                Aktywny
-                                            </span>
+                                            <span class="sm-badge sm-badge--success">Aktywny</span>
                                         @else
-                                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                                                Nieaktywny
-                                            </span>
+                                            <span class="sm-badge sm-badge--neutral">Nieaktywny</span>
                                         @endif
                                     </dd>
                                 </div>
@@ -845,7 +839,7 @@
                         </div>
 
                         <!-- Connection Status -->
-                        <div class="backdrop-blur-xl rounded-xl p-4" class="shop-panel-gradient">
+                        <div class="backdrop-blur-xl rounded-xl p-4 shop-panel-gradient">
                             <h4 class="text-lg font-semibold text-white mb-3">Status połączenia</h4>
 
                             <dl class="space-y-3">
@@ -854,29 +848,19 @@
                                     <dd class="text-sm">
                                         @switch($selectedShop->connection_status)
                                             @case('connected')
-                                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                                                    Połączony
-                                                </span>
+                                                <span class="sm-badge sm-badge--success">Połączony</span>
                                                 @break
                                             @case('disconnected')
-                                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                                                    Brak połączenia
-                                                </span>
+                                                <span class="sm-badge sm-badge--neutral">Brak połączenia</span>
                                                 @break
                                             @case('error')
-                                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                                                    Błąd połączenia
-                                                </span>
+                                                <span class="sm-badge sm-badge--danger">Błąd połączenia</span>
                                                 @break
                                             @case('maintenance')
-                                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
-                                                    Konserwacja
-                                                </span>
+                                                <span class="sm-badge sm-badge--warning">Konserwacja</span>
                                                 @break
                                             @default
-                                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                                                    Nieznany status
-                                                </span>
+                                                <span class="sm-badge sm-badge--neutral">Nieznany status</span>
                                         @endswitch
                                     </dd>
                                 </div>
@@ -905,7 +889,7 @@
                     <!-- Sync Information & Recent Jobs -->
                     <div class="space-y-4">
                         <!-- Sync Statistics -->
-                        <div class="backdrop-blur-xl rounded-xl p-4" class="shop-panel-gradient">
+                        <div class="backdrop-blur-xl rounded-xl p-4 shop-panel-gradient">
                             <h4 class="text-lg font-semibold text-white mb-3">Statystyki synchronizacji</h4>
 
                             <dl class="space-y-3">
@@ -946,7 +930,7 @@
 
                         <!-- Recent Sync Jobs -->
                         @if($selectedShop->syncJobs && $selectedShop->syncJobs->count() > 0)
-                        <div class="backdrop-blur-xl rounded-xl p-4" class="shop-panel-gradient">
+                        <div class="backdrop-blur-xl rounded-xl p-4 shop-panel-gradient">
                             <h4 class="text-lg font-semibold text-white mb-3">Ostatnie zadania synchronizacji</h4>
 
                             <div class="space-y-2">
@@ -958,19 +942,19 @@
                                     </div>
                                     <div>
                                         @if($job->status === 'completed')
-                                            <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                            <span class="sm-badge sm-badge--sm sm-badge--success">
                                                 Ukończone
                                             </span>
                                         @elseif($job->status === 'running')
-                                            <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                            <span class="sm-badge sm-badge--sm sm-badge--info">
                                                 W trakcie
                                             </span>
                                         @elseif($job->status === 'failed')
-                                            <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                                            <span class="sm-badge sm-badge--sm sm-badge--danger">
                                                 Błąd
                                             </span>
                                         @else
-                                            <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                                            <span class="sm-badge sm-badge--sm sm-badge--neutral">
                                                 Oczekuje
                                             </span>
                                         @endif
@@ -993,18 +977,18 @@
 
                     <div class="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
                         <!-- API Version Compatibility -->
-                        <div class="backdrop-blur-xl rounded-xl p-4" class="shop-panel-gradient">
+                        <div class="backdrop-blur-xl rounded-xl p-4 shop-panel-gradient">
                             <div class="flex items-center justify-between mb-3">
                                 <h4 class="text-lg font-semibold text-white">Kompatybilność API</h4>
                                 @switch($selectedShop->connection_details['api_version_check']['status'])
                                     @case('compatible')
-                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">Kompatybilny</span>
+                                        <span class="sm-badge sm-badge--success">Kompatybilny</span>
                                         @break
                                     @case('incompatible')
-                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">Niekompatybilny</span>
+                                        <span class="sm-badge sm-badge--danger">Niekompatybilny</span>
                                         @break
                                     @default
-                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">Nieznany</span>
+                                        <span class="sm-badge sm-badge--neutral">Nieznany</span>
                                 @endswitch
                             </div>
                             <div class="text-sm text-gray-300 mb-3">
@@ -1023,24 +1007,24 @@
                         </div>
 
                         <!-- SSL/TLS Status -->
-                        <div class="backdrop-blur-xl rounded-xl p-4" class="shop-panel-gradient">
+                        <div class="backdrop-blur-xl rounded-xl p-4 shop-panel-gradient">
                             <div class="flex items-center justify-between mb-3">
                                 <h4 class="text-lg font-semibold text-white">SSL/TLS</h4>
                                 @switch($selectedShop->connection_details['ssl_tls_status']['security_level'])
                                     @case('high')
-                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">Wysoki</span>
+                                        <span class="sm-badge sm-badge--success">Wysoki</span>
                                         @break
                                     @case('medium')
-                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">Średni</span>
+                                        <span class="sm-badge sm-badge--warning">Średni</span>
                                         @break
                                     @case('low')
-                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800">Niski</span>
+                                        <span class="sm-badge sm-badge--warning">Niski</span>
                                         @break
                                     @case('critical')
-                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">Krytyczny</span>
+                                        <span class="sm-badge sm-badge--danger">Krytyczny</span>
                                         @break
                                     @default
-                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">Nieznany</span>
+                                        <span class="sm-badge sm-badge--neutral">Nieznany</span>
                                 @endswitch
                             </div>
                             <div class="text-sm text-gray-300 mb-3">
@@ -1059,21 +1043,21 @@
                         </div>
 
                         <!-- API Rate Limits -->
-                        <div class="backdrop-blur-xl rounded-xl p-4" class="shop-panel-gradient">
+                        <div class="backdrop-blur-xl rounded-xl p-4 shop-panel-gradient">
                             <div class="flex items-center justify-between mb-3">
                                 <h4 class="text-lg font-semibold text-white">Limity API</h4>
                                 @switch($selectedShop->connection_details['rate_limits']['status'])
                                     @case('healthy')
-                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">OK</span>
+                                        <span class="sm-badge sm-badge--success">OK</span>
                                         @break
                                     @case('warning')
-                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">Ostrzeżenie</span>
+                                        <span class="sm-badge sm-badge--warning">Ostrzeżenie</span>
                                         @break
                                     @case('critical')
-                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">Krytyczny</span>
+                                        <span class="sm-badge sm-badge--danger">Krytyczny</span>
                                         @break
                                     @default
-                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">Nieznany</span>
+                                        <span class="sm-badge sm-badge--neutral">Nieznany</span>
                                 @endswitch
                             </div>
 
@@ -1094,24 +1078,24 @@
                         </div>
 
                         <!-- Response Time Metrics -->
-                        <div class="backdrop-blur-xl rounded-xl p-4" class="shop-panel-gradient">
+                        <div class="backdrop-blur-xl rounded-xl p-4 shop-panel-gradient">
                             <div class="flex items-center justify-between mb-3">
                                 <h4 class="text-lg font-semibold text-white">Czas odpowiedzi</h4>
                                 @switch($selectedShop->connection_details['response_metrics']['status'])
                                     @case('excellent')
-                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">Doskonały</span>
+                                        <span class="sm-badge sm-badge--success">Doskonały</span>
                                         @break
                                     @case('good')
-                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">Dobry</span>
+                                        <span class="sm-badge sm-badge--info">Dobry</span>
                                         @break
                                     @case('slow')
-                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">Wolny</span>
+                                        <span class="sm-badge sm-badge--warning">Wolny</span>
                                         @break
                                     @case('critical')
-                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">Krytyczny</span>
+                                        <span class="sm-badge sm-badge--danger">Krytyczny</span>
                                         @break
                                     @default
-                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">Nieznany</span>
+                                        <span class="sm-badge sm-badge--neutral">Nieznany</span>
                                 @endswitch
                             </div>
 
@@ -1136,21 +1120,21 @@
                         </div>
 
                         <!-- Error Rate Tracking -->
-                        <div class="backdrop-blur-xl rounded-xl p-4" class="shop-panel-gradient">
+                        <div class="backdrop-blur-xl rounded-xl p-4 shop-panel-gradient">
                             <div class="flex items-center justify-between mb-3">
                                 <h4 class="text-lg font-semibold text-white">Wskaźnik błędów</h4>
                                 @switch($selectedShop->connection_details['error_tracking']['alert_level'])
                                     @case('none')
-                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">OK</span>
+                                        <span class="sm-badge sm-badge--success">OK</span>
                                         @break
                                     @case('warning')
-                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">Ostrzeżenie</span>
+                                        <span class="sm-badge sm-badge--warning">Ostrzeżenie</span>
                                         @break
                                     @case('critical')
-                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">Krytyczny</span>
+                                        <span class="sm-badge sm-badge--danger">Krytyczny</span>
                                         @break
                                     @default
-                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">Nieznany</span>
+                                        <span class="sm-badge sm-badge--neutral">Nieznany</span>
                                 @endswitch
                             </div>
 

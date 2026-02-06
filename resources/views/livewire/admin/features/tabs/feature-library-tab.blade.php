@@ -48,7 +48,7 @@
                     <span class="feature-tree__group-name">{{ $group['name'] }}</span>
                     @if($group['vehicle_filter'])
                         <span class="feature-tree__badge feature-tree__badge--warning">
-                            {{ $group['vehicle_filter'] === 'elektryczne' ? '&#9889;' : '&#9981;' }}
+                            {{ $group['vehicle_filter'] === 'elektryczne' ? '⚡' : '⛽' }}
                         </span>
                     @endif
                     <span class="feature-tree__badge">{{ $group['features_count'] }}</span>

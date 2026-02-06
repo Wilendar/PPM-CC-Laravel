@@ -9193,7 +9193,20 @@ class ProductForm extends Component
             $shop = \App\Models\PrestaShopShop::find($shopId);
 
             if ($shop && $shop->connection_status === 'connected' && $shop->is_active) {
-                \App\Jobs\PrestaShop\SyncProductToPrestaShop::dispatch($this->product, $shop, auth()->id());
+                // FIX 2026-02-06: Pass pending media changes from session (same as dispatchSyncJobsForAllShops)
+                // Without this, sync job doesn't know about new images checked in gallery shop tab
+                $sessionKey = "pending_media_sync_{$this->product->id}";
+                $pendingMediaChanges = session($sessionKey, []);
+
+                \App\Jobs\PrestaShop\SyncProductToPrestaShop::dispatch(
+                    $this->product, $shop, auth()->id(), $pendingMediaChanges
+                );
+
+                // Clear session after dispatching (changes now in job payload)
+                if (!empty($pendingMediaChanges)) {
+                    session()->forget($sessionKey);
+                    Log::debug('[MEDIA SYNC] Cleared pending media changes from session after shop save dispatch');
+                }
 
                 // FIX 2026-02-06: Set early sync flag for ProductList badge
                 $this->setEarlySyncFlag($this->product->id, $shopId);
@@ -9214,6 +9227,7 @@ class ProductForm extends Component
                     'trigger' => 'savePendingChangesToShop',
                     'job_tracking_enabled' => !$skipJobTracking,
                     'skip_job_tracking' => $skipJobTracking,
+                    'pending_media_changes_count' => count($pendingMediaChanges),
                 ]);
             } else {
                 Log::warning('Sync job NOT dispatched - shop not connected or inactive', [
