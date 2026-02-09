@@ -384,7 +384,12 @@
                                                     @endif
                                                 </div>
                                                 <div>
-                                                    <div class="text-sm font-medium text-white">{{ $shop->name }}</div>
+                                                    <div class="text-sm font-medium text-white">
+                                                        {{ $shop->name }}
+                                                        @if($shop->is_b2b)
+                                                            <span class="ml-1.5 text-yellow-400" title="Sklep B2B (glowny)">&#11088;</span>
+                                                        @endif
+                                                    </div>
                                                     @if($shop->description)
                                                         <div class="text-sm text-gray-400">{{ \Str::limit($shop->description, 50) }}</div>
                                                     @endif
@@ -624,7 +629,12 @@
                                 <!-- Shop Details -->
                                 <div class="space-y-3">
                                     <div>
-                                        <h3 class="text-lg font-bold text-white">{{ $shop->name }}</h3>
+                                        <h3 class="text-lg font-bold text-white">
+                                            {{ $shop->name }}
+                                            @if($shop->is_b2b)
+                                                <span class="ml-1.5 text-yellow-400" title="Sklep B2B (glowny)">&#11088;</span>
+                                            @endif
+                                        </h3>
                                         @if($shop->description)
                                             <p class="text-sm text-gray-400 mt-1">{{ $shop->description }}</p>
                                         @endif

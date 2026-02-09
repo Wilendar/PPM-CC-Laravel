@@ -77,6 +77,11 @@ class ProductStatusAggregator
     private ?array $activePriceGroupIds = null;
 
     /**
+     * Cached B2B shop ID
+     */
+    private ?int $b2bShopId = null;
+
+    /**
      * Aggregate statuses for a collection of products (batch processing)
      *
      * @param Collection<Product> $products
@@ -182,6 +187,12 @@ class ProductStatusAggregator
         // 4. Not in any PrestaShop shop
         $notInPrestaShop = $product->shopData->isEmpty();
         $status->setGlobalIssue(ProductStatusDTO::ISSUE_NOT_IN_PRESTASHOP, $notInPrestaShop);
+
+        // 5. Missing descriptions in default product
+        if ($this->isMonitoringEnabled('descriptions')) {
+            $hasMissingDesc = $this->hasMissingDescriptions($product);
+            $status->setGlobalIssue(ProductStatusDTO::ISSUE_MISSING_DESC, $hasMissingDesc);
+        }
     }
 
     /**
@@ -242,6 +253,28 @@ class ProductStatusAggregator
     }
 
     /**
+     * Get B2B shop ID (cached)
+     */
+    private function getB2bShopId(): ?int
+    {
+        if ($this->b2bShopId === null) {
+            $this->b2bShopId = \App\Models\PrestaShopShop::getB2bShopId() ?? 0;
+        }
+        return $this->b2bShopId ?: null;
+    }
+
+    /**
+     * Check if data has missing descriptions.
+     * Returns true if EITHER short_description OR long_description is empty.
+     */
+    private function hasMissingDescriptions($data): bool
+    {
+        $short = $this->normalizeValue($data->short_description ?? null, 'short_description');
+        $long = $this->normalizeValue($data->long_description ?? null, 'long_description');
+        return $short === null || $long === null;
+    }
+
+    /**
      * Check per-shop data discrepancies
      */
     private function checkShopDiscrepancies(Product $product, ProductStatusDTO $status): void
@@ -252,6 +285,34 @@ class ProductStatusAggregator
 
         foreach ($product->shopData as $shopData) {
             $shopId = $shopData->shop_id;
+            $isB2bShop = ($shopId === $this->getB2bShopId());
+
+            // BUG#4 REVISED: Skip non-description checks for synced non-B2B shops
+            $skipNonDescChecks = ($shopData->sync_status === 'synced');
+
+            // --- DESCRIPTION CHECKS (B2B-aware logic) ---
+            if ($this->isMonitoringEnabled('descriptions')) {
+                if ($isB2bShop) {
+                    // B2B shop: compare with default - flag if different
+                    $descFields = $this->getMonitoredDescFields();
+                    foreach ($descFields as $field) {
+                        if ($this->hasFieldDiscrepancy($product, $shopData, $field)) {
+                            $status->addShopIssue($shopId, ProductStatusDTO::ISSUE_DESCRIPTIONS);
+                            break;
+                        }
+                    }
+                } else {
+                    // Non-B2B shop: only flag if either description is missing
+                    if ($this->hasMissingDescriptions($shopData)) {
+                        $status->addShopIssue($shopId, ProductStatusDTO::ISSUE_MISSING_DESC);
+                    }
+                }
+            }
+
+            // --- NON-DESCRIPTION CHECKS (keep BUG#4 skip for synced) ---
+            if ($skipNonDescChecks) {
+                continue;
+            }
 
             // Check basic data discrepancies
             if ($this->isMonitoringEnabled('basic')) {
@@ -259,17 +320,6 @@ class ProductStatusAggregator
                 foreach ($basicFields as $field) {
                     if ($this->hasFieldDiscrepancy($product, $shopData, $field)) {
                         $status->addShopIssue($shopId, ProductStatusDTO::ISSUE_BASIC_DATA);
-                        break; // One is enough to flag the group
-                    }
-                }
-            }
-
-            // Check description discrepancies
-            if ($this->isMonitoringEnabled('descriptions')) {
-                $descFields = $this->getMonitoredDescFields();
-                foreach ($descFields as $field) {
-                    if ($this->hasFieldDiscrepancy($product, $shopData, $field)) {
-                        $status->addShopIssue($shopId, ProductStatusDTO::ISSUE_DESCRIPTIONS);
                         break;
                     }
                 }
@@ -285,7 +335,7 @@ class ProductStatusAggregator
                 }
             }
 
-            // Check images mapping (images in PPM but not mapped to this shop)
+            // Check images mapping
             if ($this->isMonitoringEnabled('images')) {
                 if ($this->hasUnmappedImages($product, $shopData)) {
                     $status->addShopIssue($shopId, ProductStatusDTO::ISSUE_IMAGES_MAPPING);
@@ -294,7 +344,6 @@ class ProductStatusAggregator
 
             // Conditional: Attributes (only for "Pojazd" product type)
             if ($this->isMonitoringEnabled('attributes') && $this->isVehicleType($product)) {
-                // Check attribute mappings if available
                 if ($this->hasAttributeDiscrepancy($product, $shopData)) {
                     $status->addShopIssue($shopId, ProductStatusDTO::ISSUE_ATTRIBUTES);
                 }
@@ -332,14 +381,10 @@ class ProductStatusAggregator
                 }
             }
 
-            // Check description discrepancies
+            // ERP: only flag if either description is missing
             if ($this->isMonitoringEnabled('descriptions')) {
-                $descFields = $this->getMonitoredDescFields();
-                foreach ($descFields as $field) {
-                    if ($this->hasFieldDiscrepancy($product, $erpData, $field)) {
-                        $status->addErpIssue($erpId, ProductStatusDTO::ISSUE_DESCRIPTIONS);
-                        break;
-                    }
+                if ($this->hasMissingDescriptions($erpData)) {
+                    $status->addErpIssue($erpId, ProductStatusDTO::ISSUE_MISSING_DESC);
                 }
             }
 
@@ -575,8 +620,9 @@ class ProductStatusAggregator
             return (bool) $value;
         }
 
-        // Text fields - trim
+        // Text fields - trim and normalize line endings
         if (is_string($value)) {
+            $value = str_replace("\r\n", "\n", $value);
             return trim($value);
         }
 

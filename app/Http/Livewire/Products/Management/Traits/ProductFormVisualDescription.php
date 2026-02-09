@@ -273,6 +273,9 @@ trait ProductFormVisualDescription
                 ]);
                 $psd->long_description = $html;
                 $psd->save();
+
+                // Invalidate ProductStatusAggregator cache so ProductList shows updated status
+                app(\App\Services\Product\ProductStatusAggregator::class)->invalidateCache($this->product->id);
             } else {
                 // Update default long description
                 $this->long_description = $html;

@@ -93,6 +93,7 @@ class PrestaShopShop extends Model
         'url',
         'description',
         'is_active',
+        'is_b2b',
         'api_key',
         'api_version',
         'ssl_verify',
@@ -169,6 +170,7 @@ class PrestaShopShop extends Model
      */
     protected $casts = [
         'is_active' => 'boolean',
+        'is_b2b' => 'boolean',
         'ssl_verify' => 'boolean',
         'version_compatible' => 'boolean',
         'auto_sync_products' => 'boolean',
@@ -594,6 +596,41 @@ class PrestaShopShop extends Model
     {
         return $query->where('connection_status', '!=', self::CONNECTION_CONNECTED)
                     ->orWhere('consecutive_failures', '>', 0);
+    }
+
+    /**
+     * Scope to get B2B shops only.
+     */
+    public function scopeB2b($query)
+    {
+        return $query->where('is_b2b', true);
+    }
+
+    /**
+     * Get the active B2B shop instance.
+     */
+    public static function getB2bShop(): ?self
+    {
+        return static::where('is_b2b', true)->where('is_active', true)->first();
+    }
+
+    /**
+     * Get the active B2B shop ID.
+     */
+    public static function getB2bShopId(): ?int
+    {
+        return static::where('is_b2b', true)->where('is_active', true)->value('id');
+    }
+
+    /**
+     * Set a shop as the B2B shop (only one allowed).
+     */
+    public static function setAsB2b(int $shopId): void
+    {
+        // Unmark all other shops
+        static::where('is_b2b', true)->where('id', '!=', $shopId)->update(['is_b2b' => false]);
+        // Mark selected shop
+        static::where('id', $shopId)->update(['is_b2b' => true]);
     }
 
     // ==========================================

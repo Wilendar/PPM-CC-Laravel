@@ -36,6 +36,7 @@ class ProductStatusDTO
     public const ISSUE_IMAGES_MAPPING = 'images';
     public const ISSUE_ATTRIBUTES = 'attributes';
     public const ISSUE_COMPATIBILITY = 'compatibility';
+    public const ISSUE_MISSING_DESC = 'no_desc';
 
     /**
      * Variant issue constants
@@ -62,6 +63,7 @@ class ProductStatusDTO
         self::ISSUE_LOW_STOCK => false,
         self::ISSUE_NO_IMAGES => false,
         self::ISSUE_NOT_IN_PRESTASHOP => false,
+        self::ISSUE_MISSING_DESC => false,
     ];
 
     /**
@@ -410,6 +412,7 @@ class ProductStatusDTO
             self::ISSUE_IMAGES_MAPPING => 'Zdjęcia',
             self::ISSUE_ATTRIBUTES => 'Atrybuty',
             self::ISSUE_COMPATIBILITY => 'Dopasowania',
+            self::ISSUE_MISSING_DESC => 'Brak opisu',
             // Variants
             self::VARIANT_NO_IMAGES => 'Brak zdjęć',
             self::VARIANT_ZERO_PRICE => 'Cena 0,00 zł',
@@ -433,6 +436,7 @@ class ProductStatusDTO
             self::ISSUE_IMAGES_MAPPING => 'orange',
             self::ISSUE_ATTRIBUTES => 'purple',
             self::ISSUE_COMPATIBILITY => 'blue',
+            self::ISSUE_MISSING_DESC => 'red',
         ];
     }
 

@@ -366,6 +366,9 @@ class UnifiedVisualEditor extends Component
 
             $shopData->save();
 
+            // Invalidate ProductStatusAggregator cache so ProductList shows updated status
+            app(\App\Services\Product\ProductStatusAggregator::class)->invalidateCache($this->productId);
+
             Log::info('[UVE] Auto-synced rendered HTML to ProductShopData', [
                 'product_id' => $this->productId,
                 'shop_id' => $this->shopId,

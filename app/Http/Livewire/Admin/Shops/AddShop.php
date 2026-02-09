@@ -96,6 +96,9 @@ class AddShop extends Component
     public ?string $labelColor = null;
     public ?string $labelIcon = null;
 
+    // B2B Shop Flag
+    public bool $isB2b = false;
+
     // Validation messages
     protected $messages = [
         'shopName.required' => 'Nazwa sklepu jest wymagana',
@@ -211,6 +214,9 @@ class AddShop extends Component
         // ETAP_10: Label customization
         $this->labelColor = null;
         $this->labelIcon = null;
+
+        // B2B Shop Flag
+        $this->isB2b = false;
     }
 
     public function loadShopData()
@@ -293,6 +299,9 @@ class AddShop extends Component
         // ETAP_10: Label customization
         $this->labelColor = $shop->getAttributes()['label_color'] ?? null;
         $this->labelIcon = $shop->getAttributes()['label_icon'] ?? null;
+
+        // B2B Shop Flag
+        $this->isB2b = (bool) ($shop->is_b2b ?? false);
 
         // ✅ FIX BUG#11c: Load existing price group mappings from database
         $this->priceGroupMappings = [];
@@ -1360,6 +1369,8 @@ class AddShop extends Component
                 // ETAP_10: Label customization
                 'label_color' => $this->labelColor,
                 'label_icon' => $this->labelIcon,
+                // B2B Shop Flag
+                'is_b2b' => $this->isB2b,
             ];
 
             if ($this->isEditing) {
@@ -1431,6 +1442,11 @@ class AddShop extends Component
                 ]);
 
                 session()->flash('success', 'Sklep PrestaShop został pomyślnie dodany!');
+            }
+
+            // B2B: Ensure only one shop is marked as B2B
+            if ($this->isB2b) {
+                PrestaShopShop::setAsB2b($shop->id);
             }
 
             // Redirect to shops list

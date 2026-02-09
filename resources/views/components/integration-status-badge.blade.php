@@ -61,6 +61,7 @@
         'images' => 'Zdjęcia',
         'attributes' => 'Atrybuty',
         'compatibility' => 'Dopasowania',
+        'no_desc' => 'Brak opisu',
     ];
 
     // Sync status labels

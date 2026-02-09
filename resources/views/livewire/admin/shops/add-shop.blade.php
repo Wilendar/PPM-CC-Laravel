@@ -239,6 +239,17 @@
                             </div>
                         </div>
                     </div>
+
+                    {{-- B2B Flag --}}
+                    <div class="mt-4 pt-4 border-t border-gray-700">
+                        <label class="flex items-center gap-3 cursor-pointer">
+                            <input type="checkbox" wire:model="isB2b" class="checkbox-enterprise">
+                            <div>
+                                <span class="text-sm font-medium text-white">Sklep B2B (glowny)</span>
+                                <p class="text-xs text-gray-400 mt-0.5">Opisy tego sklepu musza byc zgodne z zakladka Default. Roznice beda sygnalizowane w kolumnie Zgodnosc.</p>
+                            </div>
+                        </label>
+                    </div>
                 </div>
 
             <!-- Step 2: API Credentials -->
