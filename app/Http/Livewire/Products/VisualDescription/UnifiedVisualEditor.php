@@ -104,6 +104,9 @@ class UnifiedVisualEditor extends Component
     /** @var bool Whether there are unsaved changes */
     public bool $isDirty = false;
 
+    /** @var bool Whether textarea was edited outside UVE */
+    public bool $hasExternalEdits = false;
+
     /** @var bool Show block palette panel */
     public bool $showBlockPalette = true;
 
@@ -164,6 +167,9 @@ class UnifiedVisualEditor extends Component
         // Load existing description
         $this->loadDescription();
 
+        // Detect if textarea was edited outside UVE
+        $this->detectExternalEdits();
+
         // Initialize history
         $this->initHistory();
     }
@@ -198,6 +204,35 @@ class UnifiedVisualEditor extends Component
         // This ensures default CSS values (like text-decoration: none) are not hardcoded
         if (!empty($this->blocks)) {
             $this->compileAllBlocksHtml();
+        }
+    }
+
+    /**
+     * Detect if textarea (ProductShopData) was edited outside UVE
+     */
+    protected function detectExternalEdits(): void
+    {
+        $shopData = ProductShopData::where('product_id', $this->productId)
+            ->where('shop_id', $this->shopId)
+            ->first();
+
+        if (!$shopData || !$this->description) {
+            return;
+        }
+
+        $targetField = $this->description->target_field ?? 'description';
+        $textareaContent = match ($targetField) {
+            'description', 'both' => $shopData->long_description,
+            'description_short' => $shopData->short_description,
+            default => $shopData->long_description,
+        };
+
+        $uveContent = $this->description->rendered_html;
+
+        if ($textareaContent && $uveContent && trim($textareaContent) !== trim($uveContent)) {
+            $this->hasExternalEdits = true;
+            $this->dispatch('notify', type: 'warning',
+                message: 'Opis zostal zmodyfikowany poza edytorem wizualnym. Zapisanie nadpisze te zmiany wersja z edytora.');
         }
     }
 
@@ -311,6 +346,32 @@ class UnifiedVisualEditor extends Component
                     'target_field' => 'description', // Send to long description field
                 ]
             );
+
+            // AUTO-SYNC: Write rendered HTML to ProductShopData (single source of truth)
+            $renderedHtml = $this->description->rendered_html;
+            $shopData = ProductShopData::firstOrNew([
+                'product_id' => $this->productId,
+                'shop_id' => $this->shopId,
+            ]);
+
+            $targetField = $this->description->target_field ?? 'description';
+
+            if (in_array($targetField, ['description', 'both'])) {
+                $shopData->long_description = $renderedHtml;
+            }
+            if (in_array($targetField, ['description_short', 'both'])) {
+                $shortHtml = strip_tags($renderedHtml);
+                $shopData->short_description = \Str::limit($shortHtml, 800, '');
+            }
+
+            $shopData->save();
+
+            Log::info('[UVE] Auto-synced rendered HTML to ProductShopData', [
+                'product_id' => $this->productId,
+                'shop_id' => $this->shopId,
+                'target_field' => $targetField,
+                'html_length' => strlen($renderedHtml),
+            ]);
 
             // Reset CSS dirty flag
             $this->cssDirty = false;

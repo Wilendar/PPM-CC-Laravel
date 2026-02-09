@@ -1266,6 +1266,9 @@ class ProductForm extends Component
         // Store default data
         $this->storeDefaultData();
 
+        // BUG#3 FIX: Initialize character counts after loading product data
+        $this->updateCharacterCounts();
+
         // Load shop-specific data if editing
         if ($this->isEditMode) {
             $this->loadShopData();
@@ -4200,8 +4203,27 @@ class ProductForm extends Component
     public function switchToShop(?int $shopId = null): void
     {
         try {
+            $previousShopId = $this->activeShopId;
+
             // Save current form state to pending changes BEFORE switching
             $this->savePendingChanges();
+
+            // BUG#1 FIX: When leaving default tab, update defaultData to reflect pending edits
+            // This ensures validator compares shop values with CURRENT default (not stale DB value)
+            if ($previousShopId === null && isset($this->pendingChanges['default'])) {
+                $pendingDefault = $this->pendingChanges['default'];
+                $fieldsToSync = [
+                    'name', 'slug', 'sku', 'ean', 'manufacturer', 'supplier_code',
+                    'short_description', 'long_description', 'meta_title', 'meta_description',
+                    'weight', 'height', 'width', 'length', 'tax_rate',
+                    'is_active', 'is_variant_master', 'is_featured', 'sort_order',
+                ];
+                foreach ($fieldsToSync as $field) {
+                    if (array_key_exists($field, $pendingDefault) && $pendingDefault[$field] !== null) {
+                        $this->defaultData[$field] = $pendingDefault[$field];
+                    }
+                }
+            }
 
             // Switch active shop context
             $this->activeShopId = $shopId;
@@ -4231,6 +4253,9 @@ class ProductForm extends Component
 
                     // Switch to shop-specific data with inheritance
                     $this->loadShopDataToForm($shopId);
+
+                    // Refresh descriptions from DB (UVE may have changed them externally)
+                    $this->refreshDescriptionsFromDb();
 
                     // ETAP_05b FAZA 5: Switch variant context to shop
                     $this->switchVariantContextToShop($shopId);
@@ -4362,6 +4387,10 @@ class ProductForm extends Component
             // Fallback: load from product if defaultData is not available
             $this->loadProductData();
         }
+
+        // BUG#3 FIX: Update character counts after loading data
+        // Without this, counts show "0" until user edits textarea
+        $this->updateCharacterCounts();
     }
 
     /**
@@ -5252,6 +5281,19 @@ class ProductForm extends Component
         $currentValueStr = $this->normalizeValueForComparison($currentValue);
         $defaultValueStr = $this->normalizeValueForComparison($defaultValue);
 
+        // DEBUG: Log comparison for description fields (temporary)
+        if (in_array($field, ['short_description', 'long_description'])) {
+            \Log::debug('[VALIDATOR DEBUG] getShopFieldStatusInternal', [
+                'field' => $field,
+                'current_type' => gettype($currentValue),
+                'default_type' => gettype($defaultValue),
+                'current_len' => is_string($currentValue) ? strlen($currentValue) : null,
+                'default_len' => is_string($defaultValue) ? strlen($defaultValue) : null,
+                'normalized_equal' => ($currentValueStr === $defaultValueStr),
+                'result' => ($currentValue === null || $currentValue === '') ? 'inherited' : (($currentValueStr === $defaultValueStr) ? 'same' : 'different'),
+            ]);
+        }
+
         // If current value is empty/null, it's inherited from defaults
         if ($currentValue === null || $currentValue === '' || $currentValue === 0 || (is_array($currentValue) && empty($currentValue))) {
             return 'inherited';
@@ -5423,7 +5465,13 @@ class ProductForm extends Component
             return (int)$value;
         }
 
-        // Return as-is for other types (strings, objects, etc.)
+        // Normalize strings: whitespace and newlines
+        if (is_string($value)) {
+            // Normalize Windows line endings to Unix
+            $value = str_replace("\r\n", "\n", $value);
+            // Trim whitespace
+            $value = trim($value);
+        }
         return $value;
     }
 
@@ -8452,9 +8500,19 @@ class ProductForm extends Component
                     'product_id' => $this->product->id,
                 ]);
             } else {
+                // BUG#2 FIX: Also persist pending default changes when saving from shop context
+                // Without this, editing default tab → switching to shop → saving → loses default edits
+                if (isset($this->pendingChanges['default']) && $this->isEditMode && $this->product) {
+                    $this->savePendingChangesToProduct($this->pendingChanges['default'], markShopsAsPending: false);
+                    unset($this->pendingChanges['default']);
+                    Log::info('[BUG#2 FIX] Also saved pending default changes from shop context', [
+                        'product_id' => $this->product->id,
+                    ]);
+                }
+
                 // FIX 2025-11-25: Pass skipJobTracking to prevent UI from showing job status
                 $this->savePendingChangesToShop((int)$currentKey, $changes, $skipJobTracking);
-                Log::info('[FIX #5 2025-11-21] Saved ONLY shop context', [
+                Log::info('[FIX #5 2025-11-21] Saved shop context', [
                     'product_id' => $this->product->id,
                     'shop_id' => $currentKey,
                     'skip_job_tracking' => $skipJobTracking,

@@ -90,6 +90,20 @@ class ProductTransformer
             'id_tax_rules_group' => $this->mapTaxRate($effectiveTaxRate, $shop),
         ]);
 
+        // Single source of truth: ProductShopData
+        // UVE writes rendered HTML to ProductShopData automatically (bidirectional sync)
+        // Textarea edits go to ProductShopData directly
+        // No need for Visual Description bypass - all descriptions come from ProductShopData
+        $effectiveShortDesc = $this->getEffectiveValue($shopData, $product, 'short_description') ?? '';
+        $effectiveLongDesc = $this->getEffectiveValue($shopData, $product, 'long_description') ?? '';
+
+        Log::debug('[DESC TRANSFORM] Description source (single source of truth)', [
+            'product_id' => $product->id,
+            'shop_id' => $shop->id,
+            'short_len' => strlen($effectiveShortDesc),
+            'long_len' => strlen($effectiveLongDesc),
+        ]);
+
         // Build PrestaShop product structure
         $prestashopProduct = [
             'product' => [
@@ -102,29 +116,18 @@ class ProductTransformer
                     $this->getEffectiveValue($shopData, $product, 'name'),
                     $defaultLangId
                 ),
-                // ETAP_07f Faza 8.2: Visual Description integration
-                // Priority: 1. Visual Editor HTML, 2. Shop-specific text, 3. Product default
-                'description_short' => $this->buildMultilangField(
-                    $this->getVisualDescription($product, $shop, 'description_short')
-                        ?? $this->getEffectiveValue($shopData, $product, 'short_description')
-                        ?? '',
-                    $defaultLangId
-                ),
-                'description' => $this->buildMultilangField(
-                    $this->getVisualDescription($product, $shop, 'description')
-                        ?? $this->getEffectiveValue($shopData, $product, 'long_description')
-                        ?? '',
-                    $defaultLangId
-                ),
+                // Single source of truth: ProductShopData (UVE + textarea both write here)
+                'description_short' => $this->buildMultilangField($effectiveShortDesc, $defaultLangId),
+                'description' => $this->buildMultilangField($effectiveLongDesc, $defaultLangId),
 
                 // Pricing (net price, PrestaShop calculates gross)
                 'price' => $this->calculatePrice($product, $shop),
 
                 // Physical properties
-                'weight' => (float) ($product->weight ?? 0),
-                'width' => (float) ($product->width ?? 0),
-                'height' => (float) ($product->height ?? 0),
-                'depth' => (float) ($product->length ?? 0), // PrestaShop uses 'depth' not 'length'
+                'weight' => (float) ($this->getEffectiveValue($shopData, $product, 'weight') ?? 0),
+                'width' => (float) ($this->getEffectiveValue($shopData, $product, 'width') ?? 0),
+                'height' => (float) ($this->getEffectiveValue($shopData, $product, 'height') ?? 0),
+                'depth' => (float) ($this->getEffectiveValue($shopData, $product, 'length') ?? 0),
 
                 // Status and visibility
                 'active' => $this->getEffectiveValue($shopData, $product, 'is_active') ? 1 : 0,

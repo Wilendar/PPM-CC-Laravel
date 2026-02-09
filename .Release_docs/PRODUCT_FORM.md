@@ -1,9 +1,9 @@
 # PPM - ProductForm Component Documentation
 
-> **Wersja:** 1.1
-> **Data:** 2026-01-29
+> **Wersja:** 1.2
+> **Data:** 2026-02-09
 > **Status:** Production Ready
-> **Changelog:** ETAP_14 - Variant Modals, Price/Stock Sync to PrestaShop
+> **Changelog:** Bidirectional UVE Sync, BUG#1-3 fixes (defaultData sync, cross-context save, character counts)
 
 ---
 
@@ -189,14 +189,15 @@ Akcje:
 #### Description Tab
 ```
 Dane:
-- Krotki opis (max 1000 znakow)
-- Dlugi opis (max 10000 znakow)
+- Krotki opis (max 800 znakow)
+- Dlugi opis (max 21844 znakow)
 - Meta title (SEO)
 - Meta description (SEO)
 
 Features:
-- Liczniki znakow (real-time)
+- Liczniki znakow (real-time, inicjalizowane przy mount/loadDefaultDataToForm)
 - Ostrzezenia przy przekroczeniu limitow
+- Bidirectional sync z UVE (Visual Editor) via ProductShopData
 ```
 
 #### Physical Tab
@@ -352,8 +353,8 @@ public string $short_description = '';
 public string $long_description = '';
 public string $meta_title = '';
 public string $meta_description = '';
-public int $shortDescriptionCount = 0;    // Licznik znakow
-public int $longDescriptionCount = 0;     // Licznik znakow
+public int $shortDescriptionCount = 0;    // Licznik znakow (inicjalizowany w mount via updateCharacterCounts)
+public int $longDescriptionCount = 0;     // Licznik znakow (inicjalizowany w mount via updateCharacterCounts)
 ```
 
 ### 4.5 Physical Properties
@@ -542,7 +543,9 @@ public array $originalFormData = [];
 | `save()` | Glowna metoda zapisu |
 | `updateOnly()` | Zapisz bez przekierowania |
 | `saveAndClose()` | Zapisz i wróc do listy |
+| `saveCurrentContextOnly()` | Zapisz aktywny kontekst + pending default changes |
 | `saveAllChanges()` | Zapisz wszystkie pending changes |
+| `savePendingChangesToProduct()` | Persist pending changes do tabeli products |
 | `cancel()` | Anuluj edycje |
 
 ### 5.9 Validation (~15 metod)
@@ -555,6 +558,7 @@ public array $originalFormData = [];
 | `getFieldStatus(string $field)` | Status pola (sync) |
 | `getFieldStatusIndicator(string $field)` | Badge dla pola |
 | `getFieldClasses(string $field)` | CSS classes dla inputa |
+| `updateCharacterCounts()` | Aktualizuj liczniki znakow (short/long description) |
 
 ### 5.10 Variant Management (~20 metod)
 
@@ -646,6 +650,7 @@ Kazde pole formularza moze miec status:
 | `same` | - | - | Wartosc shop === PPM |
 | `different` | `field-different` | "Nadpisane" | Wartosc shop != PPM |
 | `pending_sync` | `field-pending-sync` | "Oczekuje na sync" | Zmiana niezapisana |
+| `own` | `field-different` | "Wlasne" | Shop ma wlasna wartosc (rozna od default) |
 
 ---
 
@@ -1075,33 +1080,79 @@ processPendingCategories()
 
 ---
 
-## 13. Visual Description (UVE)
+## 13. Visual Description (UVE) - Bidirectional Sync
 
-### 13.1 ProductFormVisualDescription trait
+### 13.1 Architektura Bidirectional Sync (v1.2)
+
+```
+ProductDescription (blocks_v2)     ProductShopData (long_description)
+     |                                      |
+     | UVE save() -> compile HTML --------> | (auto-write)
+     |                                      |
+     | UVE load() <- detect diff <--------- | (textarea edits)
+     |                                      |
+                                            | --------> PrestaShop API
+                                            |   (via ProductTransformer)
+                                            |   (via getEffectiveValue)
+```
+
+**Kluczowa zasada**: ProductShopData.long_description = SINGLE SOURCE OF TRUTH dla PrestaShop sync. ProductDescription jest EDYTOREM (narzedzie do tworzenia HTML), nie zrodlem danych sync.
+
+### 13.2 UVE save() -> auto-write do ProductShopData
+
+Przy kazdym zapisie UVE (`UnifiedVisualEditor::save()`), rendered HTML jest automatycznie zapisywany do `ProductShopData.long_description`:
+
+```php
+// Po ProductDescription::updateOrCreate():
+$shopData = ProductShopData::firstOrNew([...]);
+$shopData->long_description = $renderedHtml;
+$shopData->save();
+```
+
+**Efekt:** Textarea w "Opisy i SEO" natychmiast odzwierciedla zmiany z UVE.
+
+### 13.3 Wykrywanie zewnetrznych edycji
+
+Przy ladowaniu UVE (`detectExternalEdits()`), system porownuje `ProductShopData.long_description` z `ProductDescription.rendered_html`. Jezeli sie roznia → notyfikacja warning:
+
+> "Opis zostal zmodyfikowany poza edytorem wizualnym. Zapisanie nadpisze te zmiany wersja z edytora."
+
+### 13.4 syncVisualToStandard() - zapis do DB
+
+Metoda `syncVisualToStandard()` w traicie `ProductFormVisualDescription` nie tylko aktualizuje in-memory `$this->shopData`, ale rowniez persystuje do bazy:
+
+```php
+$psd = ProductShopData::firstOrNew([...]);
+$psd->long_description = $html;
+$psd->save();
+```
+
+### 13.5 ProductTransformer - uproszczenie
+
+ProductTransformer nie korzysta juz z bezposredniego Visual Description bypass. Zamiast tego uzywa `getEffectiveValue()` ktore czyta z ProductShopData (single source of truth):
+
+```php
+$effectiveShortDesc = $this->getEffectiveValue($shopData, $product, 'short_description');
+$effectiveLongDesc = $this->getEffectiveValue($shopData, $product, 'long_description');
+```
+
+### 13.6 ProductFormVisualDescription trait
 
 ```php
 trait ProductFormVisualDescription
 {
-    // Properties
     public array $visualBlocks = [];
     public ?string $activeBlockId = null;
 
-    // Methods
     public function loadVisualDescription(): void
     public function saveVisualDescription(): void
+    public function syncVisualToStandard(): void    // Sync do DB (nie tylko in-memory)
     public function addBlock(string $type): void
     public function updateBlock(string $blockId, array $data): void
     public function deleteBlock(string $blockId): void
     public function reorderBlocks(array $order): void
 }
 ```
-
-### 13.2 Integracja z Visual Editor (UVE)
-
-- Block-based content editing
-- CSS per block (sync do PrestaShop)
-- Preview mode
-- Responsive layouts
 
 ---
 
@@ -1242,6 +1293,53 @@ USER                    LIVEWIRE                 QUEUE                    EXTERN
 
 ---
 
+## 16. Bugfixes (v1.2)
+
+### BUG#1: defaultData nie aktualizowane po edycji default tab
+
+**Symptom:** Po wklejeniu identycznego opisu z shop tab do default tab, walidator caly czas pokazuje "Wlasne" mimo identycznych wartosci.
+
+**Przyczyna:** `defaultData['long_description']` bylo ladowane z DB przy mount() i NIGDY nie aktualizowane gdy user edytowal pola na default tab. `getShopFieldStatusInternal()` porownywalo shop value z STALE defaultData.
+
+**Fix:** W `switchToShop()`, po `savePendingChanges()`, gdy opuszczamy default tab (`$previousShopId === null`), synchronizujemy pending default values do `defaultData[]`:
+
+```php
+if ($previousShopId === null && isset($this->pendingChanges['default'])) {
+    foreach ($fieldsToSync as $field) {
+        if (array_key_exists($field, $pendingDefault)) {
+            $this->defaultData[$field] = $pendingDefault[$field];
+        }
+    }
+}
+```
+
+### BUG#2: Pending default changes tracone przy zapisie z shop context
+
+**Symptom:** Po edycji opisu w default tab, przejsciu do shop tab i kliknieciu "Zapisz zmiany", opis w default tab nie zostal zapisany.
+
+**Przyczyna:** `saveCurrentContextOnly()` zapisywalo TYLKO aktywny kontekst (shop). Pending changes z default tab byly w pamieci ale nigdy nie persistowane do DB. Redirect do listy produktow traciwal caly stan.
+
+**Fix:** W `saveCurrentContextOnly()`, przy zapisie z non-default context, rowniez persist pending default changes:
+
+```php
+if (isset($this->pendingChanges['default']) && $this->isEditMode && $this->product) {
+    $this->savePendingChangesToProduct($this->pendingChanges['default'], markShopsAsPending: false);
+    unset($this->pendingChanges['default']);
+}
+```
+
+### BUG#3: Liczniki znakow pokazuja 0 przy ladowaniu
+
+**Symptom:** Po otwarciu karty produktu i przejsciu na "Opisy i SEO", liczniki pokazuja "0/800" i "0/21844" do momentu edycji textarea.
+
+**Przyczyna:** `updateCharacterCounts()` bylo wywolywane tylko w `switchToShop()` i `resetToDefaults()`. NIE bylo wywolywane po `mount()` → `loadProductData()` ani `loadDefaultDataToForm()`. Properties inicjalizowane jako `0`.
+
+**Fix:** Dodano `$this->updateCharacterCounts()` w dwoch miejscach:
+1. Po `storeDefaultData()` w `loadProductData()`
+2. Na koncu `loadDefaultDataToForm()`
+
+---
+
 ## Appendix A: Kluczowe pliki
 
 | Typ | Sciezka |
@@ -1257,6 +1355,9 @@ USER                    LIVEWIRE                 QUEUE                    EXTERN
 | PrestaShop8Client | `app/Services/PrestaShop/PrestaShop8Client.php` |
 | VariantModalsTrait | `app/Http/Livewire/Products/Management/Traits/VariantModalsTrait.php` |
 | VariantCrudTrait | `app/Http/Livewire/Products/Management/Traits/VariantCrudTrait.php` |
+| ProductTransformer | `app/Services/PrestaShop/ProductTransformer.php` |
+| UnifiedVisualEditor | `app/Http/Livewire/Products/VisualDescription/UnifiedVisualEditor.php` |
+| VisualDescription Trait | `app/Http/Livewire/Products/Management/Traits/ProductFormVisualDescription.php` |
 
 ---
 

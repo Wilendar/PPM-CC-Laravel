@@ -263,8 +263,16 @@ trait ProductFormVisualDescription
 
             // Update standard description based on context
             if ($this->activeShopId) {
-                // Update shop-specific description
+                // Update shop-specific description (in-memory)
                 $this->shopData[$this->activeShopId]['long_description'] = $html;
+
+                // Persist to database (not just in-memory)
+                $psd = \App\Models\ProductShopData::firstOrNew([
+                    'product_id' => $this->product->id,
+                    'shop_id' => $this->activeShopId,
+                ]);
+                $psd->long_description = $html;
+                $psd->save();
             } else {
                 // Update default long description
                 $this->long_description = $html;
@@ -500,6 +508,30 @@ trait ProductFormVisualDescription
                 'error' => $e->getMessage(),
             ]);
             $this->addError('css_refresh', 'Blad podczas odswiezania CSS');
+        }
+    }
+
+    /**
+     * Refresh descriptions from DB for current shop
+     *
+     * Called when returning from UVE or switching shop tabs to ensure
+     * textarea shows up-to-date data (UVE may have changed it externally).
+     */
+    public function refreshDescriptionsFromDb(): void
+    {
+        if (!$this->activeShopId || !$this->product || !$this->product->id) {
+            return;
+        }
+
+        $freshData = \App\Models\ProductShopData::where('product_id', $this->product->id)
+            ->where('shop_id', $this->activeShopId)
+            ->first();
+
+        if ($freshData) {
+            $this->shopData[$this->activeShopId]['long_description'] = $freshData->long_description ?? '';
+            $this->shopData[$this->activeShopId]['short_description'] = $freshData->short_description ?? '';
+            $this->long_description = $freshData->long_description ?? '';
+            $this->short_description = $freshData->short_description ?? '';
         }
     }
 

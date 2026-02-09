@@ -1,9 +1,9 @@
 # PPM - Jobs & Workers Documentation
 
-> **Wersja:** 1.6
-> **Data:** 2026-02-06
+> **Wersja:** 1.7
+> **Data:** 2026-02-09
 > **Status:** Production Ready
-> **Changelog:** Smart Diff Media Sync - inteligentny sync obrazkow do PrestaShop
+> **Changelog:** Bidirectional UVE Sync - ProductShopData jako single source of truth dla opisow
 
 ---
 
@@ -78,6 +78,20 @@ PPM-CC-Laravel wykorzystuje **49 zdefiniowanych JOBow** zorganizowanych w 9 kate
 - **FIX: GalleryTab race condition** - `handleBeforeProductSave()` nie wywoluje juz `pushToPrestaShop()` bezposrednio (eliminacja race condition z sync jobem)
 - **FIX: savePendingChangesToShop** - Teraz przekazuje pending media changes z session do sync job (4th param)
 - **FIX: Soft-deleted media detection** - `MediaDiffCalculator::findMediaToDelete()` uzywa `withTrashed()` do wykrywania soft-deleted media z PS mapping
+
+### Nowe w v1.7 (Bidirectional UVE Sync + BUG#1-3 fixes)
+
+- **Bidirectional UVE ↔ Textarea Sync** - UVE rendered HTML automatycznie zapisywany do ProductShopData.long_description:
+  - UVE `save()` → auto-write do `ProductShopData` (single source of truth)
+  - Textarea edycja → wykrywanie zewnetrznych zmian w UVE (`detectExternalEdits()`)
+  - `syncVisualToStandard()` teraz persystuje do DB (nie tylko in-memory)
+- **ProductTransformer Simplification** - Usuniety Visual Description bypass:
+  - `getVisualDescription()` call usuniety z `transformForPrestaShop()`
+  - Opis pobierany wylacznie przez `getEffectiveValue()` z ProductShopData
+  - ProductShopData = SINGLE SOURCE OF TRUTH dla PrestaShop sync
+- **BUG#1 FIX: defaultData sync** - `switchToShop()` teraz synchronizuje pending default edits do `defaultData[]` przy opuszczaniu default tab (walidator `getShopFieldStatusInternal()` poprawnie porownuje)
+- **BUG#2 FIX: cross-context save** - `saveCurrentContextOnly()` teraz persystuje pending default changes rowniez przy zapisie z shop context (eliminacja utraty danych przy redirect)
+- **BUG#3 FIX: character counts** - `updateCharacterCounts()` wywolywane w `loadProductData()` i `loadDefaultDataToForm()` (inicjalizacja przy mount zamiast 0/800)
 
 ### Nowe w v1.5 (ETAP_15 - BusinessPartner + Variant Field Inheritance)
 
@@ -535,6 +549,12 @@ Wywolanie z:
 - BulkSyncProducts dispatcher
 - CompatibilityManagement panel
 
+Opis Source (v1.7):
+- ProductShopData.long_description = SINGLE SOURCE OF TRUTH
+- UVE auto-writes rendered HTML do ProductShopData
+- ProductTransformer uzywa getEffectiveValue() (nie getVisualDescription())
+- Textarea edits + UVE edits -> oba trafiaja do ProductShopData
+
 Tracking:
 - Tworzy SyncJob rekord
 - Updates JobProgress
@@ -948,6 +968,17 @@ Timeout: 120s
 Przeznaczenie:
 - Render blocks -> HTML
 - Sync do PrestaShop
+```
+
+#### Description Flow (v1.7 - Bidirectional Sync)
+```
+UVE save() → ProductDescription::updateOrCreate() → auto-write ProductShopData.long_description
+                                                          ↓
+ProductForm textarea → wire:model.live → ProductShopData.long_description
+                                                          ↓
+SyncProductToPrestaShop → ProductTransformer::getEffectiveValue() → PrestaShop API
+
+ProductShopData = SINGLE SOURCE OF TRUTH (nie ProductDescription.rendered_html)
 ```
 
 #### Inne VisualEditor Jobs
