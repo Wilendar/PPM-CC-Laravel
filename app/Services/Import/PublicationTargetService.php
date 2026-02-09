@@ -115,31 +115,26 @@ class PublicationTargetService
         }
 
         // New format: erp_connections array of IDs
-        if (isset($targets['erp_connections'])) {
+        if (isset($targets['erp_connections']) && !empty($targets['erp_connections'])) {
             return [
-                'erp_connection_ids' => $targets['erp_connections'] ?? [],
+                'erp_connection_ids' => $targets['erp_connections'],
                 'prestashop_shop_ids' => $targets['prestashop_shops'] ?? [],
             ];
         }
 
-        // Legacy format: erp_primary boolean
-        if (isset($targets['erp_primary'])) {
-            $erpIds = [];
-            if ($targets['erp_primary']) {
-                $defaultId = $this->getDefaultErpConnectionId();
-                if ($defaultId) {
-                    $erpIds[] = $defaultId;
-                }
-            }
-
+        // erp_primary flag OR empty erp_connections with erp_primary=true
+        if (!empty($targets['erp_primary'])) {
+            $defaultId = $this->getDefaultErpConnectionId();
             return [
-                'erp_connection_ids' => $erpIds,
+                'erp_connection_ids' => $defaultId ? [$defaultId] : [],
                 'prestashop_shop_ids' => $targets['prestashop_shops'] ?? [],
             ];
         }
 
+        // Targets exist but no ERP selection - include default ERP as fallback
+        $defaultId = $this->getDefaultErpConnectionId();
         return [
-            'erp_connection_ids' => [],
+            'erp_connection_ids' => $defaultId ? [$defaultId] : [],
             'prestashop_shop_ids' => $targets['prestashop_shops'] ?? [],
         ];
     }
@@ -156,14 +151,23 @@ class PublicationTargetService
         $shopIds = $resolvedTargets['prestashop_shop_ids'] ?? [];
         foreach ($shopIds as $shopId) {
             try {
-                SyncProductToPrestaShop::dispatch($product->id, $shopId)
+                $shop = PrestaShopShop::find($shopId);
+                if (!$shop) {
+                    Log::warning('PublicationTargetService: Shop not found', [
+                        'product_id' => $product->id,
+                        'shop_id' => $shopId,
+                    ]);
+                    continue;
+                }
+
+                SyncProductToPrestaShop::dispatch($product, $shop)
                     ->onQueue('prestashop-sync');
 
                 Log::info('PublicationTargetService: PrestaShop sync dispatched', [
                     'product_id' => $product->id,
                     'shop_id' => $shopId,
                 ]);
-            } catch (\Exception $e) {
+            } catch (\Throwable $e) {
                 Log::error('PublicationTargetService: PrestaShop sync failed', [
                     'product_id' => $product->id,
                     'shop_id' => $shopId,
@@ -202,30 +206,15 @@ class PublicationTargetService
                 return;
             }
 
-            $jobClass = match ($connection->erp_type) {
-                'subiekt_gt' => \App\Jobs\ERP\SyncProductToSubiektJob::class,
-                'baselinker' => \App\Jobs\ERP\SyncProductToBaselinkerJob::class,
-                'dynamics' => \App\Jobs\ERP\SyncProductToDynamicsJob::class,
-                default => null,
-            };
+            \App\Jobs\ERP\SyncProductToERP::dispatch($product, $connection)
+                ->onQueue('erp-sync');
 
-            if ($jobClass && class_exists($jobClass)) {
-                $jobClass::dispatch($product->id, $connectionId)->onQueue('erp-sync');
-
-                Log::info('PublicationTargetService: ERP sync dispatched', [
-                    'product_id' => $product->id,
-                    'connection_id' => $connectionId,
-                    'erp_type' => $connection->erp_type,
-                    'job_class' => $jobClass,
-                ]);
-            } else {
-                Log::warning('PublicationTargetService: ERP job class not found', [
-                    'connection_id' => $connectionId,
-                    'erp_type' => $connection->erp_type,
-                    'expected_class' => $jobClass,
-                ]);
-            }
-        } catch (\Exception $e) {
+            Log::info('PublicationTargetService: ERP sync dispatched', [
+                'product_id' => $product->id,
+                'connection_id' => $connectionId,
+                'erp_type' => $connection->erp_type,
+            ]);
+        } catch (\Throwable $e) {
             Log::error('PublicationTargetService: ERP sync dispatch failed', [
                 'product_id' => $product->id,
                 'connection_id' => $connectionId,

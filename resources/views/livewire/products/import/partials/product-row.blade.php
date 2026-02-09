@@ -521,7 +521,17 @@
             $hasSchedule = !empty($product->scheduled_publish_at);
         @endphp
         @if($pubStatus === 'published')
-            <span class="import-publish-btn import-publish-btn-published">Opublikowano</span>
+            <div x-data="{ hovering: false }" class="inline-block"
+                 x-on:mouseenter="hovering = true"
+                 x-on:mouseleave="hovering = false">
+                <span x-show="!hovering" class="import-publish-btn import-publish-btn-published">Opublikowano</span>
+                <button x-show="hovering" x-cloak
+                        wire:click="requestUnpublish({{ $product->id }})"
+                        class="import-publish-btn import-publish-btn-failed"
+                        title="Cofnij publikacje">
+                    Cofnij
+                </button>
+            </div>
         @elseif($pubStatus === 'publishing')
             <span class="import-publish-btn import-publish-btn-publishing">
                 <svg class="animate-spin h-3 w-3 inline mr-1" fill="none" viewBox="0 0 24 24">

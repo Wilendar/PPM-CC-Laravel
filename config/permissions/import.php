@@ -105,16 +105,24 @@ return [
             'description' => 'Duplikowanie i usuwanie produktow z panelu importu',
             'dangerous' => true,
         ],
+
+        // P12: Cofnij publikacje
+        'unpublish' => [
+            'name' => 'import.unpublish',
+            'label' => 'Cofnij publikacje',
+            'description' => 'Mozliwosc cofniecia publikacji - usuwa produkt z PPM i systemow zewnetrznych',
+            'dangerous' => true,
+        ],
     ],
 
     'role_defaults' => [
         'Admin' => [
             'images', 'basic_data', 'prices', 'categories', 'publication_targets',
-            'variants', 'compatibility', 'descriptions', 'schedule', 'publish', 'manage',
+            'variants', 'compatibility', 'descriptions', 'schedule', 'publish', 'manage', 'unpublish',
         ],
         'Manager' => [
             'images', 'basic_data', 'prices', 'categories', 'publication_targets',
-            'variants', 'compatibility', 'descriptions', 'schedule', 'publish', 'manage',
+            'variants', 'compatibility', 'descriptions', 'schedule', 'publish', 'manage', 'unpublish',
         ],
         'Editor' => [
             'images', 'basic_data', 'categories', 'descriptions',

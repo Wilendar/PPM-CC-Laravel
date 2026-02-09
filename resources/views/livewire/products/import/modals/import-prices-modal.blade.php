@@ -59,12 +59,12 @@
             <div class="px-6 py-4 max-h-[60vh] overflow-y-auto {{ !$isEditable ? 'opacity-60' : '' }}"
                  x-data="{
                      taxRate: {{ $taxRate }},
-                     isLocked: {{ !$isEditable ? 'true' : 'false' }},
+                     get isLocked() { return !$wire.pricesUnlocked; },
                      prices: @js($modalPrices ?? []),
                      calculateGross(groupId) {
                          if (this.isLocked) return;
-                         const net = parseFloat(this.prices[groupId]?.net || 0);
-                         if (isNaN(net) || net === 0) return;
+                         const net = parseFloat(this.prices[groupId]?.net);
+                         if (isNaN(net)) return;
                          const gross = (net * (1 + this.taxRate / 100)).toFixed(2);
                          this.prices[groupId] = this.prices[groupId] || {};
                          this.prices[groupId].gross = gross;
@@ -72,8 +72,8 @@
                      },
                      calculateNet(groupId) {
                          if (this.isLocked) return;
-                         const gross = parseFloat(this.prices[groupId]?.gross || 0);
-                         if (isNaN(gross) || gross === 0) return;
+                         const gross = parseFloat(this.prices[groupId]?.gross);
+                         if (isNaN(gross)) return;
                          const net = (gross / (1 + this.taxRate / 100)).toFixed(2);
                          this.prices[groupId] = this.prices[groupId] || {};
                          this.prices[groupId].net = net;
@@ -110,8 +110,7 @@
                                                    step="0.01"
                                                    min="0"
                                            x-model="prices[{{ $group->id }}].net"
-                                            @input="calculateGross({{ $group->id }})"
-                                            wire:model.live="modalPrices.{{ $group->id }}.net"
+                                            @input.debounce.300ms="calculateGross({{ $group->id }})"
                                             @class([
                                                 'w-full border text-sm rounded-lg px-3 py-2 text-right',
                                                'bg-gray-700 border-gray-600 text-white focus:ring-blue-500 focus:border-blue-500' => $isEditable,
@@ -127,8 +126,7 @@
                                                    step="0.01"
                                                    min="0"
                                            x-model="prices[{{ $group->id }}].gross"
-                                            @input="calculateNet({{ $group->id }})"
-                                            wire:model.live="modalPrices.{{ $group->id }}.gross"
+                                            @input.debounce.300ms="calculateNet({{ $group->id }})"
                                             @class([
                                                 'w-full border text-sm rounded-lg px-3 py-2 text-right',
                                                'bg-gray-700 border-gray-600 text-white focus:ring-blue-500 focus:border-blue-500' => $isEditable,

@@ -111,7 +111,7 @@ Schedule::command('db:health-check --alert')
 // 2026-01-19: Auto-process queue jobs every minute (shared hosting compatible)
 // On shared hosting we can't run `queue:work` as daemon, so we use scheduler
 
-Schedule::command('queue:work database --queue=erp-sync,erp_default,erp_high,default,sync --once --max-time=55')
+Schedule::command('queue:work database --queue=prestashop-sync,erp-sync,erp_default,erp_high,default,sync --once --max-time=55')
     ->everyMinute()
     ->name('queue-worker-erp')
     ->withoutOverlapping()

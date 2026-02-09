@@ -39,6 +39,43 @@ trait ImportPanelPublicationTrait
     protected ?array $cachedErpConnections = null;
 
     /**
+     * Product ID awaiting unpublish confirmation (PPM modal).
+     * When set, the confirmation modal is displayed.
+     */
+    public ?int $confirmUnpublishId = null;
+
+    /**
+     * Show PPM confirmation modal for unpublish action.
+     */
+    public function requestUnpublish(int $productId): void
+    {
+        $this->confirmUnpublishId = $productId;
+    }
+
+    /**
+     * Cancel the unpublish confirmation modal.
+     */
+    public function cancelUnpublish(): void
+    {
+        $this->confirmUnpublishId = null;
+    }
+
+    /**
+     * Confirm and execute unpublish (called from PPM modal).
+     */
+    public function confirmUnpublish(): void
+    {
+        if (!$this->confirmUnpublishId) {
+            return;
+        }
+
+        $productId = $this->confirmUnpublishId;
+        $this->confirmUnpublishId = null;
+
+        $this->unpublishProduct($productId);
+    }
+
+    /**
      * Get all available publication targets for dropdowns
      *
      * @return array ['erp_connections' => [...], 'prestashop_shops' => [...]]
@@ -335,7 +372,7 @@ trait ImportPanelPublicationTrait
 
         try {
             $service = app(\App\Services\Import\ProductPublicationService::class);
-            $result = $service->publishSingle($product);
+            $result = $service->publishSingle($product, dispatchSyncJobs: false);
 
             if ($result['success']) {
                 $product->publish_status = 'published';
@@ -359,7 +396,7 @@ trait ImportPanelPublicationTrait
                     'message' => 'Blad publikacji: ' . implode(', ', $result['errors']),
                 ]);
             }
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             $product->publish_status = 'failed';
             $product->save();
 
@@ -512,5 +549,50 @@ trait ImportPanelPublicationTrait
         }
 
         return $badges;
+    }
+
+    /**
+     * Unpublish a product - full rollback from PPM.
+     * Requires import.unpublish permission.
+     *
+     * @param int $productId PendingProduct ID
+     */
+    public function unpublishProduct(int $productId): void
+    {
+        $user = auth()->user();
+        if (!$user || !$user->can('import.unpublish')) {
+            $this->dispatch('flash-message', [
+                'type' => 'error',
+                'message' => 'Brak uprawnien do cofania publikacji',
+            ]);
+            return;
+        }
+
+        try {
+            $service = app(\App\Services\Import\ProductUnpublishService::class);
+            $result = $service->unpublish($productId);
+
+            if ($result['success']) {
+                $this->dispatch('flash-message', [
+                    'type' => 'success',
+                    'message' => 'Publikacja cofnieta - produkt przywrocony do draft',
+                ]);
+            } else {
+                $this->dispatch('flash-message', [
+                    'type' => 'error',
+                    'message' => 'Blad cofania: ' . implode(', ', $result['errors']),
+                ]);
+            }
+        } catch (\Throwable $e) {
+            Log::error('ImportPanelPublicationTrait: unpublish failed', [
+                'product_id' => $productId,
+                'error' => $e->getMessage(),
+            ]);
+
+            $this->dispatch('flash-message', [
+                'type' => 'error',
+                'message' => 'Blad cofania publikacji: ' . $e->getMessage(),
+            ]);
+        }
     }
 }

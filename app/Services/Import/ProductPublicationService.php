@@ -14,7 +14,9 @@ use App\Jobs\PrestaShop\SyncProductToPrestaShop;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use App\Models\Media;
 
 /**
  * ProductPublicationService
@@ -371,21 +373,69 @@ class ProductPublicationService
      */
     protected function handleMedia(Product $product, PendingProduct $pendingProduct): void
     {
-        $tempPaths = $pendingProduct->temp_media_paths ?? [];
+        $rawPaths = $pendingProduct->temp_media_paths ?? [];
         $primaryIndex = $pendingProduct->primary_media_index ?? 0;
 
-        if (empty($tempPaths)) {
+        // Handle nested format: {"images": [...], "source": "...", "updated_at": "..."}
+        $images = isset($rawPaths['images']) ? $rawPaths['images'] : $rawPaths;
+
+        if (empty($images) || !is_array($images)) {
             return;
         }
 
-        // TODO: Implement media migration from temp to permanent storage
-        // This will depend on your Media system implementation
-        // For now, we log it for later implementation
+        $disk = Storage::disk('public');
+        $migrated = 0;
 
-        Log::info('ProductPublicationService: Media migration needed', [
+        foreach ($images as $index => $item) {
+            $sourcePath = is_array($item) ? ($item['path'] ?? null) : $item;
+            if (!$sourcePath || !$disk->exists($sourcePath)) {
+                Log::warning('ProductPublicationService: Media file not found, skipping', [
+                    'product_id' => $product->id,
+                    'source_path' => $sourcePath,
+                    'index' => $index,
+                ]);
+                continue;
+            }
+
+            try {
+                $fileName = basename($sourcePath);
+                $newPath = 'products/' . $product->id . '/' . $fileName;
+                $disk->copy($sourcePath, $newPath);
+
+                $isCover = is_array($item) ? ($item['is_cover'] ?? false) : false;
+                $position = is_array($item) ? ($item['position'] ?? $index) : $index;
+                $originalName = is_array($item)
+                    ? ($item['original_name'] ?? $item['filename'] ?? $fileName)
+                    : $fileName;
+
+                Media::create([
+                    'mediable_type' => Product::class,
+                    'mediable_id' => $product->id,
+                    'file_path' => $newPath,
+                    'file_name' => $fileName,
+                    'original_name' => $originalName,
+                    'file_size' => $disk->size($newPath),
+                    'mime_type' => $disk->mimeType($newPath),
+                    'context' => Media::CONTEXT_PRODUCT_GALLERY,
+                    'sort_order' => $position,
+                    'is_primary' => $isCover || $index === $primaryIndex,
+                    'sync_status' => 'pending',
+                ]);
+
+                $migrated++;
+            } catch (\Throwable $e) {
+                Log::error('ProductPublicationService: Media migration failed for file', [
+                    'product_id' => $product->id,
+                    'source_path' => $sourcePath,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        Log::info('ProductPublicationService: Media migration completed', [
             'product_id' => $product->id,
-            'temp_paths' => $tempPaths,
-            'primary_index' => $primaryIndex,
+            'total' => count($images),
+            'migrated' => $migrated,
         ]);
     }
 

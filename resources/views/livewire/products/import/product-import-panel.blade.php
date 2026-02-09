@@ -337,4 +337,7 @@
     @if($activeModal === 'sku-paste')
         @livewire('products.import.modals.s-k-u-paste-modal', key('sku-paste-modal'))
     @endif
+
+    {{-- Modal: Potwierdzenie cofniecia publikacji (PPM modal) --}}
+    @include('livewire.products.import.modals.unpublish-confirm-modal')
 </div>
