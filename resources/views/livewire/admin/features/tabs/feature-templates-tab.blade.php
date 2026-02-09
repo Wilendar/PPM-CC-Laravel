@@ -154,9 +154,15 @@
                                 + Dodaj ceche
                             </button>
                         </div>
-                        <div class="space-y-2">
+                        <div class="space-y-2"
+                             wire:sortable="reorderTemplateFeatures"
+                             wire:sortable.options="{ animation: 150, ghostClass: 'template-sortable-ghost', handle: '.template-drag-handle' }"
+                        >
                             @foreach($templateFeatures as $index => $feature)
-                                <div class="flex items-start gap-2 p-3 bg-gray-700/50 rounded-lg">
+                                <div wire:key="tpl-feat-{{ $index }}"
+                                     wire:sortable.item="{{ $index }}"
+                                     class="flex items-start gap-2 p-3 bg-gray-700/50 rounded-lg">
+                                    <span class="template-drag-handle" wire:sortable.handle>&#9776;</span>
                                     <div class="flex-1 grid grid-cols-2 gap-2">
                                         <input
                                             type="text"

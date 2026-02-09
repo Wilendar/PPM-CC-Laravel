@@ -252,7 +252,7 @@
 
             // Get active ERP connections (cached in trait)
             $activeErpConnections = $this->getActiveErpConnections();
-            $allShops = \App\Models\PrestaShopShop::where('is_active', true)->orderBy('name')->get();
+            $allShops = $allShops ?? \App\Models\PrestaShopShop::where('is_active', true)->orderBy('name')->get();
 
             // FIX: ALWAYS ensure default ERP is in the list
             $defaultErpId = null;
@@ -506,6 +506,7 @@
             </span>
         @else
             <input type="datetime-local"
+                   wire:key="schedule-{{ $product->id }}-{{ $product->scheduled_publish_at?->timestamp ?? 'none' }}"
                    value="{{ $product->scheduled_publish_at?->format('Y-m-d\\TH:i') }}"
                    wire:change="schedulePublication({{ $product->id }}, $event.target.value)"
                    class="import-schedule-input"

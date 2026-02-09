@@ -290,6 +290,7 @@
                         @include('livewire.products.import.partials.product-row', [
                             'product' => $product,
                             'effectiveCategoryMaxLevel' => $effectiveCategoryMaxLevel,
+                            'allShops' => $this->activePrestaShopShops,
                         ])
                     @empty
                         <tr>

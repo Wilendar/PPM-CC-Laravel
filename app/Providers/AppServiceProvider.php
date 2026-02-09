@@ -20,6 +20,7 @@ use App\Services\Permissions\PermissionModuleLoader;
 use App\Services\Product\FeatureManager;
 use App\Services\Product\ProductStatusAggregator;
 use App\Services\Product\VariantManager;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -51,6 +52,9 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        // Sync MySQL session timezone with PHP APP_TIMEZONE (handles DST automatically)
+        DB::statement("SET time_zone = '" . now()->format('P') . "'");
+
         $this->registerProductStatusCacheObservers();
     }
 

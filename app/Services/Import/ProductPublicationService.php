@@ -9,6 +9,7 @@ use App\Models\PriceGroup;
 use App\Models\PublishHistory;
 use App\Models\Category;
 use App\Models\ProductShopData;
+use App\Models\PrestaShopShop;
 use App\Jobs\PrestaShop\SyncProductToPrestaShop;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -202,7 +203,13 @@ class ProductPublicationService
         // Basic fields
         $product->sku = $pendingProduct->sku;
         $product->name = $pendingProduct->name;
-        $product->slug = $pendingProduct->slug ?: Str::slug($pendingProduct->name);
+        $baseSlug = $pendingProduct->slug ?: Str::slug($pendingProduct->name);
+        $slug = $baseSlug;
+        $counter = 2;
+        while (Product::where('slug', $slug)->exists()) {
+            $slug = $baseSlug . '-' . $counter++;
+        }
+        $product->slug = $slug;
         $product->product_type_id = $pendingProduct->product_type_id;
 
         // Optional fields
@@ -238,18 +245,9 @@ class ProductPublicationService
         // SEO
         $product->meta_title = $pendingProduct->meta_title;
         $product->meta_description = $pendingProduct->meta_description;
-        $product->meta_keywords = $pendingProduct->meta_keywords;
-
-        // Prices
-        $product->base_price = $pendingProduct->base_price ?? 0;
-        $product->purchase_price = $pendingProduct->purchase_price;
 
         // Status
         $product->is_active = true;
-        $product->is_visible = true;
-
-        // Metadata
-        $product->created_by = Auth::id() ?? $pendingProduct->imported_by;
 
         $product->save();
 
@@ -270,6 +268,8 @@ class ProductPublicationService
             return;
         }
 
+        $taxRate = $pendingProduct->tax_rate ?? $product->tax_rate ?? 23.00;
+
         foreach ($groups as $groupId => $prices) {
             $netPrice = $prices['net'] ?? null;
             $grossPrice = $prices['gross'] ?? null;
@@ -284,14 +284,23 @@ class ProductPublicationService
                 continue;
             }
 
+            // Auto-calculate missing price (DB constraint: price_gross >= price_net)
+            $net = (float) ($netPrice ?? 0);
+            $gross = (float) ($grossPrice ?? 0);
+            if ($net > 0 && $gross <= 0) {
+                $gross = round($net * (1 + $taxRate / 100), 2);
+            } elseif ($gross > 0 && $net <= 0) {
+                $net = round($gross / (1 + $taxRate / 100), 2);
+            }
+
             ProductPrice::updateOrCreate(
                 [
                     'product_id' => $product->id,
                     'price_group_id' => $groupId,
                 ],
                 [
-                    'net_price' => $netPrice ?? 0,
-                    'gross_price' => $grossPrice ?? 0,
+                    'price_net' => $net,
+                    'price_gross' => $gross,
                 ]
             );
         }
@@ -315,15 +324,6 @@ class ProductPublicationService
 
         // Sync categories through relationship
         $product->categories()->sync($categoryIds);
-
-        // Set primary category (deepest level)
-        $deepestCategory = Category::whereIn('id', $categoryIds)
-            ->orderBy('level', 'desc')
-            ->first();
-
-        if ($deepestCategory) {
-            $product->update(['primary_category_id' => $deepestCategory->id]);
-        }
     }
 
     /**
@@ -336,7 +336,20 @@ class ProductPublicationService
 
         foreach ($shopIds as $shopId) {
             // Get shop-specific categories if defined, otherwise use global
-            $categories = $shopCategories[$shopId] ?? $pendingProduct->category_ids ?? [];
+            $categoryIds = $shopCategories[$shopId] ?? $pendingProduct->category_ids ?? [];
+
+            // Build Option A category_mappings structure for CategoryMappingsCast
+            $categoryMappings = [
+                'ui' => [
+                    'selected' => array_values(array_map('intval', $categoryIds)),
+                    'primary' => !empty($categoryIds) ? (int) end($categoryIds) : null,
+                ],
+                'mappings' => [],
+                'metadata' => [
+                    'last_updated' => now()->format('Y-m-d\TH:i:sP'),
+                    'source' => 'import',
+                ],
+            ];
 
             ProductShopData::updateOrCreate(
                 [
@@ -345,9 +358,8 @@ class ProductPublicationService
                 ],
                 [
                     'is_active' => true,
-                    'is_visible' => true,
-                    'category_ids' => $categories,
-                    'price' => $pendingProduct->base_price,
+                    'is_published' => true,
+                    'category_mappings' => $categoryMappings,
                     'sync_status' => 'pending',
                 ]
             );
@@ -409,15 +421,25 @@ class ProductPublicationService
 
         foreach ($shopIds as $shopId) {
             try {
-                // Dispatch sync job
-                SyncProductToPrestaShop::dispatch($product->id, $shopId)
+                // Load PrestaShopShop model (job requires model, not ID)
+                $shop = PrestaShopShop::find($shopId);
+                if (!$shop) {
+                    Log::warning('ProductPublicationService: Shop not found, skipping sync', [
+                        'product_id' => $product->id,
+                        'shop_id' => $shopId,
+                    ]);
+                    continue;
+                }
+
+                // Dispatch sync job with model instances
+                SyncProductToPrestaShop::dispatch($product, $shop)
                     ->onQueue('prestashop-sync');
 
                 $jobIds[] = [
                     'shop_id' => $shopId,
                     'dispatched_at' => now()->toIso8601String(),
                 ];
-            } catch (\Exception $e) {
+            } catch (\Throwable $e) {
                 Log::error('ProductPublicationService: Failed to dispatch sync job', [
                     'product_id' => $product->id,
                     'shop_id' => $shopId,

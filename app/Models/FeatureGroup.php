@@ -272,4 +272,102 @@ class FeatureGroup extends Model
             self::GROUP_INNE,
         ];
     }
+
+    /**
+     * Get complete icon map with HTML entities, labels and categories
+     */
+    public static function getIconMap(): array
+    {
+        return [
+            // === Glowne ===
+            'engine' => ['entity' => '&#9881;', 'label' => 'Silnik', 'category' => 'glowne'],
+            'car' => ['entity' => '&#128663;', 'label' => 'Samochod', 'category' => 'glowne'],
+            'motorcycle' => ['entity' => '&#127949;', 'label' => 'Motocykl', 'category' => 'glowne'],
+            'gear' => ['entity' => '&#9881;', 'label' => 'Zebatka', 'category' => 'glowne'],
+            'fuel' => ['entity' => '&#9981;', 'label' => 'Paliwo', 'category' => 'glowne'],
+            'electric' => ['entity' => '&#9889;', 'label' => 'Elektryczny', 'category' => 'glowne'],
+            'racing' => ['entity' => '&#127937;', 'label' => 'Wyscigowy', 'category' => 'glowne'],
+            'quad' => ['entity' => '&#128755;', 'label' => 'Quad/ATV', 'category' => 'glowne'],
+
+            // === Uklad napedowy ===
+            'transmission' => ['entity' => '&#128260;', 'label' => 'Skrzynia biegow', 'category' => 'naped'],
+            'chain' => ['entity' => '&#128279;', 'label' => 'Lancuch', 'category' => 'naped'],
+            'clutch' => ['entity' => '&#128296;', 'label' => 'Sprzeglo', 'category' => 'naped'],
+            'differential' => ['entity' => '&#9881;', 'label' => 'Dyferencjal', 'category' => 'naped'],
+            'axle' => ['entity' => '&#8596;', 'label' => 'Os napedowa', 'category' => 'naped'],
+
+            // === Podwozie ===
+            'wheel' => ['entity' => '&#9899;', 'label' => 'Kolo', 'category' => 'podwozie'],
+            'tire' => ['entity' => '&#11044;', 'label' => 'Opona', 'category' => 'podwozie'],
+            'brake' => ['entity' => '&#128376;', 'label' => 'Hamulec', 'category' => 'podwozie'],
+            'suspension' => ['entity' => '&#8597;', 'label' => 'Zawieszenie', 'category' => 'podwozie'],
+            'fork' => ['entity' => '&#10546;', 'label' => 'Widly', 'category' => 'podwozie'],
+            'shock' => ['entity' => '&#10972;', 'label' => 'Amortyzator', 'category' => 'podwozie'],
+            'frame' => ['entity' => '&#9645;', 'label' => 'Rama', 'category' => 'podwozie'],
+            'steering' => ['entity' => '&#9935;', 'label' => 'Kierownica', 'category' => 'podwozie'],
+
+            // === Elektryka ===
+            'battery' => ['entity' => '&#128267;', 'label' => 'Akumulator', 'category' => 'elektryka'],
+            'light' => ['entity' => '&#128161;', 'label' => 'Oswietlenie', 'category' => 'elektryka'],
+            'plug' => ['entity' => '&#128268;', 'label' => 'Wtyczka', 'category' => 'elektryka'],
+            'wiring' => ['entity' => '&#128300;', 'label' => 'Instalacja', 'category' => 'elektryka'],
+            'sensor' => ['entity' => '&#128225;', 'label' => 'Czujnik', 'category' => 'elektryka'],
+            'ecu' => ['entity' => '&#128187;', 'label' => 'Sterownik ECU', 'category' => 'elektryka'],
+            'ignition' => ['entity' => '&#128273;', 'label' => 'Zaplonowy', 'category' => 'elektryka'],
+            'controller' => ['entity' => '&#127918;', 'label' => 'Kontroler', 'category' => 'elektryka'],
+
+            // === Czesci silnika ===
+            'piston' => ['entity' => '&#9898;', 'label' => 'Tlok', 'category' => 'silnik'],
+            'carburetor' => ['entity' => '&#9904;', 'label' => 'Gaznik', 'category' => 'silnik'],
+            'turbo' => ['entity' => '&#127744;', 'label' => 'Turbo', 'category' => 'silnik'],
+            'exhaust' => ['entity' => '&#128168;', 'label' => 'Wydech', 'category' => 'silnik'],
+            'radiator' => ['entity' => '&#10052;', 'label' => 'Chlodnica', 'category' => 'silnik'],
+            'oil' => ['entity' => '&#128167;', 'label' => 'Olej', 'category' => 'silnik'],
+            'filter' => ['entity' => '&#9783;', 'label' => 'Filtr', 'category' => 'silnik'],
+
+            // === Wymiary ===
+            'ruler' => ['entity' => '&#128207;', 'label' => 'Wymiar', 'category' => 'wymiary'],
+            'weight' => ['entity' => '&#9878;', 'label' => 'Waga', 'category' => 'wymiary'],
+            'speed' => ['entity' => '&#128168;', 'label' => 'Predkosc', 'category' => 'wymiary'],
+            'power' => ['entity' => '&#9889;', 'label' => 'Moc', 'category' => 'wymiary'],
+            'volume' => ['entity' => '&#129506;', 'label' => 'Pojemnosc', 'category' => 'wymiary'],
+            'range' => ['entity' => '&#128205;', 'label' => 'Zasieg', 'category' => 'wymiary'],
+
+            // === Nadwozie ===
+            'seat' => ['entity' => '&#129681;', 'label' => 'Siedzenie', 'category' => 'nadwozie'],
+            'mirror' => ['entity' => '&#128064;', 'label' => 'Lusterko', 'category' => 'nadwozie'],
+            'bumper' => ['entity' => '&#128739;', 'label' => 'Zderzak', 'category' => 'nadwozie'],
+            'fender' => ['entity' => '&#128736;', 'label' => 'Blotnik', 'category' => 'nadwozie'],
+
+            // === Narzedzia ===
+            'wrench' => ['entity' => '&#128295;', 'label' => 'Klucz', 'category' => 'narzedzia'],
+            'bolt' => ['entity' => '&#128297;', 'label' => 'Sruba', 'category' => 'narzedzia'],
+            'toolkit' => ['entity' => '&#129520;', 'label' => 'Zestaw narzedzi', 'category' => 'narzedzia'],
+
+            // === Inne ===
+            'document' => ['entity' => '&#128196;', 'label' => 'Dokument', 'category' => 'inne'],
+            'info' => ['entity' => '&#8505;', 'label' => 'Info', 'category' => 'inne'],
+            'certificate' => ['entity' => '&#128220;', 'label' => 'Certyfikat', 'category' => 'inne'],
+            'tag' => ['entity' => '&#127991;', 'label' => 'Etykieta', 'category' => 'inne'],
+            'shield' => ['entity' => '&#128737;', 'label' => 'Gwarancja', 'category' => 'inne'],
+        ];
+    }
+
+    /**
+     * Get icon categories with Polish labels
+     */
+    public static function getIconCategories(): array
+    {
+        return [
+            'glowne' => 'Glowne',
+            'naped' => 'Naped',
+            'podwozie' => 'Podwozie',
+            'elektryka' => 'Elektryka',
+            'silnik' => 'Czesci silnika',
+            'wymiary' => 'Wymiary',
+            'nadwozie' => 'Nadwozie',
+            'narzedzia' => 'Narzedzia',
+            'inne' => 'Inne',
+        ];
+    }
 }

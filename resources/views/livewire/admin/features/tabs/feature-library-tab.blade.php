@@ -1,3 +1,4 @@
+@php $iconMap = \App\Models\FeatureGroup::getIconMap(); @endphp
 <div class="feature-browser">
     {{-- HEADER --}}
     <div class="feature-browser__header">
@@ -18,32 +19,129 @@
         </div>
     </div>
 
-    {{-- EXPANDABLE TREE --}}
-    <div class="feature-tree">
+    {{-- EXPANDABLE TREE with Drag & Drop --}}
+    <div class="feature-tree"
+         x-data="{
+            draggedFeatureId: null,
+            draggedFromGroupId: null,
+            dropTargetGroupId: null,
+            insertBeforeId: null,
+            insertIndicatorEl: null,
+            expandTimer: null,
+
+            startDrag(event, featureId, groupId) {
+                this.draggedFeatureId = featureId;
+                this.draggedFromGroupId = groupId;
+                event.dataTransfer.effectAllowed = 'move';
+                event.dataTransfer.setData('text/plain', String(featureId));
+                document.body.classList.add('dragging-feature');
+            },
+
+            endDrag() {
+                this.draggedFeatureId = null;
+                this.draggedFromGroupId = null;
+                this.dropTargetGroupId = null;
+                this.insertBeforeId = null;
+                this.clearInsertLine();
+                if (this.expandTimer) { clearTimeout(this.expandTimer); this.expandTimer = null; }
+                document.body.classList.remove('dragging-feature');
+            },
+
+            highlightGroup(event, groupId, isExpanded) {
+                if (!this.draggedFeatureId) return;
+                event.preventDefault();
+                this.dropTargetGroupId = groupId;
+                if (!isExpanded && !this.expandTimer) {
+                    this.expandTimer = setTimeout(() => {
+                        $wire.toggleGroup(groupId);
+                        this.expandTimer = null;
+                    }, 500);
+                }
+            },
+
+            unhighlightGroup(groupId) {
+                if (this.dropTargetGroupId === groupId) {
+                    this.dropTargetGroupId = null;
+                }
+                this.clearInsertLine();
+                this.insertBeforeId = null;
+                if (this.expandTimer) { clearTimeout(this.expandTimer); this.expandTimer = null; }
+            },
+
+            onFeatureDragOver(event, featureId, groupId) {
+                if (!this.draggedFeatureId || this.draggedFeatureId === featureId) return;
+                event.preventDefault();
+                event.stopPropagation();
+                this.dropTargetGroupId = groupId;
+
+                const rect = event.currentTarget.getBoundingClientRect();
+                const midY = rect.top + rect.height / 2;
+                const isAbove = event.clientY < midY;
+
+                this.clearInsertLine();
+
+                if (isAbove) {
+                    this.insertBeforeId = featureId;
+                    event.currentTarget.classList.add('feature-tree__feature-item--insert-above');
+                } else {
+                    const next = event.currentTarget.nextElementSibling;
+                    if (next && next.hasAttribute('draggable')) {
+                        this.insertBeforeId = parseInt(next.getAttribute('data-feature-id'));
+                    } else {
+                        this.insertBeforeId = null;
+                    }
+                    event.currentTarget.classList.add('feature-tree__feature-item--insert-below');
+                }
+                this.insertIndicatorEl = event.currentTarget;
+            },
+
+            clearInsertLine() {
+                document.querySelectorAll('.feature-tree__feature-item--insert-above, .feature-tree__feature-item--insert-below').forEach(el => {
+                    el.classList.remove('feature-tree__feature-item--insert-above', 'feature-tree__feature-item--insert-below');
+                });
+                this.insertIndicatorEl = null;
+            },
+
+            dropOnFeature(event, featureId, groupId) {
+                event.preventDefault();
+                event.stopPropagation();
+                if (!this.draggedFeatureId || this.draggedFeatureId === featureId) { this.endDrag(); return; }
+                const movedId = this.draggedFeatureId;
+                const fromGroup = this.draggedFromGroupId;
+                const beforeId = this.insertBeforeId;
+                this.endDrag();
+                $wire.moveFeatureToGroup(movedId, groupId, beforeId);
+            },
+
+            dropOnGroup(event, targetGroupId) {
+                event.preventDefault();
+                if (!this.draggedFeatureId) return;
+                const movedId = this.draggedFeatureId;
+                const fromGroup = this.draggedFromGroupId;
+                this.endDrag();
+                $wire.moveFeatureToGroup(movedId, targetGroupId, null);
+            }
+         }"
+         @dragover.prevent
+    >
         @foreach($this->groups as $group)
+            @php $isExpanded = $this->isGroupExpanded($group['id']); @endphp
             <div wire:key="group-{{ $group['id'] }}" class="feature-tree__group">
-                {{-- Group Header (clickable) --}}
-                <div class="feature-tree__group-header" wire:click="toggleGroup({{ $group['id'] }})">
-                    <span class="feature-tree__expand-icon {{ $this->isGroupExpanded($group['id']) ? 'expanded' : '' }}">
+                {{-- Group Header (clickable + drop target) --}}
+                <div class="feature-tree__group-header"
+                     wire:click="toggleGroup({{ $group['id'] }})"
+                     @dragover.prevent="highlightGroup($event, {{ $group['id'] }}, {{ $isExpanded ? 'true' : 'false' }})"
+                     @dragleave="unhighlightGroup({{ $group['id'] }})"
+                     @drop.prevent="dropOnGroup($event, {{ $group['id'] }})"
+                     :class="{ 'feature-tree__group-header--drop-target': dropTargetGroupId === {{ $group['id'] }} }"
+                >
+                    <span class="feature-tree__expand-icon {{ $isExpanded ? 'expanded' : '' }}">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
                         </svg>
                     </span>
                     <span class="feature-tree__group-icon">
-                        @switch($group['icon'])
-                            @case('engine') &#9881; @break
-                            @case('electric') &#9889; @break
-                            @case('fuel') &#9981; @break
-                            @case('ruler') &#128207; @break
-                            @case('wheel') &#9899; @break
-                            @case('brake') &#128376; @break
-                            @case('suspension') &#8597; @break
-                            @case('document') &#128196; @break
-                            @case('car') &#128663; @break
-                            @case('gear') &#9881; @break
-                            @case('info') &#8505; @break
-                            @default &#128193;
-                        @endswitch
+                        {!! $iconMap[$group['icon']]['entity'] ?? '&#128193;' !!}
                     </span>
                     <span class="feature-tree__group-name">{{ $group['name'] }}</span>
                     @if($group['vehicle_filter'])
@@ -60,11 +158,26 @@
                     </div>
                 </div>
 
-                {{-- Features List (collapsible) --}}
-                @if($this->isGroupExpanded($group['id']))
-                    <div class="feature-tree__features">
+                {{-- Features List (collapsible + drop target) --}}
+                @if($isExpanded)
+                    <div class="feature-tree__features"
+                         @dragover.prevent="highlightGroup($event, {{ $group['id'] }}, true)"
+                         @drop.prevent="dropOnGroup($event, {{ $group['id'] }})"
+                         :class="{ 'feature-tree__features--drop-target': dropTargetGroupId === {{ $group['id'] }} }"
+                    >
                         @forelse($group['features'] as $feature)
-                            <div wire:key="feature-{{ $feature['id'] }}" class="feature-tree__feature-item">
+                            <div wire:key="feature-{{ $feature['id'] }}"
+                                 class="feature-tree__feature-item"
+                                 draggable="true"
+                                 data-feature-id="{{ $feature['id'] }}"
+                                 @dragstart="startDrag($event, {{ $feature['id'] }}, {{ $group['id'] }})"
+                                 @dragend="endDrag()"
+                                 @dragover.prevent="onFeatureDragOver($event, {{ $feature['id'] }}, {{ $group['id'] }})"
+                                 @dragleave="clearInsertLine()"
+                                 @drop.prevent="dropOnFeature($event, {{ $feature['id'] }}, {{ $group['id'] }})"
+                                 :class="{ 'feature-tree__feature-item--dragging': draggedFeatureId === {{ $feature['id'] }} }"
+                            >
+                                <span class="feature-drag-handle">&#9776;</span>
                                 <span class="feature-tree__feature-name">{{ $feature['name'] }}</span>
                                 <span class="feature-tree__feature-code text-gray-500">{{ $feature['code'] }}</span>
                                 @if($feature['unit'])
@@ -80,7 +193,11 @@
                                 </div>
                             </div>
                         @empty
-                            <div class="feature-tree__empty">Brak cech w grupie</div>
+                            <div class="feature-tree__empty"
+                                 @dragover.prevent="highlightGroup($event, {{ $group['id'] }}, true)"
+                                 @drop.prevent="dropOnGroup($event, {{ $group['id'] }})">
+                                Brak cech - przeciagnij tutaj
+                            </div>
                         @endforelse
                     </div>
                 @endif
@@ -230,24 +347,76 @@
                 <div class="grid grid-cols-2 gap-4">
                     <div>
                         <label class="form-label">Ikona</label>
-                        <select wire:model="featureGroupIcon" class="form-input">
-                            <option value="">-- Brak --</option>
-                            <option value="engine">&#9881; Silnik</option>
-                            <option value="ruler">&#128207; Linijka</option>
-                            <option value="wheel">&#9899; Kolo</option>
-                            <option value="brake">&#128376; Hamulec</option>
-                            <option value="suspension">&#8597; Zawieszenie</option>
-                            <option value="electric">&#9889; Elektryczny</option>
-                            <option value="fuel">&#9981; Paliwo</option>
-                            <option value="document">&#128196; Dokument</option>
-                            <option value="car">&#128663; Samochod</option>
-                            <option value="gear">&#9881; Zebatka</option>
-                            <option value="info">&#8505; Info</option>
-                        </select>
+                        @php
+                            $iconMapJson = json_encode(\App\Models\FeatureGroup::getIconMap());
+                            $categoriesJson = json_encode(\App\Models\FeatureGroup::getIconCategories());
+                        @endphp
+                        <div x-data="{
+                            open: false,
+                            selected: $wire.entangle('featureGroupIcon'),
+                            activeCategory: 'glowne',
+                            icons: {{ $iconMapJson }},
+                            categories: {{ $categoriesJson }},
+                            get selectedEntity() { return this.icons[this.selected]?.entity ?? '&#128193;'; },
+                            get selectedLabel() { return this.icons[this.selected]?.label ?? null; },
+                            getFilteredIcons() {
+                                return Object.fromEntries(
+                                    Object.entries(this.icons).filter(([k, v]) => v.category === this.activeCategory)
+                                );
+                            },
+                            selectIcon(key) {
+                                this.selected = key;
+                                this.open = false;
+                            }
+                        }" class="relative" wire:key="icon-picker-{{ $editingFeatureGroupId ?? 'new' }}">
+                            {{-- Trigger button --}}
+                            <button type="button" @click="open = !open"
+                                    class="form-input-enterprise w-full flex items-center gap-2 text-left cursor-pointer">
+                                <span class="text-xl" x-html="selectedEntity"></span>
+                                <span class="text-sm text-gray-300" x-text="selectedLabel || '-- Wybierz ikone --'"></span>
+                                <svg class="w-4 h-4 ml-auto text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                                </svg>
+                            </button>
+
+                            {{-- Dropdown grid --}}
+                            <div x-show="open" @click.outside="open = false"
+                                 x-transition:enter="transition ease-out duration-150"
+                                 x-transition:enter-start="opacity-0 -translate-y-2"
+                                 x-transition:enter-end="opacity-100 translate-y-0"
+                                 x-transition:leave="transition ease-in duration-100"
+                                 x-transition:leave-start="opacity-100"
+                                 x-transition:leave-end="opacity-0"
+                                 class="icon-picker-dropdown">
+
+                                {{-- Category tabs --}}
+                                <div class="icon-picker-categories">
+                                    <template x-for="(catLabel, catKey) in categories" :key="catKey">
+                                        <button type="button" @click="activeCategory = catKey"
+                                                :class="{ 'icon-picker-cat--active': activeCategory === catKey }"
+                                                class="icon-picker-cat"
+                                                x-text="catLabel"></button>
+                                    </template>
+                                </div>
+
+                                {{-- Icons grid --}}
+                                <div class="icon-picker-grid">
+                                    <template x-for="(iconData, iconKey) in getFilteredIcons()" :key="iconKey">
+                                        <button type="button" @click="selectIcon(iconKey)"
+                                                :class="{ 'icon-picker-item--selected': selected === iconKey }"
+                                                class="icon-picker-item"
+                                                :title="iconData.label">
+                                            <span class="text-xl" x-html="iconData.entity"></span>
+                                            <span class="icon-picker-item-label" x-text="iconData.label"></span>
+                                        </button>
+                                    </template>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                     <div>
                         <label class="form-label">Kolor</label>
-                        <select wire:model="featureGroupColor" class="form-input">
+                        <select wire:model="featureGroupColor" wire:key="color-select-{{ $editingFeatureGroupId ?? 'new' }}" class="form-input">
                             <option value="">-- Domyslny --</option>
                             <option value="orange">Pomaranczowy</option>
                             <option value="blue">Niebieski</option>

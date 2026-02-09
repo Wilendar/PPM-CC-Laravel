@@ -236,6 +236,15 @@ class ProductImportPanel extends Component
     }
 
     /**
+     * Get active PrestaShop shops (cached per request, prevents N+1 in product-row)
+     */
+    #[Computed]
+    public function activePrestaShopShops()
+    {
+        return \App\Models\PrestaShopShop::where('is_active', true)->orderBy('name')->get();
+    }
+
+    /**
      * Get import sessions for filter
      */
     #[Computed]

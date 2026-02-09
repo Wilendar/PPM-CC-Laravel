@@ -441,6 +441,104 @@ class FeatureLibraryTab extends Component
     }
 
     // ========================================
+    // DRAG & DROP METHODS
+    // ========================================
+
+    /**
+     * Move feature to group at specific position (drag & drop callback)
+     *
+     * @param int $featureId Feature to move
+     * @param int $targetGroupId Target group
+     * @param int|null $beforeFeatureId Insert before this feature (null = end)
+     */
+    public function moveFeatureToGroup(int $featureId, int $targetGroupId, ?int $beforeFeatureId = null): void
+    {
+        try {
+            $feature = FeatureType::findOrFail($featureId);
+            $oldGroupId = $feature->feature_group_id;
+
+            if ($oldGroupId === $targetGroupId && $beforeFeatureId === null) {
+                return;
+            }
+
+            DB::transaction(function () use ($feature, $featureId, $targetGroupId, $oldGroupId, $beforeFeatureId) {
+                // Get ordered features in target group (excluding the dragged one)
+                $targetFeatures = FeatureType::where('feature_group_id', $targetGroupId)
+                    ->where('id', '!=', $featureId)
+                    ->orderBy('position')
+                    ->pluck('id')
+                    ->toArray();
+
+                // Determine insert index
+                if ($beforeFeatureId !== null) {
+                    $insertIdx = array_search($beforeFeatureId, $targetFeatures);
+                    if ($insertIdx === false) {
+                        $insertIdx = count($targetFeatures); // fallback: end
+                    }
+                } else {
+                    $insertIdx = count($targetFeatures); // end
+                }
+
+                // Insert feature at position
+                array_splice($targetFeatures, $insertIdx, 0, [$featureId]);
+
+                // Update group assignment
+                $feature->update(['feature_group_id' => $targetGroupId]);
+
+                // Reindex all positions in target group
+                foreach ($targetFeatures as $pos => $fId) {
+                    FeatureType::where('id', $fId)->update(['position' => $pos + 1]);
+                }
+
+                // Reindex old group if cross-group move
+                if ($oldGroupId && $oldGroupId !== $targetGroupId) {
+                    $oldFeatures = FeatureType::where('feature_group_id', $oldGroupId)
+                        ->orderBy('position')
+                        ->get();
+                    foreach ($oldFeatures as $i => $f) {
+                        if ($f->position !== $i + 1) {
+                            $f->update(['position' => $i + 1]);
+                        }
+                    }
+                }
+            });
+
+            // Auto-expand target group
+            if (!in_array($targetGroupId, $this->expandedGroups)) {
+                $this->expandedGroups[] = $targetGroupId;
+            }
+
+            $this->dispatch('notify', type: 'success', message: 'Cecha przeniesiona.');
+            Log::info('Feature moved', [
+                'feature' => $featureId, 'from' => $oldGroupId,
+                'to' => $targetGroupId, 'before' => $beforeFeatureId,
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Feature move failed', ['error' => $e->getMessage()]);
+            $this->dispatch('notify', type: 'error', message: 'Blad przenoszenia: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Update feature order within a group (drag & drop reorder)
+     */
+    public function updateFeatureOrder(int $groupId, array $featureIds): void
+    {
+        try {
+            DB::transaction(function () use ($groupId, $featureIds) {
+                foreach ($featureIds as $position => $featureId) {
+                    FeatureType::where('id', (int) $featureId)
+                        ->where('feature_group_id', $groupId)
+                        ->update(['position' => $position + 1]);
+                }
+            });
+        } catch (\Exception $e) {
+            Log::error('Feature order update failed', ['error' => $e->getMessage()]);
+        }
+    }
+
+    // ========================================
     // RENDER
     // ========================================
 

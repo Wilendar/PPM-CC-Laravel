@@ -301,6 +301,23 @@ class FeatureTemplatesTab extends Component
         }
     }
 
+    /**
+     * Reorder template features (drag & drop callback from wire:sortable)
+     */
+    public function reorderTemplateFeatures(array $newOrder): void
+    {
+        $reordered = [];
+        foreach ($newOrder as $item) {
+            $oldIndex = (int) $item['value'];
+            if (isset($this->templateFeatures[$oldIndex])) {
+                $reordered[] = $this->templateFeatures[$oldIndex];
+            }
+        }
+        if (count($reordered) === count($this->templateFeatures)) {
+            $this->templateFeatures = $reordered;
+        }
+    }
+
     // ========================================
     // BULK ASSIGN METHODS
     // ========================================
