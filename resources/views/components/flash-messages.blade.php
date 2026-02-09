@@ -1,5 +1,5 @@
 {{-- Flash Messages Container - DOM managed by JavaScript --}}
-<div id="flash-messages-container" class="fixed top-4 right-4 z-50 space-y-2">
+<div id="flash-messages-container" class="fixed top-4 right-4 z-[9999999] space-y-2">
 
     {{-- Success Messages (support both 'success' and 'message' keys) --}}
     @if(session('success') || session('message'))

@@ -200,15 +200,15 @@
             
             {{-- Main content area --}}
             <main class="flex-1">
-                {{-- Flash Messages --}}
-                @include('components.flash-messages')
-                
                 {{-- Page content --}}
                 @yield('content')
                 {{ $slot ?? '' }}
             </main>
         </div>
     </div>
+
+    {{-- Flash Messages - MUST be direct child of body for correct z-index stacking --}}
+    @include('components.flash-messages')
     
     {{-- Scripts --}}
     @livewireScripts

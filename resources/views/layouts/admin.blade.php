@@ -905,7 +905,7 @@
     <div id="toast-container"
          x-data="toastNotifications()"
          x-init="init()"
-         class="fixed top-24 right-6 z-[9999] space-y-3 pointer-events-none"
+         class="fixed top-24 right-6 z-[9999999] space-y-3 pointer-events-none"
          style="max-width: min(calc(100vw - 3rem), 420px); min-width: 360px; width: 360px;">
 
         <template x-for="notification in notifications" :key="notification.id">

@@ -37,6 +37,9 @@
         🚧 DEVELOPMENT MODE - Authentication Disabled 🚧
     </div>
     
+    {{-- Flash Messages --}}
+    <x-flash-messages />
+
     <!-- Main Content -->
     <div class="min-h-screen">
         {{ $slot }}
