@@ -2,6 +2,7 @@
 
 use App\Http\Middleware\AdminMiddleware;
 use App\Http\Middleware\CheckAccountLockMiddleware;
+use App\Http\Middleware\CheckBlockedIp;
 use App\Http\Middleware\DevAuthBypass;
 use App\Http\Middleware\ForcePasswordChangeMiddleware;
 use App\Http\Middleware\PermissionMiddleware;
@@ -40,6 +41,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'track_session' => TrackUserSessionMiddleware::class,
             'force_password_change' => ForcePasswordChangeMiddleware::class,
             'check_account_lock' => CheckAccountLockMiddleware::class,
+            'check.blocked.ip' => CheckBlockedIp::class,
         ]);
         
         // Dev auth bypass - auto-login admin w trybie dev (MUSI być przed innymi!)

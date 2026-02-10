@@ -41,6 +41,7 @@ class ERPManager extends Component
     public $testingConnection = false;
     public $syncingERP = false;
     public bool $showReplaceAllConfirmModal = false;
+    public string $replaceAllConfirmText = '';
 
     // Filters and Search
     public $search = '';
@@ -96,7 +97,7 @@ class ERPManager extends Component
         // REST API Configuration (ONLY mode supported)
         'connection_mode' => 'rest_api',
         'rest_api_url' => 'https://sapi.mpptrade.pl',
-        'rest_api_key' => 'YHZ4AtJiNBrEFhez7AvPTGJK3XKCrX4NCyGLwrQpecqCyvP3XxxCGYRvjdmtGkRb',
+        'rest_api_key' => '',
         'rest_api_timeout' => 30,
         'rest_api_verify_ssl' => false, // Temporarily disabled - sapi.mpptrade.pl certificate issue
         // Mappings (populated after test)
@@ -174,6 +175,9 @@ class ERPManager extends Component
     {
         // DEVELOPMENT: Autoryzacja tymczasowo wyłączona
         // $this->authorize('admin.erp.view');
+
+        // Load API key from environment (not hardcoded)
+        $this->subiektConfig['rest_api_key'] = env('SUBIEKT_GT_API_KEY', '');
     }
 
     /**
@@ -1453,6 +1457,11 @@ class ERPManager extends Component
      */
     public function replaceAllWithErp(): void
     {
+        if ($this->replaceAllConfirmText !== 'POTWIERDZAM') {
+            session()->flash('error', 'Wpisz POTWIERDZAM aby wykonac operacje');
+            return;
+        }
+
         $this->showReplaceAllConfirmModal = false; // Close modal first
         $erpType = $this->connectionForm['erp_type'];
         $connectionId = $this->editingConnectionId ?? 0;
@@ -1471,6 +1480,19 @@ class ERPManager extends Component
 
         \DB::beginTransaction();
         try {
+            // Activity log BEFORE destructive operation
+            activity()
+                ->causedBy(auth()->user())
+                ->withProperties([
+                    'erp_type' => $erpType,
+                    'connection_id' => $connectionId,
+                    'warehouses_to_delete' => \App\Models\Warehouse::count(),
+                    'price_groups_to_delete' => \App\Models\PriceGroup::count(),
+                    'erp_warehouses_to_create' => count($this->availableErpWarehouses),
+                    'erp_price_levels_to_create' => count($this->availableErpPriceLevels),
+                ])
+                ->log('ERP: Replace all warehouses and price groups');
+
             // 1. Delete ALL warehouses (not just those with ERP mapping!)
             $warehousesToDelete = \App\Models\Warehouse::all();
 
@@ -1566,6 +1588,8 @@ class ERPManager extends Component
             ]);
             $this->dispatch('notify', type: 'error', message: 'Błąd podczas zastępowania danych: ' . $e->getMessage());
         }
+
+        $this->replaceAllConfirmText = '';
     }
 
     /**

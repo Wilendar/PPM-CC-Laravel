@@ -338,9 +338,13 @@ class UserList extends Component
     protected function bulkExportUsers()
     {
         $this->authorize('export', User::class);
-        
-        // TODO: Implement export functionality
-        session()->flash('info', 'Funkcja eksportu zostanie wkrótce zaimplementowana.');
+
+        $userIds = !empty($this->selectedUsers) ? $this->selectedUsers : null;
+
+        return \Maatwebsite\Excel\Facades\Excel::download(
+            new \App\Exports\UsersExport($userIds),
+            'users_export_' . date('Y-m-d') . '.xlsx'
+        );
     }
 
     protected function bulkDeleteUsers()

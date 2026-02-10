@@ -291,15 +291,13 @@ class AuditLogs extends Component
     protected function exportToExcel($logs)
     {
         $data = $this->formatLogsForExport($logs);
-        
+
         $filename = 'audit_logs_' . now()->format('Y-m-d_H-i-s') . '.xlsx';
-        
-        // TODO: Implement Excel export using Laravel-Excel
-        session()->flash('info', 'Eksport do Excel zostanie wkrótce zaimplementowany.');
-        
-        return response()->streamDownload(function() use ($data) {
-            // Excel generation logic will be implemented
-        }, $filename);
+
+        return Excel::download(
+            new \App\Exports\AuditLogsExport($data, $this->exportFields),
+            $filename
+        );
     }
 
     protected function exportToCsv($logs)

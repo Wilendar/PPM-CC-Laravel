@@ -129,6 +129,15 @@
                         class="py-4 px-1 border-b-2 font-medium text-sm {{ $activeTab === 'policies' ? 'border-[#e0ac7e] text-[#e0ac7e]' : 'border-transparent text-gray-400 hover:text-gray-300 hover:border-gray-600' }}">
                         Polityki hasel
                     </button>
+                    <button wire:click="setTab('blocked_ips')"
+                        class="py-4 px-1 border-b-2 font-medium text-sm {{ $activeTab === 'blocked_ips' ? 'border-[#e0ac7e] text-[#e0ac7e]' : 'border-transparent text-gray-400 hover:text-gray-300 hover:border-gray-600' }}">
+                        Zablokowane IP
+                        @if($blockedIps->where('is_active', true)->count() > 0)
+                            <span class="ml-2 px-2 py-0.5 text-xs rounded-full bg-red-900/50 text-red-300">
+                                {{ $blockedIps->where('is_active', true)->count() }}
+                            </span>
+                        @endif
+                    </button>
                 </nav>
             </div>
 
@@ -242,7 +251,7 @@
                                                 <p class="text-sm font-medium text-white">{{ $ipData->ip_address }}</p>
                                                 <p class="text-xs text-gray-400">{{ $ipData->attempt_count }} nieudanych prob</p>
                                             </div>
-                                            <button wire:click="blockIp('{{ $ipData->ip_address }}')"
+                                            <button wire:click="openBlockIpModal('{{ $ipData->ip_address }}')"
                                                 class="text-sm text-red-400 hover:text-red-300">
                                                 Zablokuj IP
                                             </button>
@@ -499,9 +508,164 @@
                         @endforeach
                     </div>
                 @endif
+
+                @if($activeTab === 'blocked_ips')
+                    {{-- Blocked IPs Tab --}}
+                    <div>
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="text-lg font-medium text-white">Zablokowane adresy IP</h3>
+                            <button wire:click="openBlockIpModal"
+                                class="inline-flex items-center px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-md transition-colors duration-150">
+                                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"></path>
+                                </svg>
+                                Zablokuj IP
+                            </button>
+                        </div>
+
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full divide-y divide-gray-700">
+                                <thead class="bg-gray-700/50">
+                                    <tr>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase">Adres IP</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase">Powod</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase">Zablokowal</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase">Data</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase">Wygasa</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase">Status</th>
+                                        <th class="px-6 py-3 text-right text-xs font-medium text-gray-300 uppercase">Akcje</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="bg-gray-800 divide-y divide-gray-700">
+                                    @forelse($blockedIps as $blocked)
+                                        <tr>
+                                            <td class="px-6 py-4 whitespace-nowrap">
+                                                <span class="text-sm font-mono text-white">{{ $blocked->ip_address }}</span>
+                                            </td>
+                                            <td class="px-6 py-4">
+                                                <span class="text-sm text-gray-300">{{ $blocked->reason ?? '-' }}</span>
+                                            </td>
+                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-400">
+                                                {{ $blocked->blocker?->full_name ?? $blocked->blocker?->email ?? '-' }}
+                                            </td>
+                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-400">
+                                                {{ $blocked->created_at->format('Y-m-d H:i') }}
+                                            </td>
+                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-400">
+                                                {{ $blocked->expires_at ? $blocked->expires_at->format('Y-m-d H:i') : 'Nigdy' }}
+                                            </td>
+                                            <td class="px-6 py-4 whitespace-nowrap">
+                                                @if($blocked->is_active && (!$blocked->expires_at || $blocked->expires_at->isFuture()))
+                                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-900/50 text-red-300">
+                                                        Aktywna
+                                                    </span>
+                                                @elseif($blocked->expires_at && $blocked->expires_at->isPast())
+                                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-900/50 text-yellow-300">
+                                                        Wygasla
+                                                    </span>
+                                                @else
+                                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-700 text-gray-300">
+                                                        Nieaktywna
+                                                    </span>
+                                                @endif
+                                            </td>
+                                            <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                                @if($blocked->is_active)
+                                                    <button wire:click="unblockIp({{ $blocked->id }})"
+                                                        wire:confirm="Czy na pewno chcesz odblokowac ten adres IP?"
+                                                        class="text-green-400 hover:text-green-300">
+                                                        Odblokuj
+                                                    </button>
+                                                @endif
+                                            </td>
+                                        </tr>
+                                    @empty
+                                        <tr>
+                                            <td colspan="7" class="px-6 py-12 text-center text-gray-400">
+                                                Brak zablokowanych adresow IP.
+                                            </td>
+                                        </tr>
+                                    @endforelse
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                @endif
             </div>
         </div>
     </div>
+
+    {{-- Block IP Modal --}}
+    @if($showBlockIpModal)
+        <div class="fixed inset-0 z-50 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+            <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+                {{-- Backdrop --}}
+                <div class="fixed inset-0 bg-gray-900/75 transition-opacity" wire:click="$set('showBlockIpModal', false)"></div>
+
+                <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+
+                {{-- Modal content --}}
+                <div class="inline-block align-bottom bg-gray-800 rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full border border-gray-700">
+                    <div class="bg-gray-800 px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                        <div class="flex items-center mb-4">
+                            <div class="flex-shrink-0 bg-red-900/50 rounded-lg p-3">
+                                <svg class="w-6 h-6 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"></path>
+                                </svg>
+                            </div>
+                            <h3 class="ml-3 text-lg font-medium text-white" id="modal-title">Zablokuj adres IP</h3>
+                        </div>
+
+                        <div class="space-y-4">
+                            {{-- IP Address --}}
+                            <div>
+                                <label for="blockIpAddress" class="block text-sm font-medium text-gray-300">Adres IP</label>
+                                <input type="text" wire:model="blockIpAddress" id="blockIpAddress"
+                                    placeholder="np. 192.168.1.100"
+                                    class="mt-1 block w-full rounded-md bg-gray-700 border-gray-600 text-white shadow-sm focus:border-[#e0ac7e] focus:ring-[#e0ac7e] sm:text-sm">
+                                @error('blockIpAddress')
+                                    <p class="mt-1 text-sm text-red-400">{{ $message }}</p>
+                                @enderror
+                            </div>
+
+                            {{-- Reason --}}
+                            <div>
+                                <label for="blockIpReason" class="block text-sm font-medium text-gray-300">Powod (opcjonalnie)</label>
+                                <textarea wire:model="blockIpReason" id="blockIpReason" rows="3"
+                                    placeholder="Powod blokady..."
+                                    class="mt-1 block w-full rounded-md bg-gray-700 border-gray-600 text-white shadow-sm focus:border-[#e0ac7e] focus:ring-[#e0ac7e] sm:text-sm"></textarea>
+                                @error('blockIpReason')
+                                    <p class="mt-1 text-sm text-red-400">{{ $message }}</p>
+                                @enderror
+                            </div>
+
+                            {{-- Expiry --}}
+                            <div>
+                                <label for="blockIpExpiry" class="block text-sm font-medium text-gray-300">Wygasa (opcjonalnie)</label>
+                                <input type="datetime-local" wire:model="blockIpExpiry" id="blockIpExpiry"
+                                    class="mt-1 block w-full rounded-md bg-gray-700 border-gray-600 text-white shadow-sm focus:border-[#e0ac7e] focus:ring-[#e0ac7e] sm:text-sm">
+                                <p class="mt-1 text-xs text-gray-400">Pozostaw puste aby zablokowac permanentnie.</p>
+                                @error('blockIpExpiry')
+                                    <p class="mt-1 text-sm text-red-400">{{ $message }}</p>
+                                @enderror
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-gray-800 border-t border-gray-700 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                        <button wire:click="blockIp" type="button"
+                            class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-red-600 text-base font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 sm:ml-3 sm:w-auto sm:text-sm">
+                            Zablokuj
+                        </button>
+                        <button wire:click="$set('showBlockIpModal', false)" type="button"
+                            class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-600 shadow-sm px-4 py-2 bg-gray-700 text-base font-medium text-gray-300 hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">
+                            Anuluj
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    @endif
 
     {{-- Flash Messages --}}
     @if (session()->has('success'))

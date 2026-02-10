@@ -44,6 +44,9 @@ class ReportsDashboard extends Component
             'statistics' => $reportsService->getReportStatistics(),
             'latestReports' => $reportsService->getLatestReports(5),
             'chartData' => $this->getChartData(),
+        ])->layout('layouts.admin', [
+            'title' => 'Raporty i Analytics - Admin PPM',
+            'breadcrumb' => 'Raporty',
         ]);
     }
 

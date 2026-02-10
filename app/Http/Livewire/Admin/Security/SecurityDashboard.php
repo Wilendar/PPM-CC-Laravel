@@ -4,6 +4,8 @@ namespace App\Http\Livewire\Admin\Security;
 
 use Livewire\Component;
 use Livewire\WithPagination;
+use App\Models\AuditLog;
+use App\Models\BlockedIp;
 use App\Models\UserSession;
 use App\Models\LoginAttempt;
 use App\Models\SecurityAlert;
@@ -49,6 +51,12 @@ class SecurityDashboard extends Component
     // Filters
     public string $alertFilter = 'all';
     public int $alertsPerPage = 10;
+
+    // IP Blocking
+    public bool $showBlockIpModal = false;
+    public string $blockIpAddress = '';
+    public string $blockIpReason = '';
+    public string $blockIpExpiry = '';
 
     // ==========================================
     // LIFECYCLE
@@ -198,12 +206,51 @@ class SecurityDashboard extends Component
     // IP ACTIONS
     // ==========================================
 
-    public function blockIp(string $ip): void
+    public function openBlockIpModal(string $ip = ''): void
     {
-        // TODO: Implement IP blocking functionality
-        // This would require an ip_restrictions table and middleware
+        $this->blockIpAddress = $ip;
+        $this->blockIpReason = '';
+        $this->blockIpExpiry = '';
+        $this->showBlockIpModal = true;
+    }
 
-        session()->flash('info', "Funkcja blokowania IP bedzie dostepna wkrotce.");
+    public function blockIp(): void
+    {
+        $this->validate([
+            'blockIpAddress' => 'required|ip',
+            'blockIpReason' => 'nullable|string|max:500',
+            'blockIpExpiry' => 'nullable|date|after:now',
+        ]);
+
+        $blockedIp = BlockedIp::create([
+            'ip_address' => $this->blockIpAddress,
+            'reason' => $this->blockIpReason ?: null,
+            'blocked_by' => auth()->id(),
+            'expires_at' => $this->blockIpExpiry ?: null,
+            'is_active' => true,
+        ]);
+
+        AuditLog::logCreated($blockedIp, 'Zablokowano adres IP: ' . $this->blockIpAddress);
+
+        session()->flash('success', 'Adres IP ' . $this->blockIpAddress . ' zostal zablokowany.');
+
+        $this->showBlockIpModal = false;
+        $this->blockIpAddress = '';
+        $this->blockIpReason = '';
+        $this->blockIpExpiry = '';
+        $this->refreshStats();
+    }
+
+    public function unblockIp(int $id): void
+    {
+        $blockedIp = BlockedIp::findOrFail($id);
+        $oldValues = $blockedIp->toArray();
+        $blockedIp->update(['is_active' => false]);
+
+        AuditLog::logUpdated($blockedIp, $oldValues, 'Odblokowano adres IP: ' . $blockedIp->ip_address);
+
+        session()->flash('success', 'Adres IP ' . $blockedIp->ip_address . ' zostal odblokowany.');
+        $this->refreshStats();
     }
 
     // ==========================================
@@ -271,6 +318,13 @@ class SecurityDashboard extends Component
             ->get();
     }
 
+    public function getBlockedIpsProperty()
+    {
+        return BlockedIp::with('blocker')
+            ->orderBy('created_at', 'desc')
+            ->get();
+    }
+
     // ==========================================
     // CHART DATA
     // ==========================================
@@ -319,6 +373,7 @@ class SecurityDashboard extends Component
             'alerts' => $this->alerts,
             'loginAttempts' => $this->loginAttempts,
             'passwordPolicies' => $this->passwordPolicies,
+            'blockedIps' => $this->blockedIps,
             'failedLoginsChartData' => $this->getFailedLoginsChartData(),
             'sessionsChartData' => $this->getSessionsChartData(),
         ])->layout('layouts.admin', [

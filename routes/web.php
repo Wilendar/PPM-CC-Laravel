@@ -597,7 +597,7 @@ Route::prefix('admin')->name('admin.')->middleware($adminMiddleware)->group(func
     // Route::get('/notifications', \App\Http\Livewire\Admin\Notifications\NotificationCenter::class)->name('notifications');
 
     // Reports & Analytics - działający komponent
-    // Route::get('/reports', \App\Http\Livewire\Admin\Reports\ReportsDashboard::class)->name('reports');
+    Route::get('/reports', \App\Http\Livewire\Admin\Reports\ReportsDashboard::class)->name('reports');
 
     // API Management - działający komponent
     // Route::get('/api', \App\Http\Livewire\Admin\Api\ApiManagement::class)->name('api');
