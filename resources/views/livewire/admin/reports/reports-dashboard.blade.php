@@ -373,9 +373,9 @@
 
     <!-- Generate Report Modal -->
     @if($showGenerateModal)
-        <div class="fixed inset-0 bg-black/60 overflow-y-auto h-full w-full layer-overlay"
-             wire:click.self="hideGenerateModal">
-            <div class="relative top-20 mx-auto p-6 w-96 bg-gray-800 border border-gray-700 rounded-lg shadow-xl">
+        <div class="fixed inset-0 bg-black/60 flex items-center justify-center p-4 layer-overlay"
+             wire:click.self="closeGenerateModal">
+            <div class="w-full max-w-md bg-gray-800 border border-gray-700 rounded-lg shadow-xl p-6">
                 <div class="flex items-center justify-between mb-4">
                     <h3 class="text-lg font-medium text-white">Generuj nowy raport</h3>
                     <button wire:click="closeGenerateModal" class="text-gray-400 hover:text-gray-300">
