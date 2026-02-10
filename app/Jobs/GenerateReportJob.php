@@ -100,24 +100,24 @@ class GenerateReportJob implements ShouldQueue
 
         return match ($this->report->period) {
             SystemReport::PERIOD_DAILY => [
-                'start' => $reportDate->startOfDay(),
-                'end' => $reportDate->endOfDay(),
+                'start' => $reportDate->copy()->startOfDay(),
+                'end' => $reportDate->copy()->endOfDay(),
             ],
             SystemReport::PERIOD_WEEKLY => [
-                'start' => $reportDate->startOfWeek(),
-                'end' => $reportDate->endOfWeek(),
+                'start' => $reportDate->copy()->startOfWeek(),
+                'end' => $reportDate->copy()->endOfWeek(),
             ],
             SystemReport::PERIOD_MONTHLY => [
-                'start' => $reportDate->startOfMonth(),
-                'end' => $reportDate->endOfMonth(),
+                'start' => $reportDate->copy()->startOfMonth(),
+                'end' => $reportDate->copy()->endOfMonth(),
             ],
             SystemReport::PERIOD_QUARTERLY => [
-                'start' => $reportDate->startOfQuarter(),
-                'end' => $reportDate->endOfQuarter(),
+                'start' => $reportDate->copy()->startOfQuarter(),
+                'end' => $reportDate->copy()->endOfQuarter(),
             ],
             default => [
-                'start' => $reportDate->startOfDay(),
-                'end' => $reportDate->endOfDay(),
+                'start' => $reportDate->copy()->startOfDay(),
+                'end' => $reportDate->copy()->endOfDay(),
             ],
         };
     }

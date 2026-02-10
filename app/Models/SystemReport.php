@@ -121,9 +121,9 @@ class SystemReport extends Model
     public function getStatusColorAttribute(): string
     {
         return match ($this->status) {
-            self::STATUS_COMPLETED => 'text-green-600',
-            self::STATUS_GENERATING => 'text-blue-600',
-            self::STATUS_FAILED => 'text-red-600',
+            self::STATUS_COMPLETED => 'text-green-400',
+            self::STATUS_GENERATING => 'text-blue-400',
+            self::STATUS_FAILED => 'text-red-400',
         };
     }
 

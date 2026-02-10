@@ -364,10 +364,44 @@ class ProductTransformer
         if ($shopData && !empty($shopData->category_mappings)) {
             $categoryMappings = $shopData->category_mappings;
 
-            // Extract PPM category IDs from Option A structure: ui.selected
+            // Extract category IDs from Option A structure: ui.selected
             $shopCategories = $categoryMappings['ui']['selected'] ?? [];
+            $categorySource = $categoryMappings['metadata']['source'] ?? 'manual';
 
             if (!empty($shopCategories)) {
+                // FIX 2026-02-10: Handle PrestaShop direct IDs from import publication
+                // When source is 'prestashop_direct', ui.selected contains PS IDs (not PPM IDs)
+                if ($categorySource === 'prestashop_direct') {
+                    Log::debug('[CATEGORY SYNC] Using PrestaShop direct category IDs from import', [
+                        'product_id' => $product->id,
+                        'shop_id' => $shop->id,
+                        'prestashop_category_ids' => $shopCategories,
+                        'source' => 'prestashop_direct',
+                    ]);
+
+                    $associations = [];
+                    $addedIds = [];
+
+                    foreach ($shopCategories as $psId) {
+                        $psId = (int) $psId;
+                        if ($psId > 0 && !in_array($psId, $addedIds)) {
+                            $associations[] = ['id' => $psId];
+                            $addedIds[] = $psId;
+                        }
+                    }
+
+                    if (!empty($associations)) {
+                        Log::info('[CATEGORY SYNC] Category associations built from PrestaShop direct IDs', [
+                            'product_id' => $product->id,
+                            'shop_id' => $shop->id,
+                            'association_count' => count($associations),
+                            'prestashop_category_ids' => $addedIds,
+                        ]);
+
+                        return $this->injectRootCategories($associations);
+                    }
+                }
+
                 Log::debug('[CATEGORY SYNC] Using shop-specific categories from category_mappings', [
                     'product_id' => $product->id,
                     'shop_id' => $shop->id,
@@ -1193,8 +1227,21 @@ class ProductTransformer
         if ($shopData && !empty($shopData->category_mappings)) {
             $categoryMappings = $shopData->category_mappings;
             $primaryCategoryId = $categoryMappings['ui']['primary'] ?? null;
+            $categorySource = $categoryMappings['metadata']['source'] ?? 'manual';
 
             if ($primaryCategoryId) {
+                // FIX 2026-02-10: If source is prestashop_direct, primary is already a PS ID
+                if ($categorySource === 'prestashop_direct') {
+                    Log::debug('[CATEGORY SYNC] Using PrestaShop direct primary category as default', [
+                        'product_id' => $product->id,
+                        'shop_id' => $shop->id,
+                        'prestashop_primary_id' => $primaryCategoryId,
+                        'source' => 'prestashop_direct',
+                    ]);
+
+                    return (int) $primaryCategoryId;
+                }
+
                 // Map PPM category ID to PrestaShop ID
                 $prestashopPrimaryId = $this->categoryMapper->mapToPrestaShop((int) $primaryCategoryId, $shop);
 

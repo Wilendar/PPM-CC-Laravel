@@ -35,6 +35,7 @@ return new class extends Migration
                   ->default('generating');
             $table->timestamp('generated_at')->nullable();
             $table->foreignId('generated_by')
+                  ->nullable()
                   ->constrained('users');
             
             // Performance metrics

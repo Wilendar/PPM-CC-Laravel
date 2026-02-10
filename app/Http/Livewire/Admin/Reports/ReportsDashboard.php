@@ -18,7 +18,8 @@ class ReportsDashboard extends Component
     public $dateFrom = '';
     public $dateTo = '';
     public $showGenerateModal = false;
-    
+    public $expandedReportId = null;
+
     // Report generation fields
     public $generateType = 'usage_analytics';
     public $generatePeriod = 'daily';
@@ -114,7 +115,7 @@ class ReportsDashboard extends Component
     /**
      * Show generate report modal
      */
-    public function showGenerateModal()
+    public function openGenerateModal()
     {
         $this->showGenerateModal = true;
     }
@@ -122,7 +123,7 @@ class ReportsDashboard extends Component
     /**
      * Hide generate report modal
      */
-    public function hideGenerateModal()
+    public function closeGenerateModal()
     {
         $this->showGenerateModal = false;
         $this->resetGenerateForm();
@@ -156,7 +157,7 @@ class ReportsDashboard extends Component
                 'message' => 'Raport został dodany do kolejki generowania.',
             ]);
 
-            $this->hideGenerateModal();
+            $this->closeGenerateModal();
             $this->refreshReports();
 
         } catch (\Exception $e) {
@@ -260,6 +261,14 @@ class ReportsDashboard extends Component
         $this->dateFrom = now()->subDays(7)->format('Y-m-d');
         $this->dateTo = now()->format('Y-m-d');
         $this->resetPage();
+    }
+
+    /**
+     * Toggle report details view
+     */
+    public function toggleReportDetails($reportId)
+    {
+        $this->expandedReportId = $this->expandedReportId === $reportId ? null : $reportId;
     }
 
     /**

@@ -31,13 +31,13 @@ class ReportsService
             'period' => $period,
             'report_date' => $date->toDateString(),
             'status' => SystemReport::STATUS_GENERATING,
-            'generated_by' => auth()->id(),
+            'generated_by' => auth()->id() ?? 8,
             'data' => [],
         ]);
 
-        // Queue report generation
-        GenerateReportJob::dispatch($report);
-        
+        // dispatchSync for immediate execution (Hostido has no queue daemon)
+        GenerateReportJob::dispatchSync($report);
+
         return $report;
     }
 
@@ -48,19 +48,19 @@ class ReportsService
     {
         $date = $date ?? now()->startOfDay();
         $reportName = "Performance Report - " . ucfirst($period) . " - " . $date->format('Y-m-d');
-        
+
         $report = SystemReport::create([
             'name' => $reportName,
             'type' => SystemReport::TYPE_PERFORMANCE,
             'period' => $period,
             'report_date' => $date->toDateString(),
             'status' => SystemReport::STATUS_GENERATING,
-            'generated_by' => auth()->id(),
+            'generated_by' => auth()->id() ?? 8,
             'data' => [],
         ]);
 
-        GenerateReportJob::dispatch($report);
-        
+        GenerateReportJob::dispatchSync($report);
+
         return $report;
     }
 
@@ -71,19 +71,19 @@ class ReportsService
     {
         $date = $date ?? now()->startOfWeek();
         $reportName = "Business Intelligence - " . ucfirst($period) . " - " . $date->format('Y-m-d');
-        
+
         $report = SystemReport::create([
             'name' => $reportName,
             'type' => SystemReport::TYPE_BUSINESS_INTELLIGENCE,
             'period' => $period,
             'report_date' => $date->toDateString(),
             'status' => SystemReport::STATUS_GENERATING,
-            'generated_by' => auth()->id(),
+            'generated_by' => auth()->id() ?? 8,
             'data' => [],
         ]);
 
-        GenerateReportJob::dispatch($report);
-        
+        GenerateReportJob::dispatchSync($report);
+
         return $report;
     }
 
@@ -94,19 +94,19 @@ class ReportsService
     {
         $date = $date ?? now()->startOfDay();
         $reportName = "Integration Performance - " . ucfirst($period) . " - " . $date->format('Y-m-d');
-        
+
         $report = SystemReport::create([
             'name' => $reportName,
             'type' => SystemReport::TYPE_INTEGRATION_PERFORMANCE,
             'period' => $period,
             'report_date' => $date->toDateString(),
             'status' => SystemReport::STATUS_GENERATING,
-            'generated_by' => auth()->id(),
+            'generated_by' => auth()->id() ?? 8,
             'data' => [],
         ]);
 
-        GenerateReportJob::dispatch($report);
-        
+        GenerateReportJob::dispatchSync($report);
+
         return $report;
     }
 
@@ -256,7 +256,7 @@ class ReportsService
         return [
             'hourly_distribution' => $hourlyLogins,
             'weekday_distribution' => $weekdayLogins,
-            'peak_hour' => array_keys($hourlyLogins, max($hourlyLogins))[0] ?? null,
+            'peak_hour' => !empty($hourlyLogins) ? array_keys($hourlyLogins, max($hourlyLogins))[0] : null,
         ];
     }
 
@@ -292,7 +292,7 @@ class ReportsService
         $totalRequests = ApiUsageLog::whereBetween('requested_at', [$startDate, $endDate])->count();
 
         return [
-            'average_response_time' => round($avgResponseTime, 2),
+            'average_response_time' => round($avgResponseTime ?? 0, 2),
             'slow_queries_count' => $slowQueries,
             'error_rate' => $totalRequests > 0 ? round(($errorRate / $totalRequests) * 100, 2) : 0,
             'total_requests' => $totalRequests,
@@ -313,7 +313,7 @@ class ReportsService
             'products_created' => $productsCreated,
             'products_updated' => $productsUpdated,
             'total_products' => Product::count(),
-            'creation_velocity' => $productsCreated / max(1, $startDate->diffInDays($endDate)),
+            'creation_velocity' => round($productsCreated / max(1, (int) $startDate->diffInDays($endDate)), 2),
         ];
     }
 
@@ -367,7 +367,7 @@ class ReportsService
      */
     protected function getUserActivitySummary(Carbon $startDate, Carbon $endDate): string
     {
-        $days = $startDate->diffInDays($endDate) + 1;
+        $days = (int) $startDate->diffInDays($endDate) + 1;
         $activeUsers = User::whereBetween('last_login_at', [$startDate, $endDate])->count();
         
         return "W okresie {$days} dni, {$activeUsers} użytkowników było aktywnych w systemie.";
@@ -377,8 +377,8 @@ class ReportsService
     {
         $avgResponse = ApiUsageLog::whereBetween('requested_at', [$startDate, $endDate])
             ->avg('response_time_ms');
-            
-        return "Średni czas odpowiedzi API: " . round($avgResponse, 2) . "ms";
+
+        return "Średni czas odpowiedzi API: " . round($avgResponse ?? 0, 2) . "ms";
     }
 
     protected function getBusinessIntelligenceSummary(Carbon $startDate, Carbon $endDate): string
