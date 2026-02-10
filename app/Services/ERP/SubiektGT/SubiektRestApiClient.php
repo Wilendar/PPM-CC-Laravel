@@ -121,6 +121,30 @@ class SubiektRestApiClient
                 503,
                 $e
             );
+        } catch (SubiektApiException $e) {
+            // Re-throw SubiektApiException as-is to preserve HTTP status code (e.g. 404)
+            throw $e;
+        } catch (\Illuminate\Http\Client\RequestException $e) {
+            // HTTP error from Laravel retry mechanism - preserve actual HTTP status code
+            // This is critical: retry() throws RequestException for non-2xx responses
+            // BEFORE handleResponse() is called, so we must convert it here
+            $statusCode = $e->response->status();
+            $data = $e->response->json() ?? [];
+            $errorMessage = is_string($data['error'] ?? null)
+                ? $data['error']
+                : ($data['error']['message'] ?? 'HTTP error');
+
+            Log::warning('SubiektRestApiClient: API error', [
+                'endpoint' => $endpoint,
+                'status' => $statusCode,
+                'error' => $errorMessage,
+            ]);
+
+            throw new SubiektApiException(
+                "Subiekt GT API error ({$statusCode}): {$errorMessage}",
+                $statusCode,
+                $e
+            );
         } catch (\Exception $e) {
             Log::error('SubiektRestApiClient: Request failed', [
                 'endpoint' => $endpoint,

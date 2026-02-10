@@ -10,7 +10,7 @@ use App\Models\PublishHistory;
 use App\Models\Category;
 use App\Models\ProductShopData;
 use App\Models\PrestaShopShop;
-use App\Jobs\PrestaShop\SyncProductToPrestaShop;
+use App\Services\Import\PublicationTargetService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Auth;
@@ -98,9 +98,9 @@ class ProductPublicationService
                 // 7. Create publish history record
                 $this->createPublishHistory($pendingProduct, $product);
 
-                // 8. Dispatch sync jobs if requested
+                // 8. Dispatch sync jobs if requested (uses PublicationTargetService)
                 if ($dispatchSyncJobs) {
-                    $this->dispatchSyncJobs($product, $pendingProduct->shop_ids ?? []);
+                    $this->dispatchAllSyncJobs($product, $pendingProduct);
                 }
 
                 Log::info('ProductPublicationService: Published product', [
@@ -200,7 +200,20 @@ class ProductPublicationService
      */
     protected function createProductFromPending(PendingProduct $pendingProduct): Product
     {
-        $product = new Product();
+        // Check for soft-deleted product with same SKU (re-publication scenario)
+        $existing = Product::withTrashed()->where('sku', $pendingProduct->sku)->first();
+        if ($existing) {
+            if ($existing->trashed()) {
+                $existing->restore();
+                Log::info('Restored soft-deleted product for re-publication', [
+                    'product_id' => $existing->id,
+                    'sku' => $existing->sku,
+                ]);
+            }
+            $product = $existing;
+        } else {
+            $product = new Product();
+        }
 
         // Basic fields
         $product->sku = $pendingProduct->sku;
@@ -337,19 +350,33 @@ class ProductPublicationService
         $shopCategories = $pendingProduct->shop_categories ?? [];
 
         foreach ($shopIds as $shopId) {
-            // Get shop-specific categories if defined, otherwise use global
+            // Get shop-specific categories if defined, otherwise use global PPM categories
+            $hasShopSpecificCategories = !empty($shopCategories[$shopId]);
             $categoryIds = $shopCategories[$shopId] ?? $pendingProduct->category_ids ?? [];
 
-            // Build Option A category_mappings structure for CategoryMappingsCast
+            // FIX 2026-02-10: Mark source correctly
+            // shop_categories contains PrestaShop category IDs (from PS category picker)
+            // category_ids contains PPM internal category IDs
+            // ProductTransformer needs to know which type to handle correctly
+            $categorySource = $hasShopSpecificCategories ? 'prestashop_direct' : 'import';
+
+            // Build category_mappings structure for CategoryMappingsCast
+            $intCategoryIds = array_values(array_map('intval', $categoryIds));
+            // Identity mapping: each ID maps to itself (for prestashop_direct, IDs ARE PS IDs)
+            $mappings = [];
+            foreach ($intCategoryIds as $catId) {
+                $mappings[$catId] = $catId;
+            }
+
             $categoryMappings = [
                 'ui' => [
-                    'selected' => array_values(array_map('intval', $categoryIds)),
-                    'primary' => !empty($categoryIds) ? (int) end($categoryIds) : null,
+                    'selected' => $intCategoryIds,
+                    'primary' => !empty($intCategoryIds) ? end($intCategoryIds) : null,
                 ],
-                'mappings' => [],
+                'mappings' => $mappings,
                 'metadata' => [
                     'last_updated' => now()->format('Y-m-d\TH:i:sP'),
-                    'source' => 'import',
+                    'source' => $categorySource,
                 ],
             ];
 
@@ -459,44 +486,43 @@ class ProductPublicationService
     }
 
     /**
-     * Dispatch PrestaShop sync jobs for each shop
+     * Dispatch all sync jobs (PrestaShop + ERP) via PublicationTargetService.
+     * Uses the SAME job classes and dispatch patterns as ProductForm.
+     *
+     * FIX 2026-02-10: Replaces old dispatchSyncJobs() that:
+     * - Used wrong queue name 'prestashop-sync' (not processed by CRON)
+     * - Didn't pass userId to SyncProductToPrestaShop
+     * - Didn't dispatch ERP sync jobs at all
      */
-    protected function dispatchSyncJobs(Product $product, array $shopIds): void
+    protected function dispatchAllSyncJobs(Product $product, PendingProduct $pendingProduct): void
     {
-        if (empty($shopIds)) {
+        $targetService = app(PublicationTargetService::class);
+
+        // Resolve targets from publication_targets (supports both new and legacy format)
+        $resolvedTargets = $targetService->resolveTargets($pendingProduct->publication_targets);
+
+        // Also include shops from shop_ids if not already in resolved targets
+        $shopIdsFromTargets = $resolvedTargets['prestashop_shop_ids'] ?? [];
+        $shopIdsFromPending = $pendingProduct->shop_ids ?? [];
+        $allShopIds = array_unique(array_merge($shopIdsFromTargets, $shopIdsFromPending));
+        $resolvedTargets['prestashop_shop_ids'] = array_values($allShopIds);
+
+        if (empty($resolvedTargets['prestashop_shop_ids']) && empty($resolvedTargets['erp_connection_ids'])) {
+            Log::warning('ProductPublicationService: No sync targets resolved', [
+                'product_id' => $product->id,
+                'publication_targets' => $pendingProduct->publication_targets,
+            ]);
             return;
         }
 
-        $jobIds = [];
+        Log::info('ProductPublicationService: Dispatching sync jobs via PublicationTargetService', [
+            'product_id' => $product->id,
+            'prestashop_shops' => $resolvedTargets['prestashop_shop_ids'],
+            'erp_connections' => $resolvedTargets['erp_connection_ids'],
+        ]);
 
-        foreach ($shopIds as $shopId) {
-            try {
-                // Load PrestaShopShop model (job requires model, not ID)
-                $shop = PrestaShopShop::find($shopId);
-                if (!$shop) {
-                    Log::warning('ProductPublicationService: Shop not found, skipping sync', [
-                        'product_id' => $product->id,
-                        'shop_id' => $shopId,
-                    ]);
-                    continue;
-                }
-
-                // Dispatch sync job with model instances
-                SyncProductToPrestaShop::dispatch($product, $shop)
-                    ->onQueue('prestashop-sync');
-
-                $jobIds[] = [
-                    'shop_id' => $shopId,
-                    'dispatched_at' => now()->toIso8601String(),
-                ];
-            } catch (\Throwable $e) {
-                Log::error('ProductPublicationService: Failed to dispatch sync job', [
-                    'product_id' => $product->id,
-                    'shop_id' => $shopId,
-                    'error' => $e->getMessage(),
-                ]);
-            }
-        }
+        // Dispatch all jobs (PS on default queue, ERP synchronous)
+        $targetService->dispatchSyncJobs($product, $resolvedTargets);
 
         // Update publish history with dispatched jobs
         $history = PublishHistory::where('product_id', $product->id)
@@ -504,17 +530,19 @@ class ProductPublicationService
             ->first();
 
         if ($history) {
+            $jobIds = [];
+            foreach ($resolvedTargets['prestashop_shop_ids'] as $shopId) {
+                $jobIds[] = ['type' => 'prestashop', 'shop_id' => $shopId, 'dispatched_at' => now()->toIso8601String()];
+            }
+            foreach ($resolvedTargets['erp_connection_ids'] as $connId) {
+                $jobIds[] = ['type' => 'erp', 'connection_id' => $connId, 'dispatched_at' => now()->toIso8601String()];
+            }
+
             $history->update([
                 'sync_jobs_dispatched' => $jobIds,
                 'sync_status' => PublishHistory::SYNC_IN_PROGRESS,
             ]);
         }
-
-        Log::info('ProductPublicationService: Sync jobs dispatched', [
-            'product_id' => $product->id,
-            'shops' => $shopIds,
-            'jobs_count' => count($jobIds),
-        ]);
     }
 
     /**

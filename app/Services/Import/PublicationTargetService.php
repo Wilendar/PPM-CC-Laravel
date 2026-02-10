@@ -7,8 +7,11 @@ namespace App\Services\Import;
 use App\Models\ERPConnection;
 use App\Models\PendingProduct;
 use App\Models\Product;
+use App\Models\ProductErpData;
 use App\Models\PrestaShopShop;
 use App\Jobs\PrestaShop\SyncProductToPrestaShop;
+use App\Jobs\ERP\SyncProductToERP;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -140,15 +143,26 @@ class PublicationTargetService
     }
 
     /**
-     * Dispatch sync jobs based on resolved targets
+     * Dispatch sync jobs based on resolved targets.
+     * Uses the SAME dispatch patterns as ProductForm:
+     * - PrestaShop: dispatch() on default queue (processed by CRON)
+     * - ERP: dispatchSync() for immediate execution (Hostido has no daemon)
      *
      * @param Product $product Published product
      * @param array $resolvedTargets Output from resolveTargets()
      */
     public function dispatchSyncJobs(Product $product, array $resolvedTargets): void
     {
-        // Dispatch PrestaShop sync jobs
+        $userId = Auth::id();
+
+        // Dispatch PrestaShop sync jobs (same pattern as ProductForm::dispatchSyncJobsForAllShops)
         $shopIds = $resolvedTargets['prestashop_shop_ids'] ?? [];
+
+        // Build pendingMediaChanges: mark ALL product media as "sync" for each shop
+        // This is needed because SmartMediaSyncService filters out media without PS mapping
+        // unless explicitly marked in pendingMediaChanges
+        $pendingMediaChanges = $this->buildPendingMediaChanges($product, $shopIds);
+
         foreach ($shopIds as $shopId) {
             try {
                 $shop = PrestaShopShop::find($shopId);
@@ -160,12 +174,19 @@ class PublicationTargetService
                     continue;
                 }
 
-                SyncProductToPrestaShop::dispatch($product, $shop)
-                    ->onQueue('prestashop-sync');
+                // FIX 2026-02-10: Use default queue, pass userId + pendingMediaChanges
+                // Same pattern as ProductForm::dispatchSyncJobsForAllShops
+                SyncProductToPrestaShop::dispatch(
+                    $product,
+                    $shop,
+                    $userId,
+                    $pendingMediaChanges
+                );
 
                 Log::info('PublicationTargetService: PrestaShop sync dispatched', [
                     'product_id' => $product->id,
                     'shop_id' => $shopId,
+                    'user_id' => $userId,
                 ]);
             } catch (\Throwable $e) {
                 Log::error('PublicationTargetService: PrestaShop sync failed', [
@@ -176,7 +197,7 @@ class PublicationTargetService
             }
         }
 
-        // Dispatch ERP sync jobs for each connection
+        // Dispatch ERP sync jobs (same pattern as ProductForm::dispatchSyncJobsForAllErp)
         $erpConnectionIds = $resolvedTargets['erp_connection_ids'] ?? [];
         foreach ($erpConnectionIds as $connectionId) {
             $this->dispatchErpJobByConnection($product, $connectionId);
@@ -190,7 +211,26 @@ class PublicationTargetService
     }
 
     /**
-     * Dispatch ERP sync job for a specific ERPConnection
+     * Ensure ProductErpData record exists before ERP dispatch.
+     * The SyncProductToERP job needs this record for status tracking.
+     */
+    public function ensureProductErpData(Product $product, int $connectionId): ProductErpData
+    {
+        return ProductErpData::firstOrCreate(
+            [
+                'product_id' => $product->id,
+                'erp_connection_id' => $connectionId,
+            ],
+            [
+                'sync_status' => ProductErpData::STATUS_PENDING,
+                'sync_direction' => ProductErpData::DIRECTION_BIDIRECTIONAL,
+            ]
+        );
+    }
+
+    /**
+     * Dispatch ERP sync job for a specific ERPConnection.
+     * Uses dispatchSync() for immediate execution (same as ProductForm).
      *
      * @param Product $product
      * @param int $connectionId ERPConnection ID
@@ -206,10 +246,21 @@ class PublicationTargetService
                 return;
             }
 
-            \App\Jobs\ERP\SyncProductToERP::dispatch($product, $connection)
-                ->onQueue('erp-sync');
+            // Ensure ProductErpData record exists for tracking
+            $erpData = $this->ensureProductErpData($product, $connectionId);
+            $erpData->update(['sync_status' => ProductErpData::STATUS_PENDING]);
 
-            Log::info('PublicationTargetService: ERP sync dispatched', [
+            // FIX 2026-02-10: Use dispatchSync() like ProductForm does
+            // Hostido shared hosting has no queue daemon, CRON processes --once per minute
+            // dispatchSync = immediate execution = reliable for publication
+            SyncProductToERP::dispatchSync(
+                $product,
+                $connection,
+                null, // syncJob - will be created by job
+                ['sync_prices' => true, 'sync_stock' => true]
+            );
+
+            Log::info('PublicationTargetService: ERP sync dispatched (sync)', [
                 'product_id' => $product->id,
                 'connection_id' => $connectionId,
                 'erp_type' => $connection->erp_type,
@@ -221,6 +272,37 @@ class PublicationTargetService
                 'error' => $e->getMessage(),
             ]);
         }
+    }
+
+    /**
+     * Build pendingMediaChanges array for publication.
+     * Marks all active product media as "sync" for each target shop.
+     * Format: ['mediaId:shopId' => 'sync']
+     */
+    protected function buildPendingMediaChanges(Product $product, array $shopIds): array
+    {
+        $media = \App\Models\Media::where('mediable_type', Product::class)
+            ->where('mediable_id', $product->id)
+            ->where('is_active', true)
+            ->orderBy('is_primary', 'desc')
+            ->orderBy('sort_order', 'asc')
+            ->get();
+
+        $changes = [];
+        foreach ($media as $m) {
+            foreach ($shopIds as $shopId) {
+                $changes["{$m->id}:{$shopId}"] = 'sync';
+            }
+        }
+
+        Log::debug('PublicationTargetService: Built pendingMediaChanges', [
+            'product_id' => $product->id,
+            'media_count' => $media->count(),
+            'shops' => $shopIds,
+            'changes_count' => count($changes),
+        ]);
+
+        return $changes;
     }
 
     /**
