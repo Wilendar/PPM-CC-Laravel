@@ -2678,7 +2678,18 @@ class SubiektGTService implements ERPSyncServiceInterface
             $config['_sync_options'] = $syncOptions;
 
             $client = $this->createRestApiClient($config);
-            $syncDirection = $config['sync_direction'] ?? 'pull'; // pull, push, bidirectional
+            // FIX: ERPManager stores sync direction as ERPConnection.sync_mode column,
+            // NOT in connection_config. Read from model with fallback to config.
+            // Mapping: push_only->push, pull_only->pull, bidirectional->bidirectional
+            $syncModeRaw = $connection->sync_mode ?? $config['sync_direction'] ?? 'pull';
+            $syncDirection = match($syncModeRaw) {
+                'push_only' => 'push',
+                'pull_only' => 'pull',
+                'bidirectional' => 'bidirectional',
+                'push' => 'push',
+                'pull' => 'pull',
+                default => 'pull',
+            };
 
             // Try to find product in Subiekt GT by SKU
             try {
@@ -2792,8 +2803,10 @@ class SubiektGTService implements ERPSyncServiceInterface
 
             // === PRODUCT NOT FOUND IN SUBIEKT GT ===
             // Check if we should create it
+            // FIX: ERPManager saves 'create_missing_products', not 'create_in_erp'
+            // Support both keys for backward compatibility
             $shouldCreate = in_array($syncDirection, ['push', 'bidirectional'])
-                && ($config['create_in_erp'] ?? false);
+                && ($config['create_missing_products'] ?? $config['create_in_erp'] ?? false);
 
             if ($shouldCreate) {
                 $createResult = $this->createProductInSubiekt($client, $product, $config, $connection->id);
