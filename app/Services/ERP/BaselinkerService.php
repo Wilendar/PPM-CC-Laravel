@@ -257,6 +257,11 @@ class BaselinkerService implements ERPSyncServiceInterface
     protected function syncSingleProduct(ERPConnection $connection, Product $product, string $inventoryId): array
     {
         try {
+            // FIX: Eager-load relations needed by buildBaselinkerProductData()
+            if (!$product->relationLoaded('manufacturerRelation') || !$product->relationLoaded('productType')) {
+                $product->load(['manufacturerRelation', 'productType', 'supplierRelation', 'media', 'prices', 'stock']);
+            }
+
             // Get or create Baselinker product mapping
             $mapping = $product->integrationMappings()
                 ->where('integration_type', 'baselinker')
@@ -367,26 +372,28 @@ class BaselinkerService implements ERPSyncServiceInterface
         ]);
 
         try {
-            // ETAP_08.5 FIX: text_fields as PHP array - makeRequest() calls json_encode($parameters)
-            // so passing array here results in proper nested JSON: {"text_fields":{"name":"..."}}
-            // NOT double-encoded: {"text_fields":"{\"name\":\"...\"}"}
+            // text_fields as PHP array - makeRequest() calls json_encode($parameters)
             $textFields = [
                 'name' => $productData['name'],
                 'description' => $productData['description'],
                 'description_extra1' => $productData['description_extra1'],
+                // FIX #7: manufacturer moved to manufacturer_id param, description_extra2 now supplier_code
+                'description_extra2' => $productData['supplier_code'],
+                'description_extra3' => $productData['supplier_name'],
             ];
 
-            // ETAP_08.5 FIX: For CREATE, product_id MUST be empty!
-            // Baselinker API: product_id = empty → CREATE new product (BL assigns ID)
-            //                 product_id = existing ID → UPDATE existing product
-            // Passing SKU as product_id caused ERROR_PRODUCT_ID because BL
-            // tried to find product with that ID (which doesn't exist yet!)
+            // FIX: Add product type to extra_field if configured
+            if (!empty($productData['product_type'])) {
+                $extraFieldKey = $connection->connection_config['product_type_extra_field'] ?? 'extra_field_21824';
+                $textFields[$extraFieldKey] = $productData['product_type'];
+            }
+
             $requestParams = [
                 'inventory_id' => $inventoryId,
                 // NO product_id for CREATE - let Baselinker assign it!
                 'parent_id' => 0,
                 'is_bundle' => false,
-                'text_fields' => $textFields,  // PHP array - proper format!
+                'text_fields' => $textFields,
                 'sku' => $productData['sku'],
                 'ean' => $productData['ean'],
                 'tax_rate' => $productData['tax_rate'],
@@ -395,6 +402,11 @@ class BaselinkerService implements ERPSyncServiceInterface
                 'width' => $productData['width'],
                 'length' => $productData['length'],
             ];
+
+            // FIX #7: Add manufacturer_id as separate API param (BL integer ID, NOT text_fields!)
+            if (!empty($productData['manufacturer_bl_id'])) {
+                $requestParams['manufacturer_id'] = $productData['manufacturer_bl_id'];
+            }
 
             // ETAP_08.5: Add images if available (stdClass requires get_object_vars check)
             if (isset($productData['images']) && count(get_object_vars($productData['images'])) > 0) {
@@ -469,28 +481,39 @@ class BaselinkerService implements ERPSyncServiceInterface
         ]);
 
         try {
-            // ETAP_08.5 FIX: text_fields as PHP array - makeRequest() calls json_encode($parameters)
-            // so passing array here results in proper nested JSON: {"text_fields":{"name":"..."}}
-            // NOT double-encoded: {"text_fields":"{\"name\":\"...\"}"}
+            // text_fields as PHP array - makeRequest() calls json_encode($parameters)
             $textFields = [
                 'name' => $productData['name'],
                 'description' => $productData['description'],
                 'description_extra1' => $productData['description_extra1'],
+                // FIX #7: manufacturer moved to manufacturer_id param, description_extra2 now supplier_code
+                'description_extra2' => $productData['supplier_code'],
+                'description_extra3' => $productData['supplier_name'],
             ];
 
-            // ETAP_08.5: Build request params - same pattern as createBaselinkerProduct
+            // FIX: Add product type to extra_field if configured
+            if (!empty($productData['product_type'])) {
+                $extraFieldKey = $connection->connection_config['product_type_extra_field'] ?? 'extra_field_21824';
+                $textFields[$extraFieldKey] = $productData['product_type'];
+            }
+
             $requestParams = [
                 'inventory_id' => $inventoryId,
                 'product_id' => $baselinkerProductId,  // For UPDATE - use existing BL product ID
                 'sku' => $productData['sku'],
                 'ean' => $productData['ean'],
-                'text_fields' => $textFields,  // PHP array - proper format!
+                'text_fields' => $textFields,
                 'tax_rate' => $productData['tax_rate'],
                 'weight' => $productData['weight'],
                 'height' => $productData['height'],
                 'width' => $productData['width'],
                 'length' => $productData['length'],
             ];
+
+            // FIX #7: Add manufacturer_id as separate API param (BL integer ID)
+            if (!empty($productData['manufacturer_bl_id'])) {
+                $requestParams['manufacturer_id'] = $productData['manufacturer_bl_id'];
+            }
 
             // ETAP_08.5: Add images if available (stdClass requires get_object_vars check)
             if (isset($productData['images']) && count(get_object_vars($productData['images'])) > 0) {
@@ -590,28 +613,37 @@ class BaselinkerService implements ERPSyncServiceInterface
             $warehouseMapping = $connection->connection_config['warehouse_mappings'] ?? [];
             $stockData = [];
 
+            // FIX: Baselinker API expects object-of-objects format:
+            // { product_id: { "bl_warehouse_id": stock_qty } }
+            $stockByWarehouse = [];
+
             foreach ($product->stock as $stock) {
                 $baselinkerWarehouseId = $warehouseMapping[$stock->warehouse_id] ?? null;
-                
+
                 if ($baselinkerWarehouseId) {
-                    $stockData[] = [
-                        'product_id' => $baselinkerProductId,
-                        'variant_id' => 0,
-                        'warehouse_id' => $baselinkerWarehouseId,
-                        'stock' => $stock->quantity
-                    ];
+                    $warehouseKey = 'bl_' . $baselinkerWarehouseId;
+                    $stockByWarehouse[$warehouseKey] = (int) $stock->quantity;
                 }
             }
 
-            if (!empty($stockData)) {
+            if (!empty($stockByWarehouse)) {
+                $productsStock = new \stdClass();
+                $productsStock->{$baselinkerProductId} = (object) $stockByWarehouse;
+
                 $this->makeRequest(
                     $connection->connection_config,
                     'updateInventoryProductsStock',
                     [
                         'inventory_id' => $inventoryId,
-                        'products' => $stockData
+                        'products' => $productsStock
                     ]
                 );
+
+                Log::info('Baselinker syncProductStock: Sent stock data', [
+                    'product_sku' => $product->sku,
+                    'baselinker_product_id' => $baselinkerProductId,
+                    'warehouses_count' => count($stockByWarehouse),
+                ]);
             }
 
         } catch (\Exception $e) {
@@ -635,30 +667,39 @@ class BaselinkerService implements ERPSyncServiceInterface
     protected function syncProductPrices(ERPConnection $connection, Product $product, string $inventoryId, string $baselinkerProductId): void
     {
         try {
-            $priceMapping = $this->getPriceGroupMapping(); // PPM -> Baselinker mapping
+            $priceMapping = $this->getPriceGroupMapping($connection); // PPM -> Baselinker mapping
             $priceData = [];
+
+            // FIX: Baselinker API expects object-of-objects format:
+            // { product_id: { price_group_id: price_value } }
+            $pricesByGroup = [];
 
             foreach ($product->prices as $price) {
                 $baselinkerPriceType = $priceMapping[$price->price_group_id] ?? null;
-                
+
                 if ($baselinkerPriceType) {
-                    $priceData[] = [
-                        'product_id' => $baselinkerProductId,
-                        'price_type' => $baselinkerPriceType,
-                        'price' => $price->price_gross
-                    ];
+                    $pricesByGroup[$baselinkerPriceType] = (float) $price->price_gross;
                 }
             }
 
-            if (!empty($priceData)) {
+            if (!empty($pricesByGroup)) {
+                $productsPrices = new \stdClass();
+                $productsPrices->{$baselinkerProductId} = (object) $pricesByGroup;
+
                 $this->makeRequest(
                     $connection->connection_config,
                     'updateInventoryProductsPrices',
                     [
                         'inventory_id' => $inventoryId,
-                        'products' => $priceData
+                        'products' => $productsPrices
                     ]
                 );
+
+                Log::info('Baselinker syncProductPrices: Sent price data', [
+                    'product_sku' => $product->sku,
+                    'baselinker_product_id' => $baselinkerProductId,
+                    'price_groups_count' => count($pricesByGroup),
+                ]);
             }
 
         } catch (\Exception $e) {
@@ -1171,7 +1212,7 @@ class BaselinkerService implements ERPSyncServiceInterface
         string $baselinkerVariantId
     ): void {
         try {
-            $priceMapping = $this->getPriceGroupMapping();
+            $priceMapping = $this->getPriceGroupMapping($connection);
             $priceData = [];
 
             foreach ($variant->prices as $price) {
@@ -1450,10 +1491,52 @@ class BaselinkerService implements ERPSyncServiceInterface
             'images_type' => gettype($imagesObject),
         ]);
 
+        // Resolve manufacturer name (BusinessPartner relation or direct field)
+        $manufacturerName = '';
+        if ($product->manufacturer_id && $product->relationLoaded('manufacturerRelation')) {
+            $manufacturerName = $product->manufacturerRelation?->name ?? '';
+        } elseif ($product->manufacturer_id) {
+            $manufacturerName = $product->manufacturerRelation?->name ?? '';
+        }
+        if (empty($manufacturerName)) {
+            $manufacturerName = $product->manufacturer ?? '';
+        }
+
+        // Resolve product type name and map to BL allowed values
+        // BL extra_field_21824 accepts ONLY: Pojazd, Część Zamienna, Odzież, Inne
+        $productTypeName = '';
+        if ($product->product_type_id) {
+            $ppmTypeName = $product->productType?->name ?? '';
+            // Map PPM ProductType to BL allowed values (case-sensitive match)
+            $blTypeMapping = $connection->connection_config['product_type_mapping'] ?? [
+                'Pojazd' => 'Pojazd',
+                'Część zamienna' => 'Część Zamienna',
+                'Odzież' => 'Odzież',
+                'Inne' => 'Inne',
+                // Unmapped PPM types -> 'Inne' as fallback
+                'Akcesoria' => 'Inne',
+                'Oleje i chemia' => 'Inne',
+                'Outlet' => 'Inne',
+            ];
+            $productTypeName = $blTypeMapping[$ppmTypeName] ?? '';
+        }
+
+        // Resolve supplier name
+        $supplierName = '';
+        if ($product->supplier_id) {
+            $supplierName = $product->supplierRelation?->name ?? '';
+        }
+
+        // FIX #7: Resolve BL manufacturer_id (integer) for API param
+        $manufacturerBlId = $this->resolveBaselinkerManufacturerId(
+            $connection->connection_config,
+            $manufacturerName
+        );
+
         // Use ERP data if exists, fallback to Product
         return [
             'name' => $erpData?->name ?? $product->name,
-            'description' => $erpData?->long_description ?? $product->description ?: '',
+            'description' => $erpData?->long_description ?? $product->long_description ?: '',
             'description_extra1' => $erpData?->short_description ?? $product->short_description ?: '',
             'sku' => $erpData?->sku ?? $product->sku,
             'ean' => $erpData?->ean ?? $product->ean ?: '',
@@ -1462,7 +1545,13 @@ class BaselinkerService implements ERPSyncServiceInterface
             'height' => $erpData?->height ?? $product->height ?: 0,
             'width' => $erpData?->width ?? $product->width ?: 0,
             'length' => $erpData?->length ?? $product->length ?: 0,
-            'images' => $imagesObject,  // ETAP_08.5: stdClass for proper JSON object encoding
+            'images' => $imagesObject,
+            // FIX #7: manufacturer_id as BL integer ID (for manufacturer_id API param)
+            'manufacturer_bl_id' => $manufacturerBlId,
+            'manufacturer' => $manufacturerName,
+            'supplier_code' => $product->supplier_code ?: '',
+            'supplier_name' => $supplierName,
+            'product_type' => $productTypeName,
         ];
     }
 
@@ -1483,20 +1572,128 @@ class BaselinkerService implements ERPSyncServiceInterface
     }
 
     /**
-     * Get price group mapping PPM -> Baselinker.
+     * Get price group mapping PPM -> Baselinker (using BL price group IDs).
+     *
+     * FIX: Was using hardcoded string names ('retail', 'wholesale_std') that don't match
+     * any BL price group IDs. Now uses actual BL price group integer IDs.
+     * Supports override from connection_config['price_group_mappings'].
      */
-    protected function getPriceGroupMapping(): array
+    protected function getPriceGroupMapping(ERPConnection $connection): array
     {
+        // Use config if provided (allows per-connection customization)
+        $configMapping = $connection->connection_config['price_group_mappings'] ?? null;
+        if ($configMapping && is_array($configMapping)) {
+            // Ensure keys/values are integers
+            return array_combine(
+                array_map('intval', array_keys($configMapping)),
+                array_map('intval', array_values($configMapping))
+            );
+        }
+
+        // Default: PPM price_group_id -> BL price_group_id
         return [
-            1 => 'retail',        // Detaliczna
-            2 => 'wholesale_std', // Dealer Standard
-            3 => 'wholesale_prem',// Dealer Premium
-            4 => 'workshop',      // Warsztat
-            5 => 'workshop_prem', // Warsztat Premium
-            6 => 'school',        // Szkółka
-            7 => 'commission',    // Komis
-            8 => 'employee',      // Pracownik
+            81 => 11457,  // Detaliczna -> MPP / Detaliczna
+            83 => 53776,  // Szkółka-Komis-Drop -> MPP / Szkółka-Komis-Drop
+            85 => 18357,  // Warsztat -> MPP / Warsztat
+            86 => 14515,  // Standard -> MPP / Standard
+            87 => 14517,  // Premium -> MPP / Premium
         ];
+    }
+
+    /**
+     * Resolve PPM manufacturer name to Baselinker manufacturer_id.
+     *
+     * Calls getInventoryManufacturers and matches by name (case-insensitive).
+     * Result is cached for 1 hour to avoid excessive API calls.
+     */
+    protected function resolveBaselinkerManufacturerId(array $config, string $manufacturerName): ?int
+    {
+        if (empty($manufacturerName)) {
+            return null;
+        }
+
+        // Cache key per API token
+        $cacheKey = 'bl_manufacturers_' . md5($config['api_token'] ?? '');
+        $manufacturers = cache()->remember($cacheKey, 3600, function () use ($config) {
+            $response = $this->makeRequest($config, 'getInventoryManufacturers', []);
+            if (($response['status'] ?? '') === 'SUCCESS') {
+                return $response['manufacturers'] ?? [];
+            }
+            return [];
+        });
+
+        // Match by name (case-insensitive)
+        // BL API returns: [{"manufacturer_id": 198190, "name": "KAYO"}, ...]
+        // Array keys are sequential indexes, NOT actual BL manufacturer IDs!
+        $searchName = mb_strtolower(trim($manufacturerName));
+        foreach ($manufacturers as $index => $entry) {
+            $blName = is_array($entry) ? ($entry['name'] ?? '') : (string) $entry;
+            if (mb_strtolower(trim($blName)) === $searchName) {
+                // Return actual BL manufacturer_id (NOT array index!)
+                return is_array($entry) ? (int) ($entry['manufacturer_id'] ?? $index) : (int) $index;
+            }
+        }
+
+        Log::warning('Baselinker: Manufacturer not found in BL', [
+            'ppm_name' => $manufacturerName,
+            'bl_manufacturers_count' => count($manufacturers),
+        ]);
+
+        return null;
+    }
+
+    /**
+     * Delete product from Baselinker.
+     *
+     * Used by ProductUnpublishService to remove product from BL when unpublishing.
+     */
+    public function deleteProductFromBaselinker(ERPConnection $connection, Product $product): array
+    {
+        $inventoryId = $connection->connection_config['inventory_id'] ?? null;
+        if (!$inventoryId) {
+            return ['success' => false, 'message' => 'No inventory_id configured'];
+        }
+
+        $mapping = $product->integrationMappings()
+            ->where('integration_type', 'baselinker')
+            ->where('integration_identifier', $connection->instance_name)
+            ->first();
+
+        if (!$mapping) {
+            return ['success' => true, 'message' => 'No BL mapping found - nothing to delete'];
+        }
+
+        try {
+            $response = $this->makeRequest(
+                $connection->connection_config,
+                'deleteInventoryProduct',
+                [
+                    'inventory_id' => $inventoryId,
+                    'product_id' => $mapping->external_id,
+                ]
+            );
+
+            if (($response['status'] ?? '') === 'SUCCESS') {
+                $mapping->delete();
+                Log::info('Baselinker: Product deleted from BL', [
+                    'product_id' => $product->id,
+                    'sku' => $product->sku,
+                    'bl_product_id' => $mapping->external_id,
+                ]);
+                return ['success' => true, 'message' => 'Deleted from Baselinker'];
+            }
+
+            return [
+                'success' => false,
+                'message' => 'BL API error: ' . ($response['error_message'] ?? 'Unknown'),
+            ];
+        } catch (\Exception $e) {
+            Log::error('Baselinker: Delete failed', [
+                'product_id' => $product->id,
+                'error' => $e->getMessage(),
+            ]);
+            return ['success' => false, 'message' => $e->getMessage()];
+        }
     }
 
     /*

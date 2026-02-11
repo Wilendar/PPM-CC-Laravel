@@ -252,13 +252,9 @@ class SyncShopVariantsToPrestaShopJob implements ShouldQueue
             }
 
             // Set images if provided
-            $images = $variantData['images'] ?? [];
-            if (!empty($images)) {
-                $imageIds = array_column($images, 'prestashop_image_id');
-                $imageIds = array_filter($imageIds);
-                if (!empty($imageIds)) {
-                    $client->setCombinationImages($combinationId, $imageIds);
-                }
+            $imageIds = $this->resolveVariantImageIds($variantData, $shopVariant);
+            if (!empty($imageIds)) {
+                $client->setCombinationImages($combinationId, $imageIds);
             }
 
             // FIX 2026-01-29: Sync price and stock from PPM to PrestaShop after creating combination
@@ -375,25 +371,36 @@ class SyncShopVariantsToPrestaShopJob implements ShouldQueue
         }
 
         // Update images if provided
-        $images = $variantData['images'] ?? [];
-        if (!empty($images)) {
-            $imageIds = array_column($images, 'prestashop_image_id');
-            $imageIds = array_filter($imageIds);
-            if (!empty($imageIds)) {
-                try {
-                    $client->setCombinationImages($combinationId, $imageIds);
-                } catch (\Exception $e) {
-                    if ($this->isCombinationNotFoundError($e)) {
-                        Log::warning('[SyncShopVariantsJob] setCombinationImages 404 - falling back to ADD', [
-                            'shop_variant_id' => $shopVariant->id,
-                        ]);
-                        $shopVariant->prestashop_combination_id = null;
-                        $shopVariant->save();
-                        $this->handleAddOperation($client, $shopVariant, $prestashopProductId);
-                        return;
-                    }
-                    throw $e;
+        $imageIds = $this->resolveVariantImageIds($variantData, $shopVariant);
+        if (!empty($imageIds)) {
+            try {
+                $result = $client->setCombinationImages($combinationId, $imageIds);
+
+                // FIX 2026-02-11: Log warning if setCombinationImages returns false (internal error)
+                if (!$result) {
+                    Log::warning('[SyncShopVariantsJob] setCombinationImages returned false', [
+                        'shop_variant_id' => $shopVariant->id,
+                        'combination_id' => $combinationId,
+                        'image_ids' => $imageIds,
+                    ]);
+                } else {
+                    Log::info('[SyncShopVariantsJob] setCombinationImages success', [
+                        'shop_variant_id' => $shopVariant->id,
+                        'combination_id' => $combinationId,
+                        'image_ids' => $imageIds,
+                    ]);
                 }
+            } catch (\Exception $e) {
+                if ($this->isCombinationNotFoundError($e)) {
+                    Log::warning('[SyncShopVariantsJob] setCombinationImages 404 - falling back to ADD', [
+                        'shop_variant_id' => $shopVariant->id,
+                    ]);
+                    $shopVariant->prestashop_combination_id = null;
+                    $shopVariant->save();
+                    $this->handleAddOperation($client, $shopVariant, $prestashopProductId);
+                    return;
+                }
+                throw $e;
             }
         }
 
@@ -435,6 +442,76 @@ class SyncShopVariantsToPrestaShopJob implements ShouldQueue
         }
 
         return false;
+    }
+
+    /**
+     * Resolve variant image IDs from variant_data
+     *
+     * FIX 2026-02-11: Supports both formats:
+     * - New: variant_data['images'] = [['prestashop_image_id' => int], ...]
+     * - Legacy: variant_data['media_ids'] = [int, ...] (PPM Media IDs)
+     *
+     * For legacy format, looks up Media.prestashop_mapping[store_{shopId}]
+     *
+     * @param array $variantData The variant_data from ShopVariant
+     * @param ShopVariant $shopVariant The ShopVariant model (for shop_id)
+     * @return array PrestaShop image IDs ready for setCombinationImages()
+     */
+    protected function resolveVariantImageIds(array $variantData, ShopVariant $shopVariant): array
+    {
+        // Try new format first: images with prestashop_image_id
+        $images = $variantData['images'] ?? [];
+        if (!empty($images)) {
+            $imageIds = array_column($images, 'prestashop_image_id');
+            $imageIds = array_filter($imageIds);
+            if (!empty($imageIds)) {
+                Log::debug('[SyncShopVariantsJob] Resolved images from new format', [
+                    'shop_variant_id' => $shopVariant->id,
+                    'image_ids' => $imageIds,
+                ]);
+                return array_values(array_map('intval', $imageIds));
+            }
+        }
+
+        // Fallback: resolve media_ids (PPM Media IDs) to PS image IDs
+        $mediaIds = $variantData['media_ids'] ?? [];
+        if (!empty($mediaIds)) {
+            $storeKey = "store_{$shopVariant->shop_id}";
+            $resolvedIds = [];
+
+            $mediaRecords = \App\Models\Media::whereIn('id', $mediaIds)->get();
+            foreach ($mediaRecords as $media) {
+                $mapping = $media->prestashop_mapping ?? [];
+                $shopMapping = $mapping[$storeKey]
+                    ?? $mapping[$shopVariant->shop_id]
+                    ?? $mapping["shop_{$shopVariant->shop_id}"]
+                    ?? null;
+
+                if ($shopMapping) {
+                    $psImageId = (int) ($shopMapping['ps_image_id'] ?? $shopMapping['image_id'] ?? 0);
+                    if ($psImageId > 0) {
+                        $resolvedIds[] = $psImageId;
+                    }
+                }
+            }
+
+            if (!empty($resolvedIds)) {
+                Log::info('[SyncShopVariantsJob] Resolved images from media_ids fallback', [
+                    'shop_variant_id' => $shopVariant->id,
+                    'media_ids' => $mediaIds,
+                    'resolved_ps_image_ids' => $resolvedIds,
+                ]);
+                return $resolvedIds;
+            }
+
+            Log::warning('[SyncShopVariantsJob] media_ids present but no PS images resolved', [
+                'shop_variant_id' => $shopVariant->id,
+                'media_ids' => $mediaIds,
+                'shop_id' => $shopVariant->shop_id,
+            ]);
+        }
+
+        return [];
     }
 
     /**
@@ -655,16 +732,35 @@ class SyncShopVariantsToPrestaShopJob implements ShouldQueue
 
         // Case 2: PPM format [attribute_type_id => value_id]
         foreach ($attributes as $key => $value) {
-            // Skip if value is an array (not PPM format)
+            // Handle array format [['attribute_type_id' => X, 'value_id' => Y]]
             if (is_array($value)) {
-                // Maybe it's [['id' => X, 'value_id' => Y]] format from pull
                 if (isset($value['prestashop_attribute_id'])) {
                     $prestashopAttributeIds[] = (int) $value['prestashop_attribute_id'];
                 } elseif (isset($value['value_id'])) {
-                    // Lookup from value_id
                     $psId = $this->lookupPrestaShopAttributeId((int) $value['value_id'], $shopId);
                     if ($psId) {
                         $prestashopAttributeIds[] = $psId;
+                    } elseif ($client !== null) {
+                        // FIX BUG#12-v3: Auto-create missing attribute for array format
+                        Log::info('[SyncShopVariantsJob] Auto-create for array-format attribute', [
+                            'attribute_type_id' => $value['attribute_type_id'] ?? null,
+                            'attribute_value_id' => (int) $value['value_id'],
+                            'shop_id' => $shopId,
+                        ]);
+                        $psId = $this->ensureAttributeValueMapped($client, (int) $value['value_id'], $shopId);
+                        if ($psId) {
+                            $prestashopAttributeIds[] = $psId;
+                        } else {
+                            Log::error('[SyncShopVariantsJob] Failed auto-create attribute (array format)', [
+                                'attribute_value_id' => (int) $value['value_id'],
+                                'shop_id' => $shopId,
+                            ]);
+                        }
+                    } else {
+                        Log::warning('[SyncShopVariantsJob] No PS mapping for attribute (no client)', [
+                            'attribute_value_id' => (int) $value['value_id'],
+                            'shop_id' => $shopId,
+                        ]);
                     }
                 }
                 continue;

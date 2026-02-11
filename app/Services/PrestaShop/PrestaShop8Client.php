@@ -2829,10 +2829,11 @@ class PrestaShop8Client extends BasePrestaShopClient
                 return false;
             }
 
+            // FIX 2026-02-11: Remove extra 'image' nesting - buildXmlFromArray auto-singularizes
+            // 'images' → 'image' children. Manual 'image' key caused double <image><image> nesting
+            // which made PrestaShop unable to find 'id' key (Combination.php line 434 error)
             $associations = [
-                'images' => [
-                    'image' => array_map(fn($id) => ['id' => $id], $imageIds),
-                ],
+                'images' => array_map(fn($id) => ['id' => $id], $imageIds),
             ];
 
             // FIX 2025-12-08: PrestaShop API wymaga id_product i minimal_quantity w PUT request!
@@ -2845,6 +2846,12 @@ class PrestaShop8Client extends BasePrestaShopClient
 
             $xmlBody = $this->arrayToXml(['combination' => $combinationData]);
 
+            \Log::info('[PrestaShop8Client] setCombinationImages', [
+                'combination_id' => $combinationId,
+                'image_ids' => $imageIds,
+                'xml_body' => $xmlBody,
+            ]);
+
             $this->makeRequest('PUT', "/combinations/{$combinationId}", [], [
                 'body' => $xmlBody,
                 'headers' => ['Content-Type' => 'application/xml'],
@@ -2854,6 +2861,7 @@ class PrestaShop8Client extends BasePrestaShopClient
         } catch (\Exception $e) {
             \Log::error('[PrestaShop8Client] setCombinationImages failed', [
                 'combination_id' => $combinationId,
+                'image_ids' => $imageIds,
                 'error' => $e->getMessage(),
             ]);
             return false;

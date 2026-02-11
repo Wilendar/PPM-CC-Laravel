@@ -3,6 +3,7 @@
 namespace App\Http\Livewire\Products\Management\Traits;
 
 use App\DTOs\ShopVariantOverride;
+use App\Models\Media;
 use App\Models\ProductVariant;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
@@ -56,6 +57,13 @@ trait VariantShopContextTrait
      */
     public bool $showInheritedVariants = true;
 
+    /**
+     * PrestaShop product images for variant image picker (shop context)
+     * Format: [['prestashop_image_id' => int, 'url' => string, 'thumbnail_url' => string], ...]
+     * @var array
+     */
+    public array $psProductImages = [];
+
     /*
     |--------------------------------------------------------------------------
     | CONTEXT SWITCHING
@@ -78,6 +86,10 @@ trait VariantShopContextTrait
             ->get();
 
         $this->defaultVariantsSnapshot = $variants->mapWithKeys(function ($variant) {
+            // FIX 2026-02-11: Include image count for comparison with PS variants
+            $imageCount = $variant->images()->count();
+            $imageIds = $variant->images()->orderBy('position')->pluck('id')->toArray();
+
             return [$variant->id => [
                 'id' => $variant->id,
                 'sku' => $variant->sku,
@@ -85,6 +97,8 @@ trait VariantShopContextTrait
                 'is_active' => $variant->is_active,
                 'is_default' => $variant->is_default,
                 'position' => $variant->position,
+                'image_count' => $imageCount,
+                'image_ids' => $imageIds,
                 'attributes' => $variant->attributes->mapWithKeys(
                     fn($attr) => [$attr->attribute_type_id => $attr->attribute_value_id]
                 )->toArray(),
@@ -252,25 +266,51 @@ trait VariantShopContextTrait
     /**
      * Compare PrestaShop variant data vs PPM variant data
      *
-     * FIX 2025-12-09 v2: If SKU matches, consider variants as "same" (synced).
-     * Minor differences (is_default, position) are expected and don't affect sync status.
-     * The key question: is this PS variant linked to a PPM variant? If SKU matches = YES = "same"
+     * FIX 2026-02-11: Full comparison including images, name, active status, attributes.
+     * SKU match is required first, then we compare actual data fields.
      *
      * @param object $psVariant PrestaShop variant data
      * @param array $ppmVariant PPM variant data from defaultVariantsSnapshot
-     * @return bool True if variants are linked (same base SKU)
+     * @return bool True if variants match (same data)
      */
     protected function compareVariantData(object $psVariant, array $ppmVariant): bool
     {
-        // Compare SKU: strip -Sx suffix from PS SKU to match PPM SKU
-        // Example: PS has "MR-MRF-E-V001-S1", PPM has "MR-MRF-E-V001"
+        // Step 1: SKU must match (exact or base without shop suffix)
         $psSku = $psVariant->sku ?? '';
         $psSkuBase = preg_replace('/-S\d+$/', '', $psSku);
         $ppmSku = $ppmVariant['sku'] ?? '';
 
-        // If SKU matches (exact or base), variants are linked = "same"
-        // Minor differences in is_default, position, etc. are expected and don't affect this
-        return ($psSku === $ppmSku || $psSkuBase === $ppmSku);
+        if ($psSku !== $ppmSku && $psSkuBase !== $ppmSku) {
+            return false;
+        }
+
+        // Step 2: Compare image count (PS images vs PPM images)
+        $psImages = $psVariant->images ?? [];
+        $psImageCount = is_array($psImages) ? count($psImages)
+            : ($psImages instanceof \Illuminate\Support\Collection ? $psImages->count() : 0);
+        $ppmImageCount = $ppmVariant['image_count'] ?? 0;
+
+        if ($psImageCount !== $ppmImageCount) {
+            return false;
+        }
+
+        // Step 3: Compare active status
+        $psActive = (bool) ($psVariant->is_active ?? true);
+        $ppmActive = (bool) ($ppmVariant['is_active'] ?? true);
+
+        if ($psActive !== $ppmActive) {
+            return false;
+        }
+
+        // Step 4: Compare name
+        $psName = trim($psVariant->name ?? '');
+        $ppmName = trim($ppmVariant['name'] ?? '');
+
+        if (!empty($psName) && !empty($ppmName) && $psName !== $ppmName) {
+            return false;
+        }
+
+        return true;
     }
 
     /**
@@ -486,6 +526,27 @@ trait VariantShopContextTrait
     }
 
     /**
+     * Undo pending update of PrestaShop variant
+     * FIX 2026-02-11: Removes pending changes, restoring original PS data
+     *
+     * @param string $psVariantId PS variant ID (format: 'ps_123')
+     */
+    public function undoPsVariantUpdate(string $psVariantId): void
+    {
+        if (isset($this->pendingPsVariantUpdates[$psVariantId])) {
+            unset($this->pendingPsVariantUpdates[$psVariantId]);
+
+            Log::info('[PS VARIANT] Undo pending update', [
+                'ps_variant_id' => $psVariantId,
+                'shop_id' => $this->activeShopId,
+                'remaining_pending' => count($this->pendingPsVariantUpdates),
+            ]);
+
+            session()->flash('message', 'Cofnieto oczekujace zmiany wariantu.');
+        }
+    }
+
+    /**
      * Load PrestaShop variant for editing
      * Creates a shop override from PS variant data
      *
@@ -516,6 +577,7 @@ trait VariantShopContextTrait
                 'is_default' => $pendingData['is_default'] ?? false,
                 'position' => $pendingData['position'] ?? 0,
                 'media_ids' => $pendingData['media_ids'] ?? [],
+                'ps_image_ids' => $pendingData['ps_image_ids'] ?? [],
             ];
 
             $this->editingVariantId = null;
@@ -528,6 +590,7 @@ trait VariantShopContextTrait
                 'sku' => $this->variantData['sku'],
                 'attributes_loaded' => count($this->variantAttributes),
                 'media_ids_loaded' => count($this->variantData['media_ids']),
+                'ps_image_ids_loaded' => count($this->variantData['ps_image_ids']),
             ]);
 
             // FIX 2025-12-09 BUG #6: Use correct variable name (showEditModal not showVariantModal)
@@ -564,42 +627,33 @@ trait VariantShopContextTrait
             return;
         }
 
-        // FIX 2025-12-09 BUG #4: Load PS variant images for modal display
+        // FIX 2026-02-11: Load PS variant images directly by prestashop_image_id
         // PS variant images are in $psVariant->images array with format:
         // [{prestashop_image_id: int, url: string, thumbnail_url: string}]
+        $psImageIds = [];
         $mediaIds = [];
 
-        // Load PS variant images - mapping done below
-
         if (isset($psVariant->images) && is_array($psVariant->images)) {
-            // Get PS image IDs from variant
-            $psImageIds = array_column($psVariant->images, 'prestashop_image_id');
+            // Direct PS image IDs (for PS product image picker)
+            $psImageIds = array_filter(array_column($psVariant->images, 'prestashop_image_id'));
 
+            // Also try to map to PPM Media IDs (legacy compatibility)
             if (!empty($psImageIds)) {
-                // Try to find matching local media by prestashop_mapping
-                // FIX 2025-12-09: Actual format in DB is:
-                // prestashop_mapping['store_1'] = {ps_image_id: xxx, synced_at: xxx}
-                // Key format: "store_{shopId}"
                 $shopId = $this->activeShopId;
                 $storeKey = "store_{$shopId}";
                 $productMedia = $this->product->media ?? collect();
 
                 foreach ($productMedia as $media) {
                     $mapping = $media->prestashop_mapping ?? [];
-                    // Try multiple key formats for compatibility
                     $shopMapping = $mapping[$storeKey] ?? $mapping[$shopId] ?? $mapping["shop_{$shopId}"] ?? null;
 
                     if ($shopMapping) {
-                        // Check for ps_image_id (actual format) or image_id (legacy)
                         $psImageId = (int) ($shopMapping['ps_image_id'] ?? $shopMapping['image_id'] ?? 0);
                         if ($psImageId && in_array($psImageId, $psImageIds)) {
                             $mediaIds[] = $media->id;
-                            // Image successfully mapped
                         }
                     }
                 }
-
-                // Images mapped from PrestaShop to local media IDs
             }
         }
 
@@ -610,7 +664,8 @@ trait VariantShopContextTrait
             'is_active' => $psVariant->is_active ?? true,
             'is_default' => $psVariant->is_default ?? false,
             'position' => $psVariant->position ?? 0,
-            'media_ids' => $mediaIds, // FIX: Load actual images
+            'media_ids' => $mediaIds,
+            'ps_image_ids' => array_values(array_map('intval', $psImageIds)),
         ];
 
         // Store PS variant ID for reference when saving
@@ -693,7 +748,7 @@ trait VariantShopContextTrait
             $this->pendingPsVariantUpdates = [];
         }
 
-        // FIX 2025-12-09 BUG#5a: Include media_ids for pending thumbnail display
+        // FIX 2026-02-11: Include both media_ids and ps_image_ids
         $this->pendingPsVariantUpdates[$psVariantId] = [
             'sku' => $this->variantData['sku'],
             'name' => $this->variantData['name'],
@@ -701,7 +756,8 @@ trait VariantShopContextTrait
             'is_default' => $this->variantData['is_default'],
             'position' => $this->variantData['position'],
             'attributes' => $this->variantAttributes ?? [],
-            'media_ids' => $this->variantData['media_ids'] ?? [], // FIX: Include for pending image preview
+            'media_ids' => $this->variantData['media_ids'] ?? [],
+            'ps_image_ids' => $this->variantData['ps_image_ids'] ?? [],
         ];
 
         $this->hasUnsavedChanges = true;
@@ -718,6 +774,23 @@ trait VariantShopContextTrait
         $this->resetVariantData();
 
         session()->flash('message', 'Zmiany wariantu zapisane (zapisz formularz aby wyslac do PrestaShop).');
+    }
+
+    /**
+     * Toggle PrestaShop image selection for variant (shop context)
+     * FIX 2026-02-11: Direct PS image ID toggle, bypasses PPM Media mapping
+     *
+     * Called from blade via wire:click="togglePsVariantImage(psImageId)"
+     */
+    public function togglePsVariantImage(int $psImageId): void
+    {
+        $psImageIds = $this->variantData['ps_image_ids'] ?? [];
+
+        if (in_array($psImageId, $psImageIds)) {
+            $this->variantData['ps_image_ids'] = array_values(array_diff($psImageIds, [$psImageId]));
+        } else {
+            $this->variantData['ps_image_ids'][] = $psImageId;
+        }
     }
 
     /**
@@ -851,6 +924,161 @@ trait VariantShopContextTrait
             ]);
             return false;
         }
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | PS VARIANT UPDATES COMMIT - FIX 2026-02-11
+    |--------------------------------------------------------------------------
+    */
+
+    /**
+     * Commit pending PrestaShop variant updates to ShopVariant records
+     *
+     * FIX 2026-02-11: pendingPsVariantUpdates were collected by savePsVariantEdit()
+     * but NEVER committed to database. This method creates ShopVariant records
+     * with operation_type=OVERRIDE so SyncShopVariantsToPrestaShopJob can process them.
+     */
+    public function commitPsVariantUpdates(): array
+    {
+        $stats = ['updated' => 0, 'errors' => []];
+
+        if (empty($this->pendingPsVariantUpdates) || !$this->product || !$this->activeShopId) {
+            return $stats;
+        }
+
+        Log::info('[PS VARIANT COMMIT] Starting commit of pending PS variant updates', [
+            'product_id' => $this->product->id,
+            'shop_id' => $this->activeShopId,
+            'pending_count' => count($this->pendingPsVariantUpdates),
+        ]);
+
+        foreach ($this->pendingPsVariantUpdates as $psVariantId => $data) {
+            try {
+                // Extract numeric PS combination ID from ps_variant_id (format: "ps_123" or just "123")
+                $psCombinationId = is_numeric($psVariantId)
+                    ? (int) $psVariantId
+                    : (int) str_replace('ps_', '', (string) $psVariantId);
+
+                if ($psCombinationId <= 0) {
+                    $stats['errors'][] = "Invalid PS variant ID: {$psVariantId}";
+                    continue;
+                }
+
+                // Find existing ShopVariant by prestashop_combination_id
+                $existingShopVariant = \App\Models\ShopVariant::where('shop_id', $this->activeShopId)
+                    ->where('product_id', $this->product->id)
+                    ->where('prestashop_combination_id', $psCombinationId)
+                    ->first();
+
+                // FIX 2026-02-11: Use ps_image_ids directly if available (shop context)
+                // Fallback to media_ids resolution (PPM context)
+                $psImageIds = $data['ps_image_ids'] ?? [];
+                $mediaIds = $data['media_ids'] ?? [];
+
+                if (!empty($psImageIds)) {
+                    $images = array_map(fn($id) => ['prestashop_image_id' => (int) $id], $psImageIds);
+                } else {
+                    $images = $this->resolveMediaIdsToPrestaShopImages($mediaIds, $this->activeShopId);
+                }
+
+                // Build variant_data with images instead of media_ids
+                $variantData = [
+                    'sku' => $data['sku'] ?? null,
+                    'name' => $data['name'] ?? null,
+                    'is_active' => $data['is_active'] ?? true,
+                    'is_default' => $data['is_default'] ?? false,
+                    'position' => $data['position'] ?? 0,
+                    'attributes' => $data['attributes'] ?? [],
+                    'images' => $images,
+                    'media_ids' => $mediaIds, // Keep for reference
+                ];
+
+                if ($existingShopVariant) {
+                    $existingShopVariant->update([
+                        'operation_type' => 'OVERRIDE',
+                        'variant_data' => $variantData,
+                        'sync_status' => 'pending',
+                    ]);
+                } else {
+                    \App\Models\ShopVariant::create([
+                        'shop_id' => $this->activeShopId,
+                        'product_id' => $this->product->id,
+                        'variant_id' => null,
+                        'prestashop_combination_id' => $psCombinationId,
+                        'operation_type' => 'OVERRIDE',
+                        'variant_data' => $variantData,
+                        'sync_status' => 'pending',
+                    ]);
+                }
+
+                $stats['updated']++;
+
+                Log::info('[PS VARIANT COMMIT] Committed PS variant update', [
+                    'ps_variant_id' => $psVariantId,
+                    'ps_combination_id' => $psCombinationId,
+                    'images_resolved' => count($images),
+                    'media_ids_count' => count($mediaIds),
+                ]);
+            } catch (\Exception $e) {
+                $stats['errors'][] = "PS variant {$psVariantId}: {$e->getMessage()}";
+                Log::error('[PS VARIANT COMMIT] Failed', [
+                    'ps_variant_id' => $psVariantId,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        // Clear pending after commit
+        $this->pendingPsVariantUpdates = [];
+
+        Log::info('[PS VARIANT COMMIT] Completed', $stats);
+
+        return $stats;
+    }
+
+    /**
+     * Resolve PPM media IDs to PrestaShop image IDs for variant sync
+     *
+     * FIX 2026-02-11: Converts media_ids (PPM Media.id) to images array
+     * with prestashop_image_id using Media.prestashop_mapping[store_{shopId}]
+     *
+     * @param array $mediaIds PPM Media IDs
+     * @param int $shopId PrestaShop shop ID
+     * @return array Format: [['prestashop_image_id' => int], ...]
+     */
+    public function resolveMediaIdsToPrestaShopImages(array $mediaIds, int $shopId): array
+    {
+        if (empty($mediaIds)) {
+            return [];
+        }
+
+        $images = [];
+        $storeKey = "store_{$shopId}";
+
+        $mediaRecords = Media::whereIn('id', $mediaIds)->get();
+
+        foreach ($mediaRecords as $media) {
+            $mapping = $media->prestashop_mapping ?? [];
+            // Try multiple key formats for compatibility
+            $shopMapping = $mapping[$storeKey] ?? $mapping[$shopId] ?? $mapping["shop_{$shopId}"] ?? null;
+
+            if ($shopMapping) {
+                $psImageId = (int) ($shopMapping['ps_image_id'] ?? $shopMapping['image_id'] ?? 0);
+                if ($psImageId > 0) {
+                    $images[] = ['prestashop_image_id' => $psImageId];
+                }
+            }
+        }
+
+        Log::debug('[MEDIA RESOLVE] Resolved media_ids to PS images', [
+            'shop_id' => $shopId,
+            'media_ids_input' => $mediaIds,
+            'images_resolved' => count($images),
+            'images' => $images,
+        ]);
+
+        return $images;
     }
 
     /*

@@ -2843,11 +2843,35 @@ class SubiektGTService implements ERPSyncServiceInterface
                         (string) $connection->id
                     );
 
+                    // BUG#14 FIX: Sync variants after CREATE (not only after UPDATE)
+                    // Each variant = separate product in Subiekt GT
+                    $variantsSynced = 0;
+                    $variantsFailed = 0;
+                    if ($product->is_variant_master && $product->variants()->count() > 0) {
+                        Log::info('SubiektGTService: Product created, syncing variants', [
+                            'product_id' => $product->id,
+                            'sku' => $product->sku,
+                            'variant_count' => $product->variants()->count(),
+                        ]);
+
+                        $variantResult = $this->syncProductVariantsToSubiekt($connection, $product);
+                        $variantsSynced = $variantResult['synced'] ?? 0;
+                        $variantsFailed = $variantResult['failed'] ?? 0;
+
+                        Log::info('SubiektGTService: Variants sync after create completed', [
+                            'product_id' => $product->id,
+                            'synced' => $variantsSynced,
+                            'failed' => $variantsFailed,
+                        ]);
+                    }
+
                     return [
                         'success' => true,
                         'message' => $createResult['message'] ?? 'Produkt utworzony w Subiekt GT',
                         'external_id' => $externalId,
                         'action' => 'created',
+                        'variants_synced' => $variantsSynced,
+                        'variants_failed' => $variantsFailed,
                     ];
                 }
 

@@ -132,16 +132,31 @@ class ShopVariantService
             // Update ShopVariant records based on pulled data (with attribute names)
             $this->syncShopVariantsFromPull($product, $shopId, $combinations, $attributeNamesMap);
 
+            // FIX 2026-02-11: Build product images with URLs for variant image picker
+            $productImagesWithUrls = [];
+            foreach ($productImages as $pi) {
+                $imageId = is_array($pi) ? ($pi['id'] ?? 0) : (int) $pi;
+                if ($imageId > 0 && $shop->url) {
+                    $productImagesWithUrls[] = [
+                        'prestashop_image_id' => (int) $imageId,
+                        'url' => $this->buildPrestaShopImageUrl($shop->url, $imageId, 'medium_default'),
+                        'thumbnail_url' => $this->buildPrestaShopImageUrl($shop->url, $imageId, 'small_default'),
+                    ];
+                }
+            }
+
             Log::info('[ShopVariantService] pullShopVariants SUCCESS', [
                 'product_id' => $product->id,
                 'shop_id' => $shopId,
                 'variants_count' => $mappedVariants->count(),
+                'product_images_count' => count($productImagesWithUrls),
             ]);
 
             return [
                 'variants' => $mappedVariants,
                 'synced' => true,
                 'error' => null,
+                'product_images' => $productImagesWithUrls,
             ];
 
         } catch (\Exception $e) {

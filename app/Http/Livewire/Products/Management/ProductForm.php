@@ -8344,6 +8344,8 @@ class ProductForm extends Component
         // FIX 2025-12-08: Check for shop-only changes BEFORE commitPendingVariants() clears the array!
         // ETAP_05c: Process SHOP-SPECIFIC variant operations when in shop context
         $hasShopVariantChanges = false;
+        // FIX 2026-02-11: Also check pendingPsVariantUpdates for PS variant edits
+        $hasPsVariantUpdates = !empty($this->pendingPsVariantUpdates);
         if ($this->activeShopId !== null) {
             $hasShopVariantChanges = !empty($this->shopVariantOverrides[$this->activeShopId] ?? []);
 
@@ -8358,8 +8360,10 @@ class ProductForm extends Component
             Log::info('[SAVE] Shop variant changes check (BEFORE commit)', [
                 'shop_id' => $this->activeShopId,
                 'hasShopVariantChanges' => $hasShopVariantChanges,
+                'hasPsVariantUpdates' => $hasPsVariantUpdates,
                 'shopVariantOverrides' => count($this->shopVariantOverrides[$this->activeShopId] ?? []),
                 'pendingVariantCreates' => count($this->pendingVariantCreates),
+                'pendingPsVariantUpdates' => count($this->pendingPsVariantUpdates),
             ]);
         }
 
@@ -8401,6 +8405,30 @@ class ProductForm extends Component
                 'deleted' => $shopVariantResults['deleted'],
                 'errors' => count($shopVariantResults['errors']),
             ]);
+        }
+
+        // FIX 2026-02-11: Process pending PS variant updates (edits from PS API variants)
+        // These are collected by savePsVariantEdit() but were never committed to ShopVariant records
+        if ($hasPsVariantUpdates) {
+            $psVariantResults = $this->commitPsVariantUpdates();
+
+            if (!empty($psVariantResults['errors'])) {
+                foreach ($psVariantResults['errors'] as $error) {
+                    $this->addError('variants', $error);
+                }
+            }
+
+            Log::info('[SAVE] Processed pending PS variant updates', [
+                'shop_id' => $this->activeShopId,
+                'updated' => $psVariantResults['updated'],
+                'errors' => count($psVariantResults['errors']),
+            ]);
+
+            // Dispatch sync job if PS variant updates were committed
+            if ($psVariantResults['updated'] > 0 && !$hasShopVariantChanges) {
+                // Only dispatch if commitShopVariants didn't already dispatch
+                $this->dispatchShopVariantsSync();
+            }
         }
 
         // ETAP_08.4: Handle ERP context (Shop-Tab pattern)

@@ -98,12 +98,18 @@ trait ProductFormShopTabs
 
             $this->prestaShopVariants = $result;
 
+            // FIX 2026-02-11: Store PS product images for variant image picker
+            if (property_exists($this, 'psProductImages')) {
+                $this->psProductImages = $result['product_images'] ?? [];
+            }
+
             Log::info('[ProductFormShopTabs] Pulled variants from PrestaShop', [
                 'product_id' => $this->product->id,
                 'shop_id' => $shopId,
                 'variants_count' => $result['variants']->count(),
                 'synced' => $result['synced'],
                 'error' => $result['error'] ?? null,
+                'product_images_count' => count($result['product_images'] ?? []),
             ]);
 
         } catch (\Exception $e) {
@@ -133,6 +139,11 @@ trait ProductFormShopTabs
         $this->selectedShopId = null;
         $this->activeShopTab = 'all';
         $this->prestaShopVariants = []; // Clear PS variants when going back to default
+
+        // FIX 2026-02-11: Clear PS product images when going back to default
+        if (property_exists($this, 'psProductImages')) {
+            $this->psProductImages = [];
+        }
 
         // FIX PROBLEM 1: Reset activeShopId to null for getAllVariantsForDisplay() to use local data
         $this->activeShopId = null;

@@ -154,6 +154,10 @@ class ProductTransformer
                 // 'quantity' => $this->warehouseMapper->calculateStockForShop($product, $shop), // ❌ READONLY
                 // TODO: Implement stock sync via PrestaShopStockExporter service
 
+                // Product type: 'standard', 'combinations', 'pack', 'virtual'
+                // BUG#12 FIX: Variant masters MUST be 'combinations' for PS admin to show variants
+                'product_type' => $product->is_variant_master ? 'combinations' : 'standard',
+
                 // Tax (PrestaShop tax_rules_group_id) - FAZA 5.2 Integration (2025-11-14)
                 'id_tax_rules_group' => $this->mapTaxRate($effectiveTaxRate, $shop),
 

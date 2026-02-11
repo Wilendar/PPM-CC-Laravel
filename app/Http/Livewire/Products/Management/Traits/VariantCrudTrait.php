@@ -46,6 +46,7 @@ trait VariantCrudTrait
         'is_default' => false,
         'position' => 0,
         'media_ids' => [], // Selected product media IDs for variant images (multiple)
+        'ps_image_ids' => [], // FIX 2026-02-11: Selected PrestaShop image IDs (shop context)
         'auto_generate_sku' => true, // ETAP_05f: Auto-generate SKU from attributes
     ];
 
@@ -1318,8 +1319,9 @@ trait VariantCrudTrait
             'is_active' => true,
             'is_default' => false,
             'position' => 0,
-            'media_ids' => [], // Array of selected media IDs (multiple images)
-            'auto_generate_sku' => true, // ETAP_05f: Default enabled
+            'media_ids' => [],
+            'ps_image_ids' => [],
+            'auto_generate_sku' => true,
         ];
         $this->variantAttributes = [];
         $this->selectedAttributeTypeIds = [];
@@ -2076,6 +2078,12 @@ trait VariantCrudTrait
                     }
 
                     try {
+                        // FIX 2026-02-11: Resolve media_ids to PS images before saving
+                        $mediaIds = $data['media_ids'] ?? [];
+                        $images = method_exists($this, 'resolveMediaIdsToPrestaShopImages')
+                            ? $this->resolveMediaIdsToPrestaShopImages($mediaIds, $this->activeShopId)
+                            : [];
+
                         $shopVariant = \App\Models\ShopVariant::create([
                             'shop_id' => $this->activeShopId,
                             'product_id' => $this->product->id,
@@ -2088,7 +2096,8 @@ trait VariantCrudTrait
                                 'is_default' => $data['is_default'] ?? false,
                                 'position' => $data['position'],
                                 'attributes' => $data['attributes'] ?? [],
-                                'media_ids' => $data['media_ids'] ?? [],
+                                'images' => $images,
+                                'media_ids' => $mediaIds,
                             ],
                             'sync_status' => 'pending',
                         ]);
@@ -2151,6 +2160,14 @@ trait VariantCrudTrait
                         $variantDataForStorage = null;
                         if ($operationType !== 'DELETE') {
                             $variantDataForStorage = $isDto ? $overrideData->toArray() : $overrideData;
+
+                            // FIX 2026-02-11: Resolve media_ids to PS images
+                            if (!empty($variantDataForStorage['media_ids']) && method_exists($this, 'resolveMediaIdsToPrestaShopImages')) {
+                                $variantDataForStorage['images'] = $this->resolveMediaIdsToPrestaShopImages(
+                                    $variantDataForStorage['media_ids'],
+                                    $this->activeShopId
+                                );
+                            }
                         }
 
                         \App\Models\ShopVariant::updateOrCreate(

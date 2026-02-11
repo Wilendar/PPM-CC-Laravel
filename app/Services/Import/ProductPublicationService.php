@@ -17,6 +17,10 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use App\Models\Media;
+use App\Models\ProductVariant;
+use App\Models\ShopVariant;
+use App\Models\VariantAttribute;
+use App\Models\VariantImage;
 
 /**
  * ProductPublicationService
@@ -83,14 +87,45 @@ class ProductPublicationService
                 // 2. Create price entries from price_data
                 $this->createPriceEntries($product, $pendingProduct);
 
+                // FIX #9: Auto-detect variant master from variant_data
+                // PendingProduct may have variant_data with variants array even if
+                // is_variant_master flag wasn't explicitly set during import
+                $variantData = $pendingProduct->variant_data ?? [];
+                if (!$product->is_variant_master && !empty($variantData['variants'] ?? [])) {
+                    $product->is_variant_master = true;
+                    $product->save();
+                    Log::info('ProductPublicationService: Auto-set is_variant_master from variant_data', [
+                        'product_id' => $product->id,
+                        'sku' => $product->sku,
+                        'variants_count' => count($variantData['variants']),
+                    ]);
+                }
+
+                // 2b. Create variants from variant_data (if variant master)
+                if ($product->is_variant_master) {
+                    $this->createVariants($product, $pendingProduct);
+                }
+
                 // 3. Assign categories
                 $this->assignCategories($product, $pendingProduct);
 
                 // 4. Create shop data entries
                 $this->createShopData($product, $pendingProduct);
 
+                // 4b. Create ShopVariant records for variant sync
+                // BUG#12 FIX: SyncShopVariantsToPrestaShopJob requires ShopVariant
+                // records with sync_status='pending' to create PS combinations
+                if ($product->is_variant_master) {
+                    $this->createShopVariants($product, $pendingProduct);
+                }
+
                 // 5. Handle media (if any)
                 $this->handleMedia($product, $pendingProduct);
+
+                // 5b. Assign product images to variants (for PPM UI + PS/ERP sync)
+                if ($product->is_variant_master) {
+                    $this->assignVariantImages($product);
+                }
 
                 // 6. Mark pending product as published
                 $pendingProduct->markAsPublished($product);
@@ -327,6 +362,162 @@ class ProductPublicationService
     }
 
     /**
+     * Create ProductVariant records from PendingProduct variant_data.
+     *
+     * FIX BUG#5/7: variant_data was stored on PendingProduct but never materialized
+     * as ProductVariant records during publication. This caused is_variant_master=true
+     * products to have zero variants, so Baselinker sync skipped variant creation.
+     *
+     * variant_data structure:
+     * {
+     *   "variants": [
+     *     {"sku_suffix": "-RED-XL", "name": "Czerwony XL", "attributes": [
+     *       {"attribute_type_id": 1, "value_id": 5, "value": "Czerwony", "color_hex": "#FF0000"},
+     *       {"attribute_type_id": 2, "value_id": 12, "value": "XL"},
+     *     ]},
+     *   ],
+     *   "attribute_types_used": [1, 2]
+     * }
+     */
+    protected function createVariants(Product $product, PendingProduct $pendingProduct): void
+    {
+        $variantData = $pendingProduct->variant_data ?? [];
+        $variants = $variantData['variants'] ?? [];
+
+        if (empty($variants)) {
+            Log::info('ProductPublicationService: is_variant_master=true but no variant_data', [
+                'product_id' => $product->id,
+                'sku' => $product->sku,
+            ]);
+            return;
+        }
+
+        $position = 0;
+
+        foreach ($variants as $index => $variantInfo) {
+            $skuSuffix = $variantInfo['sku_suffix'] ?? '-V' . ($index + 1);
+            $variantSku = $product->sku . $skuSuffix;
+            $variantName = $variantInfo['name'] ?? $product->name . ' ' . $skuSuffix;
+
+            // Create or restore variant (handle re-publication)
+            $existing = ProductVariant::withTrashed()
+                ->where('product_id', $product->id)
+                ->where('sku', $variantSku)
+                ->first();
+
+            if ($existing) {
+                if ($existing->trashed()) {
+                    $existing->restore();
+                }
+                $variant = $existing;
+                $variant->update([
+                    'name' => $variantName,
+                    'is_active' => true,
+                    'is_default' => $index === 0,
+                    'position' => $position++,
+                ]);
+            } else {
+                $variant = ProductVariant::create([
+                    'product_id' => $product->id,
+                    'sku' => $variantSku,
+                    'name' => $variantName,
+                    'is_active' => true,
+                    'is_default' => $index === 0,
+                    'position' => $position++,
+                ]);
+            }
+
+            // Create variant attributes (skip if FK references don't exist)
+            $attributes = $variantInfo['attributes'] ?? [];
+            foreach ($attributes as $attr) {
+                if (!empty($attr['attribute_type_id']) && !empty($attr['value_id'])) {
+                    // Verify FK references exist before insert
+                    $typeExists = DB::table('attribute_types')->where('id', $attr['attribute_type_id'])->exists();
+                    if (!$typeExists) {
+                        Log::warning('ProductPublicationService: Skipping variant attribute - type not found', [
+                            'attribute_type_id' => $attr['attribute_type_id'],
+                            'variant_id' => $variant->id,
+                        ]);
+                        continue;
+                    }
+                    VariantAttribute::updateOrCreate(
+                        [
+                            'variant_id' => $variant->id,
+                            'attribute_type_id' => $attr['attribute_type_id'],
+                        ],
+                        [
+                            'value_id' => $attr['value_id'],
+                        ]
+                    );
+                }
+            }
+        }
+
+        Log::info('ProductPublicationService: Variants created', [
+            'product_id' => $product->id,
+            'sku' => $product->sku,
+            'variants_count' => count($variants),
+        ]);
+    }
+
+    /**
+     * Create ShopVariant records for each shop/variant combination.
+     *
+     * BUG#12 FIX v2: Must use operation_type='ADD' with populated variant_data
+     * so SyncShopVariantsToPrestaShopJob::handleAddOperation() creates actual
+     * PrestaShop combinations via API. Previous INHERIT just marked as synced
+     * without creating any ps_product_attribute records.
+     */
+    protected function createShopVariants(Product $product, PendingProduct $pendingProduct): void
+    {
+        $shopIds = $pendingProduct->shop_ids ?? [];
+        $variants = $product->variants()->with('attributes')->get();
+
+        if ($variants->isEmpty() || empty($shopIds)) {
+            return;
+        }
+
+        $created = 0;
+        foreach ($shopIds as $shopId) {
+            foreach ($variants as $variant) {
+                $variantData = [
+                    'sku' => $variant->sku,
+                    'name' => $variant->name,
+                    'is_default' => (bool) $variant->is_default,
+                    'price_impact' => 0,
+                    'weight_impact' => 0,
+                    'minimal_quantity' => 1,
+                    'attributes' => $variant->attributes->map(fn($a) => [
+                        'attribute_type_id' => $a->attribute_type_id,
+                        'value_id' => $a->value_id,
+                    ])->toArray(),
+                ];
+
+                ShopVariant::updateOrCreate(
+                    [
+                        'shop_id' => $shopId,
+                        'product_id' => $product->id,
+                        'variant_id' => $variant->id,
+                    ],
+                    [
+                        'operation_type' => 'ADD',
+                        'sync_status' => 'pending',
+                        'variant_data' => $variantData,
+                    ]
+                );
+                $created++;
+            }
+        }
+
+        Log::info('ProductPublicationService: ShopVariants created for PS sync', [
+            'product_id' => $product->id,
+            'shops_count' => count($shopIds),
+            'variants_count' => $variants->count(),
+            'shop_variants_created' => $created,
+        ]);
+    }
+
+    /**
      * Assign categories to product
      */
     protected function assignCategories(Product $product, PendingProduct $pendingProduct): void
@@ -388,6 +579,11 @@ class ProductPublicationService
                 [
                     'is_active' => true,
                     'is_published' => true,
+                    'name' => $product->name,
+                    'short_description' => $product->short_description,
+                    'long_description' => $product->long_description,
+                    'meta_title' => $product->meta_title,
+                    'meta_description' => $product->meta_description,
                     'category_mappings' => $categoryMappings,
                     'sync_status' => 'pending',
                 ]
@@ -463,6 +659,77 @@ class ProductPublicationService
             'product_id' => $product->id,
             'total' => count($images),
             'migrated' => $migrated,
+        ]);
+    }
+
+    /**
+     * Assign product images to all variants.
+     *
+     * Creates VariantImage records from product Media and updates
+     * ShopVariant.variant_data with media_ids for PS/ERP sync.
+     *
+     * By default ALL product images are assigned to ALL variants
+     * (same as PrestaShop's default combination image behavior).
+     */
+    protected function assignVariantImages(Product $product): void
+    {
+        $variants = $product->variants()->get();
+        if ($variants->isEmpty()) {
+            return;
+        }
+
+        $mediaRecords = Media::where('mediable_type', Product::class)
+            ->where('mediable_id', $product->id)
+            ->orderBy('is_primary', 'desc')
+            ->orderBy('sort_order', 'asc')
+            ->get();
+
+        if ($mediaRecords->isEmpty()) {
+            Log::debug('ProductPublicationService: No media to assign to variants', [
+                'product_id' => $product->id,
+            ]);
+            return;
+        }
+
+        $mediaIds = $mediaRecords->pluck('id')->toArray();
+        $variantImagesCreated = 0;
+
+        // Create VariantImage records for each variant
+        foreach ($variants as $variant) {
+            // Skip if variant already has images (re-publication safety)
+            if ($variant->images()->count() > 0) {
+                continue;
+            }
+
+            foreach ($mediaRecords as $index => $media) {
+                VariantImage::create([
+                    'variant_id' => $variant->id,
+                    'image_path' => $media->file_path,
+                    'image_url' => null,
+                    'is_cover' => (bool) $media->is_primary,
+                    'position' => $index,
+                ]);
+                $variantImagesCreated++;
+            }
+        }
+
+        // Update ShopVariant records to include media_ids in variant_data
+        $updatedShopVariants = 0;
+        ShopVariant::where('product_id', $product->id)
+            ->where('sync_status', 'pending')
+            ->each(function ($sv) use ($mediaIds, &$updatedShopVariants) {
+                $variantData = $sv->variant_data ?? [];
+                $variantData['media_ids'] = $mediaIds;
+                $sv->update(['variant_data' => $variantData]);
+                $updatedShopVariants++;
+            });
+
+        Log::info('ProductPublicationService: Variant images assigned from product media', [
+            'product_id' => $product->id,
+            'variants_count' => $variants->count(),
+            'media_count' => $mediaRecords->count(),
+            'variant_images_created' => $variantImagesCreated,
+            'shop_variants_updated' => $updatedShopVariants,
         ]);
     }
 

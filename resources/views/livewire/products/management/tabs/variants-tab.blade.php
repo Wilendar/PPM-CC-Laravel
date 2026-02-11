@@ -255,13 +255,14 @@
                             $isPendingDelete = $variant->pendingDelete ?? false;
 
                             // PS VARIANTS: Check pending status from pendingPsVariantDeletes/Updates arrays
-                            // FIX 2025-12-09: Also check OVERRIDE variants (PPM + prestashop_combination_id)
+                            // FIX 2026-02-11: Check ALL PS-linked variants in shop context (INHERIT + OVERRIDE)
                             $isPrestaShopVariant = is_string($variant->id) && str_starts_with($variant->id, 'ps_');
                             $hasPrestaShopLinkEarly = isset($variant->prestashop_combination_id) && $variant->prestashop_combination_id > 0;
                             $isLinkedOverrideEarly = !$isPrestaShopVariant && $hasPrestaShopLinkEarly && ($variant->operation_type ?? null) === 'OVERRIDE';
+                            $isLinkedInheritEarly = !$isPrestaShopVariant && $hasPrestaShopLinkEarly && ($variant->operation_type ?? null) !== 'OVERRIDE';
                             $psVariantIdEarly = $isPrestaShopVariant ? $variant->id : ($hasPrestaShopLinkEarly ? 'ps_' . $variant->prestashop_combination_id : null);
 
-                            if ($isPrestaShopVariant || ($isLinkedOverrideEarly && $isInShopContext)) {
+                            if ($isPrestaShopVariant || (($isLinkedOverrideEarly || $isLinkedInheritEarly) && $isInShopContext)) {
                                 $checkId = $psVariantIdEarly ?? $variant->id;
                                 $isPendingDelete = $isPendingDelete || ($this->isPsVariantPendingDelete($checkId) ?? false);
                                 $isPendingUpdate = $isPendingUpdate || ($this->isPsVariantPendingUpdate($checkId) ?? false);
@@ -369,11 +370,26 @@
                                             $imageUrl = $firstMedia?->thumbnail_url ?? $firstMedia?->url ?? null;
                                             $imageCount = $variant->images->count();
                                         }
-                                    } elseif ($isPendingUpdate && $pendingData && isset($pendingData['media_ids'])) {
-                                        // FIX 2025-12-09 BUG#5: Use $pendingData (from getPsVariantPendingData) for PS variants
+                                    } elseif ($isPendingUpdate && $pendingData && (isset($pendingData['media_ids']) || isset($pendingData['ps_image_ids']))) {
+                                        // FIX 2026-02-11: Handle both PPM media_ids and PS ps_image_ids
+                                        $pendingPsImageIds = $pendingData['ps_image_ids'] ?? [];
                                         $pendingMediaIds = $pendingData['media_ids'] ?? [];
-                                        $imageCount = count($pendingMediaIds);
-                                        if (!empty($pendingMediaIds)) {
+
+                                        if (!empty($pendingPsImageIds) && $isInShopContext) {
+                                            // PS image IDs - build URL from shop + image ID
+                                            $imageCount = count($pendingPsImageIds);
+                                            $firstPsImgId = $pendingPsImageIds[0];
+                                            // Find the PS image URL from psProductImages array
+                                            $psImages = $this->psProductImages ?? [];
+                                            foreach ($psImages as $psImg) {
+                                                if (($psImg['prestashop_image_id'] ?? 0) == $firstPsImgId) {
+                                                    $imageUrl = $psImg['thumbnail_url'] ?? $psImg['url'] ?? null;
+                                                    break;
+                                                }
+                                            }
+                                        } elseif (!empty($pendingMediaIds)) {
+                                            // PPM media IDs
+                                            $imageCount = count($pendingMediaIds);
                                             $firstPendingMedia = \App\Models\Media::find($pendingMediaIds[0]);
                                             $imageUrl = $firstPendingMedia?->thumbnail_url ?? $firstPendingMedia?->url ?? null;
                                         }
@@ -735,13 +751,14 @@
                             <td class="px-4 py-4 text-right">
                                 @php
                                     // Determine variant type for action buttons
-                                    // FIX 2025-12-09: Handle OVERRIDE variants (linked PPM+PS) correctly in shop context
+                                    // FIX 2026-02-11: Handle ALL PS-linked variants in shop context (not just OVERRIDE)
                                     $isPrestaShopOnly = is_string($variant->id) && str_starts_with($variant->id, 'ps_');
                                     $hasPrestaShopLink = isset($variant->prestashop_combination_id) && $variant->prestashop_combination_id > 0;
                                     $isLinkedOverride = !$isPrestaShopOnly && $hasPrestaShopLink && ($variant->operation_type ?? null) === 'OVERRIDE';
+                                    $isLinkedInherit = !$isPrestaShopOnly && $hasPrestaShopLink && ($variant->operation_type ?? null) !== 'OVERRIDE';
                                     $canEditInPpm = is_numeric($variant->id) && $variant->id > 0 && !$isInShopContext;
-                                    // In shop context, linked variants should use PS methods
-                                    $shouldUsePsMethods = $isInShopContext && ($isPrestaShopOnly || $isLinkedOverride);
+                                    // In shop context, ALL PS-linked variants should use PS edit methods
+                                    $shouldUsePsMethods = $isInShopContext && ($isPrestaShopOnly || $isLinkedOverride || $isLinkedInherit);
                                     // For linked variants, use ps_xxx format for PS methods (compute BEFORE using in pending checks)
                                     $psVariantIdForMethods = $isPrestaShopOnly ? $variant->id : ($hasPrestaShopLink ? 'ps_' . $variant->prestashop_combination_id : null);
                                     // Check pending PS variant status (use $psVariantIdForMethods for correct lookup)
@@ -793,13 +810,22 @@
                                     @elseif($shouldUsePsMethods && $psVariantIdForMethods)
                                         {{-- PrestaShop variant (ps_xxx or linked OVERRIDE): Full actions with pending support --}}
                                         @if($isPsPendingUpdate)
-                                            {{-- PS Variant with pending update --}}
+                                            {{-- PS Variant with pending update: Edit + Undo --}}
                                             <button type="button"
                                                     wire:click="loadPsVariantForEdit('{{ $psVariantIdForMethods }}')"
                                                     class="text-amber-400 hover:text-amber-300"
                                                     title="Edytuj (zmiany oczekujace)">
                                                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                                                </svg>
+                                            </button>
+                                            {{-- FIX 2026-02-11: Undo pending PS variant update --}}
+                                            <button type="button"
+                                                    wire:click="undoPsVariantUpdate('{{ $psVariantIdForMethods }}')"
+                                                    class="text-amber-400 hover:text-amber-300"
+                                                    title="Cofnij zmiany">
+                                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"></path>
                                                 </svg>
                                             </button>
                                         @else
@@ -1013,7 +1039,54 @@
                         </div>
 
                         {{-- Variant Image Selection - Multiple Images --}}
-                        @if($product->media && $product->media->count() > 0)
+                        {{-- FIX 2026-02-11: Shop context shows PS product images, default shows PPM media --}}
+                        @if($activeShopId !== null && !empty($psProductImages))
+                            {{-- PrestaShop product images (shop context) --}}
+                            <div class="border-t border-gray-700 pt-3 mt-3">
+                                <div class="flex items-center justify-between mb-2">
+                                    <h4 class="text-sm font-medium text-gray-300">
+                                        Zdjecia wariantu <span class="text-gray-500 text-xs">(PrestaShop - wielokrotny wybor)</span>
+                                    </h4>
+                                    @php
+                                        $selectedPsCount = count($variantData['ps_image_ids'] ?? []);
+                                    @endphp
+                                    @if($selectedPsCount > 0)
+                                        <span class="text-xs text-green-400 flex items-center gap-1">
+                                            <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+                                            Wybrano: {{ $selectedPsCount }}
+                                        </span>
+                                    @endif
+                                </div>
+                                <div class="flex gap-2 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-gray-600">
+                                    @foreach($psProductImages as $psImage)
+                                        @php
+                                            $psImgId = $psImage['prestashop_image_id'];
+                                            $isPsSelected = in_array($psImgId, $variantData['ps_image_ids'] ?? []);
+                                            $psSelectedIndex = $isPsSelected ? array_search($psImgId, $variantData['ps_image_ids'] ?? []) : false;
+                                        @endphp
+                                        <button type="button"
+                                                wire:click="togglePsVariantImage({{ $psImgId }})"
+                                                class="relative flex-shrink-0 w-14 h-14 rounded-md overflow-hidden border-2 transition-all duration-150 {{ $isPsSelected ? 'border-blue-500 ring-2 ring-blue-500 ring-offset-1 ring-offset-gray-800 scale-105' : 'border-gray-600 hover:border-gray-400' }}">
+                                            <img src="{{ $psImage['thumbnail_url'] }}"
+                                                 alt="PS #{{ $psImgId }}"
+                                                 class="w-full h-full object-cover"
+                                                 loading="lazy"
+                                                 onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 56 56%22><rect fill=%22%23374151%22 width=%2256%22 height=%2256%22/><text x=%2228%22 y=%2232%22 text-anchor=%22middle%22 fill=%22%239CA3AF%22 font-size=%2210%22>{{ $psImgId }}</text></svg>'">
+                                            @if($isPsSelected)
+                                                <div class="absolute inset-0 bg-blue-500/30 flex items-center justify-center">
+                                                    @if($psSelectedIndex === 0)
+                                                        <span class="text-[10px] font-bold text-white bg-blue-600 px-1 rounded">1 (Cover)</span>
+                                                    @else
+                                                        <span class="text-xs font-bold text-white">{{ $psSelectedIndex + 1 }}</span>
+                                                    @endif
+                                                </div>
+                                            @endif
+                                        </button>
+                                    @endforeach
+                                </div>
+                            </div>
+                        @elseif($product->media && $product->media->count() > 0)
+                            {{-- PPM local media (default context) --}}
                             <div class="border-t border-gray-700 pt-3 mt-3">
                                 <div class="flex items-center justify-between mb-2">
                                     <h4 class="text-sm font-medium text-gray-300">Zdjecia wariantu <span class="text-gray-500 text-xs">(wielokrotny wybor)</span></h4>
@@ -1027,7 +1100,6 @@
                                         </span>
                                     @endif
                                 </div>
-                                {{-- Horizontal scrollable strip --}}
                                 <div class="flex gap-2 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-gray-600">
                                     @foreach($product->media->take(15) as $mediaItem)
                                         @php
