@@ -521,6 +521,7 @@ trait VariantShopContextTrait
             $this->editingVariantId = null;
             $this->editingPsVariantId = $psVariantId;
             $this->variantAttributes = $pendingData['attributes'] ?? [];
+            $this->initSelectedAttributeTypes();
 
             Log::info('[PS VARIANT] Loaded PENDING for edit', [
                 'ps_variant_id' => $psVariantId,
@@ -660,6 +661,8 @@ trait VariantShopContextTrait
                 }
             }
         }
+
+        $this->initSelectedAttributeTypes();
 
         Log::info('[PS VARIANT] Loaded for edit', [
             'ps_variant_id' => $psVariantId,

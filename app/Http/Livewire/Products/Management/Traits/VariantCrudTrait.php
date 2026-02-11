@@ -853,6 +853,7 @@ trait VariantCrudTrait
 
         // Load attributes
         $this->variantAttributes = $data['attributes'] ?? [];
+        $this->initSelectedAttributeTypes();
 
         $this->showEditModal = true;
 
@@ -1239,6 +1240,7 @@ trait VariantCrudTrait
                         $this->variantAttributes[$attr->attribute_type_id] = $attr->value_id;
                     }
                 }
+                $this->initSelectedAttributeTypes();
 
                 $this->showEditModal = true;
                 return;
@@ -1262,6 +1264,7 @@ trait VariantCrudTrait
             foreach ($variant->attributes as $attr) {
                 $this->variantAttributes[$attr->attribute_type_id] = $attr->value_id;
             }
+            $this->initSelectedAttributeTypes();
 
             $this->showEditModal = true;
 
@@ -1319,6 +1322,7 @@ trait VariantCrudTrait
             'auto_generate_sku' => true, // ETAP_05f: Default enabled
         ];
         $this->variantAttributes = [];
+        $this->selectedAttributeTypeIds = [];
         $this->editingVariantId = null;
         $this->showCreateModal = false;
         $this->showEditModal = false;

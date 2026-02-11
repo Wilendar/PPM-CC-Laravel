@@ -1055,20 +1055,58 @@
                             </div>
                         @endif
 
-                        {{-- Attributes Section --}}
+                        {{-- Attributes Section - Dynamic attribute group selection --}}
                         @php
-                            $attributeTypes = \App\Models\AttributeType::where('is_active', true)
-                                ->whereIn('code', ['size', 'color'])
-                                ->orderBy('position')
-                                ->get();
+                            $allAttributeTypes = $this->getAttributeTypes();
+                            $selectedIds = $this->selectedAttributeTypeIds;
+                            $selectedAttributeTypes = $allAttributeTypes->whereIn('id', $selectedIds);
+                            $availableToAdd = $allAttributeTypes->whereNotIn('id', $selectedIds);
                         @endphp
-                        @if($attributeTypes->count() > 0)
-                            <div class="border-t border-gray-700 pt-4 mt-4">
-                                <h4 class="text-sm font-medium text-gray-300 mb-3">Atrybuty wariantu</h4>
-                                <div class="grid grid-cols-2 gap-4">
-                                    @foreach($attributeTypes as $attrType)
-                                        <div>
-                                            <label class="block text-sm font-medium text-gray-400 mb-1">{{ $attrType->name }}</label>
+                        <div class="border-t border-gray-700 pt-4 mt-4">
+                            <div class="flex items-center justify-between mb-3">
+                                <h4 class="text-sm font-medium text-gray-300">Atrybuty wariantu</h4>
+                                @if($availableToAdd->count() > 0)
+                                    <div x-data="{ open: false }" class="relative">
+                                        <button type="button"
+                                                @click="open = !open"
+                                                class="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-blue-400 bg-blue-900/30 border border-blue-700/50 rounded-md hover:bg-blue-900/50 transition-colors">
+                                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                                            </svg>
+                                            Dodaj grupe
+                                        </button>
+                                        <div x-show="open"
+                                             @click.away="open = false"
+                                             x-transition
+                                             class="absolute right-0 mt-1 w-48 bg-gray-700 border border-gray-600 rounded-lg shadow-xl z-50 py-1">
+                                            @foreach($availableToAdd as $availType)
+                                                <button type="button"
+                                                        wire:click="addAttributeTypeToVariant({{ $availType->id }})"
+                                                        @click="open = false"
+                                                        class="w-full text-left px-3 py-2 text-sm text-gray-200 hover:bg-gray-600 transition-colors">
+                                                    {{ $availType->name }}
+                                                </button>
+                                            @endforeach
+                                        </div>
+                                    </div>
+                                @endif
+                            </div>
+
+                            @if($selectedAttributeTypes->count() > 0)
+                                <div class="space-y-3">
+                                    @foreach($selectedAttributeTypes as $attrType)
+                                        <div class="bg-gray-750 rounded-lg p-3 border border-gray-700/50">
+                                            <div class="flex items-center justify-between mb-2">
+                                                <label class="block text-sm font-medium text-gray-400">{{ $attrType->name }}</label>
+                                                <button type="button"
+                                                        wire:click="removeAttributeTypeFromVariant({{ $attrType->id }})"
+                                                        class="text-gray-500 hover:text-red-400 transition-colors p-0.5"
+                                                        title="Usun grupe atrybutow">
+                                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                                                    </svg>
+                                                </button>
+                                            </div>
                                             @php
                                                 $attrValues = \App\Models\AttributeValue::where('attribute_type_id', $attrType->id)
                                                     ->where('is_active', true)
@@ -1097,8 +1135,7 @@
                                                     @endif
                                                 </div>
                                             @else
-                                                {{-- Dropdown for size - use wire:change with method call --}}
-                                                {{-- wire:model doesn't work properly with numeric array keys --}}
+                                                {{-- Dropdown --}}
                                                 <select wire:change="setVariantAttribute({{ $attrType->id }}, $event.target.value)"
                                                         class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent">
                                                     <option value="">-- Wybierz --</option>
@@ -1110,8 +1147,10 @@
                                         </div>
                                     @endforeach
                                 </div>
-                            </div>
-                        @endif
+                            @else
+                                <p class="text-xs text-gray-500 italic">Brak wybranych grup atrybutow. Uzyj przycisku "Dodaj grupe" aby dodac atrybuty.</p>
+                            @endif
+                        </div>
 
                         {{-- Validation Errors --}}
                         @error('variantData')

@@ -41,6 +41,16 @@ trait VariantAttributeTrait
      */
     public array $variantAttributes = [];
 
+    /**
+     * Currently selected attribute type IDs for variant modal
+     *
+     * Controls which attribute groups are visible in the create/edit modal.
+     * Users can add/remove groups dynamically.
+     *
+     * @var array
+     */
+    public array $selectedAttributeTypeIds = [];
+
     /*
     |--------------------------------------------------------------------------
     | ATTRIBUTE METHODS
@@ -88,6 +98,37 @@ trait VariantAttributeTrait
     public function resetVariantAttributes(): void
     {
         $this->variantAttributes = [];
+        $this->selectedAttributeTypeIds = [];
+    }
+
+    /**
+     * Add attribute group to variant modal
+     */
+    public function addAttributeTypeToVariant(int $typeId): void
+    {
+        if (!in_array($typeId, $this->selectedAttributeTypeIds)) {
+            $this->selectedAttributeTypeIds[] = $typeId;
+        }
+    }
+
+    /**
+     * Remove attribute group from variant modal
+     */
+    public function removeAttributeTypeFromVariant(int $typeId): void
+    {
+        $this->selectedAttributeTypeIds = array_values(
+            array_filter($this->selectedAttributeTypeIds, fn($id) => $id !== $typeId)
+        );
+        unset($this->variantAttributes[$typeId]);
+    }
+
+    /**
+     * Initialize selectedAttributeTypeIds from existing variant attributes
+     */
+    public function initSelectedAttributeTypes(): void
+    {
+        $ids = array_map('intval', array_keys($this->variantAttributes));
+        $this->selectedAttributeTypeIds = array_values(array_unique($ids));
     }
 
     /**
