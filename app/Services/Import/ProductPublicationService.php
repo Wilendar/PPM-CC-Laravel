@@ -706,6 +706,9 @@ class ProductPublicationService
         $fileVariantMap = $this->buildFileVariantMap($pendingProduct);
         $hasAnyAssignment = !empty(array_filter($fileVariantMap));
 
+        // Build variant_sku -> cover filename mapping from draft
+        $variantCoverFileMap = $this->buildVariantCoverMap($pendingProduct);
+
         $variantImagesCreated = 0;
         $variantMediaMap = []; // variant_id -> [media_id, ...]
 
@@ -735,11 +738,25 @@ class ProductPublicationService
                 }
 
                 if ($shouldAssign) {
+                    // Determine cover: use draft per-variant cover, fallback to first image
+                    $isCoverFromDraft = false;
+                    $hasDraftCover = false;
+                    if (!empty($variantCoverFileMap)) {
+                        $variantSuffix = str_replace($product->sku, '', $variant->sku);
+                        $coverFileName = $variantCoverFileMap[$variantSuffix] ?? null;
+                        $hasDraftCover = ($coverFileName !== null);
+                        $isCoverFromDraft = ($coverFileName !== null && $fileName === $coverFileName);
+                    }
+
+                    // If draft has a cover for this variant -> ONLY that image is cover
+                    // If no draft cover -> fallback to first image (position === 0)
+                    $isCover = $hasDraftCover ? $isCoverFromDraft : ($position === 0);
+
                     VariantImage::create([
                         'variant_id' => $variant->id,
                         'image_path' => $media->file_path,
                         'image_url' => null,
-                        'is_cover' => $position === 0,
+                        'is_cover' => $isCover,
                         'position' => $position,
                     ]);
                     $variantMediaIds[] = $media->id;
@@ -808,6 +825,35 @@ class ProductPublicationService
         }
 
         return $map;
+    }
+
+    /**
+     * Build variant_sku -> cover filename mapping from draft per-variant covers.
+     *
+     * @return array<string, string> variant_sku => cover filename
+     */
+    protected function buildVariantCoverMap(?PendingProduct $pendingProduct): array
+    {
+        if (!$pendingProduct) {
+            return [];
+        }
+
+        $rawPaths = $pendingProduct->temp_media_paths ?? [];
+        $variantCovers = $rawPaths['variant_covers'] ?? [];
+        $images = $rawPaths['images'] ?? [];
+
+        if (empty($variantCovers) || empty($images)) {
+            return [];
+        }
+
+        $coverFileMap = [];
+        foreach ($variantCovers as $sku => $imageIndex) {
+            if (isset($images[$imageIndex]) && !empty($images[$imageIndex]['path'])) {
+                $coverFileMap[$sku] = basename($images[$imageIndex]['path']);
+            }
+        }
+
+        return $coverFileMap;
     }
 
     /**
