@@ -2826,17 +2826,21 @@ class PrestaShop8Client extends BasePrestaShopClient
             $existing = $this->getCombination($combinationId);
 
             if (!$existing) {
+                \Log::warning('[PrestaShop8Client] setCombinationImages: combination not found', [
+                    'combination_id' => $combinationId,
+                ]);
                 return false;
             }
 
-            // FIX 2026-02-11: Remove extra 'image' nesting - buildXmlFromArray auto-singularizes
-            // 'images' → 'image' children. Manual 'image' key caused double <image><image> nesting
-            // which made PrestaShop unable to find 'id' key (Combination.php line 434 error)
-            $associations = [
+            // FIX 2026-02-12: GET-MODIFY-PUT pattern - preserve ALL existing associations
+            // PrestaShop API replaces the ENTIRE object on PUT, so we must include
+            // product_option_values alongside images to avoid losing attributes.
+            // Previous bug: sending only 'images' association caused PrestaShop to
+            // clear product_option_values and trigger Combination.php line 434 error.
+            $associations = $this->buildCombinationAssociations($existing, [
                 'images' => array_map(fn($id) => ['id' => $id], $imageIds),
-            ];
+            ]);
 
-            // FIX 2025-12-08: PrestaShop API wymaga id_product i minimal_quantity w PUT request!
             $combinationData = [
                 'id' => $combinationId,
                 'id_product' => $existing['id_product'] ?? null,
@@ -2846,15 +2850,23 @@ class PrestaShop8Client extends BasePrestaShopClient
 
             $xmlBody = $this->arrayToXml(['combination' => $combinationData]);
 
-            \Log::info('[PrestaShop8Client] setCombinationImages', [
+            \Log::debug('[PrestaShop8Client] setCombinationImages CALLED', [
                 'combination_id' => $combinationId,
                 'image_ids' => $imageIds,
+                'image_ids_types' => array_map('gettype', $imageIds),
+                'existing_associations' => $existing['associations'] ?? 'NONE',
+                'built_associations' => $associations,
                 'xml_body' => $xmlBody,
             ]);
 
             $this->makeRequest('PUT', "/combinations/{$combinationId}", [], [
                 'body' => $xmlBody,
                 'headers' => ['Content-Type' => 'application/xml'],
+            ]);
+
+            \Log::info('[PrestaShop8Client] setCombinationImages success', [
+                'combination_id' => $combinationId,
+                'image_ids' => $imageIds,
             ]);
 
             return true;
@@ -2881,16 +2893,19 @@ class PrestaShop8Client extends BasePrestaShopClient
             $existing = $this->getCombination($combinationId);
 
             if (!$existing) {
+                \Log::warning('[PrestaShop8Client] setCombinationAttributes: combination not found', [
+                    'combination_id' => $combinationId,
+                ]);
                 return false;
             }
 
-            // FIX 2025-12-08: buildXmlFromArray automatycznie singularyzuje 'product_option_values' → 'product_option_value'
-            // NIE podawaj 'product_option_value' jako zagnieżdżonego klucza!
-            $associations = [
+            // FIX 2026-02-12: GET-MODIFY-PUT pattern - preserve ALL existing associations
+            // PrestaShop API replaces the ENTIRE object on PUT, so we must include
+            // images alongside product_option_values to avoid losing image assignments.
+            $associations = $this->buildCombinationAssociations($existing, [
                 'product_option_values' => array_map(fn($id) => ['id' => $id], $attributeValueIds),
-            ];
+            ]);
 
-            // FIX 2025-12-08: PrestaShop API wymaga id_product i minimal_quantity w PUT request!
             $combinationData = [
                 'id' => $combinationId,
                 'id_product' => $existing['id_product'] ?? null,
@@ -2900,16 +2915,23 @@ class PrestaShop8Client extends BasePrestaShopClient
 
             $xmlBody = $this->arrayToXml(['combination' => $combinationData]);
 
-            \Log::info('[PrestaShop8Client] setCombinationAttributes', [
+            \Log::debug('[PrestaShop8Client] setCombinationAttributes CALLED', [
                 'combination_id' => $combinationId,
                 'id_product' => $existing['id_product'] ?? 'MISSING',
                 'attribute_value_ids' => $attributeValueIds,
-                'xml_body' => $xmlBody, // DEBUG: show generated XML
+                'existing_associations' => $existing['associations'] ?? 'NONE',
+                'built_associations' => $associations,
+                'xml_body' => $xmlBody,
             ]);
 
             $this->makeRequest('PUT', "/combinations/{$combinationId}", [], [
                 'body' => $xmlBody,
                 'headers' => ['Content-Type' => 'application/xml'],
+            ]);
+
+            \Log::info('[PrestaShop8Client] setCombinationAttributes success', [
+                'combination_id' => $combinationId,
+                'attribute_value_ids' => $attributeValueIds,
             ]);
 
             return true;
@@ -2920,5 +2942,102 @@ class PrestaShop8Client extends BasePrestaShopClient
             ]);
             return false;
         }
+    }
+
+    /**
+     * Build combination associations preserving existing data (GET-MODIFY-PUT pattern)
+     *
+     * FIX 2026-02-12: PrestaShop API replaces the ENTIRE object on PUT.
+     * When updating only images or only product_option_values, the other
+     * association type was being lost. This caused:
+     * - Lost attributes when setting images
+     * - Lost images when setting attributes
+     * - "Undefined array key id" error in Combination.php line 434 when
+     *   PrestaShop tried to process malformed/missing association data
+     *
+     * This method merges NEW associations with EXISTING ones from the GET response,
+     * ensuring no data loss during partial updates.
+     *
+     * @param array $existing Existing combination data from getCombination()
+     * @param array $newAssociations New associations to set (e.g., ['images' => [...]])
+     * @return array Complete associations array with both existing and new data
+     */
+    protected function buildCombinationAssociations(array $existing, array $newAssociations): array
+    {
+        $existingAssociations = $existing['associations'] ?? [];
+        $result = [];
+
+        // Preserve existing product_option_values if not being overridden
+        if (!isset($newAssociations['product_option_values']) && !empty($existingAssociations['product_option_values'])) {
+            $result['product_option_values'] = $this->normalizeAssociationItems(
+                $existingAssociations['product_option_values']
+            );
+        }
+
+        // Preserve existing images if not being overridden
+        if (!isset($newAssociations['images']) && !empty($existingAssociations['images'])) {
+            $result['images'] = $this->normalizeAssociationItems(
+                $existingAssociations['images']
+            );
+        }
+
+        // Merge in the new associations (overriding existing ones of the same type)
+        foreach ($newAssociations as $key => $value) {
+            $result[$key] = $value;
+        }
+
+        \Log::debug('[PrestaShop8Client] buildCombinationAssociations', [
+            'existing_keys' => array_keys($existingAssociations),
+            'new_keys' => array_keys($newAssociations),
+            'result_keys' => array_keys($result),
+            'result_counts' => array_map(fn($v) => is_array($v) ? count($v) : 0, $result),
+        ]);
+
+        return $result;
+    }
+
+    /**
+     * Normalize association items from PrestaShop JSON response to array format
+     *
+     * PrestaShop JSON responses have variable formats for associations:
+     * - Multiple items: [{'id': '1'}, {'id': '2'}] (indexed array)
+     * - Single item: {'id': '1'} (associative array, NOT wrapped in indexed array)
+     * - Empty: [] or missing
+     *
+     * This normalizes all formats to: [['id' => X], ['id' => Y]]
+     *
+     * @param mixed $items Association items from JSON response
+     * @return array Normalized array of [['id' => int], ...]
+     */
+    protected function normalizeAssociationItems($items): array
+    {
+        if (empty($items)) {
+            return [];
+        }
+
+        // Already an indexed array of items: [{'id': '1'}, {'id': '2'}]
+        if (isset($items[0])) {
+            return array_map(function ($item) {
+                if (is_array($item) && isset($item['id'])) {
+                    return ['id' => (int) $item['id']];
+                }
+                return ['id' => (int) $item];
+            }, $items);
+        }
+
+        // Single item as associative array: {'id': '1'}
+        if (isset($items['id'])) {
+            return [['id' => (int) $items['id']]];
+        }
+
+        // Nested format: {'product_option_value': [...]} or {'image': [...]}
+        // PrestaShop sometimes wraps in singular key
+        foreach ($items as $key => $value) {
+            if (is_array($value)) {
+                return $this->normalizeAssociationItems($value);
+            }
+        }
+
+        return [];
     }
 }

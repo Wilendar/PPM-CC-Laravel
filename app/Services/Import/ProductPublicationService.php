@@ -123,8 +123,9 @@ class ProductPublicationService
                 $this->handleMedia($product, $pendingProduct);
 
                 // 5b. Assign product images to variants (for PPM UI + PS/ERP sync)
+                // FIX BUG#2: Pass PendingProduct to read per-variant image assignments from draft
                 if ($product->is_variant_master) {
-                    $this->assignVariantImages($product);
+                    $this->assignVariantImages($product, $pendingProduct);
                 }
 
                 // 6. Mark pending product as published
@@ -470,7 +471,11 @@ class ProductPublicationService
      */
     protected function createShopVariants(Product $product, PendingProduct $pendingProduct): void
     {
-        $shopIds = $pendingProduct->shop_ids ?? [];
+        // FIX BUG#1: Use publication_targets as source of truth, fallback to legacy shop_ids
+        $targets = $pendingProduct->publication_targets ?? [];
+        $shopIds = !empty($targets['prestashop_shops'])
+            ? $targets['prestashop_shops']
+            : ($pendingProduct->shop_ids ?? []);
         $variants = $product->variants()->with('attributes')->get();
 
         if ($variants->isEmpty() || empty($shopIds)) {
@@ -537,7 +542,11 @@ class ProductPublicationService
      */
     protected function createShopData(Product $product, PendingProduct $pendingProduct): void
     {
-        $shopIds = $pendingProduct->shop_ids ?? [];
+        // FIX BUG#1: Use publication_targets as source of truth, fallback to legacy shop_ids
+        $targets = $pendingProduct->publication_targets ?? [];
+        $shopIds = !empty($targets['prestashop_shops'])
+            ? $targets['prestashop_shops']
+            : ($pendingProduct->shop_ids ?? []);
         $shopCategories = $pendingProduct->shop_categories ?? [];
 
         foreach ($shopIds as $shopId) {
@@ -663,15 +672,17 @@ class ProductPublicationService
     }
 
     /**
-     * Assign product images to all variants.
+     * Assign product images to variants based on draft assignments.
      *
-     * Creates VariantImage records from product Media and updates
-     * ShopVariant.variant_data with media_ids for PS/ERP sync.
+     * FIX BUG#2: Reads variant_sku from PendingProduct.temp_media_paths
+     * to assign SPECIFIC images to SPECIFIC variants (not all-to-all).
      *
-     * By default ALL product images are assigned to ALL variants
-     * (same as PrestaShop's default combination image behavior).
+     * Logic:
+     * - Images with variant_sku -> assigned ONLY to matching variant
+     * - Images without variant_sku (null) -> assigned to ALL variants (shared)
+     * - No assignments in draft -> fallback to all-to-all (backward compat)
      */
-    protected function assignVariantImages(Product $product): void
+    protected function assignVariantImages(Product $product, ?PendingProduct $pendingProduct = null): void
     {
         $variants = $product->variants()->get();
         if ($variants->isEmpty()) {
@@ -691,46 +702,112 @@ class ProductPublicationService
             return;
         }
 
-        $mediaIds = $mediaRecords->pluck('id')->toArray();
-        $variantImagesCreated = 0;
+        // Build filename -> variant_sku mapping from draft
+        $fileVariantMap = $this->buildFileVariantMap($pendingProduct);
+        $hasAnyAssignment = !empty(array_filter($fileVariantMap));
 
-        // Create VariantImage records for each variant
+        $variantImagesCreated = 0;
+        $variantMediaMap = []; // variant_id -> [media_id, ...]
+
         foreach ($variants as $variant) {
-            // Skip if variant already has images (re-publication safety)
             if ($variant->images()->count() > 0) {
                 continue;
             }
 
-            foreach ($mediaRecords as $index => $media) {
-                VariantImage::create([
-                    'variant_id' => $variant->id,
-                    'image_path' => $media->file_path,
-                    'image_url' => null,
-                    'is_cover' => (bool) $media->is_primary,
-                    'position' => $index,
-                ]);
-                $variantImagesCreated++;
+            $variantMediaIds = [];
+            $position = 0;
+
+            foreach ($mediaRecords as $media) {
+                $fileName = basename($media->file_path);
+                $assignedSku = $fileVariantMap[$fileName] ?? null;
+
+                // Determine if this image should be assigned to this variant
+                $shouldAssign = false;
+                if (!$hasAnyAssignment) {
+                    // Fallback: no assignments in draft -> all images to all variants
+                    $shouldAssign = true;
+                } elseif ($assignedSku === null) {
+                    // Shared image (no variant_sku) -> assign to all variants
+                    $shouldAssign = true;
+                } elseif (str_ends_with($variant->sku, $assignedSku)) {
+                    // Specific assignment: variant SKU ends with assigned suffix
+                    $shouldAssign = true;
+                }
+
+                if ($shouldAssign) {
+                    VariantImage::create([
+                        'variant_id' => $variant->id,
+                        'image_path' => $media->file_path,
+                        'image_url' => null,
+                        'is_cover' => $position === 0,
+                        'position' => $position,
+                    ]);
+                    $variantMediaIds[] = $media->id;
+                    $variantImagesCreated++;
+                    $position++;
+                }
             }
+
+            $variantMediaMap[$variant->id] = $variantMediaIds;
         }
 
-        // Update ShopVariant records to include media_ids in variant_data
+        // Update ShopVariant records with PER-VARIANT media_ids
         $updatedShopVariants = 0;
         ShopVariant::where('product_id', $product->id)
             ->where('sync_status', 'pending')
-            ->each(function ($sv) use ($mediaIds, &$updatedShopVariants) {
+            ->each(function ($sv) use ($variantMediaMap, &$updatedShopVariants) {
+                $mediaIds = $variantMediaMap[$sv->variant_id] ?? [];
+                if (empty($mediaIds)) {
+                    return;
+                }
                 $variantData = $sv->variant_data ?? [];
                 $variantData['media_ids'] = $mediaIds;
                 $sv->update(['variant_data' => $variantData]);
                 $updatedShopVariants++;
             });
 
-        Log::info('ProductPublicationService: Variant images assigned from product media', [
+        Log::info('ProductPublicationService: Variant images assigned', [
             'product_id' => $product->id,
             'variants_count' => $variants->count(),
             'media_count' => $mediaRecords->count(),
+            'has_draft_assignments' => $hasAnyAssignment,
             'variant_images_created' => $variantImagesCreated,
             'shop_variants_updated' => $updatedShopVariants,
         ]);
+    }
+
+    /**
+     * Build filename -> variant_sku mapping from PendingProduct draft data.
+     *
+     * @return array<string, string|null> filename => variant_sku (null = shared)
+     */
+    protected function buildFileVariantMap(?PendingProduct $pendingProduct): array
+    {
+        if (!$pendingProduct) {
+            return [];
+        }
+
+        $rawPaths = $pendingProduct->temp_media_paths ?? [];
+        $images = $rawPaths['images'] ?? $rawPaths;
+
+        if (empty($images) || !is_array($images)) {
+            return [];
+        }
+
+        $map = [];
+        foreach ($images as $item) {
+            if (!is_array($item)) {
+                continue;
+            }
+            $path = $item['path'] ?? null;
+            if (!$path) {
+                continue;
+            }
+            $fileName = basename($path);
+            $map[$fileName] = $item['variant_sku'] ?? null;
+        }
+
+        return $map;
     }
 
     /**
@@ -745,7 +822,10 @@ class ProductPublicationService
             'published_at' => now(),
             'sku_snapshot' => $pendingProduct->sku,
             'name_snapshot' => $pendingProduct->name,
-            'published_shops' => $pendingProduct->shop_ids ?? [],
+            // FIX BUG#1: Record actual publication targets, not legacy shop_ids
+            'published_shops' => !empty(($pendingProduct->publication_targets ?? [])['prestashop_shops'])
+                ? $pendingProduct->publication_targets['prestashop_shops']
+                : ($pendingProduct->shop_ids ?? []),
             'published_categories' => $pendingProduct->category_ids ?? [],
             'sync_status' => PublishHistory::SYNC_PENDING,
             'publish_mode' => PublishHistory::MODE_SINGLE,
@@ -765,14 +845,9 @@ class ProductPublicationService
     {
         $targetService = app(PublicationTargetService::class);
 
-        // Resolve targets from publication_targets (supports both new and legacy format)
+        // FIX BUG#1: publication_targets is the SOLE source of truth for sync targets
+        // Previously merged legacy shop_ids which caused syncing to shops NOT selected by user
         $resolvedTargets = $targetService->resolveTargets($pendingProduct->publication_targets);
-
-        // Also include shops from shop_ids if not already in resolved targets
-        $shopIdsFromTargets = $resolvedTargets['prestashop_shop_ids'] ?? [];
-        $shopIdsFromPending = $pendingProduct->shop_ids ?? [];
-        $allShopIds = array_unique(array_merge($shopIdsFromTargets, $shopIdsFromPending));
-        $resolvedTargets['prestashop_shop_ids'] = array_values($allShopIds);
 
         if (empty($resolvedTargets['prestashop_shop_ids']) && empty($resolvedTargets['erp_connection_ids'])) {
             Log::warning('ProductPublicationService: No sync targets resolved', [

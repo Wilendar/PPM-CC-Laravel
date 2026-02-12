@@ -134,6 +134,9 @@ class ProductUnpublishService
                 // Delete integration mappings (BL mappings may already be deleted)
                 $product->integrationMappings()->delete();
 
+                // FIX BUG#3: Delete ERP data records (prevent orphaned records after forceDelete)
+                $product->erpData()->delete();
+
                 // Delete variant images before deleting variants
                 $variantIds = $product->variants()->pluck('id')->toArray();
                 if (!empty($variantIds)) {
