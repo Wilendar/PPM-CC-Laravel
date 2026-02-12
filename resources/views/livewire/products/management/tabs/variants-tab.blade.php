@@ -418,6 +418,13 @@
                                                 $imageCount = 0;
                                                 $imageUrl = null;
                                             }
+
+                                            // FIX 2026-02-12: Prefer local per-variant cover over PS images[0]
+                                            // PS sorts by id_image ascending → parent cover always first.
+                                            // local_cover_url has the correct per-variant cover from PPM.
+                                            if (!empty($variant->local_cover_url)) {
+                                                $imageUrl = $variant->local_cover_url;
+                                            }
                                         }
                                     }
 

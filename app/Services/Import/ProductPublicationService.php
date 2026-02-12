@@ -718,6 +718,7 @@ class ProductPublicationService
             }
 
             $variantMediaIds = [];
+            $coverMediaId = null;
             $position = 0;
 
             foreach ($mediaRecords as $media) {
@@ -759,10 +760,20 @@ class ProductPublicationService
                         'is_cover' => $isCover,
                         'position' => $position,
                     ]);
+
+                    if ($isCover) {
+                        $coverMediaId = $media->id;
+                    }
                     $variantMediaIds[] = $media->id;
                     $variantImagesCreated++;
                     $position++;
                 }
+            }
+
+            // Reorder media_ids: cover first (critical for PrestaShop combination image order)
+            if ($coverMediaId !== null && count($variantMediaIds) > 1) {
+                $variantMediaIds = array_values(array_diff($variantMediaIds, [$coverMediaId]));
+                array_unshift($variantMediaIds, $coverMediaId);
             }
 
             $variantMediaMap[$variant->id] = $variantMediaIds;
