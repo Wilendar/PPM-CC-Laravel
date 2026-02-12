@@ -2219,7 +2219,7 @@ class PrestaShop8Client extends BasePrestaShopClient
     /**
      * Update image positions via custom PPM module endpoint
      *
-     * Requires ppmimagemanager module installed on PrestaShop shop.
+     * Requires ppmmanager module installed on PrestaShop shop.
      * Falls back gracefully if module is not installed (returns false).
      *
      * @param int $productId PrestaShop product ID
@@ -2229,7 +2229,7 @@ class PrestaShop8Client extends BasePrestaShopClient
     public function updateImagePositions(int $productId, array $positions): bool
     {
         $baseUrl = rtrim($this->shop->url, '/');
-        $moduleUrl = $baseUrl . '/module/ppmimagemanager/api';
+        $moduleUrl = $baseUrl . '/module/ppmmanager/api';
 
         // Get API key from shop sync_settings or fallback
         $syncSettings = $this->shop->sync_settings ?? [];
@@ -2284,6 +2284,110 @@ class PrestaShop8Client extends BasePrestaShopClient
 
         } catch (\Exception $e) {
             \Log::warning('[IMAGE API] Position update request failed (module may not be installed)', [
+                'product_id' => $productId,
+                'shop_id' => $this->shop->id,
+                'error' => $e->getMessage(),
+            ]);
+            return false;
+        }
+    }
+
+    /**
+     * Set combination cover images via custom PPM module endpoint
+     *
+     * Requires ppmmanager module installed on PrestaShop shop.
+     * Falls back gracefully if module is not installed (returns false).
+     *
+     * CRITICAL: Must be called AFTER setCombinationImages because PrestaShop
+     * deletes and re-inserts ps_product_attribute_image rows, resetting cover to 0.
+     *
+     * @param int $productId PrestaShop product ID
+     * @param array $covers Map of [combination_id => ps_image_id]
+     * @return bool Success
+     */
+    public function setCombinationCovers(int $productId, array $covers): bool
+    {
+        $baseUrl = rtrim($this->shop->url, '/');
+        $moduleUrl = $baseUrl . '/module/ppmmanager/api';
+
+        // Get API key from shop sync_settings or fallback
+        $syncSettings = $this->shop->sync_settings ?? [];
+        $ppmApiKey = $syncSettings['ppm_module_api_key'] ?? '';
+
+        if (empty($ppmApiKey)) {
+            \Log::warning('[PPM MODULE] PPM module API key not configured for setCombinationCovers', [
+                'shop_id' => $this->shop->id,
+            ]);
+            return false;
+        }
+
+        try {
+            // DEBUG: Log request details
+            \Log::debug('[PPM MODULE] setCombinationCovers REQUEST', [
+                'product_id' => $productId,
+                'shop_id' => $this->shop->id,
+                'module_url' => $moduleUrl,
+                'covers' => $covers,
+                'covers_detail' => array_map(function($combinationId, $imageId) {
+                    return [
+                        'combination_id' => $combinationId,
+                        'image_id' => $imageId,
+                        'combination_id_type' => gettype($combinationId),
+                        'image_id_type' => gettype($imageId),
+                    ];
+                }, array_keys($covers), array_values($covers)),
+            ]);
+
+            $response = \Illuminate\Support\Facades\Http::timeout($this->timeout)
+                ->withHeaders([
+                    'X-PPM-Api-Key' => $ppmApiKey,
+                    'Content-Type' => 'application/json',
+                ])
+                ->post($moduleUrl, [
+                    'action' => 'setCombinationCovers',
+                    'product_id' => $productId,
+                    'covers' => $covers,
+                ]);
+
+            // DEBUG: Log response
+            \Log::debug('[PPM MODULE] setCombinationCovers RESPONSE', [
+                'product_id' => $productId,
+                'shop_id' => $this->shop->id,
+                'status' => $response->status(),
+                'body' => $response->body(),
+            ]);
+
+            if ($response->successful()) {
+                $data = $response->json();
+                if ($data['success'] ?? false) {
+                    \Log::info('[PPM MODULE] Combination covers set successfully', [
+                        'product_id' => $productId,
+                        'shop_id' => $this->shop->id,
+                        'covers_count' => count($covers),
+                        'response_data' => $data,
+                    ]);
+                    return true;
+                }
+            }
+
+            // 404 = module not installed
+            if ($response->status() === 404) {
+                \Log::info('[PPM MODULE] PPM module not installed on shop, skipping setCombinationCovers', [
+                    'shop_id' => $this->shop->id,
+                ]);
+                return false;
+            }
+
+            \Log::warning('[PPM MODULE] setCombinationCovers failed', [
+                'product_id' => $productId,
+                'shop_id' => $this->shop->id,
+                'status' => $response->status(),
+                'body' => substr($response->body(), 0, 300),
+            ]);
+            return false;
+
+        } catch (\Exception $e) {
+            \Log::warning('[PPM MODULE] setCombinationCovers request failed (module may not be installed)', [
                 'product_id' => $productId,
                 'shop_id' => $this->shop->id,
                 'error' => $e->getMessage(),

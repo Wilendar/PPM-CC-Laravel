@@ -581,9 +581,8 @@ class ShopVariantService
 
         // FIX 2026-01-29: Load local PPM variants with prices and stock
         // so PrestaShop Tab shows identical prices/stock as ERP/Default Tab
-        // FIX 2026-02-12: Also load images for per-variant cover display in Shop Tab
         $localVariants = $product->variants()
-            ->with(['prices', 'stock', 'images'])
+            ->with(['prices', 'stock'])
             ->get()
             ->keyBy('id');
 
@@ -639,10 +638,6 @@ class ShopVariantService
                 'minimal_quantity' => (int) ($combination['minimal_quantity'] ?? 1),
                 'attributes' => $this->extractCombinationAttributes($combination, $attributeNamesMap),
                 'images' => $this->extractCombinationImages($combination, $shopUrl, $prestashopProductId, $productImages),
-                // FIX 2026-02-12: Local per-variant cover URL for Shop Tab thumbnail display
-                // PrestaShop API sorts images by id_image (ascending), so parent cover always first.
-                // This provides the correct per-variant cover from PPM local data.
-                'local_cover_url' => $this->getLocalVariantCoverUrl($localVariant),
                 'operation_type' => $override?->operation_type ?? 'INHERIT',
                 'sync_status' => $override?->sync_status ?? 'synced',
             ];
@@ -846,28 +841,6 @@ class ShopVariantService
                 'thumbnail_url' => $imageUrl, // Same for now, could use smaller type
             ];
         }, $images);
-    }
-
-    /**
-     * Get local PPM variant cover image URL for Shop Tab display.
-     *
-     * Uses eager-loaded images relationship to avoid N+1 queries.
-     * Returns null when no local variant or no cover image.
-     *
-     * @param \App\Models\ProductVariant|null $localVariant
-     * @return string|null
-     */
-    protected function getLocalVariantCoverUrl(?\App\Models\ProductVariant $localVariant): ?string
-    {
-        if (!$localVariant) {
-            return null;
-        }
-
-        // Uses eager-loaded images collection (no extra query)
-        $coverImage = $localVariant->images->where('is_cover', true)->first()
-            ?? $localVariant->images->first();
-
-        return $coverImage?->getUrl();
     }
 
     /**

@@ -257,6 +257,14 @@ class SyncShopVariantsToPrestaShopJob implements ShouldQueue
                 $client->setCombinationImages($combinationId, $imageIds);
             }
 
+            // Set per-variant cover via PPM module (MUST be after setCombinationImages)
+            $coverImageId = $this->resolveCoverImageId($variantData, $shopVariant);
+            if ($coverImageId && !empty($imageIds)) {
+                $client->setCombinationCovers($prestashopProductId, [
+                    $combinationId => $coverImageId,
+                ]);
+            }
+
             // FIX 2026-01-29: Sync price and stock from PPM to PrestaShop after creating combination
             $this->syncVariantPrice($client, $shopVariant, $prestashopProductId, $combinationId);
             $this->syncVariantStock($client, $shopVariant, $prestashopProductId, $combinationId);
@@ -404,6 +412,14 @@ class SyncShopVariantsToPrestaShopJob implements ShouldQueue
             }
         }
 
+        // Set per-variant cover via PPM module (MUST be after setCombinationImages)
+        $coverImageId = $this->resolveCoverImageId($variantData, $shopVariant);
+        if ($coverImageId && !empty($imageIds)) {
+            $client->setCombinationCovers($prestashopProductId, [
+                $combinationId => $coverImageId,
+            ]);
+        }
+
         // FIX 2026-01-29: Sync price and stock from PPM to PrestaShop after updating combination
         $this->syncVariantPrice($client, $shopVariant, $prestashopProductId, $combinationId);
         $this->syncVariantStock($client, $shopVariant, $prestashopProductId, $combinationId);
@@ -457,6 +473,93 @@ class SyncShopVariantsToPrestaShopJob implements ShouldQueue
      * @param ShopVariant $shopVariant The ShopVariant model (for shop_id)
      * @return array PrestaShop image IDs ready for setCombinationImages()
      */
+    /**
+     * Resolve the PrestaShop image ID for a variant's cover image.
+     *
+     * Looks up VariantImage where is_cover=true, then finds the corresponding
+     * Media record and extracts the PS image ID from prestashop_mapping.
+     *
+     * @param array $variantData Variant data array
+     * @param ShopVariant $shopVariant
+     * @return int|null PS image ID or null if no cover found
+     */
+    protected function resolveCoverImageId(array $variantData, ShopVariant $shopVariant): ?int
+    {
+        $variantId = $shopVariant->variant_id;
+        if (!$variantId) {
+            return null;
+        }
+
+        // Find the cover image for this variant
+        $coverImage = \App\Models\VariantImage::where('variant_id', $variantId)
+            ->where('is_cover', true)
+            ->first();
+
+        if (!$coverImage || empty($coverImage->image_path)) {
+            return null;
+        }
+
+        // Find corresponding Media record by file_path scoped to this product
+        $productId = $shopVariant->product_id;
+
+        $media = \App\Models\Media::where('file_path', $coverImage->image_path)
+            ->where(function ($q) use ($productId) {
+                // Product-level media (most common)
+                $q->where(function ($sub) use ($productId) {
+                    $sub->where('mediable_type', 'App\\Models\\Product')
+                        ->where('mediable_id', $productId);
+                })
+                // Variant-level media (media linked to ProductVariant of this product)
+                ->orWhere(function ($sub) use ($productId) {
+                    $sub->where('mediable_type', 'App\\Models\\ProductVariant')
+                        ->whereIn('mediable_id', function ($variantQuery) use ($productId) {
+                            $variantQuery->select('id')
+                                ->from('product_variants')
+                                ->where('product_id', $productId);
+                        });
+                });
+            })
+            ->first();
+
+        if (!$media) {
+            Log::debug('[SyncShopVariantsJob] No Media record found for variant cover image', [
+                'variant_id' => $variantId,
+                'image_path' => $coverImage->image_path,
+                'product_id' => $productId,
+            ]);
+            return null;
+        }
+
+        // Look up PS image ID from prestashop_mapping using store key pattern
+        $mapping = $media->prestashop_mapping ?? [];
+        $shopId = $shopVariant->shop_id;
+        $shopMapping = $mapping["store_{$shopId}"]
+            ?? $mapping[$shopId]
+            ?? $mapping["shop_{$shopId}"]
+            ?? null;
+
+        if (!$shopMapping) {
+            Log::debug('[SyncShopVariantsJob] No PS mapping for cover image media', [
+                'media_id' => $media->id,
+                'shop_id' => $shopId,
+            ]);
+            return null;
+        }
+
+        $psImageId = (int) ($shopMapping['ps_image_id'] ?? $shopMapping['image_id'] ?? 0);
+
+        if ($psImageId > 0) {
+            Log::debug('[SyncShopVariantsJob] Resolved cover image PS ID', [
+                'variant_id' => $variantId,
+                'media_id' => $media->id,
+                'ps_image_id' => $psImageId,
+            ]);
+            return $psImageId;
+        }
+
+        return null;
+    }
+
     protected function resolveVariantImageIds(array $variantData, ShopVariant $shopVariant): array
     {
         // Try new format first: images with prestashop_image_id

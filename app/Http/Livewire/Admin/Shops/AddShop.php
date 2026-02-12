@@ -1523,7 +1523,7 @@ class AddShop extends Component
     private function testPpmModuleConnection($client = null): array
     {
         $baseUrl = rtrim($this->shopUrl, '/');
-        $moduleUrl = $baseUrl . '/module/ppmimagemanager/api';
+        $moduleUrl = $baseUrl . '/module/ppmmanager/api';
 
         try {
             $response = \Illuminate\Support\Facades\Http::timeout(10)
@@ -1584,7 +1584,7 @@ class AddShop extends Component
                     'check' => 'PPM Manager',
                     'status' => 'warning',
                     'message' => 'Modul nie zainstalowany na tym sklepie',
-                    'details' => 'Zainstaluj modul ppmimagemanager na sklepie PrestaShop',
+                    'details' => 'Zainstaluj modul ppmmanager na sklepie PrestaShop',
                 ];
             }
 
