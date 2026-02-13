@@ -748,6 +748,22 @@ class ProductPublicationService
                         $isCoverFromDraft = ($coverFileName !== null && $fileName === $coverFileName);
                     }
 
+                    // FIX: Don't assign parent's cover to variant if variant has its own cover.
+                    // Parent's cover (is_primary=true) is a shared image (assignedSku=null).
+                    // Including it in variant's media_ids causes PS to show parent cover
+                    // instead of variant's own cover (lower PS image ID = first in API response).
+                    // Skip ONLY if: variant has draft cover AND this is parent's primary
+                    // AND it's NOT the variant's designated cover image.
+                    if ($hasDraftCover && $media->is_primary && $assignedSku === null && !$isCoverFromDraft) {
+                        Log::debug('ProductPublicationService: Skipping parent cover for variant with own cover', [
+                            'variant_sku' => $variant->sku,
+                            'media_id' => $media->id,
+                            'parent_cover_file' => $fileName,
+                            'variant_cover_file' => $variantCoverFileMap[$variantSuffix] ?? 'N/A',
+                        ]);
+                        continue;
+                    }
+
                     // If draft has a cover for this variant -> ONLY that image is cover
                     // If no draft cover -> fallback to first image (position === 0)
                     $isCover = $hasDraftCover ? $isCoverFromDraft : ($position === 0);

@@ -756,9 +756,9 @@
                                             <td class="px-6 py-3">
                                                 <div class="text-sm text-gray-300">{{ Str::limit($variant->name, 40) }}</div>
                                                 @if($variant->attributes && $variant->attributes->isNotEmpty())
-                                                    {{-- FIX 2025-12-15: Show attribute group names (e.g. "Średnica / Kolor") --}}
+                                                    {{-- FIX 2026-02-13: Show attribute group + value (e.g. "Kolor: Żółty") --}}
                                                     <div class="text-xs text-gray-500 mt-0.5">
-                                                        {{ $variant->attributes->map(fn($a) => $a->attributeType?->name)->filter()->implode(' / ') }}
+                                                        {{ $variant->attributes->map(fn($a) => ($a->attributeType?->name ?? '') . ': ' . ($a->attributeValue?->label ?? '?'))->filter()->implode(' / ') }}
                                                     </div>
                                                 @endif
                                             </td>

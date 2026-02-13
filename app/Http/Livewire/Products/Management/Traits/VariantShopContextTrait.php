@@ -657,6 +657,22 @@ trait VariantShopContextTrait
             }
         }
 
+        // FIX 2026-02-13: Reorder ps_image_ids so the variant's actual cover is first.
+        // PrestaShop API returns images sorted by id_image (ascending), so the parent's
+        // cover (lower ID) appears first. We resolve the variant's actual cover from
+        // VariantImage.is_cover and move its PS image ID to position 0.
+        if (!empty($psImageIds) && $this->product) {
+            $coverPsImageId = $this->resolveVariantCoverPsImageId(
+                $psVariant->sku ?? '',
+                $this->activeShopId
+            );
+
+            if ($coverPsImageId && in_array($coverPsImageId, $psImageIds)) {
+                $psImageIds = array_values(array_diff($psImageIds, [$coverPsImageId]));
+                array_unshift($psImageIds, $coverPsImageId);
+            }
+        }
+
         // Load PS variant data into edit form
         $this->variantData = [
             'sku' => $psVariant->sku ?? '',
@@ -1167,5 +1183,65 @@ trait VariantShopContextTrait
     public function getShopVariantOverrideCount(int $shopId): int
     {
         return count($this->shopVariantOverrides[$shopId] ?? []);
+    }
+
+    /**
+     * Resolve the PrestaShop image ID that is the cover for a variant.
+     *
+     * FIX 2026-02-13: Uses VariantImage.is_cover → Media.prestashop_mapping
+     * to find the correct PS image ID for the variant's cover.
+     * Same logic as SyncShopVariantsToPrestaShopJob::resolveCoverImageId().
+     */
+    protected function resolveVariantCoverPsImageId(string $variantSku, ?int $shopId): ?int
+    {
+        if (empty($variantSku) || !$shopId || !$this->product) {
+            return null;
+        }
+
+        // Find PPM variant by SKU
+        $variant = $this->product->variants()->where('sku', $variantSku)->first();
+        if (!$variant) {
+            return null;
+        }
+
+        // Find cover image for this variant
+        $coverImage = \App\Models\VariantImage::where('variant_id', $variant->id)
+            ->where('is_cover', true)
+            ->first();
+
+        if (!$coverImage || empty($coverImage->image_path)) {
+            return null;
+        }
+
+        // Find Media record matching this image_path
+        $media = $this->product->media->first(function ($m) use ($coverImage) {
+            return $m->file_path === $coverImage->image_path;
+        });
+
+        if (!$media) {
+            return null;
+        }
+
+        // Get PS image ID from prestashop_mapping
+        $mapping = $media->prestashop_mapping ?? [];
+        $storeKey = "store_{$shopId}";
+        $shopMapping = $mapping[$storeKey] ?? $mapping[$shopId] ?? $mapping["shop_{$shopId}"] ?? null;
+
+        if (!$shopMapping) {
+            return null;
+        }
+
+        $psImageId = (int) ($shopMapping['ps_image_id'] ?? $shopMapping['image_id'] ?? 0);
+
+        if ($psImageId > 0) {
+            Log::debug('[PS VARIANT] Resolved cover PS image ID', [
+                'variant_sku' => $variantSku,
+                'shop_id' => $shopId,
+                'cover_image_path' => $coverImage->image_path,
+                'ps_image_id' => $psImageId,
+            ]);
+        }
+
+        return $psImageId > 0 ? $psImageId : null;
     }
 }

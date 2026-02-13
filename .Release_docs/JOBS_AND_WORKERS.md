@@ -1,9 +1,9 @@
 # PPM - Jobs & Workers Documentation
 
-> **Wersja:** 1.7
-> **Data:** 2026-02-09
+> **Wersja:** 1.8
+> **Data:** 2026-02-13
 > **Status:** Production Ready
-> **Changelog:** Bidirectional UVE Sync - ProductShopData jako single source of truth dla opisow
+> **Changelog:** Per-variant cover via ppmmanager PS module + Publication pipeline fix
 
 ---
 
@@ -50,6 +50,8 @@ PPM-CC-Laravel wykorzystuje **49 zdefiniowanych JOBow** zorganizowanych w 9 kate
 | **SmartMediaSyncService** | Inteligentny diff-based sync obrazkow do PrestaShop (v1.6) |
 | **MediaDiffCalculator** | Oblicza diff desired vs current PS state (v1.6) |
 | **MediaSyncService** | Legacy replace-all sync + metody reuse (upload, delete, cover) |
+| **ProductPublicationService** | Publikacja pending products: tworzenie Product/Variants/Media/ShopVariant + dispatch sync (v1.8) |
+| **PublicationTargetService** | Resolving target sklepow/ERP + dispatch sync jobs (v1.8) |
 
 ### Nowe w v1.6 (Smart Diff Media Sync)
 
@@ -78,6 +80,31 @@ PPM-CC-Laravel wykorzystuje **49 zdefiniowanych JOBow** zorganizowanych w 9 kate
 - **FIX: GalleryTab race condition** - `handleBeforeProductSave()` nie wywoluje juz `pushToPrestaShop()` bezposrednio (eliminacja race condition z sync jobem)
 - **FIX: savePendingChangesToShop** - Teraz przekazuje pending media changes z session do sync job (4th param)
 - **FIX: Soft-deleted media detection** - `MediaDiffCalculator::findMediaToDelete()` uzywa `withTrashed()` do wykrywania soft-deleted media z PS mapping
+
+### Nowe w v1.8 (Per-Variant Cover via PPM Manager + Publication Fix)
+
+- **Per-Variant Cover System** - Pelen pipeline okladzki per wariant via modul PrestaShop `ppmmanager`:
+  - `SyncShopVariantsToPrestaShopJob::resolveCoverImageId()` - rozwiazuje VariantImage.is_cover → Media → PS image ID
+  - `PrestaShop8Client::setCombinationCovers()` - HTTP POST do modulu ppmmanager
+  - `ppmmanager` modul: kolumna `cover` w `ps_product_attribute_image`, 3 hooki frontend
+  - `Combination::getImages()` override - sortowanie po `cover DESC` (cover image zawsze pierwsza)
+  - JS gallery reorder - Swiper thumbnails reorderowane dynamicznie przy zmianie wariantu
+- **Publication Pipeline Fix** - `assignVariantImages()` nie przypisuje okładki rodzica do wariantów:
+  - Jesli wariant ma wlasna okładke z draft (variant_covers map) → okładka rodzica (`is_primary=true`, shared image) jest POMIJANA
+  - Zapobiega sytuacji gdy okładka rodzica (nizszy PS image ID) jest wyswietlana jako cover wariantu w Shop Tab
+  - Edge case: jesli okładka rodzica IS okładka wariantu (ten sam obraz) → NIE jest pomijana
+  - Bez wlasnej okładki wariantu → fallback do pierwszego obrazka (backward compat)
+- **Variant Image Association Rules (Publication)**:
+  - Shared images (variant_sku=null, nie-primary) → przypisywane do WSZYSTKICH wariantow
+  - Variant-specific images (variant_sku='-RED') → przypisywane TYLKO do matching wariantu
+  - Parent cover (is_primary=true, shared) → SKIP jesli wariant ma wlasna okładke
+  - No draft assignments → all-to-all fallback (backward compat)
+- **Variant Sync Flow (PS)**:
+  1. `SyncProductToPrestaShop` → upload product images (SmartMediaSyncService)
+  2. `dispatchVariantSyncIfNeeded()` → dispatch `SyncShopVariantsToPrestaShopJob`
+  3. `handleAddOperation()` → setCombinationImages() → setCombinationCovers()
+  4. `resolveCoverImageId()` → VariantImage.is_cover → Media.prestashop_mapping → PS image ID
+  5. `setCombinationCovers()` → HTTP POST to ppmmanager module → ps_product_attribute_image.cover=1
 
 ### Nowe w v1.7 (Bidirectional UVE Sync + BUG#1-3 fixes)
 
@@ -614,7 +641,7 @@ Przeznaczenie:
 - Uzywa Bus::batch()
 ```
 
-#### SyncShopVariantsToPrestaShopJob (ETAP_14)
+#### SyncShopVariantsToPrestaShopJob (ETAP_14 + v1.8 Per-Variant Cover)
 ```
 Sciezka: app/Jobs/PrestaShop/SyncShopVariantsToPrestaShopJob.php
 Kolejka: default
@@ -626,28 +653,117 @@ Przeznaczenie:
 - Obsluga operacji ADD/OVERRIDE/DELETE per wariant
 - Sync cen jako price_impact (delta od ceny bazowej produktu)
 - Sync stanow magazynowych via stock_availables API
+- Per-variant cover via ppmmanager PS module (v1.8)
 
 Dane wejsciowe:
 - int $productId
 - int $shopId
 - ?string $preGeneratedJobId
 
-Metody pomocnicze (FIX 2026-01-29):
+Metody pomocnicze (FIX 2026-01-29 + v1.8 cover):
 - syncVariantPrice() - Oblicza price_impact = variant_price - base_price,
   aktualizuje combination.price w PrestaShop
 - syncVariantStock() - Pobiera stock_available dla combination,
   aktualizuje ilosc przez GET-MERGE-PUT pattern
+- resolveCoverImageId() - Rozwiazuje VariantImage.is_cover=true → Media →
+  prestashop_mapping → PS image ID (v1.8)
+- resolveVariantImageIds() - Rozwiazuje ShopVariant.variant_data['media_ids']
+  → PS image IDs z Media.prestashop_mapping
 
 Wylanie z handleAddOperation() i handleOverrideOperation():
-1. Tworzenie/aktualizacja combination (atrybuty, obrazy)
-2. syncVariantPrice() - sync ceny
-3. syncVariantStock() - sync stanu
-4. markAsSynced()
+1. Tworzenie/aktualizacja combination (atrybuty)
+2. resolveVariantImageIds() - rozwiaz media IDs → PS image IDs
+3. setCombinationImages() - przypisz obrazy do kombinacji w PS
+4. resolveCoverImageId() - znajdz PS image ID okładki wariantu
+5. setCombinationCovers() - ustaw okładke via ppmmanager module
+6. syncVariantPrice() - sync ceny
+7. syncVariantStock() - sync stanu
+8. markAsSynced()
+
+Per-Variant Cover Pipeline (v1.8):
+1. VariantImage.is_cover=true → wariant ma wlasna okładke w PPM DB
+2. resolveCoverImageId() → szuka Media po file_path z VariantImage
+3. Media.prestashop_mapping["store_{shopId}"]["ps_image_id"] → PS image ID
+4. setCombinationCovers(productId, {combinationId: psImageId})
+5. HTTP POST /module/ppmmanager/api → action=setCombinationCovers
+6. ps_product_attribute_image.cover = 1 (per combination per image)
+7. Hooki frontend: actionGetProductPropertiesAfter, actionPresentProduct,
+   displayHeader (JS gallery reorder via Swiper)
 
 Serwisy:
 - PrestaShop8Client::getStockForCombination()
 - PrestaShop8Client::updateStock() (GET-MERGE-PUT)
 - PrestaShop8Client::updateCombination()
+- PrestaShop8Client::setCombinationCovers() (v1.8 - via ppmmanager module)
+- PrestaShop8Client::setCombinationImages()
+
+ppmmanager PS Module (v1.8):
+- Endpoint: POST /module/ppmmanager/api
+- Actions: setCombinationCovers, updateImagePositions
+- DB: ALTER TABLE ps_product_attribute_image ADD cover TINYINT(1) DEFAULT 0
+- Override: Combination::getImages() - ORDER BY cover DESC
+- Hooki: actionGetProductPropertiesAfter, actionPresentProduct, displayHeader
+- Graceful degradation: jesli modul nie zainstalowany → skip cover update
+```
+
+#### Publication Pipeline - Variant Image Assignment (v1.8)
+```
+Sciezka: app/Services/Import/ProductPublicationService.php
+Metoda: assignVariantImages()
+
+Przeznaczenie:
+- Przypisanie obrazkow produktu do wariantow podczas publikacji z import panelu
+- Tworzenie VariantImage records z poprawnym is_cover
+- Aktualizacja ShopVariant.variant_data['media_ids']
+
+Zasady przypisania obrazkow do wariantow:
+1. Shared images (variant_sku=null, NOT parent cover) → ALL variants
+2. Variant-specific images (variant_sku='-RED') → ONLY matching variant
+3. Parent cover (is_primary=true, shared) → SKIP if variant has own cover (v1.8)
+4. No draft assignments → all-to-all fallback (backward compat)
+
+Zasada okładki wariantu (is_cover):
+- Variant has draft cover (variant_covers map) → ONLY designated image = is_cover=true
+- No draft cover → first assigned image (position=0) = is_cover=true (fallback)
+
+KRYTYCZNE (v1.8): Parent Cover Skip Rule:
+- Warunek skip: $hasDraftCover && $media->is_primary && $assignedSku === null && !$isCoverFromDraft
+- Jesli wariant ma wlasna okładke → NIE przypisuj okładki rodzica
+- Jesli okładka rodzica IS okładka wariantu (ten sam obraz) → NIE pomijaj
+- Zapobiega wyswietlaniu okładki rodzica w Shop Tab (nizszy PS image ID = first in API)
+
+Kolejnosc w publishSingle():
+1. createProductFromPending() → Product
+2. createVariants() → ProductVariant records
+3. createShopData() → ProductShopData per shop
+4. createShopVariants() → ShopVariant (operation_type='ADD', no media_ids yet)
+5. handleMedia() → Media records (is_primary = product cover)
+6. assignVariantImages() → VariantImage records + ShopVariant.variant_data['media_ids']
+7. dispatchAllSyncJobs() → SyncProductToPrestaShop → SyncShopVariantsToPrestaShopJob
+
+Diagram:
+PendingProduct.temp_media_paths:
+  images: [{path, variant_sku, is_cover, position}, ...]
+  variant_covers: {'-RED': 0, '-BLUE': 1}  ← index do images[]
+       ↓
+buildFileVariantMap() → {filename: variant_sku}
+buildVariantCoverMap() → {variant_sku: cover_filename}
+       ↓
+assignVariantImages():
+  for each variant:
+    for each media:
+      shouldAssign? → skip parent cover if variant has own cover
+      → VariantImage.create(is_cover)
+      → variantMediaIds[]
+  → ShopVariant.variant_data['media_ids'] = variantMediaIds
+       ↓
+SyncProductToPrestaShop → upload images → dispatchVariantSync
+       ↓
+SyncShopVariantsToPrestaShopJob:
+  resolveVariantImageIds(media_ids → PS image IDs)
+  setCombinationImages(combinationId, psImageIds)
+  resolveCoverImageId(VariantImage.is_cover → PS image ID)
+  setCombinationCovers(productId, {combinationId: coverPsImageId})
 ```
 
 #### Inne PrestaShop Jobs

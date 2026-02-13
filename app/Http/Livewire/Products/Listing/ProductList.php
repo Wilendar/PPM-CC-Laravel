@@ -870,8 +870,8 @@ class ProductList extends Component
                 // ETAP_07d FAZA 7: All active media for status check (expanded from primary only)
                 'media' => fn($q) => $q->where('is_active', true)->select('id', 'mediable_id', 'mediable_type', 'is_primary', 'is_active', 'prestashop_mapping'),
                 // FIX 2025-12-15: Eager load variants with attributes + prices/stock for status
-                'variants:id,product_id,sku,is_active',
-                'variants.images:id,variant_id',
+                'variants:id,product_id,sku,name,is_active',
+                'variants.images:id,variant_id,image_path,image_thumb_path,image_url,is_cached,is_cover,position',
                 'variants.prices:id,variant_id,price_group_id,price',
                 'variants.stock:id,variant_id,warehouse_id,quantity,reserved',
                 'variants.attributes.attributeType:id,name,code',
