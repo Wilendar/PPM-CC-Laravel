@@ -1,9 +1,9 @@
 # PPM - Jobs & Workers Documentation
 
-> **Wersja:** 1.8
+> **Wersja:** 1.9
 > **Data:** 2026-02-13
 > **Status:** Production Ready
-> **Changelog:** Per-variant cover via ppmmanager PS module + Publication pipeline fix
+> **Changelog:** Appendix D - Kompletny przewodnik eksportu wariantow do PrestaShop
 
 ---
 
@@ -17,6 +17,7 @@
 6. [Konfiguracja](#6-konfiguracja)
 7. [Deployment](#7-deployment)
 8. [Monitorowanie](#8-monitorowanie)
+- [Appendix D: Kompletny Przewodnik Eksportu Wariantow do PrestaShop](#appendix-d-kompletny-przewodnik-eksportu-wariantow-do-prestashop)
 
 ---
 
@@ -1668,6 +1669,436 @@ class SyncProductToPrestaShop implements ShouldQueue, ShouldBeUnique
         return "product_{$this->product->id}_shop_{$this->shop->id}";
     }
 }
+```
+
+---
+
+## Appendix D: Kompletny Przewodnik Eksportu Wariantow do PrestaShop
+
+### D.1 Wymagania Wstepne (Prerequisites)
+
+#### Wymagane komponenty
+
+| Komponent | Opis | Weryfikacja |
+|-----------|------|-------------|
+| **Produkt w PS** | Produkt musi byc juz zsynchronizowany do PrestaShop | `ProductShopData.prestashop_product_id` IS NOT NULL |
+| **Obrazy produktu w PS** | Obrazy musza byc uploadowane do PS (musi istniec `Media.prestashop_mapping`) | `Media.prestashop_mapping["store_{shopId}"]["ps_image_id"]` |
+| **Warianty w PPM** | Produkt musi miec `ProductVariant` records z atrybutami | `product.is_variant_master = true` |
+| **ShopVariant records** | Wymagane rekordy w `shop_variants` z `operation_type` i `variant_data` | `ShopVariant::where('product_id', X)` |
+| **Mapowanie atrybutow** | `prestashop_attribute_value_mapping` + `prestashop_attribute_group_mapping` | Opcjonalne - auto-create jesli brak |
+| **ppmmanager module** | Custom PS module dla per-variant cover images | Opcjonalne - graceful degradation |
+
+#### Wymagane tabele DB
+
+```
+shop_variants              - Rekordy wariantow per sklep (operation_type, variant_data, sync_status)
+prestashop_attribute_value_mapping   - Mapowanie PPM AttributeValue → PS ps_attribute
+prestashop_attribute_group_mapping   - Mapowanie PPM AttributeType → PS ps_attribute_group
+variant_images             - Zdjecia wariantow (is_cover, position)
+media                      - Pliki mediow z prestashop_mapping (PS image IDs)
+```
+
+#### Wymagane serwisy
+
+| Serwis | Plik | Rola |
+|--------|------|------|
+| PrestaShop8Client | `app/Services/PrestaShop/PrestaShop8Client.php` | API client |
+| ShopVariantService | `app/Services/PrestaShop/ShopVariantService.php` | Mapowanie wariantow |
+| ProductPublicationService | `app/Services/Import/ProductPublicationService.php` | Publikacja z import panelu |
+
+### D.2 Przeplyw End-to-End (Flow Diagram)
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    ZRODLA TRIGGERA                           │
+├─────────────────────────────────────────────────────────────┤
+│ 1. Shop Tab UI → "Zapisz zmiany" (manual edit)              │
+│ 2. Import Panel → "Publikuj" (ProductPublicationService)     │
+│ 3. SyncProductToPrestaShop → dispatchVariantSyncIfNeeded()   │
+└──────────────────────────┬──────────────────────────────────┘
+                           │
+                           ▼
+┌─────────────────────────────────────────────────────────────┐
+│              ShopVariant records (DB)                        │
+│  operation_type: ADD | OVERRIDE | DELETE | INHERIT           │
+│  sync_status: pending → in_progress → synced/failed          │
+│  variant_data: {sku, attributes, media_ids, images, ...}     │
+└──────────────────────────┬──────────────────────────────────┘
+                           │
+                           ▼
+┌─────────────────────────────────────────────────────────────┐
+│         SyncShopVariantsToPrestaShopJob::handle()            │
+│  1. Walidacja: Product exists? Shop exists? PS product ID?   │
+│  2. Pobranie pending ShopVariants                            │
+│  3. Mark all as in_progress                                  │
+│  4. Loop: syncShopVariant() per each                         │
+│  5. broadcastCompletion() → Livewire event                   │
+└──────────────────────────┬──────────────────────────────────┘
+                           │
+              ┌────────────┼────────────┬──────────┐
+              ▼            ▼            ▼          ▼
+          [ADD]      [OVERRIDE]     [DELETE]   [INHERIT]
+              │            │            │          │
+              ▼            ▼            ▼          ▼
+    createCombination  updateCombi   deleteComb  markSynced
+    setAttributes      setAttributes (done)      (done)
+    setImages          setImages
+    setCover           setCover
+    syncPrice          syncPrice
+    syncStock          syncStock
+    markSynced         markSynced
+```
+
+### D.3 Typy Operacji (Operation Types)
+
+#### ADD - Tworzenie nowej kombinacji
+
+```
+Kiedy: Wariant nie istnieje w PrestaShop (brak prestashop_combination_id)
+Trigger: Pierwsza publikacja, nowy wariant dodany w UI
+
+Kroki:
+1. createCombination(productId, {reference, price, weight, minimal_quantity, default_on})
+   → Zwraca combinationId
+2. resolvePrestaShopAttributeIds(attributes, shopId, client)
+   → Mapuje PPM attribute IDs → PS attribute IDs (auto-create jesli brak)
+3. setCombinationAttributes(combinationId, psAttributeIds)
+   → PUT XML do /api/combinations/{id}
+4. resolveVariantImageIds(variantData, shopVariant)
+   → Mapuje PPM media_ids → PS image IDs via prestashop_mapping
+5. setCombinationImages(combinationId, psImageIds)
+   → PUT XML do /api/combinations/{id}
+6. resolveCoverImageId(variantData, shopVariant)
+   → VariantImage.is_cover=true → Media → prestashop_mapping → PS image ID
+7. setCombinationCovers(productId, {combinationId: coverPsImageId})
+   → POST do /module/ppmmanager/api (action=setCombinationCovers)
+8. syncVariantPrice(client, shopVariant, productId, combinationId)
+   → Oblicza price_impact = variant_price - base_price → updateCombination
+9. syncVariantStock(client, shopVariant, productId, combinationId)
+   → getStockForCombination → updateStock (GET-MERGE-PUT)
+10. markAsSynced(combinationId)
+```
+
+#### OVERRIDE - Aktualizacja istniejącej kombinacji
+
+```
+Kiedy: Wariant juz istnieje w PrestaShop (ma prestashop_combination_id)
+Trigger: Edycja wariantu w Shop Tab UI, re-publikacja
+
+Kroki: Identyczne jak ADD, ale zamiast createCombination:
+1. updateCombination(combinationId, updates)
+   → GET-MERGE-PUT do /api/combinations/{id}
+2-10. Jak w ADD
+
+Obsluga bledow:
+- 404 "Combination not found" → Fallback do ADD (clear stale ID, create new)
+- Kazdy sub-krok (setAttributes, setImages) rowniez ma 404→ADD fallback
+```
+
+#### DELETE - Usunięcie kombinacji
+
+```
+Kiedy: Wariant usuniety z PPM lub oznaczony do usuniecia
+Trigger: UI "Usun wariant" w Shop Tab
+
+Kroki:
+1. deleteCombination(combinationId)
+   → DELETE /api/combinations/{id}
+2. markAsSynced() (usuniety = synced)
+```
+
+#### INHERIT - Brak synchronizacji
+
+```
+Kiedy: Wariant dziedziczy dane z produktu bazowego, brak dedykowanych zmian
+Trigger: Automatycznie dla wariantow bez pending changes
+
+Kroki:
+1. markAsSynced() (nic do robienia)
+```
+
+### D.4 Rozwiazywanie Atrybutow (Attribute Resolution)
+
+#### Pipeline mapowania
+
+```
+PPM AttributeType (np. "Kolor")    → prestashop_attribute_group_mapping → PS ps_attribute_group
+PPM AttributeValue (np. "Czerwony") → prestashop_attribute_value_mapping → PS ps_attribute
+```
+
+#### Wspierane formaty wejsciowe
+
+| Format | Przyklad | Zrodlo |
+|--------|----------|--------|
+| PPM key-value | `{1: 5, 2: 8}` (type_id → value_id) | UI input |
+| PS resolved | `[{prestashop_attribute_id: 42}]` | Pull z PS |
+| Mixed | `[{id: 1, value_id: 5}]` | Import |
+
+#### Auto-Create brakujacych atrybutow
+
+Gdy brak mapowania w `prestashop_attribute_value_mapping`:
+
+```
+1. ensureAttributeValueMapped(client, valueId, shopId):
+   a. Pobierz AttributeValue + AttributeType z DB
+   b. ensureAttributeGroupMapped(client, attributeType, shopId):
+      - Sprawdz prestashop_attribute_group_mapping → istniejacy mapping?
+      - Szukaj w PS po nazwie (findPrestaShopAttributeGroup) → istniejacy group?
+      - Jesli nie → createPrestaShopAttributeGroup(client, attributeType)
+      - Zapisz mapping do prestashop_attribute_group_mapping
+   c. Szukaj wartosci w PS po nazwie (findPrestaShopAttributeValue) → istniejaca?
+   d. Jesli nie → createPrestaShopAttributeValue(client, groupId, attributeValue)
+   e. Zapisz mapping do prestashop_attribute_value_mapping
+   f. Return PS attribute ID
+```
+
+### D.5 Rozwiazywanie Obrazow (Image Resolution)
+
+#### resolveVariantImageIds() - Przypisanie obrazow do kombinacji
+
+Wspiera 2 formaty:
+
+**Format 1 (nowy):** `variant_data['images']` z `prestashop_image_id`
+```json
+{
+  "images": [
+    {"prestashop_image_id": 13305},
+    {"prestashop_image_id": 13308}
+  ]
+}
+```
+
+**Format 2 (legacy):** `variant_data['media_ids']` (PPM Media IDs)
+```json
+{
+  "media_ids": [45, 46, 47]
+}
+```
+
+Pipeline resolution (legacy format):
+```
+media_ids: [45, 46, 47]
+    → Media::whereIn('id', [45, 46, 47])
+    → for each media:
+        media.prestashop_mapping["store_{shopId}"]["ps_image_id"]
+        lub media.prestashop_mapping[shopId]["image_id"]
+    → [13305, 13306, 13308] (PS image IDs)
+```
+
+#### resolveCoverImageId() - Okladzka wariantu
+
+```
+1. VariantImage::where('variant_id', X)->where('is_cover', true)->first()
+   → coverImage.image_path (np. "products/123/cover.jpg")
+
+2. Media::where('file_path', coverImage.image_path)
+     ->where(mediable_type = Product AND mediable_id = productId
+             OR mediable_type = ProductVariant AND mediable_id IN productVariantIds)
+   → media record
+
+3. media.prestashop_mapping["store_{shopId}"]["ps_image_id"]
+   → PS image ID (np. 13307)
+
+4. setCombinationCovers(productId, {combinationId: 13307})
+   → POST /module/ppmmanager/api
+   → ps_product_attribute_image.cover = 1
+```
+
+### D.6 Sync Cen (Price Sync)
+
+```
+Problem: PrestaShop uzywa price_impact (delta), nie ceny absolutnej.
+         Np. produkt bazowy = 100 PLN, wariant = 120 PLN → price_impact = +20.
+
+Pipeline:
+1. Pobierz PPM variant price: ProductVariant->prices->first()->price (120.00)
+2. Pobierz PS base price: client->getProduct(psProductId)['product']['price'] (100.00)
+3. Oblicz delta: round(120.00 - 100.00, 6) = 20.000000
+4. updateCombination(combinationId, {price: 20.000000})
+
+Warunki skip:
+- Wariant nie istnieje lokalnie → skip
+- Variant price <= 0 → skip
+- Blad → log error, NIE failuj calego joba (secondary operation)
+```
+
+### D.7 Sync Stanow Magazynowych (Stock Sync)
+
+```
+Problem: PS przechowuje stock per kombinacja w stock_availables
+         z id_product_attribute = combinationId.
+
+Pipeline:
+1. Pobierz PPM stock: ProductVariant->stock->sum('quantity') (totalStock)
+2. Znajdz PS stock_available: getStockForCombination(productId, combinationId)
+   → GET /api/stock_availables?filter[id_product]={productId}&filter[id_product_attribute]={combinationId}
+   → {id: stockAvailableId, quantity: currentQty}
+3. updateStock(stockAvailableId, totalStock, productId, combinationId)
+   → GET-MERGE-PUT /api/stock_availables/{id}
+   → Wymagane pola: id, id_product, id_product_attribute, quantity
+
+Warunki skip:
+- Wariant nie istnieje lokalnie → skip
+- Brak stock_available w PS → skip (log warning)
+- Blad → log error, NIE failuj calego joba
+```
+
+### D.8 Struktura variant_data (ShopVariant JSON)
+
+```json
+{
+  "sku": "TEST-SKU-001-RED",
+  "price_impact": 20.0,
+  "weight_impact": 0.5,
+  "minimal_quantity": 1,
+  "is_default": false,
+  "is_active": true,
+  "attributes": {
+    "1": 5,
+    "2": 8
+  },
+  "media_ids": [45, 46, 47],
+  "images": [
+    {"prestashop_image_id": 13305, "is_cover": false},
+    {"prestashop_image_id": 13308, "is_cover": true}
+  ]
+}
+```
+
+| Pole | Typ | Opis |
+|------|-----|------|
+| `sku` | string | SKU wariantu (reference w PS) |
+| `price_impact` | float | Delta ceny (variant - base) |
+| `weight_impact` | float | Delta wagi |
+| `minimal_quantity` | int | Min ilosc zakupu |
+| `is_default` | bool | Czy domyslny wariant |
+| `is_active` | bool | Czy aktywny |
+| `attributes` | object | `{attribute_type_id: attribute_value_id}` |
+| `media_ids` | array | PPM Media IDs (legacy format) |
+| `images` | array | Obrazy z PS image IDs (nowy format) |
+
+### D.9 Publication Pipeline (Import Panel → PS)
+
+Publikacja produktu z pending import tworzy caly lancuch:
+
+```
+PendingProduct (import panel)
+    │
+    ├─ 1. createProductFromPending() → Product
+    ├─ 2. createVariants() → ProductVariant records
+    ├─ 3. createShopData() → ProductShopData per shop
+    ├─ 4. createShopVariants() → ShopVariant (operation_type='ADD', bez media_ids)
+    ├─ 5. handleMedia() → Media records (is_primary = product cover)
+    ├─ 6. assignVariantImages():
+    │     ├─ buildFileVariantMap() → {filename: variant_sku}
+    │     ├─ buildVariantCoverMap() → {variant_sku: cover_filename}
+    │     └─ for each variant:
+    │         ├─ shouldAssign? → skip parent cover jesli wariant ma wlasna okładke
+    │         ├─ VariantImage::create({is_cover, position})
+    │         └─ collect variantMediaIds
+    │     → ShopVariant.variant_data['media_ids'] = variantMediaIds
+    │
+    ├─ 7. dispatchAllSyncJobs():
+    │     ├─ SyncProductToPrestaShop → upload images (SmartMediaSyncService)
+    │     └─ ↓ (after product sync)
+    │
+    └─ 8. SyncShopVariantsToPrestaShopJob:
+          ├─ resolveVariantImageIds(media_ids → PS image IDs)
+          ├─ setCombinationImages(combinationId, psImageIds)
+          ├─ resolveCoverImageId(VariantImage.is_cover → PS image ID)
+          ├─ setCombinationCovers(productId, {combinationId: coverPsImageId})
+          ├─ syncVariantPrice()
+          └─ syncVariantStock()
+```
+
+#### Zasady przypisania obrazkow (assignVariantImages)
+
+| Typ obrazka | Warunek | Przypisanie |
+|-------------|---------|-------------|
+| Shared (variant_sku=null, nie-cover) | Zawsze | WSZYSTKIE warianty |
+| Variant-specific (variant_sku='-RED') | Match SKU suffix | TYLKO matching wariant |
+| Parent cover (is_primary=true, shared) | Wariant ma wlasna okładke | **SKIP** (v1.8) |
+| Parent cover (is_primary=true, shared) | Wariant BEZ wlasnej okładki | Przypisz normalnie |
+| Parent cover = variant cover (ten sam obraz) | Edge case | **NIE pomijaj** |
+
+### D.10 PrestaShop8Client - Metody Combination API
+
+| Metoda | HTTP | Endpoint | Opis |
+|--------|------|----------|------|
+| `createCombination($productId, $data)` | POST | `/api/combinations` | Tworzy nowa kombinacje |
+| `updateCombination($combinationId, $updates)` | GET+PUT | `/api/combinations/{id}` | GET-MERGE-PUT update |
+| `deleteCombination($combinationId)` | DELETE | `/api/combinations/{id}` | Usuwa kombinacje |
+| `setCombinationAttributes($combinationId, $attrIds)` | PUT | `/api/combinations/{id}` | Ustawia atrybuty |
+| `setCombinationImages($combinationId, $imageIds)` | PUT | `/api/combinations/{id}` | Przypisuje obrazy |
+| `setCombinationCovers($productId, $covers)` | POST | `/module/ppmmanager/api` | Per-variant cover (custom module) |
+| `getStockForCombination($productId, $combinationId)` | GET | `/api/stock_availables` | Stock wariantu |
+| `updateStock($stockId, $qty, $productId, $combinationId)` | GET+PUT | `/api/stock_availables/{id}` | GET-MERGE-PUT stock update |
+
+### D.11 Error Handling i Fallback
+
+| Scenariusz | Zachowanie |
+|------------|------------|
+| **404 przy OVERRIDE** | Clear stale combination_id → fallback do ADD (create new) |
+| **404 przy setCombinationAttributes** | Fallback do ADD |
+| **404 przy setCombinationImages** | Fallback do ADD |
+| **Brak PS product ID** | Mark all as failed, skip sync |
+| **Blad price sync** | Log error, kontynuuj (nie failuj joba) |
+| **Blad stock sync** | Log error, kontynuuj (nie failuj joba) |
+| **Brak mappingu atrybutow** | Auto-create group + value w PS via API |
+| **ppmmanager nie zainstalowany** | Skip cover update (graceful degradation) |
+| **setCombinationImages returns false** | Log warning, kontynuuj |
+| **Job failure** | markAllAsFailed() + broadcastCompletion(false) |
+| **Max retries (3)** | Job::failed() → mark all failed + broadcast |
+
+### D.12 Monitorowanie i Debugging
+
+#### Logi do szukania
+
+```bash
+# Caly flow wariantow
+grep "SyncShopVariantsJob" storage/logs/laravel.log
+
+# Konkretne operacje
+grep "ADD successful\|OVERRIDE successful\|DELETE successful" storage/logs/laravel.log
+
+# Bledy
+grep "SyncShopVariantsJob.*FAILED\|SyncShopVariantsJob.*error\|SyncShopVariantsJob.*Failed" storage/logs/laravel.log
+
+# Auto-create atrybutow
+grep "Auto-created attribute\|ensureAttributeValueMapped" storage/logs/laravel.log
+
+# Cover resolution
+grep "Resolved cover image\|No Media record found for variant cover" storage/logs/laravel.log
+
+# 404 fallback
+grep "OVERRIDE 404\|falling back to ADD" storage/logs/laravel.log
+```
+
+#### Weryfikacja w DB
+
+```sql
+-- Pending warianty do sync
+SELECT sv.id, sv.operation_type, sv.sync_status, sv.variant_data, sv.prestashop_combination_id
+FROM shop_variants sv
+WHERE sv.product_id = ? AND sv.shop_id = ? AND sv.sync_status = 'pending';
+
+-- Mapowanie atrybutow
+SELECT avm.*, av.label as value_name, at2.name as group_name
+FROM prestashop_attribute_value_mapping avm
+JOIN attribute_values av ON av.id = avm.attribute_value_id
+JOIN attribute_types at2 ON at2.id = av.attribute_type_id
+WHERE avm.prestashop_shop_id = ?;
+
+-- Cover images wariantow
+SELECT vi.variant_id, vi.is_cover, vi.image_path, vi.position
+FROM variant_images vi
+JOIN product_variants pv ON pv.id = vi.variant_id
+WHERE pv.product_id = ? AND vi.is_cover = 1;
+
+-- Media PS mapping
+SELECT m.id, m.file_path, m.prestashop_mapping
+FROM media m
+WHERE m.mediable_type = 'App\\Models\\Product' AND m.mediable_id = ?;
 ```
 
 ---
