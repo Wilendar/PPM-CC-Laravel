@@ -294,6 +294,37 @@ class CategoryPreviewModal extends Component
 
     /*
     |--------------------------------------------------------------------------
+    | TAB SYSTEM & TREE PROPERTIES
+    |--------------------------------------------------------------------------
+    */
+
+    /**
+     * Active tab in modal: 'categories' or 'product_types'
+     */
+    public string $activeTab = 'categories';
+
+    /**
+     * Expanded node IDs in PPM tree
+     */
+    public array $expandedNodes = [];
+
+    /**
+     * Show warning modal for products without categories
+     */
+    public bool $showNoCategoryWarning = false;
+
+    /**
+     * Count of products without any PPM category
+     */
+    public int $productsWithoutCategoriesCount = 0;
+
+    /**
+     * Current page for product types tab pagination
+     */
+    public int $productTypesPage = 1;
+
+    /*
+    |--------------------------------------------------------------------------
     | EVENT LISTENERS
     |--------------------------------------------------------------------------
     */
@@ -383,8 +414,14 @@ class CategoryPreviewModal extends Component
             // ETAP_07f: Load comparison tree for enhanced view
             $this->loadComparisonTree();
 
+            // Reset expanded nodes before opening
+            $this->expandedNodes = [];
+
             // Open modal
             $this->isOpen = true;
+
+            // Pre-compute expanded nodes for product categories
+            $this->initAutoExpandedNodes($preview);
 
             Log::info('CategoryPreviewModal: Opened successfully', [
                 'preview_id' => $previewId,
@@ -393,6 +430,7 @@ class CategoryPreviewModal extends Component
                 'selected_count' => count($this->selectedCategoryIds),
                 'conflicts_detected' => count($this->detectedConflicts),
                 'comparison_tree_size' => count($this->comparisonTree),
+                'auto_expanded_nodes' => count($this->expandedNodes),
             ]);
 
         } catch (\Exception $e) {
@@ -437,6 +475,11 @@ class CategoryPreviewModal extends Component
             'selectedConflictProduct',
             'selectedResolution',
             'manuallySelectedCategories',
+            'activeTab',
+            'expandedNodes',
+            'showNoCategoryWarning',
+            'productsWithoutCategoriesCount',
+            'productTypesPage',
         ]);
 
         $this->resetValidation();
@@ -1283,6 +1326,676 @@ class CategoryPreviewModal extends Component
 
             $this->dispatch('error', message: 'Błąd podczas anulowania: ' . $e->getMessage());
         }
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | TAB & TREE METHODS
+    |--------------------------------------------------------------------------
+    */
+
+    /**
+     * Switch active tab
+     */
+    public function setActiveTab(string $tab): void
+    {
+        $this->activeTab = $tab;
+        if ($tab === 'product_types') {
+            $this->productTypesPage = 1;
+        }
+    }
+
+    /**
+     * Toggle tree node expand/collapse
+     */
+    public function toggleNode(int|string $categoryId): void
+    {
+        if (in_array($categoryId, $this->expandedNodes)) {
+            $this->expandedNodes = array_values(
+                array_filter($this->expandedNodes, fn($id) => $id !== $categoryId)
+            );
+        } else {
+            $this->expandedNodes[] = $categoryId;
+        }
+    }
+
+    /**
+     * Build full PPM tree merged with missing categories from preview
+     * Default: collapsed, expanded only where new categories exist
+     *
+     * @return array
+     */
+    /**
+     * Get PPM category IDs that are product categories (assigned to imported products)
+     *
+     * @return array{ppm_ids: int[], ps_ids: int[]}
+     */
+    protected function getProductCategoryPpmIds(): array
+    {
+        if (!$this->previewId) {
+            return ['ppm_ids' => [], 'ps_ids' => []];
+        }
+
+        $preview = CategoryPreview::find($this->previewId);
+        if (!$preview) {
+            return ['ppm_ids' => [], 'ps_ids' => []];
+        }
+
+        $products = $preview->import_context_json['analyzed_products'] ?? [];
+        if (empty($products)) {
+            return ['ppm_ids' => [], 'ps_ids' => []];
+        }
+
+        // Collect all PS category IDs (handle both formats)
+        $psCatIds = [];
+        foreach ($products as $p) {
+            foreach ($p['categories'] ?? [] as $cat) {
+                $id = is_array($cat) ? (int) ($cat['id'] ?? 0) : (int) $cat;
+                if ($id > 0) {
+                    $psCatIds[] = $id;
+                }
+            }
+        }
+        $psCatIds = array_unique($psCatIds);
+
+        // Map PS → PPM via ShopMapping
+        $ppmIds = [];
+        if (!empty($psCatIds) && $preview->shop_id) {
+            $ppmIds = ShopMapping::where('shop_id', $preview->shop_id)
+                ->where('mapping_type', ShopMapping::TYPE_CATEGORY)
+                ->whereIn('prestashop_id', $psCatIds)
+                ->pluck('ppm_value')
+                ->map(fn($v) => (int) $v)
+                ->toArray();
+        }
+
+        return [
+            'ppm_ids' => $ppmIds,
+            'ps_ids' => $psCatIds,
+        ];
+    }
+
+    public function getFullPpmTreeProperty(): array
+    {
+        if (!$this->isOpen) {
+            return [];
+        }
+
+        try {
+            // Get product category data for "produkt" badges
+            $productCatData = $this->getProductCategoryPpmIds();
+            $productPpmIds = $productCatData['ppm_ids'] ?? [];
+            $productPsIds = $productCatData['ps_ids'] ?? [];
+
+            // 1. Get full PPM tree (root categories with all descendants)
+            $ppmCategories = Category::whereNull('parent_id')
+                ->where('is_active', true)
+                ->orderBy('sort_order')
+                ->orderBy('name')
+                ->get();
+
+            // 2. Build tree with status markers and product flags
+            $tree = [];
+            foreach ($ppmCategories as $category) {
+                $tree[] = $this->buildTreeNode($category, $productPpmIds);
+            }
+
+            // 3. Merge missing categories from preview (with duplicate detection)
+            $missingCategories = $this->getMissingCategoriesFlat();
+            $tree = $this->mergeMissingIntoTree($tree, $missingCategories, $productPsIds);
+
+            // 4. Auto-expand branches with new categories
+            $this->autoExpandNewBranches($tree);
+
+            return $tree;
+        } catch (\Exception $e) {
+            Log::error('CategoryPreviewModal: Failed to build PPM tree', [
+                'error' => $e->getMessage(),
+            ]);
+            return [];
+        }
+    }
+
+    /**
+     * Build tree node recursively from Category model
+     *
+     * @param Category $category
+     * @param array $productPpmIds PPM category IDs assigned to imported products
+     */
+    protected function buildTreeNode(Category $category, array $productPpmIds = []): array
+    {
+        $children = [];
+        $hasProductDescendants = false;
+
+        foreach ($category->children()->where('is_active', true)->orderBy('sort_order')->orderBy('name')->get() as $child) {
+            $childNode = $this->buildTreeNode($child, $productPpmIds);
+            if ($childNode['is_product_category'] || ($childNode['has_product_descendants'] ?? false)) {
+                $hasProductDescendants = true;
+            }
+            $children[] = $childNode;
+        }
+
+        $isProduct = in_array($category->id, $productPpmIds);
+
+        return [
+            'id' => $category->id,
+            'name' => $category->name,
+            'level' => $category->level ?? 0,
+            'status' => 'existing',
+            'children' => $children,
+            'prestashop_id' => null,
+            'has_new_descendants' => false,
+            'is_product_category' => $isProduct,
+            'has_product_descendants' => $hasProductDescendants,
+        ];
+    }
+
+    /**
+     * Get flat list of missing categories from preview
+     */
+    protected function getMissingCategoriesFlat(): array
+    {
+        $missing = [];
+        $this->flattenMissingCategories($this->categoryTree, $missing);
+        return $missing;
+    }
+
+    /**
+     * Flatten missing categories tree to flat array
+     * BUG#1 FIX: Resolves parent_ps_id to FULL PPM path (not just name)
+     * and stores parent_ppm_id for accurate tree expansion
+     */
+    protected function flattenMissingCategories(array $categories, array &$result, ?string $parentPath = null, ?int $parentPpmId = null): void
+    {
+        foreach ($categories as $cat) {
+            $isExisting = $cat['exists_in_ppm'] ?? false;
+            $name = $cat['name'] ?? 'Unknown';
+
+            // Resolve parent for orphaned categories (parent exists in PPM)
+            $effectiveParentPath = $parentPath;
+            $effectiveParentPpmId = $parentPpmId;
+            if (!$parentPath && !empty($cat['parent_ps_id']) && $this->shopId) {
+                $resolved = $this->resolveParentPathFromPsId((int) $cat['parent_ps_id']);
+                if ($resolved) {
+                    $effectiveParentPath = $resolved['path'];
+                    $effectiveParentPpmId = $resolved['ppm_id'];
+                }
+            }
+
+            $path = $effectiveParentPath ? $effectiveParentPath . ' > ' . $name : $name;
+
+            if (!$isExisting) {
+                $result[] = [
+                    'name' => $name,
+                    'path' => $path,
+                    'prestashop_id' => $cat['prestashop_id'] ?? $cat['id'] ?? 0,
+                    'parent_name' => $effectiveParentPath,
+                    'parent_ppm_id' => $effectiveParentPpmId,
+                    'level_depth' => $cat['level_depth'] ?? 0,
+                ];
+            }
+
+            if (!empty($cat['children'])) {
+                $this->flattenMissingCategories($cat['children'], $result, $path, $effectiveParentPpmId);
+            }
+        }
+    }
+
+    /**
+     * Resolve PrestaShop parent category ID to full PPM category path
+     * Returns full ancestry path like "Baza > Czesci zamienne > Czesci Mini GP"
+     * BUG#1 FIX: Returns full path instead of just name to avoid ambiguous matching
+     *
+     * @param int $parentPsId PrestaShop parent category ID
+     * @return array{path: string, ppm_id: int}|null Full path and PPM ID, or null
+     */
+    protected function resolveParentPathFromPsId(int $parentPsId): ?array
+    {
+        $mapping = ShopMapping::where('shop_id', $this->shopId)
+            ->where('mapping_type', ShopMapping::TYPE_CATEGORY)
+            ->where('prestashop_id', $parentPsId)
+            ->where('is_active', true)
+            ->first(['ppm_value']);
+
+        if (!$mapping) {
+            return null;
+        }
+
+        $category = Category::find($mapping->ppm_value);
+        if (!$category) {
+            return null;
+        }
+
+        // Build full ancestry path from root to this category
+        $pathParts = [$category->name];
+        $ancestor = $category->parent;
+        while ($ancestor) {
+            array_unshift($pathParts, $ancestor->name);
+            $ancestor = $ancestor->parent;
+        }
+
+        return [
+            'path' => implode(' > ', $pathParts),
+            'ppm_id' => $category->id,
+        ];
+    }
+
+    /**
+     * Merge missing categories into PPM tree
+     * Adds missing categories under their parent with 'to_add' status
+     * FIX #1: Detects duplicates (same name already exists in PPM tree)
+     *
+     * @param array $tree PPM tree
+     * @param array $missingCategories Flat list of missing categories
+     * @param array $productPsIds PS category IDs assigned to imported products
+     */
+    protected function mergeMissingIntoTree(array $tree, array $missingCategories, array $productPsIds = []): array
+    {
+        foreach ($missingCategories as $missing) {
+            $parentPath = $missing['parent_name'] ?? null;
+            $psId = (int) ($missing['prestashop_id'] ?? 0);
+            $isProductCategory = in_array($psId, $productPsIds);
+
+            if ($parentPath) {
+                $tree = $this->addMissingToParent($tree, $parentPath, $missing, $productPsIds);
+            } else {
+                // FIX #1: Check for duplicate name in existing PPM tree before adding as root
+                $existing = $this->findExistingCategoryInTree($tree, $missing['name']);
+                if ($existing) {
+                    // Skip duplicate - mark existing node with flags
+                    $this->markExistingNodeFlags($tree, $existing['id'], $isProductCategory);
+                    continue;
+                }
+
+                $tree[] = [
+                    'id' => 'new_' . $psId,
+                    'name' => $missing['name'],
+                    'level' => 0,
+                    'status' => 'to_add',
+                    'children' => [],
+                    'prestashop_id' => $psId,
+                    'has_new_descendants' => false,
+                    'is_product_category' => $isProductCategory,
+                    'has_product_descendants' => false,
+                ];
+            }
+        }
+
+        return $tree;
+    }
+
+    /**
+     * Add missing category under its parent in tree
+     * BUG#1 FIX: Uses EXACT full path matching instead of str_ends_with
+     * Only recurses into branches where parentPath starts with nodePath
+     *
+     * @param array $tree
+     * @param string $parentPath Full path like "Baza > Czesci zamienne > Czesci Mini GP"
+     * @param array $missing
+     * @param array $productPsIds PS category IDs assigned to imported products
+     * @param string $currentPath Accumulated path during recursion
+     */
+    protected function addMissingToParent(array $tree, string $parentPath, array $missing, array $productPsIds = [], string $currentPath = ''): array
+    {
+        $psId = (int) ($missing['prestashop_id'] ?? 0);
+        $isProductCategory = in_array($psId, $productPsIds);
+
+        foreach ($tree as &$node) {
+            $nodePath = $currentPath ? $currentPath . ' > ' . $node['name'] : $node['name'];
+
+            // EXACT match only - no more str_ends_with
+            if ($nodePath === $parentPath) {
+                // Check if child with same name already exists under this parent
+                $childExists = false;
+                foreach ($node['children'] as &$child) {
+                    if (($child['status'] ?? '') === 'existing' && strcasecmp($child['name'], $missing['name']) === 0) {
+                        $childExists = true;
+                        if ($isProductCategory) {
+                            $child['is_product_category'] = true;
+                        }
+                        break;
+                    }
+                }
+                unset($child);
+
+                if ($childExists) {
+                    $node['has_new_descendants'] = true;
+                    if ($isProductCategory) {
+                        $node['has_product_descendants'] = true;
+                    }
+                    return $tree;
+                }
+
+                $node['children'][] = [
+                    'id' => 'new_' . $psId,
+                    'name' => $missing['name'],
+                    'level' => ($node['level'] ?? 0) + 1,
+                    'status' => 'to_add',
+                    'children' => [],
+                    'prestashop_id' => $psId,
+                    'has_new_descendants' => false,
+                    'is_product_category' => $isProductCategory,
+                    'has_product_descendants' => false,
+                ];
+                $node['has_new_descendants'] = true;
+                if ($isProductCategory) {
+                    $node['has_product_descendants'] = true;
+                }
+                return $tree;
+            }
+
+            // Recurse ONLY if parent path starts with current node path
+            if (!empty($node['children']) && str_starts_with($parentPath, $nodePath . ' > ')) {
+                $node['children'] = $this->addMissingToParent(
+                    $node['children'], $parentPath, $missing, $productPsIds, $nodePath
+                );
+                foreach ($node['children'] as $child) {
+                    if (($child['status'] ?? '') === 'to_add' || ($child['has_new_descendants'] ?? false)) {
+                        $node['has_new_descendants'] = true;
+                    }
+                    if ($child['is_product_category'] || ($child['has_product_descendants'] ?? false)) {
+                        $node['has_product_descendants'] = true;
+                    }
+                }
+            }
+        }
+
+        return $tree;
+    }
+
+    /**
+     * FIX #1: Find existing category in tree by name (case-insensitive)
+     *
+     * @param array $tree
+     * @param string $name
+     * @return array|null Found node or null
+     */
+    protected function findExistingCategoryInTree(array $tree, string $name): ?array
+    {
+        foreach ($tree as $node) {
+            if (($node['status'] ?? '') === 'existing' && strcasecmp($node['name'], $name) === 0) {
+                return $node;
+            }
+            if (!empty($node['children'])) {
+                $found = $this->findExistingCategoryInTree($node['children'], $name);
+                if ($found !== null) {
+                    return $found;
+                }
+            }
+        }
+        return null;
+    }
+
+    /**
+     * FIX #1: Mark existing node with flags (product category, has_new_descendants)
+     *
+     * @param array &$tree Tree by reference
+     * @param int|string $nodeId
+     * @param bool $isProductCategory
+     */
+    protected function markExistingNodeFlags(array &$tree, $nodeId, bool $isProductCategory): void
+    {
+        foreach ($tree as &$node) {
+            if ($node['id'] === $nodeId) {
+                $node['has_new_descendants'] = true;
+                if ($isProductCategory) {
+                    $node['is_product_category'] = true;
+                }
+                return;
+            }
+            if (!empty($node['children'])) {
+                $this->markExistingNodeFlags($node['children'], $nodeId, $isProductCategory);
+            }
+        }
+    }
+
+    /**
+     * Pre-compute expanded nodes when modal opens.
+     * Expands all ancestor paths to:
+     * - PPM categories mapped to imported products
+     * - Parent categories of missing (new) categories
+     */
+    protected function initAutoExpandedNodes(CategoryPreview $preview): void
+    {
+        $expandIds = [];
+
+        // 1. Expand ancestors of PPM categories mapped to imported products
+        $productCatData = $this->getProductCategoryPpmIds();
+        $ppmIds = $productCatData['ppm_ids'] ?? [];
+
+        foreach ($ppmIds as $categoryId) {
+            $category = Category::find($categoryId);
+            if (!$category) {
+                continue;
+            }
+            // Add only ANCESTORS (not the category itself) so the product category
+            // is visible but not expanded unnecessarily
+            $ancestor = $category->parent;
+            while ($ancestor) {
+                $expandIds[] = $ancestor->id;
+                $ancestor = $ancestor->parent;
+            }
+        }
+
+        // 2. Expand ancestors of parent categories for missing (new) categories
+        // BUG#1 FIX: Use parent_ppm_id directly instead of name-based search
+        $missingCategories = [];
+        $this->flattenMissingCategories($this->categoryTree, $missingCategories);
+
+        foreach ($missingCategories as $missing) {
+            $parentPpmId = $missing['parent_ppm_id'] ?? null;
+            if (!$parentPpmId) {
+                continue;
+            }
+
+            $category = Category::find($parentPpmId);
+            if (!$category) {
+                continue;
+            }
+
+            $expandIds[] = $category->id;
+            $ancestor = $category->parent;
+            while ($ancestor) {
+                $expandIds[] = $ancestor->id;
+                $ancestor = $ancestor->parent;
+            }
+        }
+
+        // 3. Always expand root nodes (level 0) if they have children
+        $rootCategories = Category::whereNull('parent_id')
+            ->where('is_active', true)
+            ->whereHas('children')
+            ->pluck('id')
+            ->toArray();
+
+        $expandIds = array_merge($expandIds, $rootCategories);
+
+        $this->expandedNodes = array_values(array_unique($expandIds));
+    }
+
+    /**
+     * Auto-expand branches that contain new categories
+     */
+    protected function autoExpandNewBranches(array &$tree): void
+    {
+        foreach ($tree as &$node) {
+            $shouldExpand = ($node['has_new_descendants'] ?? false)
+                || ($node['status'] ?? '') === 'to_add'
+                || ($node['has_product_descendants'] ?? false);
+
+            if ($shouldExpand) {
+                $nodeId = $node['id'];
+                if (!in_array($nodeId, $this->expandedNodes)) {
+                    $this->expandedNodes[] = $nodeId;
+                }
+            }
+
+            if (!empty($node['children'])) {
+                $this->autoExpandNewBranches($node['children']);
+            }
+        }
+    }
+
+    /**
+     * Get products with detected types for Tab 2 (paginated)
+     *
+     * @return array
+     */
+    public function getProductsWithDetectedTypesProperty(): array
+    {
+        $emptyResult = ['data' => [], 'total' => 0, 'per_page' => 25, 'current_page' => 1, 'last_page' => 1];
+
+        if (!$this->isOpen || !$this->previewId) {
+            return $emptyResult;
+        }
+
+        try {
+            $preview = CategoryPreview::find($this->previewId);
+            if (!$preview) {
+                return $emptyResult;
+            }
+
+            $importContext = $preview->import_context_json ?? [];
+            $products = $importContext['analyzed_products'] ?? $importContext['products'] ?? [];
+
+            if (empty($products)) {
+                return $emptyResult;
+            }
+
+            // Build category ID → name map for this shop
+            // Handle both OLD format (int[]) and NEW format ([{id, name}][])
+            $allCategoryIds = [];
+            foreach ($products as $p) {
+                if (isset($p['categories']) && is_array($p['categories'])) {
+                    foreach ($p['categories'] as $cat) {
+                        if (is_array($cat)) {
+                            $allCategoryIds[] = (int) ($cat['id'] ?? 0);
+                        } elseif (is_int($cat) || is_numeric($cat)) {
+                            $allCategoryIds[] = (int) $cat;
+                        }
+                    }
+                }
+            }
+            $allCategoryIds = array_unique(array_filter($allCategoryIds));
+
+            // Map PS category IDs → PPM category names via ShopMapping
+            $categoryNameMap = [];
+            if (!empty($allCategoryIds) && $preview->shop_id) {
+                $categoryNameMap = ShopMapping::where('shop_id', $preview->shop_id)
+                    ->where('mapping_type', ShopMapping::TYPE_CATEGORY)
+                    ->whereIn('prestashop_id', $allCategoryIds)
+                    ->join('categories', 'shop_mappings.ppm_value', '=', 'categories.id')
+                    ->pluck('categories.name', 'shop_mappings.prestashop_id')
+                    ->toArray();
+            }
+
+            $detector = app(\App\Services\Import\ProductTypeDetector::class);
+            $items = [];
+
+            foreach ($products as $p) {
+                $categoryNames = [];
+                if (isset($p['categories']) && is_array($p['categories'])) {
+                    foreach ($p['categories'] as $catId) {
+                        if (is_array($catId)) {
+                            $categoryNames[] = $catId['name'] ?? '';
+                        } else {
+                            $categoryNames[] = $categoryNameMap[(int) $catId] ?? '';
+                        }
+                    }
+                    $categoryNames = array_filter($categoryNames);
+                }
+
+                $typeInfo = $detector->detectWithInfo($categoryNames);
+
+                $items[] = [
+                    'sku' => $p['sku'] ?? $p['reference'] ?? '-',
+                    'name' => $p['name'] ?? '-',
+                    'detected_type' => $typeInfo['name'],
+                    'type_slug' => $typeInfo['slug'],
+                    'type_color' => $typeInfo['color'],
+                ];
+            }
+
+            // Manual pagination
+            $perPage = 25;
+            $page = max(1, $this->productTypesPage);
+            $total = count($items);
+            $lastPage = max(1, (int) ceil($total / $perPage));
+            $page = min($page, $lastPage);
+            $slice = array_slice($items, ($page - 1) * $perPage, $perPage);
+
+            return [
+                'data' => $slice,
+                'total' => $total,
+                'per_page' => $perPage,
+                'current_page' => $page,
+                'last_page' => $lastPage,
+            ];
+        } catch (\Exception $e) {
+            Log::error('CategoryPreviewModal: Failed to get products with types', [
+                'error' => $e->getMessage(),
+            ]);
+            return $emptyResult;
+        }
+    }
+
+    /**
+     * Navigate to next/previous page in product types tab
+     */
+    public function setProductTypesPage(int $page): void
+    {
+        $this->productTypesPage = max(1, $page);
+    }
+
+    /**
+     * Import without categories - with warning for products without PPM categories
+     */
+    public function importWithoutCategories(): void
+    {
+        $preview = CategoryPreview::find($this->previewId);
+        if (!$preview) {
+            return;
+        }
+
+        $importContext = $preview->import_context_json ?? [];
+        $products = $importContext['products'] ?? $importContext['analyzed_products'] ?? [];
+
+        $withoutCategories = 0;
+        foreach ($products as $p) {
+            $sku = $p['sku'] ?? $p['reference'] ?? null;
+            if ($sku) {
+                $existingProduct = \App\Models\Product::where('sku', $sku)->first();
+                if ($existingProduct && $existingProduct->categories()->count() === 0) {
+                    $withoutCategories++;
+                }
+            }
+        }
+
+        if ($withoutCategories > 0) {
+            $this->showNoCategoryWarning = true;
+            $this->productsWithoutCategoriesCount = $withoutCategories;
+            return;
+        }
+
+        $this->confirmImportWithoutCategories();
+    }
+
+    /**
+     * Confirm import without categories (after warning)
+     */
+    public function confirmImportWithoutCategories(): void
+    {
+        $this->showNoCategoryWarning = false;
+        $this->skipCategories = true;
+        $this->approve();
+    }
+
+    /**
+     * Dismiss the no-category warning
+     */
+    public function dismissNoCategoryWarning(): void
+    {
+        $this->showNoCategoryWarning = false;
     }
 
     /*

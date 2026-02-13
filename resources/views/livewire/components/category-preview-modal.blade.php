@@ -3,7 +3,7 @@
 {{-- LIVEWIRE ROOT: Transparent wrapper (no stacking context) --}}
 <div>
     {{-- Preview Modal --}}
-    <div x-data="{ isOpen: @entangle('isOpen') }"
+    <div x-data="{ isOpen: @entangle('isOpen'), activeTab: @entangle('activeTab') }"
          x-show="isOpen"
          x-cloak
          class="modal-category-preview-root"
@@ -20,7 +20,7 @@
          x-transition:leave-start="opacity-100"
          x-transition:leave-end="opacity-0"
          @click="isOpen = false"
-         class="absolute inset-0 bg-black/70 backdrop-blur-sm transition-opacity"></div>
+         class="fixed inset-0 bg-black/70 backdrop-blur-sm transition-opacity"></div>
 
     <!-- Modal Container -->
     <div class="p-4 text-center sm:p-0 relative modal-z-content">
@@ -42,7 +42,7 @@
                             <svg class="w-5 h-5 text-brand-400" fill="currentColor" viewBox="0 0 20 20">
                                 <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"></path>
                             </svg>
-                            Podgląd Kategorii do Zaimportowania
+                            Podglad Kategorii do Zaimportowania
                         </h3>
                         <p class="text-sm text-gray-300 mt-1 flex items-center gap-3">
                             <span>Sklep: <strong class="text-brand-400">{{ $shopName }}</strong> | Znaleziono: <strong class="text-white">{{ $totalCount }}</strong> {{ $totalCount === 1 ? 'kategoria' : ($totalCount < 5 ? 'kategorie' : 'kategorii') }}</span>
@@ -51,7 +51,7 @@
                                     <svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
                                         <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path>
                                     </svg>
-                                    {{ count($detectedConflicts) }} {{ count($detectedConflicts) === 1 ? 'konflikt' : 'konfliktów' }}
+                                    {{ count($detectedConflicts) }} {{ count($detectedConflicts) === 1 ? 'konflikt' : 'konfliktow' }}
                                 </span>
                             @endif
                         </p>
@@ -65,308 +65,270 @@
                 </div>
             </div>
 
-            <!-- Actions Bar -->
-            <div class="px-6 py-3 bg-gray-800/30 border-b border-gray-700/50">
-                <div class="flex items-center justify-between flex-wrap gap-3">
-                    <div class="flex items-center gap-3 flex-wrap">
-                        <button wire:click="selectAll"
-                                @disabled($skipCategories)
-                                class="px-3 py-1.5 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed">
-                            <svg class="w-4 h-4 inline-block mr-1" fill="currentColor" viewBox="0 0 20 20">
-                                <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
-                            </svg>
-                            Zaznacz wszystkie
-                        </button>
-                        <button wire:click="deselectAll"
-                                @disabled($skipCategories)
-                                class="px-3 py-1.5 text-sm font-semibold text-white bg-gray-600 hover:bg-gray-700 rounded-lg transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed">
-                            <svg class="w-4 h-4 inline-block mr-1" fill="currentColor" viewBox="0 0 20 20">
-                                <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"></path>
-                            </svg>
-                            Odznacz wszystkie
-                        </button>
-                        <div class="h-5 w-px bg-gray-600"></div>
-                        <label class="flex items-center gap-2 cursor-pointer group">
-                            <input type="checkbox"
-                                   x-data="{ checked: @entangle('skipCategories').live }"
-                                   x-model="checked"
-                                   class="w-4 h-4 rounded border-gray-600 text-orange-600 focus:ring-orange-500 focus:ring-offset-gray-900 cursor-pointer">
-                            <span class="text-sm font-medium text-gray-300 group-hover:text-white transition-colors">
-                                <svg class="w-4 h-4 inline-block mr-1 text-orange-500" fill="currentColor" viewBox="0 0 20 20">
-                                    <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path>
-                                </svg>
-                                Importuj produkty BEZ kategorii
+            {{-- Tab Bar --}}
+            <div class="px-6 py-2 bg-gray-800/50 border-b border-gray-700/50">
+                <div class="flex gap-1 bg-gray-900/50 rounded-lg p-1">
+                    <button @click="activeTab = 'categories'; $wire.setActiveTab('categories')"
+                            :class="activeTab === 'categories' ? 'category-preview-tab category-preview-tab--active' : 'category-preview-tab category-preview-tab--inactive'"
+                            class="flex items-center">
+                        <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/>
+                        </svg>
+                        Drzewko Kategorii
+                    </button>
+                    <button @click="activeTab = 'product_types'; $wire.setActiveTab('product_types')"
+                            :class="activeTab === 'product_types' ? 'category-preview-tab category-preview-tab--active' : 'category-preview-tab category-preview-tab--inactive'"
+                            class="flex items-center">
+                        <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/>
+                        </svg>
+                        Typy Produktow
+                        @php $typesTotal = $this->productsWithDetectedTypes['total'] ?? 0; @endphp
+                        @if($typesTotal > 0)
+                            <span class="ml-1.5 px-1.5 py-0.5 text-xs rounded-full bg-gray-700 text-gray-300">
+                                {{ $typesTotal }}
                             </span>
-                        </label>
-                    </div>
-                    <div class="flex items-center gap-3">
-                        @if(count($detectedConflicts) > 0)
-                            <button wire:click="toggleConflicts"
-                                    class="px-3 py-1.5 text-sm font-semibold text-white rounded-lg transition-colors duration-200 flex items-center gap-2 {{ $showConflicts ? 'bg-orange-700 hover:bg-orange-800' : 'bg-orange-600 hover:bg-orange-700' }}">
-                                <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                                    <path fill-rule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clip-rule="evenodd"></path>
-                                </svg>
-                                <span>{{ $showConflicts ? 'Ukryj konflikty' : 'Rozwiąż konflikty' }}</span>
-                                <span class="px-1.5 py-0.5 bg-gray-800/20 rounded text-xs">{{ count($detectedConflicts) }}</span>
-                            </button>
                         @endif
-                        <span class="text-sm text-gray-400">
-                            Wybrano: <strong class="text-brand-400">{{ count($selectedCategoryIds) }}</strong> / {{ $totalCount }}
-                        </span>
-                    </div>
+                    </button>
                 </div>
+            </div>
 
-                @if($skipCategories)
-                    <div class="mt-3 px-3 py-2 bg-orange-900/20 border border-orange-500/30 rounded-lg">
-                        <p class="text-xs text-orange-300 flex items-center gap-2">
-                            <svg class="w-4 h-4 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                                <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"></path>
-                            </svg>
-                            <span><strong>Tryb bez kategorii:</strong> Produkty zostaną zaimportowane bez przypisania kategorii. Zaznaczanie kategorii jest wyłączone.</span>
-                        </p>
-                    </div>
-                @endif
+            {{-- ========== TAB 1: Categories ========== --}}
+            <div x-show="activeTab === 'categories'">
 
-                {{-- Conflicts Section (2025-10-13) --}}
-                @if(count($detectedConflicts) > 0 && $showConflicts)
-                    <div class="mt-3 p-4 bg-orange-900/10 border border-orange-500/20 rounded-lg">
-                        <div class="mb-3">
-                            <h4 class="text-sm font-bold text-orange-300 flex items-center gap-2">
-                                <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                {{-- Conflicts Toggle Section (only if conflicts detected) --}}
+                @if(count($detectedConflicts) > 0)
+                    <div class="px-6 py-2 bg-gray-800/30 border-b border-gray-700/50" x-data="{ showConflicts: @entangle('showConflicts') }">
+                        <button @click="showConflicts = !showConflicts"
+                                class="w-full flex items-center justify-between py-1 text-sm text-orange-400 hover:text-orange-300 transition-colors">
+                            <span class="flex items-center gap-2">
+                                <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                                     <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path>
                                 </svg>
-                                Wykryte konflikty kategorii ({{ count($detectedConflicts) }})
-                            </h4>
-                            <p class="text-xs text-gray-400 mt-1">
-                                Następujące produkty będą re-importowane z innymi kategoriami niż obecnie przypisane w PPM:
-                            </p>
-                        </div>
+                                <span class="font-medium">{{ count($detectedConflicts) }} {{ count($detectedConflicts) === 1 ? 'konflikt kategorii' : 'konfliktow kategorii' }}</span>
+                            </span>
+                            <svg class="w-4 h-4 transition-transform duration-200" :class="showConflicts ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                            </svg>
+                        </button>
 
-                        <div class="space-y-2 max-h-64 overflow-y-auto">
-                            @foreach($detectedConflicts as $index => $conflict)
-                                <div wire:key="conflict-{{ $conflict['product_id'] }}"
-                                     class="p-3 bg-gray-800/40 border border-gray-700/50 rounded-lg hover:bg-gray-800/60 transition-colors">
-                                    <div class="flex items-start justify-between gap-3">
-                                        <div class="flex-1 min-w-0">
-                                            <div class="flex items-center gap-2 mb-1">
-                                                <span class="text-sm font-semibold text-white truncate">{{ $conflict['name'] }}</span>
-                                                <span class="text-xs text-gray-400">(SKU: {{ $conflict['sku'] }})</span>
+                        <div x-show="showConflicts" x-collapse class="mt-2 pb-2">
+                            <div class="space-y-2 max-h-48 overflow-y-auto">
+                                @foreach($detectedConflicts as $index => $conflict)
+                                    <div wire:key="conflict-{{ $conflict['product_id'] }}"
+                                         class="p-2.5 bg-gray-800/40 border border-gray-700/50 rounded-lg hover:bg-gray-800/60 transition-colors">
+                                        <div class="flex items-center justify-between gap-3">
+                                            <div class="flex-1 min-w-0">
+                                                <span class="text-sm font-medium text-white truncate">{{ $conflict['name'] }}</span>
+                                                <span class="text-xs text-gray-400 ml-1">({{ $conflict['sku'] }})</span>
                                             </div>
-                                            <div class="text-xs text-gray-400 space-y-1">
-                                                @if($conflict['has_default_conflict'])
-                                                    <div class="flex items-start gap-2">
-                                                        <span class="text-orange-400 font-medium whitespace-nowrap">Domyślne:</span>
-                                                        <span class="text-gray-300">
-                                                            {{ count($conflict['ppm_default_categories']) }} → {{ count($conflict['import_will_assign_categories']) }} kategorii
-                                                        </span>
-                                                    </div>
-                                                @endif
-                                                @if($conflict['has_shop_conflict'])
-                                                    <div class="flex items-start gap-2">
-                                                        <span class="text-orange-400 font-medium whitespace-nowrap">Sklep {{ $shopName }}:</span>
-                                                        <span class="text-gray-300">
-                                                            {{ count($conflict['shop_categories']) }} → {{ count($conflict['import_will_assign_categories']) }} kategorii
-                                                        </span>
-                                                    </div>
-                                                @endif
-                                            </div>
-                                        </div>
-                                        <div class="flex items-center gap-2 flex-shrink-0">
-                                            <span class="inline-flex items-center px-2 py-1 rounded text-xs font-medium {{ $conflict['has_default_conflict'] && $conflict['has_shop_conflict'] ? 'bg-red-500/20 text-red-400' : 'bg-orange-500/20 text-orange-400' }}">
-                                                {{ $conflict['has_default_conflict'] && $conflict['has_shop_conflict'] ? 'Oba' : ($conflict['has_default_conflict'] ? 'Domyślne' : 'Sklep') }}
-                                            </span>
                                             <button wire:click="openConflictResolution({{ $conflict['product_id'] }})"
-                                                    class="px-2 py-1 text-xs font-semibold text-white bg-orange-600 hover:bg-orange-700 rounded transition-colors duration-200">
-                                                Rozwiąż
+                                                    class="px-2 py-1 text-xs font-semibold text-white bg-orange-600 hover:bg-orange-700 rounded transition-colors duration-200 flex-shrink-0">
+                                                Rozwiaz
                                             </button>
                                         </div>
                                     </div>
-                                </div>
-                            @endforeach
-                        </div>
-
-                        <div class="mt-4 p-3 bg-blue-900/20 border border-blue-500/30 rounded-lg">
-                            <p class="text-xs text-blue-300 flex items-start gap-2">
-                                <svg class="w-4 h-4 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
-                                    <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"></path>
-                                </svg>
-                                <span>
-                                    <strong>Co zrobić?</strong><br>
-                                    Po zakończeniu importu, zostaniesz poproszony o rozwiązanie każdego konfliktu - wybierzesz czy zachować obecne kategorie PPM, czy zaktualizować je danymi z PrestaShop.
-                                </span>
-                            </p>
+                                @endforeach
+                            </div>
                         </div>
                     </div>
                 @endif
-            </div>
 
-            <!-- Quick Category Creator - Button Only (ETAP 4) -->
-            <div class="px-6 py-4 border-t border-gray-700/50">
-                <button wire:click="showCreateCategoryForm"
-                        class="px-4 py-2 text-sm font-semibold text-white bg-green-600 hover:bg-green-700 rounded-lg transition-colors duration-200 flex items-center gap-2">
-                    <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v2H7a1 1 0 100 2h2v2a1 1 0 102 0v-2h2a1 1 0 100-2h-2V7z" clip-rule="evenodd"></path>
-                    </svg>
-                    <span>Utwórz nową kategorię</span>
-                </button>
-            </div>
+                <!-- Full PPM Tree with merged missing categories -->
+                <div class="px-6 py-4 overflow-y-auto"
+                     x-data="{ scrollToCategory(categoryId) {
+                         $nextTick(() => {
+                             const element = document.getElementById('category-ppm-' + categoryId);
+                             if (element) {
+                                 element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                 element.classList.add('bg-brand-900/40', 'ring-2', 'ring-brand-500');
+                                 setTimeout(() => {
+                                     element.classList.remove('bg-brand-900/40', 'ring-2', 'ring-brand-500');
+                                 }, 2000);
+                             }
+                         });
+                     }}"
+                     @category-created.window="scrollToCategory($event.detail.categoryId)"
+                     class="max-h-[50vh]">
 
-            <!-- Category Tree -->
-            <div class="px-6 py-6 max-h-[50vh] overflow-y-auto {{ $skipCategories ? 'opacity-30 pointer-events-none' : '' }}"
-                 x-data="{ scrollToCategory(categoryId) {
-                     $nextTick(() => {
-                         const element = document.getElementById('category-ppm-' + categoryId);
-                         if (element) {
-                             element.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                             // Highlight animation
-                             element.classList.add('bg-brand-900/40', 'ring-2', 'ring-brand-500');
-                             setTimeout(() => {
-                                 element.classList.remove('bg-brand-900/40', 'ring-2', 'ring-brand-500');
-                             }, 2000);
-                         }
-                     });
-                 }}"
-                 @category-created.window="scrollToCategory($event.detail.categoryId)">
-                {{-- ETAP_07f: Enhanced Comparison View - Always show tree --}}
-                @if(!empty($comparisonTree))
-                    {{-- Summary Panel --}}
-                    <div class="mb-4 p-4 bg-gray-800/50 border border-gray-600/30 rounded-lg">
-                        <div class="flex items-center justify-between flex-wrap gap-4">
-                            <div class="flex items-center gap-6">
-                                {{-- Synced --}}
-                                <div class="flex items-center gap-2">
-                                    <span class="w-3 h-3 rounded-full bg-green-500"></span>
-                                    <span class="text-sm text-gray-300">
-                                        Zsynchronizowane: <strong class="text-green-400">{{ $comparisonSummary['categories_synced'] ?? 0 }}</strong>
-                                    </span>
-                                </div>
-                                {{-- To Add --}}
-                                <div class="flex items-center gap-2">
-                                    <span class="w-3 h-3 rounded-full bg-orange-500"></span>
-                                    <span class="text-sm text-gray-300">
-                                        Do dodania: <strong class="text-orange-400">{{ $comparisonSummary['categories_to_add'] ?? 0 }}</strong>
-                                    </span>
-                                </div>
-                                {{-- PPM Only --}}
-                                <div class="flex items-center gap-2">
-                                    <span class="w-3 h-3 rounded-full bg-red-500"></span>
-                                    <span class="text-sm text-gray-300">
-                                        Tylko PPM: <strong class="text-red-400">{{ $comparisonSummary['categories_to_remove'] ?? 0 }}</strong>
-                                    </span>
-                                </div>
-                            </div>
-                            <div class="text-sm text-gray-400">
-                                PS: {{ $comparisonSummary['total_prestashop'] ?? 0 }} | PPM: {{ $comparisonSummary['total_ppm'] ?? 0 }}
-                            </div>
+                    @if(!empty($this->fullPpmTree))
+                        {{-- Summary counters --}}
+                        @php
+                            $ppmTotal = 0;
+                            $newToAdd = count($selectedCategoryIds);
+                            $countNodes = function($nodes) use (&$countNodes, &$ppmTotal) {
+                                foreach ($nodes as $n) {
+                                    $ppmTotal++;
+                                    if (!empty($n['children'])) $countNodes($n['children']);
+                                }
+                            };
+                            $countNodes($this->fullPpmTree);
+                        @endphp
+                        <div class="mb-3 flex items-center gap-4 text-sm text-gray-400">
+                            <span>Kategorie PPM: <strong class="text-white">{{ $ppmTotal }}</strong></span>
+                            @if($newToAdd > 0)
+                                <span class="text-emerald-400">Nowe do dodania: <strong>{{ $newToAdd }}</strong></span>
+                            @endif
+                            <span class="ml-auto">Wybrano: <strong class="text-brand-400">{{ count($selectedCategoryIds) }}</strong> / {{ $totalCount }}</span>
                         </div>
-                    </div>
 
-                    {{-- Comparison Tree --}}
-                    <div class="space-y-1">
-                        @foreach($comparisonTree as $node)
-                            <x-comparison-tree-node
-                                :node="$node"
-                                :level="0"
-                            />
+                        @foreach($this->fullPpmTree as $node)
+                            @include('livewire.components.partials.category-preview-tree-node', [
+                                'node' => $node,
+                                'level' => 0,
+                                'expandedNodes' => $expandedNodes,
+                                'selectedCategoryIds' => $selectedCategoryIds,
+                                'skipCategories' => $skipCategories,
+                            ])
                         @endforeach
-                    </div>
-
-                    {{-- Info about all synced --}}
-                    @if(empty($categoryTree))
-                        <div class="mt-4 p-4 bg-green-900/20 border border-green-500/30 rounded-lg">
-                            <div class="flex items-start gap-3">
-                                <svg class="w-6 h-6 text-green-400 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
-                                </svg>
-                                <div>
-                                    <h4 class="text-sm font-bold text-green-300">Wszystkie kategorie zsynchronizowane!</h4>
-                                    <p class="text-xs text-gray-400 mt-1">
-                                        Kategorie produktow sa juz dostepne w PPM. Mozesz kontynuowac import.
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
-                    @endif
-                @else
-                    {{-- Fallback: Original category tree (when comparison tree not available) --}}
-                    @if(!empty($categoryTree))
-                        <div class="space-y-1">
-                            @foreach($categoryTree as $category)
-                                <x-category-tree-item
-                                    :category="$category"
-                                    :level="0"
-                                    wire:key="cat-{{ $category['prestashop_id'] }}"
-                                />
-                            @endforeach
-                        </div>
                     @else
                         {{-- Empty state --}}
-                        <div class="text-center py-12">
-                            <svg class="w-16 h-16 mx-auto mb-4 text-gray-500" fill="currentColor" viewBox="0 0 20 20">
-                                <path fill-rule="evenodd" d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"/>
+                        <div class="text-center py-8 text-gray-400">
+                            <svg class="w-12 h-12 mx-auto mb-3 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/>
                             </svg>
-                            <h4 class="text-lg font-bold text-white mb-2">Brak kategorii do wyswietlenia</h4>
-                            <p class="text-gray-400 text-sm">
-                                Nie znaleziono kategorii do porownania.
-                            </p>
+                            <p>Brak kategorii do wyswietlenia</p>
                         </div>
                     @endif
-                @endif
+                </div>
+
+            </div>{{-- end Tab 1 --}}
+
+            {{-- ========== TAB 2: Product Types ========== --}}
+            <div x-show="activeTab === 'product_types'" x-cloak>
+                <div class="px-6 py-4">
+                    @php $typesData = $this->productsWithDetectedTypes; @endphp
+                    @if(!empty($typesData['data']))
+                        <div class="overflow-x-auto">
+                            <table class="w-full">
+                                <thead>
+                                    <tr class="border-b border-gray-700">
+                                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">SKU</th>
+                                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Nazwa</th>
+                                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Wykryty Typ</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-gray-700/50">
+                                    @foreach($typesData['data'] as $product)
+                                    <tr class="hover:bg-gray-700/30 transition-colors" wire:key="type-{{ $loop->index }}">
+                                        <td class="px-4 py-2.5 text-sm text-gray-300 font-mono">{{ $product['sku'] }}</td>
+                                        <td class="px-4 py-2.5 text-sm text-white">{{ Str::limit($product['name'], 60) }}</td>
+                                        <td class="px-4 py-2.5">
+                                            <span class="category-preview-type-badge category-preview-type-badge--{{ $product['type_color'] }}">
+                                                {{ $product['detected_type'] }}
+                                            </span>
+                                        </td>
+                                    </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+
+                        {{-- Pagination --}}
+                        @if($typesData['last_page'] > 1)
+                        <div class="flex items-center justify-between mt-4 pt-3 border-t border-gray-700/50">
+                            <span class="text-sm text-gray-400">
+                                Strona {{ $typesData['current_page'] }} z {{ $typesData['last_page'] }}
+                                ({{ $typesData['total'] }} produktow)
+                            </span>
+                            <div class="flex gap-1">
+                                <button wire:click="setProductTypesPage({{ $typesData['current_page'] - 1 }})"
+                                        @disabled($typesData['current_page'] <= 1)
+                                        class="px-3 py-1 text-sm rounded bg-gray-700 text-gray-300 hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed">
+                                    Poprzednia
+                                </button>
+                                <button wire:click="setProductTypesPage({{ $typesData['current_page'] + 1 }})"
+                                        @disabled($typesData['current_page'] >= $typesData['last_page'])
+                                        class="px-3 py-1 text-sm rounded bg-gray-700 text-gray-300 hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed">
+                                    Nastepna
+                                </button>
+                            </div>
+                        </div>
+                        @endif
+                    @else
+                        <div class="text-center py-8 text-gray-400">
+                            <svg class="w-12 h-12 mx-auto mb-3 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/>
+                            </svg>
+                            <p>Brak danych o typach produktow</p>
+                            <p class="text-sm text-gray-500 mt-1">Typy produktow sa wykrywane automatycznie na podstawie kategorii</p>
+                        </div>
+                    @endif
+                </div>
+            </div>{{-- end Tab 2 --}}
+
+            {{-- Modal Footer --}}
+            <div class="px-6 py-4 border-t border-gray-700/50 bg-gray-800/30">
+                <div class="flex items-center justify-between">
+                    <button wire:click="close"
+                            class="btn-enterprise-secondary">
+                        Anuluj Import
+                    </button>
+
+                    <div class="flex items-center gap-3">
+                        {{-- Import without categories button --}}
+                        <button wire:click="importWithoutCategories"
+                                class="px-4 py-2 text-sm font-medium rounded-lg border border-amber-500/30 text-amber-400 hover:bg-amber-500/10 transition-colors">
+                            Importuj BEZ kategorii
+                        </button>
+
+                        {{-- Main CTA --}}
+                        <button wire:click="approve"
+                                wire:loading.attr="disabled"
+                                class="btn-enterprise-primary">
+                            <span wire:loading.remove wire:target="approve">
+                                Utworz Kategorie i Importuj ({{ count($selectedCategoryIds) }})
+                            </span>
+                            <span wire:loading wire:target="approve">
+                                <svg class="animate-spin h-4 w-4 inline-block mr-1" fill="none" viewBox="0 0 24 24">
+                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                                Przetwarzanie...
+                            </span>
+                        </button>
+                    </div>
+                </div>
             </div>
 
-            <!-- Modal Footer -->
-            <div class="px-6 py-4 border-t border-gray-700/50 bg-gray-800/30 flex items-center justify-between">
-                <button wire:click="reject"
-                        wire:loading.attr="disabled"
-                        wire:target="reject"
-                        class="px-6 py-2 rounded-lg font-semibold text-sm text-white bg-gray-700 hover:bg-gray-600 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed">
-                    Anuluj Import
-                </button>
+        </div>
+    </div>
 
-                <button wire:click="approve"
-                        wire:loading.attr="disabled"
-                        wire:target="approve"
-                        @disabled(!empty($categoryTree) && !$skipCategories && count($selectedCategoryIds) === 0)
-                        class="px-6 py-2 rounded-lg font-semibold text-sm text-white transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 {{ $skipCategories ? 'bg-orange-600 hover:bg-orange-700' : 'bg-green-600 hover:bg-green-700' }}">
-                    <span wire:loading.remove wire:target="approve">
-                        @if($skipCategories)
-                            <svg class="w-5 h-5 inline-block mr-1" fill="currentColor" viewBox="0 0 20 20">
-                                <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
-                            </svg>
-                            Importuj Produkty BEZ Kategorii
-                        @elseif($totalCount === 0 || count($selectedCategoryIds) === 0)
-                            {{-- All categories exist OR none selected --}}
-                            <svg class="w-5 h-5 inline-block mr-1" fill="currentColor" viewBox="0 0 20 20">
-                                <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
-                            </svg>
-                            Importuj Produkty
-                        @else
-                            {{-- Has categories to create --}}
-                            <svg class="w-5 h-5 inline-block mr-1" fill="currentColor" viewBox="0 0 20 20">
-                                <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
-                            </svg>
-                            Utwórz Kategorie i Importuj ({{ count($selectedCategoryIds) }})
-                        @endif
-                    </span>
-                    <span wire:loading wire:target="approve" class="flex items-center gap-2">
-                        <svg class="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                        </svg>
-                        @if($skipCategories)
-                            Importowanie...
-                        @else
-                            Tworzenie...
-                        @endif
-                    </span>
+    {{-- Warning: Products without categories --}}
+    @if($showNoCategoryWarning)
+    <div class="fixed inset-0 layer-overlay bg-black/80 flex items-center justify-center" x-data x-transition>
+        <div class="bg-gray-800 rounded-xl border border-amber-500/30 max-w-md p-6 shadow-2xl">
+            <div class="flex items-start gap-3 mb-4">
+                <div class="flex-shrink-0 w-10 h-10 rounded-full bg-amber-500/10 flex items-center justify-center">
+                    <svg class="w-5 h-5 text-amber-400" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
+                    </svg>
+                </div>
+                <div>
+                    <h4 class="text-lg font-bold text-amber-400">Uwaga!</h4>
+                    <p class="text-gray-300 mt-2 text-sm">
+                        <strong class="text-white">{{ $productsWithoutCategoriesCount }}</strong> produktow nie posiada zadnych kategorii w PPM.
+                        Kontynuacja bez kategorii moze utrudnic zarzadzanie produktami.
+                    </p>
+                </div>
+            </div>
+            <div class="flex justify-end gap-3 mt-6">
+                <button wire:click="dismissNoCategoryWarning"
+                        class="btn-enterprise-secondary">
+                    Anuluj
+                </button>
+                <button wire:click="confirmImportWithoutCategories"
+                        class="btn-enterprise-danger">
+                    Kontynuuj bez kategorii
                 </button>
             </div>
         </div>
     </div>
+    @endif
 
-    {{-- ETAP 4: Quick Category Creator Form (z-index 9999 - INSIDE Livewire root for wire:click to work) --}}
+    {{-- ETAP 4: Quick Category Creator Form --}}
     @if($showCreateForm)
-    <div class="fixed inset-0 z-[9999] flex items-center justify-center bg-black/90 backdrop-blur-md"
+    <div class="fixed inset-0 layer-overlay flex items-center justify-center bg-black/90 backdrop-blur-md"
          role="dialog"
          aria-modal="true"
          aria-labelledby="create-category-title">
@@ -385,9 +347,9 @@
                         <svg class="w-6 h-6 text-green-400" fill="currentColor" viewBox="0 0 20 20">
                             <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"></path>
                         </svg>
-                        Utwórz nową kategorię
+                        Utworz nowa kategorie
                     </h4>
-                    <p class="text-xs text-gray-400 mt-1">Wypełnij formularz aby utworzyć nową kategorię w PPM</p>
+                    <p class="text-xs text-gray-400 mt-1">Wypelnij formularz aby utworzyc nowa kategorie w PPM</p>
                 </div>
 
                 <!-- Form Fields -->
@@ -399,7 +361,7 @@
                         </label>
                         <input type="text"
                                wire:model.live="newCategoryForm.name"
-                               placeholder="np. Elektronika, Odzież, Akcesoria..."
+                               placeholder="np. Elektronika, Odziez, Akcesoria..."
                                class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all">
                         @error('newCategoryForm.name')
                             <p class="mt-1 text-sm text-red-400">{{ $message }}</p>
@@ -409,11 +371,11 @@
                     <!-- Parent Category -->
                     <div>
                         <label class="block text-sm font-medium text-gray-300 mb-2">
-                            Kategoria nadrzędna (opcjonalnie)
+                            Kategoria nadrzedna (opcjonalnie)
                         </label>
                         <select wire:model.live="newCategoryForm.parent_id"
                                 class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all">
-                            <option value="">-- Brak (kategoria główna) --</option>
+                            <option value="">-- Brak (kategoria glowna) --</option>
                             @foreach($this->parentCategoryOptions as $categoryId => $categoryName)
                                 <option value="{{ $categoryId }}">{{ $categoryName }}</option>
                             @endforeach
@@ -430,7 +392,7 @@
                         </label>
                         <textarea wire:model.live="newCategoryForm.description"
                                   rows="2"
-                                  placeholder="Krótki opis kategorii..."
+                                  placeholder="Krotki opis kategorii..."
                                   class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all resize-none"></textarea>
                         @error('newCategoryForm.description')
                             <p class="mt-1 text-sm text-red-400">{{ $message }}</p>
@@ -466,7 +428,7 @@
                             <svg class="w-5 h-5 inline-block mr-1" fill="currentColor" viewBox="0 0 20 20">
                                 <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v2H7a1 1 0 100 2h2v2a1 1 0 102 0v-2h2a1 1 0 100-2h-2V7z" clip-rule="evenodd"></path>
                             </svg>
-                            Utwórz kategorię
+                            Utworz kategorie
                         </span>
                         <span wire:loading wire:target="createQuickCategory" class="flex items-center gap-2">
                             <svg class="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -479,10 +441,10 @@
                 </div>
             </div>
     </div>
-@endif
+    @endif
 
-{{-- ETAP 3.4: Conflict Resolution Modal (OUTSIDE main modal for proper z-index) --}}
-@if($showConflictResolutionModal && $selectedConflictProduct)
+    {{-- ETAP 3.4: Conflict Resolution Modal --}}
+    @if($showConflictResolutionModal && $selectedConflictProduct)
         <div x-data="{ isOpen: @entangle('showConflictResolutionModal') }"
              x-show="isOpen"
              x-cloak
@@ -522,7 +484,7 @@
                                     <svg class="w-5 h-5 text-orange-400" fill="currentColor" viewBox="0 0 20 20">
                                         <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path>
                                     </svg>
-                                    Rozwiązywanie Konfliktu Kategorii
+                                    Rozwiazywanie Konfliktu Kategorii
                                 </h3>
                                 <p class="text-sm text-gray-300 mt-1">
                                     <span class="font-semibold text-white">{{ $selectedConflictProduct['name'] }}</span>
@@ -540,7 +502,7 @@
 
                     <!-- Visual Diff Section -->
                     <div class="px-6 py-4 bg-gray-800/30 border-b border-gray-700/50 text-left">
-                        <h4 class="text-sm font-bold text-gray-200 mb-3">Porównanie Kategorii</h4>
+                        <h4 class="text-sm font-bold text-gray-200 mb-3">Porownanie Kategorii</h4>
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <!-- Current Categories in PPM -->
                             <div class="p-4 bg-blue-900/20 border border-blue-500/30 rounded-lg text-left">
@@ -550,35 +512,29 @@
                                     </svg>
                                     <h5 class="text-sm font-semibold text-blue-300">Obecne w PPM</h5>
                                 </div>
-
                                 <ul class="text-xs text-gray-300 space-y-1">
                                     @if($selectedConflictProduct['has_default_conflict'])
                                         @forelse($selectedConflictProduct['ppm_default_categories'] as $cat)
                                             <li class="flex items-center gap-2">
-                                                {{-- Hierarchical indent spacer --}}
                                                 @if(is_array($cat) && isset($cat['level']) && $cat['level'] > 0)
                                                     <div class="category-indent-spacer category-indent-spacer-{{ min($cat['level'], 5) }}"></div>
                                                 @endif
-
                                                 <svg class="w-3 h-3 text-blue-400 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                                                     <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"></path>
                                                 </svg>
                                                 <span class="flex-1">{{ is_array($cat) ? $cat['name'] : $cat }}</span>
-                                                <span class="text-xs text-gray-500 italic">domyślne</span>
+                                                <span class="text-xs text-gray-500 italic">domyslne</span>
                                             </li>
                                         @empty
-                                            <li class="text-gray-500 italic">(brak domyślnych)</li>
+                                            <li class="text-gray-500 italic">(brak domyslnych)</li>
                                         @endforelse
                                     @endif
-
                                     @if($selectedConflictProduct['has_shop_conflict'])
                                         @forelse($selectedConflictProduct['shop_categories'] as $cat)
                                             <li class="flex items-center gap-2">
-                                                {{-- Hierarchical indent spacer --}}
                                                 @if(is_array($cat) && isset($cat['level']) && $cat['level'] > 0)
                                                     <div class="category-indent-spacer category-indent-spacer-{{ min($cat['level'], 5) }}"></div>
                                                 @endif
-
                                                 <svg class="w-3 h-3 text-blue-400 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                                                     <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"></path>
                                                 </svg>
@@ -589,7 +545,6 @@
                                             <li class="text-gray-500 italic">(brak per-shop)</li>
                                         @endforelse
                                     @endif
-
                                     @if(!$selectedConflictProduct['has_default_conflict'] && !$selectedConflictProduct['has_shop_conflict'])
                                         <li class="text-gray-500 italic">(brak kategorii)</li>
                                     @endif
@@ -607,11 +562,9 @@
                                 <ul class="text-xs text-gray-300 space-y-1">
                                     @forelse($selectedConflictProduct['import_will_assign_categories'] as $cat)
                                         <li class="flex items-center gap-2">
-                                            {{-- Hierarchical indent spacer --}}
                                             @if(is_array($cat) && isset($cat['level']) && $cat['level'] > 0)
                                                 <div class="category-indent-spacer category-indent-spacer-{{ min($cat['level'], 5) }}"></div>
                                             @endif
-
                                             <svg class="w-3 h-3 text-green-400 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                                                 <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"></path>
                                             </svg>
@@ -627,10 +580,10 @@
 
                     <!-- Resolution Options -->
                     <div class="px-6 py-6">
-                        <h4 class="text-sm font-bold text-gray-200 mb-4">Wybierz sposób rozwiązania konfliktu:</h4>
+                        <h4 class="text-sm font-bold text-gray-200 mb-4">Wybierz sposob rozwiazania konfliktu:</h4>
 
                         <div class="space-y-3">
-                            <!-- Option 1: Overwrite (Replace default categories) -->
+                            <!-- Option 1: Overwrite -->
                             <div wire:click="selectResolutionOption('overwrite')"
                                  class="p-4 border-2 rounded-lg cursor-pointer transition-all duration-200 {{ $selectedResolution === 'overwrite' ? 'border-orange-500 bg-orange-900/20' : 'border-gray-700 bg-gray-800/30 hover:border-gray-600' }}">
                                 <div class="flex items-start gap-3">
@@ -644,21 +597,19 @@
                                         </div>
                                     </div>
                                     <div class="flex-1">
-                                        <h5 class="text-sm font-bold text-white mb-1">Zastąp domyślne kategorie</h5>
+                                        <h5 class="text-sm font-bold text-white mb-1">Zastap domyslne kategorie</h5>
                                         <p class="text-xs text-gray-400">
-                                            Usuń wszystkie obecne kategorie (domyślne i per-shop) i przypisz kategorie z importu jako domyślne dla wszystkich sklepów.
+                                            Usun wszystkie obecne kategorie (domyslne i per-shop) i przypisz kategorie z importu jako domyslne dla wszystkich sklepow.
                                         </p>
                                         <div class="mt-2 flex items-center gap-2">
-                                            <span class="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-red-500/20 text-red-400">
-                                                Destrukcyjne
-                                            </span>
-                                            <span class="text-xs text-gray-500">Stare kategorie zostaną usunięte</span>
+                                            <span class="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-red-500/20 text-red-400">Destrukcyjne</span>
+                                            <span class="text-xs text-gray-500">Stare kategorie zostana usuniete</span>
                                         </div>
                                     </div>
                                 </div>
                             </div>
 
-                            <!-- Option 2: Keep (Keep default, create per-shop override) -->
+                            <!-- Option 2: Keep -->
                             <div wire:click="selectResolutionOption('keep')"
                                  class="p-4 border-2 rounded-lg cursor-pointer transition-all duration-200 {{ $selectedResolution === 'keep' ? 'border-orange-500 bg-orange-900/20' : 'border-gray-700 bg-gray-800/30 hover:border-gray-600' }}">
                                 <div class="flex items-start gap-3">
@@ -672,21 +623,19 @@
                                         </div>
                                     </div>
                                     <div class="flex-1">
-                                        <h5 class="text-sm font-bold text-white mb-1">Zachowaj domyślne, dodaj per-shop</h5>
+                                        <h5 class="text-sm font-bold text-white mb-1">Zachowaj domyslne, dodaj per-shop</h5>
                                         <p class="text-xs text-gray-400">
-                                            Zachowaj obecne domyślne kategorie PPM bez zmian. Utwórz osobne przypisanie kategorii z importu tylko dla sklepu {{ $shopName }}.
+                                            Zachowaj obecne domyslne kategorie PPM bez zmian. Utworz osobne przypisanie kategorii z importu tylko dla sklepu {{ $shopName }}.
                                         </p>
                                         <div class="mt-2 flex items-center gap-2">
-                                            <span class="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-blue-500/20 text-blue-400">
-                                                Bezpieczne
-                                            </span>
+                                            <span class="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-blue-500/20 text-blue-400">Bezpieczne</span>
                                             <span class="text-xs text-gray-500">Zachowuje obecny stan</span>
                                         </div>
                                     </div>
                                 </div>
                             </div>
 
-                            <!-- Option 3: Manual (Select categories manually) -->
+                            <!-- Option 3: Manual -->
                             <div wire:click="selectResolutionOption('manual')"
                                  class="border-2 rounded-lg cursor-pointer transition-all duration-200 {{ $selectedResolution === 'manual' ? 'border-orange-500 bg-orange-900/20' : 'border-gray-700 bg-gray-800/30 hover:border-gray-600' }}">
                                 <div class="p-4">
@@ -701,22 +650,19 @@
                                             </div>
                                         </div>
                                         <div class="flex-1">
-                                            <h5 class="text-sm font-bold text-white mb-1">Wybierz kategorie ręcznie</h5>
+                                            <h5 class="text-sm font-bold text-white mb-1">Wybierz kategorie recznie</h5>
                                             <p class="text-xs text-gray-400 mb-3">
-                                                Wybierz dokładnie kategorie które chcesz przypisać jako domyślne dla tego produktu. Zastąpi obecne domyślne kategorie.
+                                                Wybierz dokladnie kategorie ktore chcesz przypisac jako domyslne dla tego produktu. Zastapi obecne domyslne kategorie.
                                             </p>
                                             <div class="flex items-center gap-2">
-                                                <span class="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-purple-500/20 text-purple-400">
-                                                    Pełna kontrola
-                                                </span>
-                                                <span class="text-xs text-gray-500">Wybierz własne kategorie</span>
+                                                <span class="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-purple-500/20 text-purple-400">Pelna kontrola</span>
+                                                <span class="text-xs text-gray-500">Wybierz wlasne kategorie</span>
                                             </div>
                                         </div>
                                     </div>
                                 </div>
 
                                 <!-- Category Picker (ETAP 2 embedded) -->
-                                {{-- FIX 2025-10-15: Removed :shop-id to show ALL PPM categories, not just shop-mapped ones --}}
                                 @if($selectedResolution === 'manual')
                                     <div class="px-4 pb-4 border-t border-gray-700/50 pt-4"
                                          wire:key="picker-container-{{ $selectedConflictProduct['product_id'] }}-{{ $modalInstanceId }}"
@@ -730,7 +676,7 @@
                                 @endif
                             </div>
 
-                            <!-- Option 4: Cancel (Skip, no changes) -->
+                            <!-- Option 4: Cancel -->
                             <div wire:click="selectResolutionOption('cancel')"
                                  class="p-4 border-2 rounded-lg cursor-pointer transition-all duration-200 {{ $selectedResolution === 'cancel' ? 'border-orange-500 bg-orange-900/20' : 'border-gray-700 bg-gray-800/30 hover:border-gray-600' }}">
                                 <div class="flex items-start gap-3">
@@ -744,14 +690,12 @@
                                         </div>
                                     </div>
                                     <div class="flex-1">
-                                        <h5 class="text-sm font-bold text-white mb-1">Pomiń ten produkt</h5>
+                                        <h5 class="text-sm font-bold text-white mb-1">Pomin ten produkt</h5>
                                         <p class="text-xs text-gray-400">
-                                            Nie wprowadzaj żadnych zmian w kategoriach. Produkt zostanie pominięty podczas importu i nie zostanie zaktualizowany.
+                                            Nie wprowadzaj zadnych zmian w kategoriach. Produkt zostanie pominiety podczas importu i nie zostanie zaktualizowany.
                                         </p>
                                         <div class="mt-2 flex items-center gap-2">
-                                            <span class="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-gray-600/20 text-gray-400">
-                                                Brak zmian
-                                            </span>
+                                            <span class="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-gray-600/20 text-gray-400">Brak zmian</span>
                                             <span class="text-xs text-gray-500">Zachowaj status quo</span>
                                         </div>
                                     </div>
@@ -776,7 +720,7 @@
                                 <svg class="w-5 h-5 inline-block mr-1" fill="currentColor" viewBox="0 0 20 20">
                                     <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
                                 </svg>
-                                Potwierdź Rozwiązanie
+                                Potwierdz Rozwiazanie
                             </span>
                             <span wire:loading wire:target="confirmConflictResolution" class="flex items-center gap-2">
                                 <svg class="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
