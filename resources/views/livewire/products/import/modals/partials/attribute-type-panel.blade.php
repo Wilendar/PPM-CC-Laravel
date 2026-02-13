@@ -15,7 +15,7 @@
                class="w-4 h-4 rounded bg-gray-700 border-gray-500 text-green-500 focus:ring-green-500/30 cursor-pointer">
 
         {{-- Chevron --}}
-        <svg class="import-attr-panel-chevron"
+        <svg class="w-4 h-4 flex-shrink-0 import-attr-panel-chevron"
              :class="expanded[{{ $type->id }}] && 'import-attr-panel-chevron-open'"
              fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
             <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/>

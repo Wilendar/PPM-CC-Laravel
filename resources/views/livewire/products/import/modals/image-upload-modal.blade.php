@@ -51,7 +51,7 @@
                             </div>
                             <button type="button"
                                     wire:click="toggleVariantAssignment"
-                                    class="px-3 py-1.5 text-xs bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors">
+                                    class="px-3 py-1.5 text-xs bg-purple-900/40 hover:bg-purple-900/60 text-purple-300 border border-purple-700/50 rounded-lg transition-colors">
                                 {{ $showVariantAssignment ? 'Ukryj przypisania' : 'Przypisz do wariantow' }}
                             </button>
                         </div>
@@ -85,7 +85,7 @@
                                 <h4 class="text-sm font-medium text-gray-300 uppercase tracking-wider">
                                     Galeria
                                     @if(count($images) > 0)
-                                    <span class="ml-2 px-2 py-0.5 bg-green-600 text-white text-xs rounded-full">
+                                    <span class="ml-2 px-2 py-0.5 bg-green-900/50 text-green-300 border border-green-700 text-xs rounded-full">
                                         {{ count($images) }}
                                     </span>
                                     @endif
@@ -244,15 +244,14 @@
 
                         <button type="button"
                                 wire:click="closeModal"
-                                class="px-4 py-2 bg-gray-600 hover:bg-gray-500 text-white rounded-lg transition-colors">
+                                class="btn-enterprise-secondary">
                             Anuluj
                         </button>
 
                         <button type="button"
                                 wire:click="saveImages"
                                 @disabled($isProcessing)
-                                class="px-6 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors
-                                       font-medium disabled:opacity-50 disabled:cursor-not-allowed">
+                                class="btn-enterprise-success disabled:opacity-50 disabled:cursor-not-allowed">
                             @if($isProcessing)
                             <svg class="animate-spin -ml-1 mr-2 h-5 w-5 text-white inline-block" fill="none" viewBox="0 0 24 24">
                                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>

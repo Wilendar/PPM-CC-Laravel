@@ -209,33 +209,33 @@
                                    class="form-checkbox-dark">
                         </th>
                         <th class="w-14 px-2">Obraz</th>
-                        <th class="px-2 cursor-pointer hover:bg-gray-700/50 relative resizable-column" data-column-id="sku" style="width: 100px; min-width: 80px;">
+                        <th class="px-2 cursor-pointer hover:bg-gray-700/50 relative resizable-column" data-column-id="sku" style="width: 100px;">
                             <div class="flex items-center gap-1" wire:click="sortBy('sku')">
                                 SKU
                                 @include('livewire.products.import.partials.sort-indicator', ['field' => 'sku'])
                             </div>
                             <div class="resize-handle" x-on:mousedown="startResize($event, 'sku')"></div>
                         </th>
-                        <th class="px-2 cursor-pointer hover:bg-gray-700/50 relative resizable-column" data-column-id="name" style="width: 140px; min-width: 100px;">
+                        <th class="px-2 cursor-pointer hover:bg-gray-700/50 relative resizable-column" data-column-id="name" style="width: 140px;">
                             <div class="flex items-center gap-1" wire:click="sortBy('name')">
                                 Nazwa
                                 @include('livewire.products.import.partials.sort-indicator', ['field' => 'name'])
                             </div>
                             <div class="resize-handle" x-on:mousedown="startResize($event, 'name')"></div>
                         </th>
-                        <th class="px-2 w-24 relative resizable-column" data-column-id="type" style="width: 96px; min-width: 80px;">
+                        <th class="px-2 w-24 relative resizable-column" data-column-id="type" style="width: 96px;">
                             <span class="text-xs">Typ</span>
                             <div class="resize-handle" x-on:mousedown="startResize($event, 'type')"></div>
                         </th>
 
                         {{-- MARKA (manufacturer_id) --}}
-                        <th class="px-2 w-24 relative resizable-column" data-column-id="manufacturer" style="width: 96px; min-width: 80px;">
+                        <th class="px-2 w-24 relative resizable-column" data-column-id="manufacturer" style="width: 96px;">
                             <span class="text-xs text-gray-400">Marka</span>
                             <div class="resize-handle" x-on:mousedown="startResize($event, 'manufacturer')"></div>
                         </th>
 
                         {{-- CENA - klik otwiera modal cen (FAZA 9.4) --}}
-                        <th class="px-2 w-20 relative resizable-column" data-column-id="price" style="width: 80px; min-width: 60px;">
+                        <th class="px-2 w-20 relative resizable-column" data-column-id="price" style="width: 80px;">
                             <div class="flex items-center gap-1">
                                 <span class="text-xs text-gray-400">Cena</span>
                                 <button wire:click="togglePriceDisplay"
@@ -253,7 +253,7 @@
                             $effectiveCategoryMaxLevel = $this->effectiveCategoryMaxLevel;
                         @endphp
 
-                        <th class="px-1 w-24 text-xs relative resizable-column" data-column-id="cat_l3" style="width: 96px; min-width: 70px;">
+                        <th class="px-1 w-24 text-xs relative resizable-column" data-column-id="cat_l3" style="width: 96px;">
                             @if($hasSelection)
                                 <div class="flex items-center gap-1">
                                     <span class="text-gray-500">L3</span>
@@ -264,7 +264,7 @@
                             @endif
                             <div class="resize-handle" x-on:mousedown="startResize($event, 'cat_l3')"></div>
                         </th>
-                        <th class="px-1 w-24 text-xs relative resizable-column" data-column-id="cat_l4" style="width: 96px; min-width: 70px;">
+                        <th class="px-1 w-24 text-xs relative resizable-column" data-column-id="cat_l4" style="width: 96px;">
                             @if($hasSelection)
                                 <div class="flex items-center gap-1">
                                     <span class="text-gray-500">L4</span>
@@ -275,7 +275,7 @@
                             @endif
                             <div class="resize-handle" x-on:mousedown="startResize($event, 'cat_l4')"></div>
                         </th>
-                        <th class="px-1 w-24 text-xs relative resizable-column" data-column-id="cat_l5" style="width: 96px; min-width: 70px;">
+                        <th class="px-1 w-24 text-xs relative resizable-column" data-column-id="cat_l5" style="width: 96px;">
                             @if($hasSelection)
                                 <div class="flex items-center gap-1">
                                     <span class="text-gray-500">L5</span>
@@ -288,7 +288,7 @@
                         </th>
 
                         {{-- L6 - ukryte do czasu klikniecia "+" --}}
-                        <th class="px-1 w-24 text-xs text-center text-gray-500 relative resizable-column" data-column-id="cat_l6" style="width: 96px; min-width: 70px;">
+                        <th class="px-1 w-24 text-xs text-center text-gray-500 relative resizable-column" data-column-id="cat_l6" style="width: 96px;">
                             @if($effectiveCategoryMaxLevel >= 6)
                                 <span class="text-gray-400">KAT L6</span>
                             @else
@@ -307,7 +307,7 @@
 
                         {{-- L7 (placeholder "+" dopoki nie zostanie dodane) --}}
                         @if($effectiveCategoryMaxLevel >= 6)
-                            <th class="px-1 w-24 text-xs text-center text-gray-500 relative resizable-column" data-column-id="cat_l7" style="width: 96px; min-width: 70px;">
+                            <th class="px-1 w-24 text-xs text-center text-gray-500 relative resizable-column" data-column-id="cat_l7" style="width: 96px;">
                                 @if($effectiveCategoryMaxLevel >= 7)
                                     <span class="text-gray-400">KAT L7</span>
                                 @else
@@ -327,7 +327,7 @@
 
                         {{-- L8 (placeholder "+" dopoki nie zostanie dodane) --}}
                         @if($effectiveCategoryMaxLevel >= 7)
-                            <th class="px-1 w-24 text-xs text-center text-gray-500 relative resizable-column" data-column-id="cat_l8" style="width: 96px; min-width: 70px;">
+                            <th class="px-1 w-24 text-xs text-center text-gray-500 relative resizable-column" data-column-id="cat_l8" style="width: 96px;">
                                 @if($effectiveCategoryMaxLevel >= 8)
                                     <span class="text-gray-400">KAT L8</span>
                                 @else
@@ -346,26 +346,31 @@
                         @endif
 
                         {{-- PUBLIKACJA (FAZA 9.3 - zastepuje Sklepy) --}}
-                        <th class="px-1 w-28 relative resizable-column" data-column-id="publication" style="width: 112px; min-width: 80px;">
+                        <th class="px-1 w-28 relative resizable-column" data-column-id="publication" style="width: 112px;">
                             <span class="text-gray-400 text-xs">Publikacja</span>
                             <div class="resize-handle" x-on:mousedown="startResize($event, 'publication')"></div>
                         </th>
                         {{-- DATA PUBLIKACJI (FAZA 9.3) --}}
-                        <th class="px-2 w-36 relative resizable-column" data-column-id="schedule" style="width: 144px; min-width: 110px;">
+                        <th class="px-2 w-36 relative resizable-column" data-column-id="schedule" style="width: 144px;">
                             <span class="text-gray-400 text-xs">Data publikacji</span>
                             <div class="resize-handle" x-on:mousedown="startResize($event, 'schedule')"></div>
                         </th>
                         {{-- PUBLIKUJ button (FAZA 9.3) --}}
-                        <th class="px-2 w-24 text-center">
+                        <th class="px-2 w-24 text-center relative resizable-column" data-column-id="publish" style="width: 96px;">
                             <span class="text-gray-400 text-xs">Publikuj</span>
+                            <div class="resize-handle" x-on:mousedown="startResize($event, 'publish')"></div>
                         </th>
-                        <th class="px-2 w-16 text-center cursor-pointer hover:bg-gray-700/50" wire:click="sortBy('completion_percentage')">
+                        <th class="px-2 w-16 text-center cursor-pointer hover:bg-gray-700/50 relative resizable-column" data-column-id="status" style="width: 64px;" wire:click="sortBy('completion_percentage')">
                             <div class="flex items-center justify-center gap-1 text-xs">
                                 Status
                                 @include('livewire.products.import.partials.sort-indicator', ['field' => 'completion_percentage'])
                             </div>
+                            <div class="resize-handle" x-on:mousedown="startResize($event, 'status')"></div>
                         </th>
-                        <th class="px-2 w-28 text-right text-xs">Akcje</th>
+                        <th class="px-2 w-28 text-right text-xs relative resizable-column" data-column-id="actions" style="width: 112px;">
+                            Akcje
+                            <div class="resize-handle" x-on:mousedown="startResize($event, 'actions')"></div>
+                        </th>
                     </tr>
                 </thead>
                 <tbody>

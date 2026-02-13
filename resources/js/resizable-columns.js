@@ -57,9 +57,10 @@ document.addEventListener('alpine:init', () => {
 
                 headers.forEach(th => {
                     const columnId = th.dataset.columnId;
+                    // Always clear min-width to allow shrinking
+                    th.style.minWidth = '0';
                     if (this.columnWidths[columnId]) {
                         th.style.width = `${this.columnWidths[columnId]}px`;
-                        th.style.minWidth = `${this.columnWidths[columnId]}px`;
                     }
                 });
             });
@@ -85,12 +86,12 @@ document.addEventListener('alpine:init', () => {
             if (!this.isResizing) return;
 
             const diff = e.pageX - this.startX;
-            const newWidth = Math.max(50, Math.min(500, this.startWidth + diff));
+            const newWidth = Math.max(20, Math.min(500, this.startWidth + diff));
 
             const th = this.$el.querySelector(`th[data-column-id="${this.currentColumn}"]`);
             if (th) {
                 th.style.width = `${newWidth}px`;
-                th.style.minWidth = `${newWidth}px`;
+                th.style.minWidth = '0';
                 this.columnWidths[this.currentColumn] = newWidth;
             }
         },

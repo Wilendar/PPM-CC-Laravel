@@ -63,7 +63,7 @@
                 <svg class="w-4 h-4 text-gray-400 transition-transform" :class="{ 'rotate-90': !collapsed }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
                 </svg>
-                <span class="px-2 py-0.5 bg-purple-600 text-white text-xs rounded font-medium">
+                <span class="px-2 py-0.5 bg-purple-900/50 text-purple-300 border border-purple-700/50 text-xs rounded font-medium">
                     {{ $variantName }}
                 </span>
                 <span class="text-xs text-gray-500">{{ $groupKey }}</span>

@@ -101,7 +101,7 @@
     <button type="button"
             @click="open = !open; if(open) $nextTick(() => $refs.searchInput?.focus())"
             @if($isDisabled) disabled @endif
-            class="inline-cat-trigger group flex items-center gap-1 px-2 py-1 rounded text-xs transition-all
+            class="inline-cat-trigger group w-full flex items-center gap-1 px-1.5 py-1 rounded text-xs transition-all min-w-0
                    {{ $isDisabled ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer' }}
                    {{ $selectedId
                       ? 'bg-purple-900/40 text-purple-300 hover:bg-purple-900/60 border border-purple-500/30'
@@ -114,7 +114,7 @@
         </svg>
 
         {{-- Label --}}
-        <span class="truncate max-w-20" x-text="selectedName || 'Dodaj'">
+        <span class="truncate flex-1 min-w-0" x-text="selectedName || 'Dodaj'">
             {{ $selectedCategory?->name ?? 'Dodaj' }}
         </span>
 

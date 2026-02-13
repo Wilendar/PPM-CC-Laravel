@@ -529,6 +529,7 @@ trait ImportModalColumnModeTrait
 
             $createdCount = 0;
             $skippedCount = 0;
+            $skippedSkus = [];
 
             foreach ($validRows as $row) {
                 $sku = strtoupper(trim($row['sku']));
@@ -548,6 +549,7 @@ trait ImportModalColumnModeTrait
 
                 if ($existsInProducts || $existsInPending) {
                     $skippedCount++;
+                    $skippedSkus[] = $sku;
                     continue;
                 }
 
@@ -590,7 +592,22 @@ trait ImportModalColumnModeTrait
                 'skipped' => $skippedCount,
             ]);
 
+            // Handle result feedback
+            if ($createdCount === 0 && $skippedCount > 0) {
+                // All products were skipped - show error and DON'T close modal
+                $skuList = implode(', ', array_slice($skippedSkus, 0, 5));
+                $moreText = count($skippedSkus) > 5 ? ' (i ' . (count($skippedSkus) - 5) . ' wiecej)' : '';
+                $this->addError('columnImport', "Wszystkie produkty zostaly pominiete - SKU juz istnieja: {$skuList}{$moreText}");
+                return;
+            }
+
             $this->dispatch('importCompleted', count: $createdCount);
+
+            // Show skip warning if some were skipped
+            if ($skippedCount > 0) {
+                $skuList = implode(', ', array_slice($skippedSkus, 0, 5));
+                session()->flash('warning', "Zaimportowano {$createdCount} produktow, pominieto {$skippedCount} (duplikaty SKU: {$skuList})");
+            }
 
             // Close modal after successful import
             $this->closeModal();

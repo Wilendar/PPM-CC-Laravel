@@ -121,8 +121,14 @@ class DescriptionModal extends Component
             $this->availableShops = PrestaShopShop::whereIn('id', $psShopIds)
                 ->where('is_active', true)
                 ->orderBy('name')
-                ->get(['id', 'name', 'url'])
-                ->map(fn($s) => ['id' => $s->id, 'name' => $s->name, 'url' => $s->url])
+                ->get(['id', 'name', 'url', 'label_color', 'label_icon'])
+                ->map(fn($s) => [
+                    'id' => $s->id,
+                    'name' => $s->name,
+                    'url' => $s->url,
+                    'label_color' => $s->label_color,
+                    'label_icon' => $s->label_icon,
+                ])
                 ->toArray();
         } else {
             $this->availableShops = [];

@@ -84,20 +84,25 @@
                             </span>
                         </button>
 
-                        {{-- PS shop tabs --}}
+                        {{-- PS shop tabs with per-shop label colors --}}
                         @foreach($availableShops as $shop)
                             @php
                                 $shopStatus = $this->getShopDescriptionStatus($shop['id']);
                                 $shopFilled = $this->getShopFilledCount($shop['id']);
                                 $isActive = $activeTab === 'shop_' . $shop['id'];
+                                $shopColor = $shop['label_color'] ?? '#06b6d4';
+                                // Convert hex to RGB for rgba() usage
+                                $r = hexdec(substr($shopColor, 1, 2));
+                                $g = hexdec(substr($shopColor, 3, 2));
+                                $b = hexdec(substr($shopColor, 5, 2));
                             @endphp
                             <button wire:click="setActiveTab('shop_{{ $shop['id'] }}')"
                                     wire:key="desc-tab-{{ $shop['id'] }}"
-                                    class="import-desc-tab {{ $isActive ? 'import-desc-tab-active' : '' }}">
-                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                          d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 100 4 2 2 0 000-4z"/>
-                                </svg>
+                                    class="import-desc-tab {{ $isActive ? 'import-desc-tab-shop-active' : '' }}"
+                                    @if($isActive)
+                                    style="background-color: rgba({{ $r }}, {{ $g }}, {{ $b }}, 0.15); color: {{ $shopColor }}; border: 1px solid rgba({{ $r }}, {{ $g }}, {{ $b }}, 0.4);"
+                                    @endif>
+                                <span class="import-desc-tab-dot" style="background-color: {{ $shopColor }};"></span>
                                 {{ $shop['name'] }}
                                 <span class="import-desc-tab-badge {{ $shopStatus === 'custom' ? 'import-desc-tab-badge-custom' : 'import-desc-tab-badge-inherited' }}">
                                     {{ $shopStatus === 'custom' ? $shopFilled . '/2' : 'Dziedziczy' }}
@@ -155,7 +160,7 @@
                     <div class="flex items-center gap-4">
                         <button type="button"
                                 wire:click="closeModal"
-                                class="px-4 py-2 bg-gray-600 hover:bg-gray-500 text-white rounded-lg transition-colors">
+                                class="btn-enterprise-secondary">
                             Anuluj
                         </button>
                     </div>
@@ -179,11 +184,10 @@
                         <button type="button"
                                 wire:click="saveDescriptions"
                                 @disabled($isProcessing)
-                                class="px-6 py-2 rounded-lg transition-colors font-medium
-                                       disabled:opacity-50 disabled:cursor-not-allowed
+                                class="disabled:opacity-50 disabled:cursor-not-allowed
                                        {{ $skipDescriptions
-                                           ? 'bg-red-600 hover:bg-red-700 text-white'
-                                           : 'bg-green-600 hover:bg-green-700 text-white' }}">
+                                           ? 'btn-enterprise-danger'
+                                           : 'btn-enterprise-success' }}">
                             @if($isProcessing)
                             <svg class="animate-spin -ml-1 mr-2 h-5 w-5 text-white inline-block" fill="none" viewBox="0 0 24 24">
                                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>

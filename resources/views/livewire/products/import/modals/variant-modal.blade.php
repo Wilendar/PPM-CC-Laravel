@@ -91,8 +91,7 @@
                             <button type="button"
                                     wire:click="generateVariants"
                                     @disabled(empty($selectedAttributeTypes))
-                                    class="w-full px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg
-                                           transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed">
+                                    class="btn-enterprise-primary w-full py-3 disabled:opacity-50 disabled:cursor-not-allowed">
                                 <svg class="w-5 h-5 inline-block mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                           d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
@@ -107,7 +106,7 @@
                                 <h4 class="text-sm font-medium text-gray-300 uppercase tracking-wider">
                                     2. Wygenerowane warianty
                                     @if(count($generatedVariants) > 0)
-                                    <span class="ml-2 px-2 py-0.5 bg-green-600 text-white text-xs rounded-full">
+                                    <span class="ml-2 px-2 py-0.5 bg-green-900/50 text-green-300 border border-green-700 text-xs rounded-full">
                                         {{ count($generatedVariants) }}
                                     </span>
                                     @endif
@@ -164,15 +163,14 @@
                 <div class="flex items-center justify-between px-6 py-4 border-t border-gray-700 bg-gray-800/50">
                     <button type="button"
                             wire:click="closeModal"
-                            class="px-4 py-2 bg-gray-600 hover:bg-gray-500 text-white rounded-lg transition-colors">
+                            class="btn-enterprise-secondary">
                         Anuluj
                     </button>
 
                     <button type="button"
                             wire:click="saveVariants"
                             @disabled(count($generatedVariants) === 0 || $isProcessing)
-                            class="px-6 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors
-                                   font-medium disabled:opacity-50 disabled:cursor-not-allowed">
+                            class="btn-enterprise-success disabled:opacity-50 disabled:cursor-not-allowed">
                         @if($isProcessing)
                         <svg class="animate-spin -ml-1 mr-2 h-5 w-5 text-white inline-block" fill="none" viewBox="0 0 24 24">
                             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>

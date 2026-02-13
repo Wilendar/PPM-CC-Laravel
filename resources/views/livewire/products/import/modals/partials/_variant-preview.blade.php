@@ -16,7 +16,7 @@
         @endphp
         <div class="p-3 bg-gray-700/30 rounded-lg border border-purple-700/30">
             <div class="flex items-center gap-2 mb-2">
-                <span class="px-2 py-0.5 bg-purple-600 text-white text-xs rounded font-medium">
+                <span class="px-2 py-0.5 bg-purple-900/50 text-purple-300 border border-purple-700/50 text-xs rounded font-medium">
                     {{ $variantName }}
                 </span>
                 <span class="text-xs text-gray-500">{{ $groupKey }}</span>

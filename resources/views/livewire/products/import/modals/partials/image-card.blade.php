@@ -62,7 +62,7 @@
             @if(!$isGlobalCover)
             <button type="button"
                     wire:click="setCover({{ $index }})"
-                    class="p-2 bg-green-600 hover:bg-green-700 rounded-lg text-white"
+                    class="p-2 bg-green-900/60 hover:bg-green-900/80 border border-green-600/50 rounded-lg text-green-300"
                     title="Ustaw jako okladke produktu">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
@@ -74,7 +74,7 @@
             @if($showVariantAssignment && !empty($image['variant_sku']) && !$isVariantCover)
             <button type="button"
                     wire:click="setVariantCover({{ $index }}, '{{ $image['variant_sku'] }}')"
-                    class="p-2 bg-amber-600 hover:bg-amber-700 rounded-lg text-white"
+                    class="p-2 bg-amber-900/60 hover:bg-amber-900/80 border border-amber-600/50 rounded-lg text-amber-300"
                     title="Ustaw jako okladke wariantu">
                 <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
                     <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
@@ -86,7 +86,7 @@
             @if($index > 0)
             <button type="button"
                     wire:click="moveUp({{ $index }})"
-                    class="p-2 bg-blue-600 hover:bg-blue-700 rounded-lg text-white"
+                    class="p-2 bg-blue-900/60 hover:bg-blue-900/80 border border-blue-600/50 rounded-lg text-blue-300"
                     title="Przesun w gore">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"/>
@@ -98,7 +98,7 @@
             @if($index < count($images ?? []) - 1)
             <button type="button"
                     wire:click="moveDown({{ $index }})"
-                    class="p-2 bg-blue-600 hover:bg-blue-700 rounded-lg text-white"
+                    class="p-2 bg-blue-900/60 hover:bg-blue-900/80 border border-blue-600/50 rounded-lg text-blue-300"
                     title="Przesun w dol">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
@@ -109,7 +109,7 @@
             {{-- Remove --}}
             <button type="button"
                     wire:click="removeImage({{ $index }})"
-                    class="p-2 bg-red-600 hover:bg-red-700 rounded-lg text-white"
+                    class="p-2 bg-red-900/60 hover:bg-red-900/80 border border-red-600/50 rounded-lg text-red-300"
                     title="Usun">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -149,7 +149,7 @@
         </select>
         @if(!empty($image['variant_sku']))
         <div class="mt-1 text-center">
-            <span class="inline-block px-1.5 py-0.5 bg-purple-600 text-white text-xs rounded">
+            <span class="inline-block px-1.5 py-0.5 bg-purple-900/50 text-purple-300 border border-purple-700/50 text-xs rounded">
                 {{ $image['variant_sku'] }}
             </span>
         </div>

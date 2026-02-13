@@ -3465,13 +3465,13 @@
 
 .enterprise-table tbody tr {
     border-bottom: 1px solid rgba(224, 172, 126, 0.05);
-    transition: all 0.2s ease;
+    border-left: 2px solid transparent;
+    transition: background 0.2s ease, border-color 0.2s ease;
 }
 
 .enterprise-table tbody tr:hover {
     background: rgba(224, 172, 126, 0.05);
-    /* transform removed - no hover translate for table rows */
-    border-left: 2px solid rgba(59, 130, 246, 0.5);
+    border-left-color: rgba(59, 130, 246, 0.5);
 }
 
 .enterprise-table td {
@@ -3499,21 +3499,25 @@
 /* Resize handle - positioned on right edge of th */
 .resize-handle {
     position: absolute;
-    right: 0;
-    top: 0;
-    bottom: 0;
-    width: 6px;
+    right: -2px;
+    top: 4px;
+    bottom: 4px;
+    width: 5px;
     cursor: col-resize;
-    background: transparent;
-    border-right: 2px solid transparent;
-    transition: border-color 0.15s ease, background-color 0.15s ease;
+    background: rgba(100, 116, 139, 0.3);
+    border-radius: 2px;
+    transition: background-color 0.15s ease, box-shadow 0.15s ease;
     z-index: 10;
 }
 
 .resize-handle:hover,
 .resize-handle:active {
-    border-right-color: #3b82f6;
-    background: rgba(59, 130, 246, 0.1);
+    background: rgba(59, 130, 246, 0.6);
+    box-shadow: 0 0 4px rgba(59, 130, 246, 0.4);
+}
+
+.resizable-column:hover .resize-handle {
+    background: rgba(100, 116, 139, 0.5);
 }
 
 /* When resizing is active */

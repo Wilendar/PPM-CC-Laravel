@@ -552,6 +552,15 @@ class ProductPublicationService
         // Per-shop descriptions: use shop-specific if available, fallback to default
         $shopDescriptions = $pendingProduct->shop_descriptions ?? [];
 
+        Log::info('[createShopData] Description data', [
+            'pending_product_id' => $pendingProduct->id,
+            'shop_ids' => $shopIds,
+            'shop_descriptions_keys' => array_keys($shopDescriptions),
+            'shop_descriptions_raw' => $shopDescriptions,
+            'default_short' => substr($product->short_description ?? '', 0, 50),
+            'default_long' => substr($product->long_description ?? '', 0, 50),
+        ]);
+
         foreach ($shopIds as $shopId) {
             // Get shop-specific categories if defined, otherwise use global PPM categories
             $hasShopSpecificCategories = !empty($shopCategories[$shopId]);
@@ -584,13 +593,28 @@ class ProductPublicationService
             ];
 
             // Per-shop descriptions: use shop-specific if non-empty, fallback to product default
-            $perShopDescs = $shopDescriptions[$shopId] ?? [];
+            // FIX: Handle both int and string keys from JSON decode
+            $perShopDescs = $shopDescriptions[$shopId]
+                ?? $shopDescriptions[(string) $shopId]
+                ?? $shopDescriptions[(int) $shopId]
+                ?? [];
+
             $shortDesc = !empty(trim($perShopDescs['short'] ?? ''))
                 ? $perShopDescs['short']
                 : $product->short_description;
             $longDesc = !empty(trim($perShopDescs['long'] ?? ''))
                 ? $perShopDescs['long']
                 : $product->long_description;
+
+            Log::info('[createShopData] Shop description resolved', [
+                'shop_id' => $shopId,
+                'shop_id_type' => gettype($shopId),
+                'per_shop_found' => !empty($perShopDescs),
+                'short_desc_source' => !empty(trim($perShopDescs['short'] ?? '')) ? 'per-shop' : 'default',
+                'long_desc_source' => !empty(trim($perShopDescs['long'] ?? '')) ? 'per-shop' : 'default',
+                'short_desc_preview' => substr($shortDesc ?? '', 0, 50),
+                'long_desc_preview' => substr($longDesc ?? '', 0, 50),
+            ]);
 
             ProductShopData::updateOrCreate(
                 [
