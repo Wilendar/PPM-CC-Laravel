@@ -1,0 +1,522 @@
+/* ================================================================
+ * Import Modals CSS - PPM Enterprise Dark Theme
+ * Styles for: Image Modal, Description Modal, Variant Modal
+ * ================================================================ */
+
+/* === IMAGE MODAL: Batch Selection === */
+.import-image-checkbox {
+    position: absolute;
+    top: 0.375rem;
+    left: 0.375rem;
+    z-index: 5;
+    width: 1.25rem;
+    height: 1.25rem;
+    border-radius: 0.25rem;
+    border: 2px solid rgba(156, 163, 175, 0.5);
+    background-color: rgba(31, 41, 55, 0.8);
+    cursor: pointer;
+    transition: all 150ms ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.import-image-checkbox:hover {
+    border-color: rgb(59, 130, 246);
+}
+
+.import-image-checkbox.selected {
+    background-color: rgb(59, 130, 246);
+    border-color: rgb(59, 130, 246);
+}
+
+.import-image-selected {
+    outline: 3px solid rgb(59, 130, 246);
+    outline-offset: -3px;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.4);
+}
+
+.import-batch-toolbar {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.625rem 1rem;
+    background-color: rgba(30, 58, 138, 0.3);
+    border: 1px solid rgba(59, 130, 246, 0.3);
+    border-radius: 0.5rem;
+    margin-bottom: 0.75rem;
+}
+
+.import-batch-toolbar-count {
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: rgb(147, 197, 253);
+}
+
+.import-batch-toolbar-btn {
+    padding: 0.25rem 0.625rem;
+    border-radius: 0.375rem;
+    font-size: 0.75rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 150ms ease;
+}
+
+.import-batch-toolbar-assign {
+    background-color: rgba(59, 130, 246, 0.2);
+    color: rgb(147, 197, 253);
+    border: 1px solid rgba(59, 130, 246, 0.4);
+}
+
+.import-batch-toolbar-assign:hover {
+    background-color: rgba(59, 130, 246, 0.3);
+}
+
+.import-batch-toolbar-remove {
+    background-color: rgba(239, 68, 68, 0.15);
+    color: rgb(252, 165, 165);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.import-batch-toolbar-remove:hover {
+    background-color: rgba(239, 68, 68, 0.25);
+}
+
+/* === IMAGE MODAL: Variant Filter Buttons === */
+.import-variant-filter-bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.375rem;
+    margin-bottom: 0.75rem;
+}
+
+.import-variant-filter-btn {
+    padding: 0.25rem 0.625rem;
+    border-radius: 9999px;
+    font-size: 0.6875rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 150ms ease;
+    background-color: rgba(55, 65, 81, 0.5);
+    color: rgb(156, 163, 175);
+    border: 1px solid rgba(75, 85, 99, 0.5);
+}
+
+.import-variant-filter-btn:hover {
+    background-color: rgba(75, 85, 99, 0.5);
+    color: rgb(209, 213, 219);
+}
+
+.import-variant-filter-btn-active {
+    background-color: rgba(224, 172, 126, 0.2);
+    color: rgb(224, 172, 126);
+    border-color: rgba(224, 172, 126, 0.4);
+}
+
+/* === IMAGE MODAL: Grouped View === */
+.import-grouped-section {
+    margin-bottom: 1rem;
+    border: 1px solid rgba(75, 85, 99, 0.4);
+    border-radius: 0.5rem;
+    overflow: hidden;
+}
+
+.import-grouped-section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.5rem 0.75rem;
+    background-color: rgba(55, 65, 81, 0.4);
+    cursor: pointer;
+    transition: background-color 150ms ease;
+}
+
+.import-grouped-section-header:hover {
+    background-color: rgba(55, 65, 81, 0.6);
+}
+
+.import-grouped-section-body {
+    padding: 0.75rem;
+}
+
+/* === IMAGE MODAL: Cover Badges === */
+.import-cover-badge-global {
+    position: absolute;
+    top: 0.375rem;
+    right: 0.375rem;
+    padding: 0.125rem 0.5rem;
+    border-radius: 0.25rem;
+    font-size: 0.625rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    background-color: rgba(34, 197, 94, 0.9);
+    color: white;
+    z-index: 4;
+}
+
+.import-cover-badge-variant {
+    position: absolute;
+    top: 0.375rem;
+    right: 0.375rem;
+    padding: 0.125rem 0.5rem;
+    border-radius: 0.25rem;
+    font-size: 0.625rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    background-color: rgba(245, 158, 11, 0.9);
+    color: white;
+    z-index: 4;
+}
+
+/* Stack variant badge below global badge when both are present */
+.import-cover-badge-global + .import-cover-badge-variant {
+    top: 1.625rem;
+}
+
+/* === IMAGE MODAL: View Mode Toggle === */
+.import-view-toggle {
+    display: inline-flex;
+    border-radius: 0.375rem;
+    overflow: hidden;
+    border: 1px solid rgba(75, 85, 99, 0.5);
+}
+
+.import-view-toggle-btn {
+    padding: 0.25rem 0.625rem;
+    font-size: 0.6875rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 150ms ease;
+    background-color: transparent;
+    color: rgb(156, 163, 175);
+    border: none;
+}
+
+.import-view-toggle-btn-active {
+    background-color: rgba(224, 172, 126, 0.2);
+    color: rgb(224, 172, 126);
+}
+
+/* === DESCRIPTION MODAL: Tabs === */
+.import-desc-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+    padding: 0.25rem;
+    background-color: rgba(31, 41, 55, 0.5);
+    border-radius: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+.import-desc-tab {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.5rem 0.75rem;
+    border-radius: 0.375rem;
+    font-size: 0.8125rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 150ms ease;
+    color: rgb(156, 163, 175);
+    background-color: transparent;
+    border: none;
+}
+
+.import-desc-tab:hover {
+    background-color: rgba(55, 65, 81, 0.5);
+    color: rgb(209, 213, 219);
+}
+
+.import-desc-tab-active {
+    background-color: rgba(224, 172, 126, 0.15);
+    color: rgb(224, 172, 126);
+    font-weight: 600;
+}
+
+.import-desc-tab-badge {
+    padding: 0.0625rem 0.375rem;
+    border-radius: 9999px;
+    font-size: 0.625rem;
+    font-weight: 600;
+}
+
+.import-desc-tab-badge-inherited {
+    background-color: rgba(107, 114, 128, 0.3);
+    color: rgb(156, 163, 175);
+}
+
+.import-desc-tab-badge-custom {
+    background-color: rgba(34, 197, 94, 0.2);
+    color: rgb(134, 239, 172);
+}
+
+.import-desc-tab-badge-empty {
+    background-color: rgba(245, 158, 11, 0.2);
+    color: rgb(253, 224, 71);
+}
+
+.import-desc-inherit-banner {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.625rem 0.75rem;
+    margin-bottom: 0.75rem;
+    border-radius: 0.375rem;
+    font-size: 0.75rem;
+    background-color: rgba(59, 130, 246, 0.1);
+    color: rgb(147, 197, 253);
+    border: 1px solid rgba(59, 130, 246, 0.2);
+}
+
+.import-desc-copy-btn {
+    padding: 0.25rem 0.75rem;
+    border-radius: 0.375rem;
+    font-size: 0.75rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 150ms ease;
+    background-color: rgba(59, 130, 246, 0.15);
+    color: rgb(147, 197, 253);
+    border: 1px solid rgba(59, 130, 246, 0.3);
+}
+
+.import-desc-copy-btn:hover {
+    background-color: rgba(59, 130, 246, 0.25);
+}
+
+.import-desc-clear-btn {
+    padding: 0.25rem 0.75rem;
+    border-radius: 0.375rem;
+    font-size: 0.75rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 150ms ease;
+    background-color: rgba(239, 68, 68, 0.15);
+    color: rgb(252, 165, 165);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.import-desc-clear-btn:hover {
+    background-color: rgba(239, 68, 68, 0.25);
+}
+
+/* === VARIANT MODAL: Collapsible Panels === */
+.import-attr-panel {
+    border: 1px solid rgba(75, 85, 99, 0.4);
+    border-radius: 0.5rem;
+    margin-bottom: 0.5rem;
+    overflow: hidden;
+    transition: all 200ms ease;
+}
+
+.import-attr-panel-header {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.625rem 0.75rem;
+    background-color: rgba(55, 65, 81, 0.3);
+    cursor: pointer;
+    transition: background-color 150ms ease;
+}
+
+.import-attr-panel-header:hover {
+    background-color: rgba(55, 65, 81, 0.5);
+}
+
+.import-attr-panel-header-active {
+    background-color: rgba(224, 172, 126, 0.1);
+    border-bottom: 1px solid rgba(75, 85, 99, 0.4);
+}
+
+.import-attr-panel-chevron {
+    transition: transform 200ms ease;
+    color: rgb(107, 114, 128);
+    width: 1rem;
+    height: 1rem;
+}
+
+.import-attr-panel-chevron-open {
+    transform: rotate(90deg);
+}
+
+.import-attr-panel-body {
+    padding: 0.75rem;
+}
+
+/* === VARIANT MODAL: Value Search === */
+.import-value-search {
+    width: 100%;
+    padding: 0.375rem 0.625rem;
+    margin-bottom: 0.5rem;
+    border-radius: 0.375rem;
+    font-size: 0.75rem;
+    background-color: rgba(31, 41, 55, 0.6);
+    color: rgb(243, 244, 246);
+    border: 1px solid rgba(75, 85, 99, 0.5);
+}
+
+.import-value-search:focus {
+    border-color: rgba(224, 172, 126, 0.5);
+    outline: none;
+}
+
+.import-value-search::placeholder {
+    color: rgb(107, 114, 128);
+}
+
+/* === VARIANT MODAL: Editable Cards === */
+.import-variant-card {
+    display: flex;
+    flex-direction: column;
+    gap: 0.375rem;
+    padding: 0.625rem 0.75rem;
+    border: 1px solid rgba(75, 85, 99, 0.3);
+    border-radius: 0.5rem;
+    margin-bottom: 0.375rem;
+    background-color: rgba(31, 41, 55, 0.4);
+    transition: all 150ms ease;
+}
+
+.import-variant-card:hover {
+    background-color: rgba(31, 41, 55, 0.6);
+    border-color: rgba(75, 85, 99, 0.5);
+}
+
+.import-variant-card-inactive {
+    opacity: 0.5;
+}
+
+.import-variant-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+}
+
+.import-variant-card-sku {
+    font-family: var(--font-mono, monospace);
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: rgb(134, 239, 172);
+}
+
+.import-variant-card-name {
+    font-size: 0.8125rem;
+    color: rgb(209, 213, 219);
+}
+
+.import-variant-card-details {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.import-variant-card-toggle {
+    position: relative;
+    width: 2rem;
+    height: 1.125rem;
+    border-radius: 9999px;
+    cursor: pointer;
+    transition: background-color 150ms ease;
+    flex-shrink: 0;
+}
+
+.import-variant-card-toggle-on {
+    background-color: rgb(34, 197, 94);
+}
+
+.import-variant-card-toggle-off {
+    background-color: rgb(75, 85, 99);
+}
+
+.import-variant-card-toggle-dot {
+    position: absolute;
+    top: 0.125rem;
+    width: 0.875rem;
+    height: 0.875rem;
+    border-radius: 9999px;
+    background-color: white;
+    transition: left 150ms ease;
+}
+
+.import-variant-card-toggle-dot-on {
+    left: calc(100% - 1rem);
+}
+
+.import-variant-card-toggle-dot-off {
+    left: 0.125rem;
+}
+
+.import-variant-price-input {
+    width: 5rem;
+    padding: 0.25rem 0.375rem;
+    border-radius: 0.25rem;
+    font-size: 0.6875rem;
+    text-align: right;
+    background-color: rgba(55, 65, 81, 0.5);
+    color: rgb(243, 244, 246);
+    border: 1px solid rgba(75, 85, 99, 0.5);
+}
+
+.import-variant-price-input:focus {
+    border-color: rgba(224, 172, 126, 0.5);
+    outline: none;
+}
+
+.import-variant-card-remove {
+    padding: 0.25rem;
+    border-radius: 0.25rem;
+    color: rgb(156, 163, 175);
+    cursor: pointer;
+    transition: all 150ms ease;
+    opacity: 0;
+    background: none;
+    border: none;
+}
+
+.import-variant-card:hover .import-variant-card-remove {
+    opacity: 1;
+}
+
+.import-variant-card-remove:hover {
+    color: rgb(239, 68, 68);
+    background-color: rgba(239, 68, 68, 0.1);
+}
+
+/* === VARIANT MODAL: Summary Bar === */
+.import-variant-summary-bar {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.375rem 0.75rem;
+    margin-bottom: 0.75rem;
+    border-radius: 0.375rem;
+    font-size: 0.75rem;
+    background-color: rgba(55, 65, 81, 0.3);
+    color: rgb(156, 163, 175);
+}
+
+.import-variant-summary-count {
+    font-weight: 600;
+    color: rgb(209, 213, 219);
+}
+
+.import-variant-summary-active {
+    color: rgb(134, 239, 172);
+}
+
+.import-variant-summary-inactive {
+    color: rgb(252, 165, 165);
+}
+
+/* === VARIANT MODAL: Value Usage Count === */
+.import-value-usage {
+    font-size: 0.5625rem;
+    color: rgb(107, 114, 128);
+    margin-left: 0.125rem;
+}

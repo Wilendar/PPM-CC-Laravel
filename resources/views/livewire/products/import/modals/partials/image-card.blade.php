@@ -7,37 +7,50 @@
     'showVariantAssignment' => false,
     'variants' => [],
     'variantCovers' => [],
+    'selectedImages' => [],
 ])
+
+@php
+    $isSelected = in_array($index, $selectedImages);
+@endphp
 
 <div class="relative group bg-gray-700/50 rounded-lg overflow-hidden
             {{ $isGlobalCover ? 'ring-2 ring-green-500' : '' }}
-            {{ $isVariantCover && !$isGlobalCover ? 'ring-2 ring-amber-500' : '' }}">
+            {{ $isVariantCover && !$isGlobalCover ? 'ring-2 ring-amber-500' : '' }}
+            {{ $isSelected ? 'import-image-selected' : '' }}">
     {{-- Image preview --}}
     <div class="aspect-square relative">
         <img src="{{ Storage::disk('public')->url($image['path']) }}"
              alt="{{ $image['filename'] ?? 'Image' }}"
              class="w-full h-full object-cover">
 
-        {{-- Global cover badge --}}
+        {{-- Selection checkbox (top-left) --}}
+        <div class="import-image-checkbox {{ $isSelected ? 'selected' : '' }}"
+             wire:click.stop="toggleImageSelection({{ $index }})"
+             title="Zaznacz/odznacz">
+            @if($isSelected)
+                <svg class="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+                </svg>
+            @endif
+        </div>
+
+        {{-- Global cover badge (top-right) --}}
         @if($isGlobalCover)
-        <div class="absolute top-2 left-2 px-2 py-1 bg-green-600 text-white text-xs rounded">
-            Okladka
+        <div class="import-cover-badge-global">
+            OKLADKA
         </div>
         @endif
 
-        {{-- Variant cover badge --}}
-        @if($isVariantCover && !$isGlobalCover)
-        <div class="absolute top-2 left-2 px-1.5 py-0.5 bg-amber-600 text-white text-xs rounded">
-            Okladka wariantu
-        </div>
-        @elseif($isVariantCover && $isGlobalCover)
-        <div class="absolute top-8 left-2 px-1.5 py-0.5 bg-amber-600 text-white text-xs rounded">
+        {{-- Variant cover badge (top-right, stacked below global via CSS adjacency rule) --}}
+        @if($isVariantCover)
+        <div class="import-cover-badge-variant">
             Okladka wariantu
         </div>
         @endif
 
         {{-- Position badge --}}
-        <div class="absolute top-2 right-2 w-6 h-6 bg-gray-900/80 text-white text-xs
+        <div class="absolute bottom-2 right-2 w-6 h-6 bg-gray-900/80 text-white text-xs
                     rounded-full flex items-center justify-center">
             {{ $index + 1 }}
         </div>

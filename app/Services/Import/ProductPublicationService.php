@@ -549,6 +549,9 @@ class ProductPublicationService
             : ($pendingProduct->shop_ids ?? []);
         $shopCategories = $pendingProduct->shop_categories ?? [];
 
+        // Per-shop descriptions: use shop-specific if available, fallback to default
+        $shopDescriptions = $pendingProduct->shop_descriptions ?? [];
+
         foreach ($shopIds as $shopId) {
             // Get shop-specific categories if defined, otherwise use global PPM categories
             $hasShopSpecificCategories = !empty($shopCategories[$shopId]);
@@ -580,6 +583,15 @@ class ProductPublicationService
                 ],
             ];
 
+            // Per-shop descriptions: use shop-specific if non-empty, fallback to product default
+            $perShopDescs = $shopDescriptions[$shopId] ?? [];
+            $shortDesc = !empty(trim($perShopDescs['short'] ?? ''))
+                ? $perShopDescs['short']
+                : $product->short_description;
+            $longDesc = !empty(trim($perShopDescs['long'] ?? ''))
+                ? $perShopDescs['long']
+                : $product->long_description;
+
             ProductShopData::updateOrCreate(
                 [
                     'product_id' => $product->id,
@@ -589,8 +601,8 @@ class ProductPublicationService
                     'is_active' => true,
                     'is_published' => true,
                     'name' => $product->name,
-                    'short_description' => $product->short_description,
-                    'long_description' => $product->long_description,
+                    'short_description' => $shortDesc,
+                    'long_description' => $longDesc,
                     'meta_title' => $product->meta_title,
                     'meta_description' => $product->meta_description,
                     'category_mappings' => $categoryMappings,

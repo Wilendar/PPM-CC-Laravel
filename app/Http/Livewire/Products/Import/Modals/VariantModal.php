@@ -84,6 +84,18 @@ class VariantModal extends Component
     public bool $useDbSuffixPrefix = true;
 
     /**
+     * Per-variant price overrides
+     * Format: [index => float|null]
+     */
+    public array $variantPrices = [];
+
+    /**
+     * Per-variant active/inactive states
+     * Format: [index => bool]
+     */
+    public array $variantActiveStates = [];
+
+    /**
      * Listeners
      */
     protected $listeners = [
@@ -96,7 +108,7 @@ class VariantModal extends Component
     #[On('openVariantModal')]
     public function openModal(int $productId): void
     {
-        $this->reset(['generatedVariants', 'selectedAttributeTypes', 'selectedValues', 'useDbSuffixPrefix']);
+        $this->reset(['generatedVariants', 'selectedAttributeTypes', 'selectedValues', 'useDbSuffixPrefix', 'variantPrices', 'variantActiveStates']);
         $this->useDbSuffixPrefix = true; // Default to DB config
 
         $this->pendingProductId = $productId;
@@ -133,6 +145,12 @@ class VariantModal extends Component
                     }
                 }
             }
+
+            // Initialize tracking arrays from existing variants
+            foreach ($this->generatedVariants as $index => $variant) {
+                $this->variantPrices[$index] = $variant['price'] ?? null;
+                $this->variantActiveStates[$index] = $variant['is_active'] ?? true;
+            }
         }
 
         $this->showModal = true;
@@ -144,7 +162,7 @@ class VariantModal extends Component
     public function closeModal(): void
     {
         $this->showModal = false;
-        $this->reset(['pendingProductId', 'pendingProduct', 'generatedVariants', 'selectedAttributeTypes', 'selectedValues']);
+        $this->reset(['pendingProductId', 'pendingProduct', 'generatedVariants', 'selectedAttributeTypes', 'selectedValues', 'variantPrices', 'variantActiveStates']);
     }
 
     /**
@@ -275,6 +293,14 @@ class VariantModal extends Component
             ];
         }
 
+        // Initialize tracking arrays
+        $this->variantPrices = [];
+        $this->variantActiveStates = [];
+        foreach ($this->generatedVariants as $index => $variant) {
+            $this->variantPrices[$index] = $variant['price'] ?? null;
+            $this->variantActiveStates[$index] = $variant['is_active'] ?? true;
+        }
+
         Log::info('[VariantModal] Generated variants', [
             'pending_product_id' => $this->pendingProductId,
             'count' => count($this->generatedVariants),
@@ -313,6 +339,12 @@ class VariantModal extends Component
         if (isset($this->generatedVariants[$index])) {
             unset($this->generatedVariants[$index]);
             $this->generatedVariants = array_values($this->generatedVariants);
+
+            // Re-index tracking arrays
+            unset($this->variantPrices[$index]);
+            unset($this->variantActiveStates[$index]);
+            $this->variantPrices = array_values($this->variantPrices);
+            $this->variantActiveStates = array_values($this->variantActiveStates);
         }
     }
 
@@ -330,6 +362,13 @@ class VariantModal extends Component
         try {
             // Collect used attribute types
             $usedTypeIds = array_keys(array_filter($this->selectedAttributeTypes));
+
+            // Sync prices and active states into generatedVariants before save
+            foreach ($this->generatedVariants as $index => &$variant) {
+                $variant['price'] = $this->variantPrices[$index] ?? null;
+                $variant['is_active'] = $this->variantActiveStates[$index] ?? true;
+            }
+            unset($variant);
 
             // Build variant_data structure
             $variantData = [
@@ -379,6 +418,63 @@ class VariantModal extends Component
     {
         $this->generatedVariants = [];
         $this->selectedValues = [];
+        $this->variantPrices = [];
+        $this->variantActiveStates = [];
+    }
+
+    /**
+     * Toggle variant active/inactive state
+     */
+    public function toggleVariantActive(int $index): void
+    {
+        $states = $this->variantActiveStates;
+        $states[$index] = !($states[$index] ?? true);
+        $this->variantActiveStates = $states;
+
+        // Sync to generatedVariants
+        $variants = $this->generatedVariants;
+        if (isset($variants[$index])) {
+            $variants[$index]['is_active'] = $states[$index];
+            $this->generatedVariants = $variants;
+        }
+    }
+
+    /**
+     * Set price for a specific variant
+     */
+    public function setVariantPrice(int $index, $price): void
+    {
+        $prices = $this->variantPrices;
+        $prices[$index] = $price !== '' && $price !== null ? (float) $price : null;
+        $this->variantPrices = $prices;
+
+        // Sync to generatedVariants
+        $variants = $this->generatedVariants;
+        if (isset($variants[$index])) {
+            $variants[$index]['price'] = $prices[$index];
+            $this->generatedVariants = $variants;
+        }
+    }
+
+    /**
+     * Get count of variants using a specific attribute value
+     */
+    public function getValueUsageCount(int $typeId, int $valueId): int
+    {
+        if (empty($this->generatedVariants)) {
+            return 0;
+        }
+
+        $count = 0;
+        foreach ($this->generatedVariants as $variant) {
+            foreach ($variant['attributes'] ?? [] as $attr) {
+                if (($attr['attribute_type_id'] ?? 0) == $typeId && ($attr['value_id'] ?? 0) == $valueId) {
+                    $count++;
+                }
+            }
+        }
+
+        return $count;
     }
 
     /**

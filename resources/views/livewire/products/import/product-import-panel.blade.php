@@ -38,8 +38,9 @@
         </div>
     </div>
 
-    {{-- SINGLE ROW: Filters + Bulk Actions --}}
+    {{-- FILTERS: Row 1 (main) + Row 2 (advanced toggles) + Bulk Actions --}}
     <div class="enterprise-card px-4 py-2">
+        {{-- Row 1: Main filters + Bulk actions --}}
         <div class="import-filters-inline flex items-center gap-3 flex-nowrap">
             {{-- Search --}}
             <input type="text"
@@ -47,13 +48,15 @@
                    placeholder="Szukaj po SKU, nazwie..."
                    class="form-input-dark filter-search h-8 text-sm">
 
-            {{-- Dropdowns inline - SHORT labels --}}
+            {{-- Status --}}
             <select wire:model.live="filterStatus" class="form-select-dark h-8 text-sm">
                 <option value="">Status</option>
                 <option value="ready">Gotowe</option>
                 <option value="incomplete">Niekompletne</option>
+                <option value="published">Opublikowane</option>
             </select>
 
+            {{-- Typ produktu --}}
             <select wire:model.live="filterProductType" class="form-select-dark h-8 text-sm">
                 <option value="">Typ</option>
                 @foreach($this->productTypes as $type)
@@ -61,15 +64,24 @@
                 @endforeach
             </select>
 
-            <select wire:model.live="filterSessionId" class="form-select-dark h-8 text-sm">
-                <option value="">Sesja</option>
-                @foreach($this->importSessions as $session)
-                    <option value="{{ $session->id }}">{{ Str::limit($session->session_name ?? 'Sesja #' . $session->id, 15) }}</option>
+            {{-- Marka (manufacturer) --}}
+            <select wire:model.live="filterManufacturerId" class="form-select-dark h-8 text-sm">
+                <option value="">Marka</option>
+                @foreach($this->manufacturers as $m)
+                    <option value="{{ $m->id }}">{{ $m->name }}</option>
                 @endforeach
             </select>
 
+            {{-- Cel publikacji --}}
+            <select wire:model.live="filterPublicationTarget" class="form-select-dark h-8 text-sm">
+                <option value="">Cel publikacji</option>
+                <option value="erp">ERP</option>
+                <option value="prestashop">PrestaShop</option>
+                <option value="both">ERP + PrestaShop</option>
+            </select>
+
             {{-- Reset filter --}}
-            @if($filterStatus || $filterProductType || $filterSessionId || $filterSearch)
+            @if($this->hasActiveFilters())
                 <button wire:click="resetFilters" class="p-1.5 rounded hover:bg-red-900/30 text-red-400 transition-colors flex-shrink-0" title="Wyczysc filtry">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
@@ -79,6 +91,16 @@
 
             {{-- Spacer --}}
             <div class="flex-1"></div>
+
+            {{-- Toggle advanced filters --}}
+            <button wire:click="toggleAdvancedFilters"
+                    class="import-filter-expand-btn flex items-center gap-1"
+                    title="{{ $showAdvancedFilters ? 'Zwin filtry' : 'Rozwin filtry' }}">
+                <svg class="w-3.5 h-3.5 transition-transform {{ $showAdvancedFilters ? 'rotate-180' : '' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                </svg>
+                Filtry
+            </button>
 
             {{-- Bulk actions (right side) --}}
             @if(count($selectedIds) > 0)
@@ -109,6 +131,60 @@
                 </div>
             @endif
         </div>
+
+        {{-- Row 2: Advanced filters (toggles + date range) --}}
+        @if($showAdvancedFilters)
+            <div class="import-filter-toggle-row border-t border-gray-700/50 mt-2 pt-2">
+                {{-- Hide published --}}
+                <label class="import-filter-toggle-label">
+                    <input type="checkbox" wire:model.live="filterHidePublished"
+                           class="rounded border-gray-600 bg-gray-700 text-green-500 focus:ring-green-500/30">
+                    Ukryj opublikowane
+                </label>
+
+                <div class="import-filter-separator"></div>
+
+                {{-- Without images --}}
+                <label class="import-filter-toggle-label">
+                    <input type="checkbox" wire:model.live="filterNoImages"
+                           class="rounded border-gray-600 bg-gray-700 text-amber-500 focus:ring-amber-500/30">
+                    Bez zdjec
+                </label>
+
+                {{-- Without descriptions --}}
+                <label class="import-filter-toggle-label">
+                    <input type="checkbox" wire:model.live="filterNoDescriptions"
+                           class="rounded border-gray-600 bg-gray-700 text-amber-500 focus:ring-amber-500/30">
+                    Bez opisow
+                </label>
+
+                {{-- Without compatibility (Czesc zamienna) --}}
+                <label class="import-filter-toggle-label">
+                    <input type="checkbox" wire:model.live="filterNoCompatibility"
+                           class="rounded border-gray-600 bg-gray-700 text-amber-500 focus:ring-amber-500/30">
+                    Bez dopasowan
+                </label>
+
+                {{-- Without features (Pojazd) --}}
+                <label class="import-filter-toggle-label">
+                    <input type="checkbox" wire:model.live="filterNoFeatures"
+                           class="rounded border-gray-600 bg-gray-700 text-amber-500 focus:ring-amber-500/30">
+                    Bez atrybutow
+                </label>
+
+                <div class="import-filter-separator"></div>
+
+                {{-- Date range --}}
+                <div class="import-filter-date-group">
+                    <span class="text-xs text-gray-500">Od:</span>
+                    <input type="date" wire:model.live="filterPublishedFrom"
+                           class="import-filter-date-input">
+                    <span class="text-xs text-gray-500">Do:</span>
+                    <input type="date" wire:model.live="filterPublishedTo"
+                           class="import-filter-date-input">
+                </div>
+            </div>
+        @endif
     </div>
 
     {{-- Tabela produktow z resizable columns --}}
@@ -160,7 +236,14 @@
 
                         {{-- CENA - klik otwiera modal cen (FAZA 9.4) --}}
                         <th class="px-2 w-20 relative resizable-column" data-column-id="price" style="width: 80px; min-width: 60px;">
-                            <span class="text-xs text-gray-400">Cena</span>
+                            <div class="flex items-center gap-1">
+                                <span class="text-xs text-gray-400">Cena</span>
+                                <button wire:click="togglePriceDisplay"
+                                        class="import-price-toggle-btn {{ $priceDisplayMode === 'net' ? 'import-price-toggle-net' : 'import-price-toggle-gross' }}"
+                                        title="Przelacz netto/brutto">
+                                    {{ $priceDisplayMode === 'net' ? 'NETTO' : 'BRUTTO' }}
+                                </button>
+                            </div>
                             <div class="resize-handle" x-on:mousedown="startResize($event, 'price')"></div>
                         </th>
 

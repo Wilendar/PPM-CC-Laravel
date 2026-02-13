@@ -134,9 +134,22 @@
         <div class="import-price-cell"
              wire:click="openImportPricesModal({{ $product->id }})"
              title="Kliknij aby edytowac ceny">
-            @if($product->base_price !== null)
+            @php
+                $displayPrice = null;
+                $taxRate = (float) ($product->tax_rate ?? 23);
+                $vatMultiplier = 1 + ($taxRate / 100);
+
+                if (($this->priceDisplayMode ?? 'net') === 'net') {
+                    $displayPrice = $product->base_price;
+                } else {
+                    $displayPrice = $product->base_price !== null
+                        ? round((float) $product->base_price * $vatMultiplier, 2)
+                        : null;
+                }
+            @endphp
+            @if($displayPrice !== null)
                 <span class="import-price-cell-value">
-                    {{ number_format((float) $product->base_price, 2, ',', ' ') }} zl
+                    {{ number_format($displayPrice, 2, ',', ' ') }} zl
                 </span>
             @else
                 <span class="import-price-cell-empty">brak</span>
@@ -501,9 +514,17 @@
             $pubStatus = $product->publish_status ?? 'draft';
         @endphp
         @if($pubStatus === 'published')
-            <span class="text-xs text-gray-500">
-                {{ $product->published_at?->format('d.m H:i') ?? '-' }}
-            </span>
+            <div class="import-published-date-cell">
+                <span class="import-published-date-badge">
+                    <svg class="w-3 h-3 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+                    </svg>
+                    {{ $product->published_at?->format('d.m H:i') ?? '-' }}
+                </span>
+                @if($product->publisher)
+                    <span class="import-published-by-text">{{ $product->publisher->name }}</span>
+                @endif
+            </div>
         @else
             <input type="datetime-local"
                    wire:key="schedule-{{ $product->id }}-{{ $product->scheduled_publish_at?->timestamp ?? 'none' }}"

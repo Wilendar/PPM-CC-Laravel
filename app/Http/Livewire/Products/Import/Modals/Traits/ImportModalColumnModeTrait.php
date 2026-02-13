@@ -205,7 +205,11 @@ trait ImportModalColumnModeTrait
      */
     public function loadSavedColumnLayout(): void
     {
-        $prefs = Auth::user()->import_column_preferences ?? [];
+        $user = Auth::user();
+        if (!$user) {
+            return;
+        }
+        $prefs = $user->import_column_preferences ?? [];
 
         if (!empty($prefs['active_columns'])) {
             $available = array_keys($this->getAvailableColumns());

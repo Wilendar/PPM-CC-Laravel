@@ -183,7 +183,9 @@ class PendingProduct extends Model
         'imported_by',
         'imported_at',
         'published_at',
+        'published_by',
         'published_as_product_id',
+        'shop_descriptions',
     ];
 
     /**
@@ -208,6 +210,7 @@ class PendingProduct extends Model
             'skip_history' => 'array',
             'price_data' => 'array',
             'publication_targets' => 'array',
+            'shop_descriptions' => 'array',
             'split_payment' => 'boolean',
             'shop_internet' => 'boolean',
             'is_variant_master' => 'boolean',
@@ -308,6 +311,14 @@ class PendingProduct extends Model
     public function publishedProduct(): BelongsTo
     {
         return $this->belongsTo(Product::class, 'published_as_product_id');
+    }
+
+    /**
+     * User who published this product.
+     */
+    public function publisher(): BelongsTo
+    {
+        return $this->belongsTo(\App\Models\User::class, 'published_by');
     }
 
     /**

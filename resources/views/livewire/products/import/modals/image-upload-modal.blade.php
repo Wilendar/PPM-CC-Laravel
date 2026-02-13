@@ -34,127 +34,7 @@
                 <div class="p-6 max-h-[70vh] overflow-y-auto">
 
                     {{-- Upload options --}}
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                        {{-- File upload with drag & drop --}}
-                        <div class="p-4 bg-gray-700/30 rounded-lg"
-                             x-data="{ isDragging: false }"
-                             @dragover.prevent="isDragging = true"
-                             @dragleave.prevent="isDragging = false"
-                             @drop.prevent="isDragging = false; $refs.fileInput.files = $event.dataTransfer.files; $refs.fileInput.dispatchEvent(new Event('change'))">
-                            <h4 class="text-sm font-medium text-gray-300 mb-3">
-                                Wgraj z dysku
-                            </h4>
-                            <label class="flex flex-col items-center justify-center p-4 border-2 border-dashed rounded-lg cursor-pointer transition-colors"
-                                   :class="isDragging ? 'border-green-500 bg-green-500/10' : 'border-gray-600 hover:border-gray-500'">
-                                <svg class="w-8 h-8 mb-2 transition-colors" :class="isDragging ? 'text-green-400' : 'text-gray-400'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                          d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
-                                </svg>
-                                <span class="text-sm transition-colors" :class="isDragging ? 'text-green-400' : 'text-gray-400'">
-                                    <span x-show="!isDragging">Kliknij lub upusc pliki</span>
-                                    <span x-show="isDragging" x-cloak>Upusc pliki tutaj!</span>
-                                </span>
-                                <span class="text-xs text-gray-500 mt-1">JPG, PNG, GIF, WEBP do 10MB</span>
-                                <input type="file"
-                                       x-ref="fileInput"
-                                       wire:model="uploadedFiles"
-                                       multiple
-                                       accept="image/*"
-                                       class="hidden">
-                            </label>
-                            @if($isUploading)
-                            <div class="mt-2 text-center text-sm text-gray-400">
-                                <svg class="animate-spin inline-block w-4 h-4 mr-1" fill="none" viewBox="0 0 24 24">
-                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-                                </svg>
-                                Wgrywanie...
-                            </div>
-                            @endif
-                        </div>
-
-                        {{-- URL import --}}
-                        <div class="p-4 bg-gray-700/30 rounded-lg">
-                            <h4 class="text-sm font-medium text-gray-300 mb-3">
-                                Pobierz z URL
-                            </h4>
-                            <div class="space-y-2">
-                                <input type="text"
-                                       wire:model.live="imageUrl"
-                                       placeholder="https://..."
-                                       class="form-input-dark-sm w-full"
-                                       wire:keydown.enter="importFromUrl">
-                                <button type="button"
-                                        wire:click="importFromUrl"
-                                        @disabled(empty($imageUrl) || $isUploading)
-                                        class="w-full px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg
-                                               text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
-                                    Pobierz
-                                </button>
-                            </div>
-                        </div>
-
-                        {{-- Copy from product with autocomplete --}}
-                        <div class="p-4 bg-gray-700/30 rounded-lg"
-                             x-data="{ focused: false }"
-                             @click.away="focused = false; $wire.hideSkuSuggestions()">
-                            <h4 class="text-sm font-medium text-gray-300 mb-3">
-                                Kopiuj z produktu
-                            </h4>
-                            <div class="space-y-2">
-                                <div class="relative">
-                                    <input type="text"
-                                           wire:model.live.debounce.300ms="copyFromSku"
-                                           placeholder="Wpisz SKU..."
-                                           class="form-input-dark-sm w-full"
-                                           @focus="focused = true"
-                                           wire:keydown.enter="copyFromProduct"
-                                           wire:keydown.escape="$wire.hideSkuSuggestions()"
-                                           autocomplete="off">
-
-                                    @if($showSkuSuggestions && count($skuSuggestions) > 0)
-                                    <div class="absolute z-50 w-full mt-1 bg-gray-800 border border-gray-600 rounded-lg shadow-xl max-h-64 overflow-y-auto">
-                                        @foreach($skuSuggestions as $suggestion)
-                                        <button type="button"
-                                                wire:click="selectSkuSuggestion('{{ $suggestion['sku'] }}')"
-                                                class="w-full px-3 py-2 text-left hover:bg-gray-700 transition-colors flex items-center gap-2
-                                                       {{ $loop->first ? 'rounded-t-lg' : '' }}
-                                                       {{ $loop->last ? 'rounded-b-lg' : '' }}
-                                                       border-b border-gray-700 last:border-b-0">
-                                            <span class="shrink-0 px-1.5 py-0.5 text-xs rounded
-                                                         {{ $suggestion['source'] === 'pending' ? 'bg-yellow-600 text-yellow-100' : 'bg-blue-600 text-blue-100' }}">
-                                                {{ $suggestion['source'] === 'pending' ? 'Import' : 'Prod' }}
-                                            </span>
-                                            <div class="flex-1 min-w-0">
-                                                <div class="text-sm text-white font-medium truncate">{{ $suggestion['sku'] }}</div>
-                                                <div class="text-xs text-gray-400 truncate">{{ Str::limit($suggestion['name'], 30) }}</div>
-                                            </div>
-                                            @if($suggestion['has_images'])
-                                            <span class="shrink-0 flex items-center gap-1 px-1.5 py-0.5 bg-green-600 text-green-100 text-xs rounded">
-                                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                                          d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
-                                                </svg>
-                                                {{ $suggestion['image_count'] }}
-                                            </span>
-                                            @else
-                                            <span class="shrink-0 px-1.5 py-0.5 bg-gray-600 text-gray-300 text-xs rounded">0 zdjec</span>
-                                            @endif
-                                        </button>
-                                        @endforeach
-                                    </div>
-                                    @endif
-                                </div>
-                                <button type="button"
-                                        wire:click="copyFromProduct"
-                                        @disabled(empty($copyFromSku) || $isUploading)
-                                        class="w-full px-3 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg
-                                               text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
-                                    Kopiuj zdjecia
-                                </button>
-                            </div>
-                        </div>
-                    </div>
+                    @include('livewire.products.import.modals.partials._image-upload-sources')
 
                     {{-- Variant assignment toggle --}}
                     @if(count($variants) > 0)
@@ -199,15 +79,35 @@
 
                     {{-- Image gallery --}}
                     <div class="space-y-3">
+                        {{-- Gallery header with view toggle --}}
                         <div class="flex items-center justify-between mb-2">
-                            <h4 class="text-sm font-medium text-gray-300 uppercase tracking-wider">
-                                Galeria
-                                @if(count($images) > 0)
-                                <span class="ml-2 px-2 py-0.5 bg-green-600 text-white text-xs rounded-full">
-                                    {{ count($images) }}
-                                </span>
+                            <div class="flex items-center gap-3">
+                                <h4 class="text-sm font-medium text-gray-300 uppercase tracking-wider">
+                                    Galeria
+                                    @if(count($images) > 0)
+                                    <span class="ml-2 px-2 py-0.5 bg-green-600 text-white text-xs rounded-full">
+                                        {{ count($images) }}
+                                    </span>
+                                    @endif
+                                </h4>
+
+                                {{-- View mode toggle (only when variants exist) --}}
+                                @if(count($variants) > 0 && count($images) > 0)
+                                <div class="import-view-toggle">
+                                    <button type="button"
+                                            wire:click="setViewMode('grid')"
+                                            class="import-view-toggle-btn {{ $viewMode === 'grid' ? 'import-view-toggle-btn-active' : '' }}">
+                                        Siatka
+                                    </button>
+                                    <button type="button"
+                                            wire:click="setViewMode('grouped')"
+                                            class="import-view-toggle-btn {{ $viewMode === 'grouped' ? 'import-view-toggle-btn-active' : '' }}">
+                                        Grupy
+                                    </button>
+                                </div>
                                 @endif
-                            </h4>
+                            </div>
+
                             @if(count($images) > 0)
                             <button type="button"
                                     wire:click="clearImages"
@@ -218,26 +118,76 @@
                             @endif
                         </div>
 
-                        @if(count($images) > 0)
-                        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                            @foreach($images as $index => $image)
-                                @php
-                                    $isGlobalCover = $image['is_cover'] ?? false;
-                                    $variantSku = $image['variant_sku'] ?? null;
-                                    $isVariantCover = $variantSku && isset($variantCovers[$variantSku]) && $variantCovers[$variantSku] === $index;
-                                @endphp
-                                @include('livewire.products.import.modals.partials.image-card', [
-                                    'image' => $image,
-                                    'index' => $index,
-                                    'isGlobalCover' => $isGlobalCover,
-                                    'isVariantCover' => $isVariantCover,
-                                    'showVariantAssignment' => $showVariantAssignment,
-                                    'variants' => $variants,
-                                    'variantCovers' => $variantCovers,
-                                    'images' => $images,
-                                ])
+                        {{-- Variant filter buttons (grid mode only, when variants exist) --}}
+                        @if($viewMode === 'grid' && count($variants) > 0 && count($images) > 0)
+                        @php $imageCounts = $this->variantImageCounts; @endphp
+                        <div class="import-variant-filter-bar">
+                            <button type="button"
+                                    wire:click="setVariantFilter('')"
+                                    class="import-variant-filter-btn {{ $variantFilter === null ? 'import-variant-filter-btn-active' : '' }}">
+                                Wszystkie ({{ $imageCounts['_all'] ?? 0 }})
+                            </button>
+                            <button type="button"
+                                    wire:click="setVariantFilter('_main')"
+                                    class="import-variant-filter-btn {{ $variantFilter === '_main' ? 'import-variant-filter-btn-active' : '' }}">
+                                Produkt glowny ({{ $imageCounts['_main'] ?? 0 }})
+                            </button>
+                            @foreach($variants as $variant)
+                            @php $vSku = $variant['sku_suffix'] ?? ''; @endphp
+                            @if($vSku !== '')
+                            <button type="button"
+                                    wire:click="setVariantFilter('{{ $vSku }}')"
+                                    class="import-variant-filter-btn {{ $variantFilter === $vSku ? 'import-variant-filter-btn-active' : '' }}">
+                                {{ $this->getVariantDisplayName($variant) }} ({{ $imageCounts[$vSku] ?? 0 }})
+                            </button>
+                            @endif
                             @endforeach
                         </div>
+                        @endif
+
+                        {{-- Batch toolbar (sticky) --}}
+                        @include('livewire.products.import.modals.partials.batch-toolbar')
+
+                        {{-- Gallery content --}}
+                        @if(count($images) > 0)
+                            @if($viewMode === 'grouped' && count($variants) > 0)
+                                {{-- Grouped view --}}
+                                @include('livewire.products.import.modals.partials.image-gallery-grouped')
+                            @else
+                                {{-- Grid view (with optional filter) --}}
+                                @php $displayImages = $this->filteredImages; @endphp
+                                @if(count($displayImages) > 0)
+                                <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                                    @foreach($displayImages as $index => $image)
+                                        @php
+                                            $isGlobalCover = $image['is_cover'] ?? false;
+                                            $variantSku = $image['variant_sku'] ?? null;
+                                            $isVariantCover = $variantSku && isset($variantCovers[$variantSku]) && $variantCovers[$variantSku] === $index;
+                                        @endphp
+                                        @include('livewire.products.import.modals.partials.image-card', [
+                                            'image' => $image,
+                                            'index' => $index,
+                                            'isGlobalCover' => $isGlobalCover,
+                                            'isVariantCover' => $isVariantCover,
+                                            'showVariantAssignment' => $showVariantAssignment,
+                                            'variants' => $variants,
+                                            'variantCovers' => $variantCovers,
+                                            'images' => $images,
+                                            'selectedImages' => $selectedImages,
+                                        ])
+                                    @endforeach
+                                </div>
+                                @else
+                                <div class="p-6 bg-gray-700/30 rounded-lg text-center">
+                                    <p class="text-gray-400 text-sm">Brak zdjec dla wybranego filtru</p>
+                                    <button type="button"
+                                            wire:click="setVariantFilter('')"
+                                            class="mt-2 text-xs text-blue-400 hover:text-blue-300">
+                                        Pokaz wszystkie
+                                    </button>
+                                </div>
+                                @endif
+                            @endif
                         @else
                         <div class="p-8 bg-gray-700/30 rounded-lg text-center">
                             <svg class="w-12 h-12 mx-auto text-gray-500 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -250,90 +200,9 @@
                         @endif
                     </div>
 
-                    {{-- Variant image preview section --}}
-                    @if($showVariantAssignment && count($variants) > 0 && count($images) > 0)
-                    <div class="mt-6 space-y-3">
-                        <h4 class="text-sm font-medium text-gray-300 uppercase tracking-wider">
-                            Podglad wariantow
-                        </h4>
-
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-                            @foreach($this->variantImageGroups as $groupKey => $groupImages)
-                            @if($groupKey === '_main')
-                                @continue
-                            @endif
-                            @php
-                                $variantInfo = collect($variants)->firstWhere('sku_suffix', $groupKey);
-                                $variantName = $variantInfo ? $this->getVariantDisplayName($variantInfo) : $groupKey;
-                                $coverIndex = $variantCovers[$groupKey] ?? null;
-                            @endphp
-                            <div class="p-3 bg-gray-700/30 rounded-lg border border-purple-700/30">
-                                <div class="flex items-center gap-2 mb-2">
-                                    <span class="px-2 py-0.5 bg-purple-600 text-white text-xs rounded font-medium">
-                                        {{ $variantName }}
-                                    </span>
-                                    <span class="text-xs text-gray-500">{{ $groupKey }}</span>
-                                    <span class="text-xs text-gray-500 ml-auto">
-                                        {{ count($groupImages) }} {{ count($groupImages) === 1 ? 'zdjecie' : 'zdjec' }}
-                                    </span>
-                                </div>
-
-                                @if(count($groupImages) > 0)
-                                <div class="flex flex-wrap gap-2">
-                                    @foreach($groupImages as $item)
-                                    @php
-                                        $isCover = $coverIndex === $item['index'];
-                                    @endphp
-                                    <button type="button"
-                                            wire:click="setVariantCover({{ $item['index'] }}, '{{ $groupKey }}')"
-                                            class="relative w-12 h-12 rounded overflow-hidden
-                                                   {{ $isCover ? 'ring-2 ring-amber-500' : 'ring-1 ring-gray-600 hover:ring-amber-400' }}
-                                                   transition-all"
-                                            title="{{ $isCover ? 'Okladka wariantu' : 'Kliknij aby ustawic jako okladke wariantu' }}">
-                                        <img src="{{ Storage::disk('public')->url($item['image']['path']) }}"
-                                             alt="{{ $item['image']['filename'] ?? '' }}"
-                                             class="w-full h-full object-cover">
-                                        @if($isCover)
-                                        <div class="absolute inset-0 bg-amber-500/20 flex items-center justify-center">
-                                            <svg class="w-4 h-4 text-amber-400" fill="currentColor" viewBox="0 0 24 24">
-                                                <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
-                                            </svg>
-                                        </div>
-                                        @endif
-                                    </button>
-                                    @endforeach
-                                </div>
-                                @else
-                                <p class="text-xs text-gray-500 italic">Brak przypisanych zdjec</p>
-                                @endif
-                            </div>
-                            @endforeach
-
-                            {{-- Main product images --}}
-                            @php $mainImages = $this->variantImageGroups['_main'] ?? []; @endphp
-                            @if(count($mainImages) > 0)
-                            <div class="p-3 bg-gray-700/30 rounded-lg border border-gray-600/30">
-                                <div class="flex items-center gap-2 mb-2">
-                                    <span class="px-2 py-0.5 bg-gray-600 text-gray-200 text-xs rounded font-medium">
-                                        Produkt glowny
-                                    </span>
-                                    <span class="text-xs text-gray-500 ml-auto">
-                                        {{ count($mainImages) }} {{ count($mainImages) === 1 ? 'zdjecie' : 'zdjec' }}
-                                    </span>
-                                </div>
-                                <div class="flex flex-wrap gap-2">
-                                    @foreach($mainImages as $item)
-                                    <div class="relative w-12 h-12 rounded overflow-hidden ring-1 ring-gray-600">
-                                        <img src="{{ Storage::disk('public')->url($item['image']['path']) }}"
-                                             alt="{{ $item['image']['filename'] ?? '' }}"
-                                             class="w-full h-full object-cover">
-                                    </div>
-                                    @endforeach
-                                </div>
-                            </div>
-                            @endif
-                        </div>
-                    </div>
+                    {{-- Variant image preview section (grid mode only) --}}
+                    @if($viewMode === 'grid' && $showVariantAssignment && count($variants) > 0 && count($images) > 0)
+                        @include('livewire.products.import.modals.partials._variant-preview')
                     @endif
                 </div>
 

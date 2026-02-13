@@ -42,6 +42,21 @@ class ImageUploadModal extends Component
 
     public bool $isProcessing = false;
 
+    /**
+     * View mode: 'grid' (flat) or 'grouped' (by variant)
+     */
+    public string $viewMode = 'grid';
+
+    /**
+     * Indices of selected images for batch operations
+     */
+    public array $selectedImages = [];
+
+    /**
+     * Variant filter: null=all, '_main'=main product, 'sku_suffix'=specific variant
+     */
+    public ?string $variantFilter = null;
+
     protected $listeners = [
         'openImageModal' => 'openModal',
     ];
@@ -63,6 +78,7 @@ class ImageUploadModal extends Component
             'images', 'uploadedFiles', 'copyFromSku', 'imageUrl',
             'variants', 'showVariantAssignment', 'variantCovers',
             'skuSuggestions', 'showSkuSuggestions',
+            'viewMode', 'selectedImages', 'variantFilter',
         ]);
 
         $this->pendingProductId = $productId;
@@ -127,7 +143,10 @@ class ImageUploadModal extends Component
     public function closeModal(): void
     {
         $this->showModal = false;
-        $this->reset(['pendingProductId', 'pendingProduct', 'images', 'uploadedFiles', 'variantCovers']);
+        $this->reset([
+            'pendingProductId', 'pendingProduct', 'images', 'uploadedFiles',
+            'variantCovers', 'selectedImages', 'viewMode', 'variantFilter',
+        ]);
     }
 
     /**
@@ -352,6 +371,129 @@ class ImageUploadModal extends Component
         ]);
 
         $this->dispatch('refreshPendingProducts');
+    }
+
+    // =========================================================================
+    // Batch Selection & View Mode
+    // =========================================================================
+
+    /**
+     * Set gallery view mode
+     */
+    public function setViewMode(string $mode): void
+    {
+        if (in_array($mode, ['grid', 'grouped'])) {
+            $this->viewMode = $mode;
+        }
+    }
+
+    /**
+     * Set variant filter
+     */
+    public function setVariantFilter(?string $filter): void
+    {
+        $this->variantFilter = ($filter === '') ? null : $filter;
+        $this->selectedImages = [];
+    }
+
+    /**
+     * Toggle image selection for batch operations
+     */
+    public function toggleImageSelection(int $index): void
+    {
+        if (in_array($index, $this->selectedImages)) {
+            $this->selectedImages = array_values(array_diff($this->selectedImages, [$index]));
+        } else {
+            $this->selectedImages[] = $index;
+        }
+    }
+
+    /**
+     * Deselect all images
+     */
+    public function deselectAllImages(): void
+    {
+        $this->selectedImages = [];
+    }
+
+    /**
+     * Batch assign selected images to a variant
+     * '_main' means assign to main product (null variant_sku)
+     */
+    public function batchAssignToVariant(?string $variantSku): void
+    {
+        $assignSku = ($variantSku === '_main' || $variantSku === '') ? null : $variantSku;
+
+        foreach ($this->selectedImages as $index) {
+            $this->assignToVariant($index, $assignSku);
+        }
+        $this->selectedImages = [];
+    }
+
+    /**
+     * Batch remove selected images
+     */
+    public function batchRemoveImages(): void
+    {
+        $sorted = $this->selectedImages;
+        rsort($sorted);
+        foreach ($sorted as $index) {
+            $this->removeImage($index);
+        }
+        $this->selectedImages = [];
+    }
+
+    /**
+     * Get filtered images based on variantFilter (computed property)
+     */
+    public function getFilteredImagesProperty(): array
+    {
+        if ($this->variantFilter === null) {
+            return $this->images;
+        }
+
+        $filtered = [];
+        foreach ($this->images as $index => $image) {
+            $variantSku = $image['variant_sku'] ?? null;
+
+            if ($this->variantFilter === '_main') {
+                if (empty($variantSku)) {
+                    $filtered[$index] = $image;
+                }
+            } else {
+                if ($variantSku === $this->variantFilter) {
+                    $filtered[$index] = $image;
+                }
+            }
+        }
+
+        return $filtered;
+    }
+
+    /**
+     * Get image counts per variant for filter buttons
+     */
+    public function getVariantImageCountsProperty(): array
+    {
+        $counts = ['_all' => count($this->images), '_main' => 0];
+
+        foreach ($this->variants as $variant) {
+            $sku = $variant['sku_suffix'] ?? '';
+            if ($sku !== '') {
+                $counts[$sku] = 0;
+            }
+        }
+
+        foreach ($this->images as $image) {
+            $variantSku = $image['variant_sku'] ?? null;
+            if (empty($variantSku)) {
+                $counts['_main']++;
+            } elseif (isset($counts[$variantSku])) {
+                $counts[$variantSku]++;
+            }
+        }
+
+        return $counts;
     }
 
     public function render()

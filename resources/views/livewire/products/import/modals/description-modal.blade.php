@@ -1,4 +1,5 @@
 {{-- ETAP_06 FAZA 6.5.4: DescriptionModal - Opisy produktu (short/long description) --}}
+{{-- Per-shop PrestaShop tabs with inheritance from default --}}
 <div>
     @if($showModal)
     <div class="fixed inset-0 z-50 overflow-y-auto" aria-labelledby="description-modal-title" role="dialog" aria-modal="true">
@@ -64,68 +65,84 @@
                         @endif
                     </div>
 
-                    {{-- Short description --}}
-                    <div class="{{ $skipDescriptions ? 'opacity-50 pointer-events-none' : '' }}">
-                        <div class="flex items-center justify-between mb-2">
-                            <label for="short_description" class="text-sm font-medium text-gray-300">
-                                Krotki opis
-                                <span class="text-gray-500 font-normal ml-1">(summary)</span>
-                            </label>
-                            <span class="text-xs {{ $this->shortCount > 500 ? 'text-amber-400' : 'text-gray-500' }}">
-                                {{ $this->shortCount }} / 500 znakow
+                    {{-- Tab bar (visible when PS shops are available) --}}
+                    @if(!empty($availableShops))
+                    <div class="import-desc-tabs">
+                        {{-- Default tab --}}
+                        <button wire:click="setActiveTab('default')"
+                                class="import-desc-tab {{ $activeTab === 'default' ? 'import-desc-tab-active' : '' }}">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                      d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                            </svg>
+                            Domyslny
+                            @php
+                                $defaultFilled = collect([$shortDescription, $longDescription])->filter(fn($v) => !empty(trim($v ?? '')))->count();
+                            @endphp
+                            <span class="import-desc-tab-badge {{ $defaultFilled > 0 ? 'import-desc-tab-badge-custom' : 'import-desc-tab-badge-empty' }}">
+                                {{ $defaultFilled }}/2
                             </span>
-                        </div>
-                        <textarea id="short_description"
-                                  wire:model.blur="shortDescription"
-                                  rows="3"
-                                  maxlength="1000"
-                                  placeholder="Krotki opis produktu wyswietlany w listingu..."
-                                  class="form-textarea-dark w-full resize-none"></textarea>
-                        <p class="mt-1 text-xs text-gray-500">
-                            Wyswietlany na listach produktow i w podsumowaniach
-                        </p>
-                    </div>
+                        </button>
 
-                    {{-- Long description --}}
-                    <div class="{{ $skipDescriptions ? 'opacity-50 pointer-events-none' : '' }}">
-                        <div class="flex items-center justify-between mb-2">
-                            <label for="long_description" class="text-sm font-medium text-gray-300">
-                                Pelny opis
-                                <span class="text-gray-500 font-normal ml-1">(HTML)</span>
-                            </label>
-                            <div class="flex items-center gap-3">
-                                <span class="text-xs {{ $this->longCount > 5000 ? 'text-amber-400' : 'text-gray-500' }}">
-                                    {{ $this->longCount }} znakow
+                        {{-- PS shop tabs --}}
+                        @foreach($availableShops as $shop)
+                            @php
+                                $shopStatus = $this->getShopDescriptionStatus($shop['id']);
+                                $shopFilled = $this->getShopFilledCount($shop['id']);
+                                $isActive = $activeTab === 'shop_' . $shop['id'];
+                            @endphp
+                            <button wire:click="setActiveTab('shop_{{ $shop['id'] }}')"
+                                    wire:key="desc-tab-{{ $shop['id'] }}"
+                                    class="import-desc-tab {{ $isActive ? 'import-desc-tab-active' : '' }}">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                          d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 100 4 2 2 0 000-4z"/>
+                                </svg>
+                                {{ $shop['name'] }}
+                                <span class="import-desc-tab-badge {{ $shopStatus === 'custom' ? 'import-desc-tab-badge-custom' : 'import-desc-tab-badge-inherited' }}">
+                                    {{ $shopStatus === 'custom' ? $shopFilled . '/2' : 'Dziedziczy' }}
                                 </span>
-                                <button type="button"
-                                        wire:click="copyShortToLong"
-                                        class="text-xs text-blue-400 hover:text-blue-300 transition-colors">
-                                    Kopiuj krotki opis
-                                </button>
-                            </div>
-                        </div>
-                        <textarea id="long_description"
-                                  wire:model.blur="longDescription"
-                                  rows="8"
-                                  placeholder="Pelny opis produktu z formatowaniem HTML...
-
-Mozesz uzywac tagow HTML:
-<p>Akapity</p>
-<ul><li>Listy</li></ul>
-<strong>Pogrubienie</strong>
-<em>Kursywa</em>"
-                                  class="form-textarea-dark w-full resize-y font-mono text-sm"></textarea>
-                        <p class="mt-1 text-xs text-gray-500">
-                            Pelny opis widoczny na stronie produktu. Obsługuje HTML.
-                        </p>
+                            </button>
+                        @endforeach
                     </div>
+                    @endif
 
-                    {{-- Quick actions --}}
-                    @if(!$skipDescriptions && ($shortDescription || $longDescription))
+                    {{-- Tab content: Default --}}
+                    @if($activeTab === 'default')
+                        @include('livewire.products.import.modals.partials.description-tab-content', [
+                            'tabType' => 'default',
+                            'shopId' => null,
+                            'shopName' => null,
+                            'shortModel' => 'shortDescription',
+                            'longModel' => 'longDescription',
+                            'shortValue' => $shortDescription,
+                            'longValue' => $longDescription,
+                            'skipDescriptions' => $skipDescriptions,
+                        ])
+                    @endif
+
+                    {{-- Tab content: Per-shop --}}
+                    @foreach($availableShops as $shop)
+                        @if($activeTab === 'shop_' . $shop['id'])
+                            @include('livewire.products.import.modals.partials.description-tab-content', [
+                                'tabType' => 'shop',
+                                'shopId' => $shop['id'],
+                                'shopName' => $shop['name'],
+                                'shortModel' => 'shopDescriptions.' . $shop['id'] . '.short',
+                                'longModel' => 'shopDescriptions.' . $shop['id'] . '.long',
+                                'shortValue' => $shopDescriptions[$shop['id']]['short'] ?? '',
+                                'longValue' => $shopDescriptions[$shop['id']]['long'] ?? '',
+                                'skipDescriptions' => $skipDescriptions,
+                            ])
+                        @endif
+                    @endforeach
+
+                    {{-- Quick actions (default tab only) --}}
+                    @if($activeTab === 'default' && !$skipDescriptions && ($shortDescription || $longDescription))
                     <div class="flex items-center gap-3 pt-2 border-t border-gray-700">
                         <button type="button"
                                 wire:click="clearDescriptions"
-                                wire:confirm="Wyczyścić oba opisy?"
+                                wire:confirm="Wyczyscic oba opisy domyslne?"
                                 class="text-xs text-red-400 hover:text-red-300 transition-colors">
                             Wyczysc opisy
                         </button>
@@ -149,9 +166,13 @@ Mozesz uzywac tagow HTML:
                         <span class="text-xs text-red-400 mr-2">
                             Brak opisow
                         </span>
+                        @elseif(!empty($availableShops))
+                        <span class="text-xs text-gray-400 mr-2">
+                            {{ $this->footerStatus }}
+                        </span>
                         @elseif($shortDescription || $longDescription)
                         <span class="text-xs text-green-400 mr-2">
-                            {{ ($shortDescription ? '1' : '0') }}/2 opisow
+                            {{ (trim($shortDescription) ? '1' : '0') + (trim($longDescription) ? '1' : '0') }}/2 opisow
                         </span>
                         @endif
 

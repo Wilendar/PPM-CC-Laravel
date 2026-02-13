@@ -13,6 +13,9 @@ document.addEventListener('alpine:init', () => {
         storageKey: `ppm_column_widths_${tableId}`,
 
         init() {
+            this._boundDoResize = this.doResize.bind(this);
+            this._boundStopResize = this.stopResize.bind(this);
+
             this.loadWidths();
             this.applyWidths();
 
@@ -74,8 +77,8 @@ document.addEventListener('alpine:init', () => {
             document.body.style.cursor = 'col-resize';
             document.body.style.userSelect = 'none';
 
-            document.addEventListener('mousemove', this.doResize.bind(this));
-            document.addEventListener('mouseup', this.stopResize.bind(this));
+            document.addEventListener('mousemove', this._boundDoResize);
+            document.addEventListener('mouseup', this._boundStopResize);
         },
 
         doResize(e) {
@@ -101,8 +104,8 @@ document.addEventListener('alpine:init', () => {
 
             this.saveWidths();
 
-            document.removeEventListener('mousemove', this.doResize.bind(this));
-            document.removeEventListener('mouseup', this.stopResize.bind(this));
+            document.removeEventListener('mousemove', this._boundDoResize);
+            document.removeEventListener('mouseup', this._boundStopResize);
         },
 
         resetWidths() {

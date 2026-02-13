@@ -28,7 +28,8 @@
         'resources/css/components/category-picker.css',
         'resources/css/products/compatibility-tiles.css',
         'resources/css/admin/supplier-panel.css',
-        'resources/css/products/import-panel.css'
+        'resources/css/products/import-panel.css',
+        'resources/css/products/import-modals.css'
     ])
 
     {{-- Alpine.js is included with Livewire 3.x - no need to load separately --}}

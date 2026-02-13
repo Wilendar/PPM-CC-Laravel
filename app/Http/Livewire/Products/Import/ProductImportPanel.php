@@ -10,7 +10,6 @@ use Livewire\Attributes\Computed;
 use Livewire\Attributes\On;
 use App\Models\Category;
 use App\Models\PendingProduct;
-use App\Models\ImportSession;
 use App\Models\ProductType;
 use App\Models\Manufacturer;
 use Illuminate\Support\Facades\Auth;
@@ -69,6 +68,20 @@ class ProductImportPanel extends Component
     public ?string $activeModal = null;
 
     /**
+     * Price display mode: 'net' or 'gross'
+     */
+    #[Url]
+    public string $priceDisplayMode = 'net';
+
+    /**
+     * Toggle price display between netto and brutto
+     */
+    public function togglePriceDisplay(): void
+    {
+        $this->priceDisplayMode = $this->priceDisplayMode === 'net' ? 'gross' : 'net';
+    }
+
+    /**
      * Listen for events from modals
      *
      * NOTE: 'importCompleted' is handled via #[On('importCompleted')] attribute
@@ -99,11 +112,6 @@ class ProductImportPanel extends Component
     }
 
     public function updatedFilterProductType(): void
-    {
-        $this->resetPage();
-    }
-
-    public function updatedFilterSessionId(): void
     {
         $this->resetPage();
     }
@@ -206,12 +214,16 @@ class ProductImportPanel extends Component
     #[Computed]
     public function pendingProducts()
     {
-        return PendingProduct::query()
-            ->with(['productType', 'importSession', 'importer'])
+        $query = PendingProduct::query()
+            ->with(['productType', 'importSession', 'importer', 'publisher'])
             ->when($this->filterStatus, fn($q) => $this->applyStatusFilter($q))
             ->when($this->filterProductType, fn($q) => $q->where('product_type_id', $this->filterProductType))
-            ->when($this->filterSessionId, fn($q) => $q->where('import_session_id', $this->filterSessionId))
-            ->when($this->filterSearch, fn($q) => $this->applySearchFilter($q))
+            ->when($this->filterSearch, fn($q) => $this->applySearchFilter($q));
+
+        // Apply advanced filters (manufacturer, publication target, toggles, dates)
+        $query = $this->applyAdvancedFilters($query);
+
+        return $query
             ->orderBy($this->sortField, $this->sortDirection)
             ->paginate($this->perPage);
     }
@@ -245,16 +257,17 @@ class ProductImportPanel extends Component
     }
 
     /**
-     * Get import sessions for filter
+     * Get active PrestaShop shops for publication target filter labels
      */
     #[Computed]
-    public function importSessions()
+    public function publicationTargetOptions(): array
     {
-        return ImportSession::active()
-            ->orWhere('status', ImportSession::STATUS_READY)
-            ->orderByDesc('created_at')
-            ->limit(20)
-            ->get();
+        return [
+            '' => 'Cel publikacji',
+            'erp' => 'ERP',
+            'prestashop' => 'PrestaShop',
+            'both' => 'ERP + PrestaShop',
+        ];
     }
 
     /**
