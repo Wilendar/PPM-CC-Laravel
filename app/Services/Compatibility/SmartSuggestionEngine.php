@@ -5,51 +5,46 @@ namespace App\Services\Compatibility;
 use App\Models\CompatibilitySuggestion;
 use App\Models\PrestaShopShop;
 use App\Models\Product;
-use App\Models\VehicleModel;
+use App\Models\SmartSuggestionDismissal;
 use App\Models\VehicleCompatibility;
+use App\Services\Compatibility\Results\BrandDetectionResult;
+use App\Services\Compatibility\Results\KeywordMatchResult;
+use App\Services\Compatibility\Results\ModelDetectionResult;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 /**
  * SmartSuggestionEngine Service
  *
- * ETAP_05d FAZA 2.1 - AI-powered compatibility suggestion engine
+ * ETAP_05d FAZA 2.5 - Refactored with DI, cascading scoring and central mode
  *
- * PURPOSE:
- * - Generate compatibility suggestions based on text matching
- * - Per-shop suggestions (different brands per shop)
- * - Confidence scoring (0.00 - 1.00)
- * - TTL-based caching (24h default)
- *
- * SCORING ALGORITHM:
- * - Brand match: product.manufacturer == vehicle.brand → +0.50 (highest weight)
- * - Name match: product.name CONTAINS vehicle.model → +0.30
- * - Description match: product.description CONTAINS vehicle → +0.10
- * - Category match: matching category patterns → +0.10
- * - Total confidence: 0.00 - 1.00
- *
- * USAGE:
- * ```php
- * $engine = app(SmartSuggestionEngine::class);
- * $suggestions = $engine->generateForProduct($product, $shop);
- * $autoApplied = $engine->applyHighConfidenceSuggestions($shop, $user);
- * ```
+ * SCORING ALGORITHM (5-layer cascade):
+ * - Layer 1: Keyword Rules (configurable bonus from rule)
+ * - Layer 2: Model Detection (alias_exact: 0.40, token: 0.30, alias_sku: 0.25)
+ * - Layer 3: Brand Detection (exact: 0.50, name: 0.30)
+ * - Layer 4: Description match (+0.10)
+ * - Layer 5: Category match (+0.10)
+ * - Total confidence capped at 1.00
  */
 class SmartSuggestionEngine
 {
     /**
-     * Scoring weights for each match type
+     * Scoring weights
      */
-    protected const WEIGHT_BRAND_MATCH = 0.50;
-    protected const WEIGHT_NAME_MATCH = 0.30;
+    protected const WEIGHT_KEYWORD_RULE = 0.20;
+    protected const WEIGHT_MODEL_DETECTION_ALIAS_EXACT = 0.40;
+    protected const WEIGHT_MODEL_DETECTION_TOKEN = 0.30;
+    protected const WEIGHT_MODEL_DETECTION_ALIAS_SKU = 0.25;
+    protected const WEIGHT_BRAND_EXACT = 0.50;
+    protected const WEIGHT_BRAND_NAME = 0.30;
     protected const WEIGHT_DESCRIPTION_MATCH = 0.10;
     protected const WEIGHT_CATEGORY_MATCH = 0.10;
 
     /**
      * Minimum confidence threshold for suggestions
+     * Raised from 0.30 to 0.40 to prevent brand-only matches from passing
      */
-    protected const MIN_CONFIDENCE_THRESHOLD = 0.30;
+    protected const MIN_CONFIDENCE_THRESHOLD = 0.40;
 
     /**
      * Auto-apply threshold (>=0.90 = very high confidence)
@@ -61,8 +56,14 @@ class SmartSuggestionEngine
      */
     protected const MAX_SUGGESTIONS_PER_PRODUCT = 50;
 
+    public function __construct(
+        protected KeywordRuleMatcher $keywordMatcher,
+        protected VehicleModelDetector $modelDetector,
+        protected BrandDetector $brandDetector,
+    ) {}
+
     /**
-     * Generate suggestions for a single product
+     * Generate suggestions for a single product (per-shop)
      *
      * @param Product $product Product to analyze
      * @param PrestaShopShop $shop Shop context (for brand filtering)
@@ -74,12 +75,10 @@ class SmartSuggestionEngine
         PrestaShopShop $shop,
         bool $refresh = false
     ): Collection {
-        // Check if shop has smart suggestions enabled
         if (!$shop->hasSmartSuggestionsEnabled()) {
             return collect();
         }
 
-        // Check cache unless forced refresh
         if (!$refresh) {
             $cached = $this->getCachedSuggestions($product, $shop);
             if ($cached->isNotEmpty()) {
@@ -87,13 +86,11 @@ class SmartSuggestionEngine
             }
         }
 
-        // Get existing compatibility records (to avoid duplicates)
         $existingVehicleIds = VehicleCompatibility::byProduct($product->id)
             ->byShop($shop->id)
             ->pluck('vehicle_model_id')
             ->toArray();
 
-        // Get all vehicle models filtered by shop's allowed brands
         $vehicles = $this->getEligibleVehicles($shop, $existingVehicleIds);
 
         if ($vehicles->isEmpty()) {
@@ -106,7 +103,6 @@ class SmartSuggestionEngine
         foreach ($vehicles as $vehicle) {
             $result = $this->calculateScore($product, $vehicle);
 
-            // Skip if below minimum threshold
             if ($result['score'] < max($minConfidence, self::MIN_CONFIDENCE_THRESHOLD)) {
                 continue;
             }
@@ -119,14 +115,70 @@ class SmartSuggestionEngine
                 $result['reason']
             ));
 
-            // Limit suggestions per product
             if ($suggestions->count() >= self::MAX_SUGGESTIONS_PER_PRODUCT) {
                 break;
             }
         }
 
-        // Sort by confidence (highest first)
         return $suggestions->sortByDesc('confidence_score')->values();
+    }
+
+    /**
+     * Generate CENTRAL suggestions (not per-shop)
+     * For ghost tiles in ProductForm - filters dismissed vehicles
+     *
+     * @param Product $product Product to analyze
+     * @param int $maxSuggestions Maximum number of suggestions to return
+     * @return array
+     */
+    public function generateForProductCentral(Product $product, int $maxSuggestions = 30): array
+    {
+        $existingVehicleIds = VehicleCompatibility::where('product_id', $product->id)
+            ->pluck('vehicle_model_id')
+            ->unique()
+            ->toArray();
+
+        $dismissedVehicleIds = SmartSuggestionDismissal::where('product_id', $product->id)
+            ->whereNull('restored_at')
+            ->pluck('vehicle_product_id')
+            ->toArray();
+
+        $vehicles = Product::byType('pojazd')
+            ->where('is_active', true)
+            ->whereNotIn('id', array_merge($existingVehicleIds, $dismissedVehicleIds))
+            ->get();
+
+        if ($vehicles->isEmpty()) {
+            return [];
+        }
+
+        $suggestions = [];
+
+        foreach ($vehicles as $vehicle) {
+            $result = $this->calculateScore($product, $vehicle);
+
+            if ($result['score'] < self::MIN_CONFIDENCE_THRESHOLD) {
+                continue;
+            }
+
+            $suggestions[] = [
+                'vehicle_id' => $vehicle->id,
+                'vehicle_name' => $vehicle->name,
+                'vehicle_manufacturer' => $vehicle->manufacturer,
+                'vehicle_sku' => $vehicle->sku,
+                'score' => round($result['score'], 2),
+                'reason' => $result['reason'],
+                'breakdown' => $result['breakdown'],
+            ];
+
+            if (count($suggestions) >= $maxSuggestions) {
+                break;
+            }
+        }
+
+        usort($suggestions, fn($a, $b) => $b['score'] <=> $a['score']);
+
+        return $suggestions;
     }
 
     /**
@@ -166,7 +218,6 @@ class SmartSuggestionEngine
         PrestaShopShop $shop,
         \App\Models\User $user
     ): int {
-        // Check if auto-apply is enabled
         if (!$shop->hasAutoApplySuggestionsEnabled()) {
             return 0;
         }
@@ -196,139 +247,104 @@ class SmartSuggestionEngine
     }
 
     /**
-     * Calculate confidence score for product-vehicle pair
+     * Calculate confidence score using 5-layer cascade
      *
      * @param Product $product
-     * @param VehicleModel $vehicle
-     * @return array{score: float, reason: string}
+     * @param Product $vehicle
+     * @return array{score: float, reason: string, breakdown: array}
      */
-    protected function calculateScore(Product $product, VehicleModel $vehicle): array
+    protected function calculateScore(Product $product, Product $vehicle): array
     {
         $score = 0.0;
         $reasons = [];
+        $breakdown = [];
 
-        // 1. Brand match (highest weight: 0.50)
-        if ($this->matchesBrand($product, $vehicle)) {
-            $score += self::WEIGHT_BRAND_MATCH;
+        // Layer 1: Keyword Rules (configurable bonus from rule)
+        $keywordResult = $this->keywordMatcher->match($product, $vehicle);
+        if ($keywordResult->hasMatch) {
+            $score += $keywordResult->bonus;
+            $reasons[] = 'keyword_rule';
+            $breakdown['keyword'] = $keywordResult->toArray();
+        }
+
+        // Layer 2: Model Detection (alias/token)
+        $modelResult = $this->modelDetector->detect($product, $vehicle);
+        if ($modelResult->hasMatch) {
+            $score += $modelResult->score;
+            $reasons[] = 'model_detection';
+            $breakdown['model'] = $modelResult->toArray();
+        }
+
+        // Layer 3: Brand Detection
+        $brandResult = $this->brandDetector->detect($product, $vehicle);
+        if ($brandResult->hasMatch) {
+            $score += $brandResult->score;
             $reasons[] = CompatibilitySuggestion::REASON_BRAND_MATCH;
+            $breakdown['brand'] = $brandResult->toArray();
         }
 
-        // 2. Name match (0.30)
-        if ($this->matchesName($product, $vehicle)) {
-            $score += self::WEIGHT_NAME_MATCH;
-            $reasons[] = CompatibilitySuggestion::REASON_NAME_MATCH;
-        }
-
-        // 3. Description match (0.10)
+        // Layer 4: Description match
         if ($this->matchesDescription($product, $vehicle)) {
             $score += self::WEIGHT_DESCRIPTION_MATCH;
             $reasons[] = CompatibilitySuggestion::REASON_DESCRIPTION_MATCH;
+            $breakdown['description'] = true;
         }
 
-        // 4. Category match (0.10)
+        // Layer 5: Category match
         if ($this->matchesCategory($product, $vehicle)) {
             $score += self::WEIGHT_CATEGORY_MATCH;
             $reasons[] = CompatibilitySuggestion::REASON_CATEGORY_MATCH;
+            $breakdown['category'] = true;
         }
 
-        // Primary reason is the highest weighted match
         $primaryReason = !empty($reasons)
             ? $reasons[0]
             : CompatibilitySuggestion::REASON_SIMILAR_PRODUCT;
 
         return [
-            'score' => min(1.0, $score), // Cap at 1.0
+            'score' => min(1.0, $score),
             'reason' => $primaryReason,
+            'breakdown' => $breakdown,
         ];
     }
 
     /**
-     * Check if product manufacturer matches vehicle brand
-     */
-    protected function matchesBrand(Product $product, VehicleModel $vehicle): bool
-    {
-        $productBrand = strtolower(trim($product->manufacturer ?? ''));
-        $vehicleBrand = strtolower(trim($vehicle->brand ?? ''));
-
-        if (empty($productBrand) || empty($vehicleBrand)) {
-            return false;
-        }
-
-        // Exact match or contains
-        return $productBrand === $vehicleBrand
-            || str_contains($productBrand, $vehicleBrand)
-            || str_contains($vehicleBrand, $productBrand);
-    }
-
-    /**
-     * Check if product name contains vehicle model name
-     */
-    protected function matchesName(Product $product, VehicleModel $vehicle): bool
-    {
-        $productName = strtolower(trim($product->name ?? ''));
-        $vehicleModel = strtolower(trim($vehicle->model ?? ''));
-        $vehicleName = strtolower(trim($vehicle->name ?? ''));
-
-        if (empty($productName)) {
-            return false;
-        }
-
-        // Check model name
-        if (!empty($vehicleModel) && str_contains($productName, $vehicleModel)) {
-            return true;
-        }
-
-        // Check vehicle name
-        if (!empty($vehicleName) && str_contains($productName, $vehicleName)) {
-            return true;
-        }
-
-        return false;
-    }
-
-    /**
      * Check if product description mentions vehicle
+     * Only matches full vehicle name, NOT brand alone (too broad)
      */
-    protected function matchesDescription(Product $product, VehicleModel $vehicle): bool
+    protected function matchesDescription(Product $product, Product $vehicle): bool
     {
         $description = strtolower(strip_tags($product->description ?? ''));
-        $vehicleModel = strtolower(trim($vehicle->model ?? ''));
-        $vehicleBrand = strtolower(trim($vehicle->brand ?? ''));
+        $vehicleName = strtolower(trim($vehicle->name ?? ''));
 
-        if (empty($description)) {
+        if (empty($description) || empty($vehicleName)) {
             return false;
         }
 
-        // Check for model or brand mentions
-        if (!empty($vehicleModel) && str_contains($description, $vehicleModel)) {
-            return true;
-        }
-
-        if (!empty($vehicleBrand) && str_contains($description, $vehicleBrand)) {
-            return true;
-        }
-
-        return false;
+        return str_contains($description, $vehicleName);
     }
 
     /**
      * Check if product category matches vehicle-related patterns
+     * Only matches full vehicle name in category, NOT brand alone (too broad)
      */
-    protected function matchesCategory(Product $product, VehicleModel $vehicle): bool
+    protected function matchesCategory(Product $product, Product $vehicle): bool
     {
-        // Get product categories
         $categories = $product->categories ?? collect();
         if ($categories->isEmpty()) {
             return false;
         }
 
-        $vehicleBrand = strtolower(trim($vehicle->brand ?? ''));
+        $vehicleName = strtolower(trim($vehicle->name ?? ''));
+
+        if (empty($vehicleName)) {
+            return false;
+        }
 
         foreach ($categories as $category) {
             $categoryName = strtolower($category->name ?? '');
 
-            // Check if category contains brand name
-            if (!empty($vehicleBrand) && str_contains($categoryName, $vehicleBrand)) {
+            if (str_contains($categoryName, $vehicleName)) {
                 return true;
             }
         }
@@ -350,31 +366,29 @@ class SmartSuggestionEngine
 
     /**
      * Get eligible vehicles for a shop (respecting brand restrictions)
+     * Uses Product::byType('pojazd') instead of VehicleModel
      *
      * @param PrestaShopShop $shop
      * @param array $excludeVehicleIds Vehicle IDs to exclude (already matched)
-     * @return Collection<VehicleModel>
+     * @return Collection<Product>
      */
     protected function getEligibleVehicles(PrestaShopShop $shop, array $excludeVehicleIds = []): Collection
     {
-        $query = VehicleModel::query();
+        $query = Product::byType('pojazd')
+            ->where('is_active', true);
 
-        // Exclude already matched vehicles
         if (!empty($excludeVehicleIds)) {
             $query->whereNotIn('id', $excludeVehicleIds);
         }
 
-        // Apply brand restrictions
         $allowedBrands = $shop->allowed_vehicle_brands;
 
         if ($allowedBrands === null) {
             // null = all brands allowed
         } elseif (empty($allowedBrands)) {
-            // empty array = no brands allowed
             return collect();
         } else {
-            // array = whitelist
-            $query->whereIn('brand', $allowedBrands);
+            $query->whereIn('manufacturer', $allowedBrands);
         }
 
         return $query->get();
@@ -385,7 +399,7 @@ class SmartSuggestionEngine
      */
     protected function createSuggestion(
         Product $product,
-        VehicleModel $vehicle,
+        Product $vehicle,
         PrestaShopShop $shop,
         float $score,
         string $reason

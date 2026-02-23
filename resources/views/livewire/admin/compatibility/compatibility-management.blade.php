@@ -320,9 +320,13 @@
                             @unless($this->isBrandCollapsed($brand))
                                 <div class="vehicle-tiles-grid">
                                     @foreach($brandVehicles as $vehicle)
+                                        @php
+                                            $isAiSuggested = isset($suggestedVehicleScores[$vehicle->id]);
+                                            $aiScore = $suggestedVehicleScores[$vehicle->id] ?? null;
+                                        @endphp
                                         <div
                                             wire:key="tile-{{ $vehicle->id }}"
-                                            class="vehicle-tile {{ $this->getVehicleStateClass($vehicle->id) }}"
+                                            class="vehicle-tile {{ $this->getVehicleStateClass($vehicle->id) }} {{ $isAiSuggested ? 'vehicle-tile--ai-suggested' : '' }}"
                                             wire:click="toggleVehicle({{ $vehicle->id }})"
                                         >
                                             <div class="vehicle-tile__content">
@@ -344,6 +348,20 @@
                                             @elseif($this->isZamiennik($vehicle->id))
                                                 <div class="vehicle-tile__indicator vehicle-tile__indicator--zamiennik">
                                                     <span>Z</span>
+                                                </div>
+                                            @endif
+
+                                            {{-- AI Suggestion Overlay --}}
+                                            @if($isAiSuggested)
+                                                <span class="vehicle-tile__ai-badge">AI</span>
+                                                <span class="vehicle-tile__confidence">{{ round($aiScore * 100) }}%</span>
+                                                <div class="ai-hover-overlay">
+                                                    <div class="ai-hover-overlay__accept" wire:click.stop="toggleVehicle({{ $vehicle->id }})">
+                                                        <span class="text-white text-lg">&#10003;</span>
+                                                    </div>
+                                                    <div class="ai-hover-overlay__dismiss" wire:click.stop="dismissAiSuggestion({{ $vehicle->id }})">
+                                                        <span class="text-white text-lg">&#10005;</span>
+                                                    </div>
                                                 </div>
                                             @endif
                                         </div>

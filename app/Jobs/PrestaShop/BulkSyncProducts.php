@@ -253,7 +253,7 @@ class BulkSyncProducts implements ShouldQueue
                         );
                     }
                 })
-                ->onQueue('prestashop_sync')
+                ->onQueue('default')
                 ->dispatch();
 
             Log::info('Bulk sync batch dispatched', [

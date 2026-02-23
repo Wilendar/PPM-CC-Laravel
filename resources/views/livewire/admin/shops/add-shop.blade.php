@@ -741,180 +741,304 @@
                         </div>
                     @endif
                     </div>
+
+                    {{-- Warehouse Mapping Section (NEW) --}}
+                    <div class="warehouse-mapping-section mt-8">
+                        <div class="section-header mb-4">
+                            <h4 class="text-lg font-semibold text-white flex items-center mb-2">
+                                <svg class="w-5 h-5 mr-2 text-[#e0ac7e]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path>
+                                </svg>
+                                Mapowanie magazynu
+                            </h4>
+                            <p class="text-sm text-gray-300">
+                                Wybierz magazyn PPM, ktorego stany beda synchronizowane z tym sklepem
+                            </p>
+                        </div>
+
+                        <div class="bg-blue-900 bg-opacity-20 border border-blue-500 border-opacity-30 rounded-lg p-4 backdrop-blur-sm mb-4">
+                            <div class="flex">
+                                <svg class="w-5 h-5 text-blue-400 mr-3 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                </svg>
+                                <span class="text-sm text-blue-200">
+                                    PrestaShop obsluguje jeden magazyn per sklep. Wybierz magazyn PPM, ktorego stany beda synchronizowane z tym sklepem.
+                                    Opcjonalne - jesli nie potrzebujesz synchronizacji stanow, pominij.
+                                </span>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label for="selectedWarehouseId" class="block text-sm font-medium text-white mb-2">
+                                Magazyn PPM
+                            </label>
+                            <select id="selectedWarehouseId"
+                                    wire:model.defer="selectedWarehouseId"
+                                    class="w-full px-4 py-3 bg-gray-800 bg-opacity-60 border border-gray-600 text-white rounded-lg focus:ring-2 focus:ring-[#e0ac7e] focus:border-[#e0ac7e] transition-all duration-200">
+                                <option value="">-- Wybierz magazyn --</option>
+                                @foreach ($availableWarehouses as $warehouse)
+                                    <option value="{{ $warehouse['id'] }}">
+                                        [{{ strtoupper($warehouse['code']) }}] - {{ $warehouse['name'] }}
+                                    </option>
+                                @endforeach
+                            </select>
+
+                            @if ($selectedWarehouseId)
+                                <div class="mt-2">
+                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-900 bg-opacity-40 text-green-300 border border-green-500 border-opacity-30">
+                                        <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                                        </svg>
+                                        Zmapowany
+                                    </span>
+                                </div>
+                            @endif
+                        </div>
+                    </div>
                 </div>
 
-            <!-- Step 5: Initial Sync Settings (was Step 4) -->
+            <!-- Step 5: Sync Direction Settings -->
             @elseif ($currentStep === 5)
-                <div class="space-y-6">
-                    <div>
-                        <label for="syncFrequency" class="block text-sm font-medium text-white mb-2">
-                            Częstotliwość synchronizacji
-                        </label>
-                        <select id="syncFrequency"
-                                wire:model.defer="syncFrequency" 
-                                class="w-full px-4 py-3 bg-gray-800 bg-opacity-60 border border-gray-600 text-white rounded-lg focus:ring-2 focus:ring-[#e0ac7e] focus:border-[#e0ac7e] transition-all duration-200">
-                            <option value="real-time">Czasie rzeczywistym (webhook)</option>
-                            <option value="hourly">Co godzinę</option>
-                            <option value="daily">Raz dziennie</option>
-                            <option value="manual">Tylko ręcznie</option>
-                        </select>
+                <div class="space-y-6" x-data="{
+                    get hasBidirectional() {
+                        return $wire.syncDirectionProducts === 'bidirectional'
+                            || $wire.syncDirectionCategories === 'bidirectional'
+                            || $wire.syncDirectionPrices === 'bidirectional'
+                            || $wire.syncDirectionStock === 'bidirectional'
+                            || $wire.syncDirectionImages === 'bidirectional'
+                            || $wire.syncDirectionMetadata === 'bidirectional';
+                    }
+                }">
+
+                    {{-- Sekcja 1: Czestotliwosc synchronizacji --}}
+                    <div class="bg-gray-800 bg-opacity-30 border border-gray-600 rounded-lg p-6 backdrop-blur-sm">
+                        <h4 class="font-medium text-white mb-4 flex items-center">
+                            <svg class="w-5 h-5 text-[#e0ac7e] mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                            Czestotliwosc synchronizacji
+                        </h4>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label for="syncFrequency" class="block text-sm font-medium text-white mb-2">
+                                    Harmonogram
+                                </label>
+                                <select id="syncFrequency"
+                                        wire:model.defer="syncFrequency"
+                                        class="w-full px-4 py-3 bg-gray-800 bg-opacity-60 border border-gray-600 text-white rounded-lg focus:ring-2 focus:ring-[#e0ac7e] focus:border-[#e0ac7e] transition-all duration-200">
+                                    <option value="real-time">Czas rzeczywisty (webhook)</option>
+                                    <option value="hourly">Co godzine</option>
+                                    <option value="daily">Raz dziennie</option>
+                                    <option value="manual">Tylko recznie</option>
+                                </select>
+                            </div>
+                            <div class="flex items-center">
+                                <label class="flex items-center">
+                                    <input type="checkbox"
+                                           wire:model.defer="autoSyncEnabled"
+                                           class="rounded border-gray-600 bg-gray-800 bg-opacity-60 text-[#e0ac7e] focus:ring-[#e0ac7e]">
+                                    <span class="ml-3 text-sm text-white">Wlacz automatyczna synchronizacje</span>
+                                </label>
+                            </div>
+                        </div>
                     </div>
 
-                    <div>
-                        <label class="block text-sm font-medium text-white mb-4">
-                            Zakres synchronizacji
-                        </label>
+                    {{-- Sekcja 2: Kierunek synchronizacji per kategoria --}}
+                    <div class="bg-gray-800 bg-opacity-30 border border-gray-600 rounded-lg p-6 backdrop-blur-sm">
+                        <h4 class="font-medium text-white mb-2 flex items-center">
+                            <svg class="w-5 h-5 text-[#e0ac7e] mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path>
+                            </svg>
+                            Kierunek synchronizacji per kategoria
+                        </h4>
+                        <p class="text-sm text-gray-400 mb-6">Okresl kierunek synchronizacji danych dla kazdej kategorii osobno</p>
+
+                        {{-- Header row --}}
+                        <div class="hidden md:grid md:grid-cols-[1fr_repeat(4,auto)] gap-3 mb-3 px-4">
+                            <div class="text-xs font-medium text-gray-400 uppercase tracking-wider">Kategoria</div>
+                            <div class="text-xs font-medium text-gray-400 uppercase tracking-wider text-center w-28">Dwukierunkowa</div>
+                            <div class="text-xs font-medium text-gray-400 uppercase tracking-wider text-center w-28">PPM &rarr; Presta</div>
+                            <div class="text-xs font-medium text-gray-400 uppercase tracking-wider text-center w-28">Presta &rarr; PPM</div>
+                            <div class="text-xs font-medium text-gray-400 uppercase tracking-wider text-center w-28">Wylaczona</div>
+                        </div>
+
+                        <div class="space-y-2">
+                            @php
+                                $syncCategories = [
+                                    ['field' => 'syncDirectionProducts', 'label' => 'Produkty', 'desc' => 'Nazwa, opis, dostepnosc', 'icon' => 'M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4'],
+                                    ['field' => 'syncDirectionCategories', 'label' => 'Kategorie', 'desc' => 'Struktura, nazwy, opisy', 'icon' => 'M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z'],
+                                    ['field' => 'syncDirectionPrices', 'label' => 'Ceny', 'desc' => 'Wszystkie grupy cenowe', 'icon' => 'M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z'],
+                                    ['field' => 'syncDirectionStock', 'label' => 'Stany magazynowe', 'desc' => 'Ilosc, rezerwacja', 'icon' => 'M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4'],
+                                    ['field' => 'syncDirectionImages', 'label' => 'Zdjecia', 'desc' => 'Obrazy produktow', 'icon' => 'M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z'],
+                                    ['field' => 'syncDirectionMetadata', 'label' => 'Metadane SEO', 'desc' => 'Title, description, URL', 'icon' => 'M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z'],
+                                ];
+                            @endphp
+
+                            @foreach ($syncCategories as $cat)
+                                <div class="bg-gray-700 bg-opacity-30 rounded-lg p-4 hover:bg-opacity-50 transition-colors">
+                                    <div class="md:grid md:grid-cols-[1fr_repeat(4,auto)] gap-3 items-center">
+                                        {{-- Category label --}}
+                                        <div class="flex items-center mb-3 md:mb-0">
+                                            <svg class="w-5 h-5 text-[#e0ac7e] mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="{{ $cat['icon'] }}"></path>
+                                            </svg>
+                                            <div>
+                                                <span class="text-white text-sm font-medium">{{ $cat['label'] }}</span>
+                                                <span class="text-gray-400 text-xs block">{{ $cat['desc'] }}</span>
+                                            </div>
+                                        </div>
+
+                                        {{-- Radio buttons --}}
+                                        @foreach (['bidirectional' => 'Dwukierunkowa', 'ppm_to_ps' => 'PPM -> Presta', 'ps_to_ppm' => 'Presta -> PPM', 'disabled' => 'Wylaczona'] as $value => $label)
+                                            <label class="flex items-center justify-center w-28 cursor-pointer">
+                                                <input type="radio"
+                                                       wire:model.defer="{{ $cat['field'] }}"
+                                                       value="{{ $value }}"
+                                                       class="border-gray-500 bg-gray-800 text-[#e0ac7e] focus:ring-[#e0ac7e]">
+                                                <span class="ml-1.5 text-xs text-gray-300 md:hidden">{{ $label }}</span>
+                                            </label>
+                                        @endforeach
+                                    </div>
+                                </div>
+                            @endforeach
+                        </div>
+                    </div>
+
+                    {{-- Sekcja 3: Rozwiazywanie konfliktow (PRZENIESIONE z KROK 6) --}}
+                    <div class="bg-gray-800 bg-opacity-30 border rounded-lg p-6 backdrop-blur-sm transition-all duration-300"
+                         :class="hasBidirectional ? 'border-yellow-500 border-opacity-50' : 'border-gray-600'">
+                        <h4 class="font-medium text-white mb-4 flex items-center">
+                            <svg class="w-5 h-5 mr-2" :class="hasBidirectional ? 'text-yellow-400' : 'text-[#e0ac7e]'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                            Rozwiazywanie konfliktow
+                            <template x-if="hasBidirectional">
+                                <span class="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-900 bg-opacity-40 text-yellow-300 border border-yellow-500 border-opacity-30">
+                                    Istotne
+                                </span>
+                            </template>
+                        </h4>
+
+                        <template x-if="hasBidirectional">
+                            <div class="bg-yellow-900 bg-opacity-20 border border-yellow-500 border-opacity-30 rounded-lg p-3 mb-4">
+                                <div class="flex items-center">
+                                    <svg class="w-5 h-5 text-yellow-400 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
+                                    </svg>
+                                    <span class="text-sm text-yellow-200">Masz wlaczona synchronizacje dwukierunkowa - wybierz strategie rozwiazywania konfliktow.</span>
+                                </div>
+                            </div>
+                        </template>
+
+                        <template x-if="!hasBidirectional">
+                            <p class="text-gray-400 text-sm mb-4">Konflikty nie wystepuja przy synchronizacji jednokierunkowej. Ustawienie bedzie zastosowane jesli zmienisz kierunek na dwukierunkowy.</p>
+                        </template>
+
+                        <div>
+                            <label for="conflictResolution" class="block text-sm font-medium text-white mb-2">
+                                Strategia rozwiazywania konfliktow
+                            </label>
+                            <select id="conflictResolution"
+                                    wire:model.defer="conflictResolution"
+                                    class="w-full px-4 py-3 bg-gray-800 bg-opacity-60 border border-gray-600 text-white rounded-lg focus:ring-2 focus:ring-[#e0ac7e] focus:border-[#e0ac7e] transition-all duration-200">
+                                <option value="ppm_wins">PPM ma pierwszenstwo (zalecane)</option>
+                                <option value="prestashop_wins">PrestaShop ma pierwszenstwo</option>
+                                <option value="newest_wins">Najnowsze zmiany wygrywaja</option>
+                                <option value="manual">Manualne rozwiazywanie</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    {{-- Sekcja 4: Filtry synchronizacji --}}
+                    <div class="bg-gray-800 bg-opacity-30 border border-gray-600 rounded-lg p-6 backdrop-blur-sm">
+                        <h4 class="font-medium text-white mb-4 flex items-center">
+                            <svg class="w-5 h-5 text-[#e0ac7e] mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"></path>
+                            </svg>
+                            Filtry synchronizacji
+                        </h4>
                         <div class="space-y-3">
                             <label class="flex items-center">
-                                <input type="checkbox" 
-                                       wire:model.defer="syncProducts" 
+                                <input type="checkbox"
+                                       wire:model.defer="filterOnlyActive"
                                        class="rounded border-gray-600 bg-gray-800 bg-opacity-60 text-[#e0ac7e] focus:ring-[#e0ac7e]">
-                                <span class="ml-3 text-sm text-white">Produkty (nazwa, opis, cena, dostępność)</span>
+                                <span class="ml-3 text-sm text-white">Synchronizuj tylko aktywne produkty</span>
                             </label>
-                            
                             <label class="flex items-center">
-                                <input type="checkbox" 
-                                       wire:model.defer="syncCategories" 
+                                <input type="checkbox"
+                                       wire:model.defer="filterPreserveImages"
                                        class="rounded border-gray-600 bg-gray-800 bg-opacity-60 text-[#e0ac7e] focus:ring-[#e0ac7e]">
-                                <span class="ml-3 text-sm text-white">Kategorie (struktura, nazwy, opisy)</span>
-                            </label>
-                            
-                            <label class="flex items-center">
-                                <input type="checkbox" 
-                                       wire:model.defer="syncPrices" 
-                                       class="rounded border-gray-600 bg-gray-800 bg-opacity-60 text-[#e0ac7e] focus:ring-[#e0ac7e]">
-                                <span class="ml-3 text-sm text-white">Ceny (wszystkie grupy cenowe)</span>
+                                <span class="ml-3 text-sm text-white">Zachowaj lokalne zdjecia (nie nadpisuj przy imporcie)</span>
                             </label>
                         </div>
                     </div>
 
-                    <div>
-                        <label class="flex items-center">
-                            <input type="checkbox" 
-                                   wire:model.defer="autoSyncEnabled" 
-                                   class="rounded border-gray-600 bg-gray-800 bg-opacity-60 text-[#e0ac7e] focus:ring-[#e0ac7e]">
-                            <span class="ml-3 text-sm text-white">Włącz automatyczną synchronizację</span>
-                        </label>
-                        <p class="text-gray-400 text-sm mt-1 ml-6">
-                            Jeśli wyłączone, synchronizacja będzie możliwa tylko ręcznie z panelu administracyjnego
-                        </p>
-                    </div>
+                    {{-- Warehouse warning --}}
+                    @error('warehouse_warning')
+                        <div class="bg-yellow-900 bg-opacity-20 border border-yellow-500 border-opacity-30 rounded-lg p-4 backdrop-blur-sm">
+                            <div class="flex">
+                                <svg class="w-5 h-5 text-yellow-400 mr-3 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
+                                </svg>
+                                <span class="text-sm text-yellow-200">{{ $message }}</span>
+                            </div>
+                        </div>
+                    @enderror
 
-                    <!-- Summary Card -->
+                    {{-- Podsumowanie synchronizacji --}}
+                    @php
+                        $directionLabels = [
+                            'bidirectional' => ['icon' => '&#8596;', 'text' => 'Dwukierunkowa', 'class' => 'text-blue-300'],
+                            'ppm_to_ps' => ['icon' => '&#8594;', 'text' => 'PPM -> Presta', 'class' => 'text-green-300'],
+                            'ps_to_ppm' => ['icon' => '&#8592;', 'text' => 'Presta -> PPM', 'class' => 'text-purple-300'],
+                            'disabled' => ['icon' => '&#10005;', 'text' => 'Wylaczona', 'class' => 'text-gray-500'],
+                        ];
+                    @endphp
                     <div class="bg-gray-800 bg-opacity-40 border border-gray-600 rounded-lg p-6 backdrop-blur-sm">
-                        <h4 class="font-medium text-white mb-4">Podsumowanie konfiguracji:</h4>
+                        <h4 class="font-medium text-white mb-4">Podsumowanie synchronizacji:</h4>
                         <dl class="space-y-2 text-sm">
-                            <div class="flex justify-between">
-                                <dt class="text-gray-400">Sklep:</dt>
-                                <dd class="font-medium text-white">{{ $shopName }}</dd>
-                            </div>
-                            <div class="flex justify-between">
-                                <dt class="text-gray-400">URL:</dt>
-                                <dd class="font-medium text-white">{{ $shopUrl }}</dd>
-                            </div>
-                            <div class="flex justify-between">
-                                <dt class="text-gray-400">Wersja PrestaShop:</dt>
-                                <dd class="font-medium text-white">{{ $prestashopVersion }}.x</dd>
-                            </div>
-                            <div class="flex justify-between">
-                                <dt class="text-gray-400">Synchronizacja:</dt>
-                                <dd class="font-medium text-white">{{ ucfirst(str_replace('-', ' ', $syncFrequency)) }}</dd>
-                            </div>
-                            <div class="flex justify-between">
-                                <dt class="text-gray-400">Status połączenia:</dt>
-                                <dd class="font-medium 
-                                    @if ($connectionStatus === 'success') text-green-400
-                                    @elseif ($connectionStatus === 'error') text-red-400
-                                    @else text-yellow-400 @endif">
-                                    @if ($connectionStatus === 'success') ✓ Połączono pomyślnie
-                                    @elseif ($connectionStatus === 'error') ✗ Błąd połączenia
-                                    @else ⚠ Nie testowano @endif
-                                </dd>
+                            @foreach ([
+                                'Produkty' => $syncDirectionProducts,
+                                'Kategorie' => $syncDirectionCategories,
+                                'Ceny' => $syncDirectionPrices,
+                                'Stany magazynowe' => $syncDirectionStock,
+                                'Zdjecia' => $syncDirectionImages,
+                                'Metadane SEO' => $syncDirectionMetadata,
+                            ] as $catName => $catDirection)
+                                @php $dl = $directionLabels[$catDirection] ?? $directionLabels['disabled']; @endphp
+                                <div class="flex justify-between">
+                                    <dt class="text-gray-400">{{ $catName }}:</dt>
+                                    <dd class="font-medium {{ $dl['class'] }}">{!! $dl['icon'] !!} {{ $dl['text'] }}</dd>
+                                </div>
+                            @endforeach
+                            <div class="border-t border-gray-700 pt-2 mt-2">
+                                <div class="flex justify-between">
+                                    <dt class="text-gray-400">Magazyn:</dt>
+                                    <dd class="font-medium text-white">
+                                        @if ($selectedWarehouseId)
+                                            @php $wh = collect($availableWarehouses)->firstWhere('id', $selectedWarehouseId); @endphp
+                                            {{ $wh ? '[' . strtoupper($wh['code']) . '] ' . $wh['name'] : 'ID: ' . $selectedWarehouseId }}
+                                        @else
+                                            <span class="text-gray-500">Nie wybrano</span>
+                                        @endif
+                                    </dd>
+                                </div>
+                                <div class="flex justify-between">
+                                    <dt class="text-gray-400">Konflikty:</dt>
+                                    <dd class="font-medium text-white">{{ ucfirst(str_replace('_', ' ', $conflictResolution)) }}</dd>
+                                </div>
+                                <div class="flex justify-between">
+                                    <dt class="text-gray-400">Harmonogram:</dt>
+                                    <dd class="font-medium text-white">{{ ucfirst(str_replace('-', ' ', $syncFrequency)) }}</dd>
+                                </div>
                             </div>
                         </dl>
                     </div>
                 </div>
 
-            <!-- Step 6: Advanced Settings (was Step 5) -->
+            <!-- Step 6: Advanced Settings -->
             @elseif ($currentStep === 6)
                 <div class="space-y-6">
-                    
-                    <!-- Conflict Resolution -->
-                    <div class="bg-gray-800 bg-opacity-30 border border-gray-600 rounded-lg p-6 backdrop-blur-sm">
-                        <h4 class="font-medium text-white mb-4 flex items-center">
-                            <svg class="w-5 h-5 text-[#e0ac7e] mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                            </svg>
-                            Rozwiązywanie konfliktów
-                        </h4>
-                        <div>
-                            <label for="conflictResolution" class="block text-sm font-medium text-white mb-2">
-                                Strategia rozwiązywania konfliktów danych
-                            </label>
-                            <select id="conflictResolution"
-                                    wire:model.defer="conflictResolution" 
-                                    class="w-full px-4 py-3 bg-gray-800 bg-opacity-60 border border-gray-600 text-white rounded-lg focus:ring-2 focus:ring-[#e0ac7e] focus:border-[#e0ac7e] transition-all duration-200">
-                                <option value="ppm_wins">PPM ma pierwszeństwo (zalecane)</option>
-                                <option value="prestashop_wins">PrestaShop ma pierwszeństwo</option>
-                                <option value="newest_wins">Najnowsze zmiany wygrywają</option>
-                                <option value="manual">Manualne rozwiązywanie konfliktów</option>
-                            </select>
-                            <p class="text-gray-400 text-xs mt-1">Określa jak system ma postępować gdy te same dane różnią się między PPM a PrestaShop</p>
-                        </div>
-                    </div>
-
-                    <!-- Extended Sync Options -->
-                    <div class="bg-gray-800 bg-opacity-30 border border-gray-600 rounded-lg p-6 backdrop-blur-sm">
-                        <h4 class="font-medium text-white mb-4 flex items-center">
-                            <svg class="w-5 h-5 text-[#e0ac7e] mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
-                            </svg>
-                            Rozszerzone opcje synchronizacji
-                        </h4>
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <label class="flex items-center">
-                                <input type="checkbox" 
-                                       wire:model.defer="syncStock" 
-                                       class="rounded border-gray-600 bg-gray-800 bg-opacity-60 text-[#e0ac7e] focus:ring-[#e0ac7e]">
-                                <span class="ml-3 text-sm text-white">Synchronizuj stany magazynowe</span>
-                            </label>
-                            
-                            <label class="flex items-center">
-                                <input type="checkbox" 
-                                       wire:model.defer="syncOrders" 
-                                       class="rounded border-gray-600 bg-gray-800 bg-opacity-60 text-[#e0ac7e] focus:ring-[#e0ac7e]">
-                                <span class="ml-3 text-sm text-white">Synchronizuj zamówienia</span>
-                            </label>
-                            
-                            <label class="flex items-center">
-                                <input type="checkbox" 
-                                       wire:model.defer="syncCustomers" 
-                                       class="rounded border-gray-600 bg-gray-800 bg-opacity-60 text-[#e0ac7e] focus:ring-[#e0ac7e]">
-                                <span class="ml-3 text-sm text-white">Synchronizuj klientów</span>
-                            </label>
-                            
-                            <label class="flex items-center">
-                                <input type="checkbox" 
-                                       wire:model.defer="syncMetaData" 
-                                       class="rounded border-gray-600 bg-gray-800 bg-opacity-60 text-[#e0ac7e] focus:ring-[#e0ac7e]">
-                                <span class="ml-3 text-sm text-white">Synchronizuj metadane SEO</span>
-                            </label>
-                            
-                            <label class="flex items-center">
-                                <input type="checkbox" 
-                                       wire:model.defer="syncOnlyActiveProducts" 
-                                       class="rounded border-gray-600 bg-gray-800 bg-opacity-60 text-[#e0ac7e] focus:ring-[#e0ac7e]">
-                                <span class="ml-3 text-sm text-white">Tylko aktywne produkty</span>
-                            </label>
-                            
-                            <label class="flex items-center">
-                                <input type="checkbox" 
-                                       wire:model.defer="preserveLocalImages" 
-                                       class="rounded border-gray-600 bg-gray-800 bg-opacity-60 text-[#e0ac7e] focus:ring-[#e0ac7e]">
-                                <span class="ml-3 text-sm text-white">Zachowaj lokalne zdjęcia</span>
-                            </label>
-                        </div>
-                    </div>
 
                     <!-- ETAP_07f: CSS/JS Sync Configuration -->
                     <div class="bg-gray-800 bg-opacity-30 border border-gray-600 rounded-lg p-6 backdrop-blur-sm">
@@ -1277,6 +1401,14 @@
                     </div>
 
                     <!-- Final Summary -->
+                    @php
+                        $dirLabels = [
+                            'bidirectional' => ['icon' => '&#8596;', 'text' => 'Dwukierunkowa', 'class' => 'text-blue-300'],
+                            'ppm_to_ps' => ['icon' => '&#8594;', 'text' => 'PPM -> Presta', 'class' => 'text-green-300'],
+                            'ps_to_ppm' => ['icon' => '&#8592;', 'text' => 'Presta -> PPM', 'class' => 'text-purple-300'],
+                            'disabled' => ['icon' => '&#10005;', 'text' => 'Wylaczona', 'class' => 'text-gray-500'],
+                        ];
+                    @endphp
                     <div class="bg-gray-800 bg-opacity-40 border border-gray-600 rounded-lg p-6 backdrop-blur-sm">
                         <h4 class="font-medium text-white mb-4">Ostateczne podsumowanie konfiguracji:</h4>
                         <dl class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
@@ -1294,34 +1426,54 @@
                                     <dd class="font-medium text-white">PrestaShop {{ $prestashopVersion }}.x</dd>
                                 </div>
                                 <div class="flex justify-between">
-                                    <dt class="text-gray-400">Synchronizacja:</dt>
+                                    <dt class="text-gray-400">Harmonogram:</dt>
                                     <dd class="font-medium text-white">{{ ucfirst(str_replace('-', ' ', $syncFrequency)) }}</dd>
                                 </div>
                                 <div class="flex justify-between">
                                     <dt class="text-gray-400">Konflikty:</dt>
                                     <dd class="font-medium text-white">{{ ucfirst(str_replace('_', ' ', $conflictResolution)) }}</dd>
                                 </div>
+                                <div class="flex justify-between">
+                                    <dt class="text-gray-400">Magazyn:</dt>
+                                    <dd class="font-medium text-white">
+                                        @if ($selectedWarehouseId)
+                                            @php $whFinal = collect($availableWarehouses)->firstWhere('id', $selectedWarehouseId); @endphp
+                                            {{ $whFinal ? strtoupper($whFinal['code']) : 'ID: ' . $selectedWarehouseId }}
+                                        @else
+                                            <span class="text-gray-500">Brak</span>
+                                        @endif
+                                    </dd>
+                                </div>
                             </div>
                             <div class="space-y-2">
-                                <div class="flex justify-between">
-                                    <dt class="text-gray-400">Batch size:</dt>
-                                    <dd class="font-medium text-white">{{ $syncBatchSize }} produktów</dd>
-                                </div>
-                                <div class="flex justify-between">
-                                    <dt class="text-gray-400">Timeout:</dt>
-                                    <dd class="font-medium text-white">{{ $syncTimeoutMinutes }} minut</dd>
-                                </div>
-                                <div class="flex justify-between">
-                                    <dt class="text-gray-400">Retry:</dt>
-                                    <dd class="font-medium text-white">{{ $retryFailedSyncs ? $maxRetryAttempts . ' prób' : 'Wyłączone' }}</dd>
-                                </div>
-                                <div class="flex justify-between">
-                                    <dt class="text-gray-400">Powiadomienia:</dt>
-                                    <dd class="font-medium text-white">{{ $notifyOnSyncErrors ? 'Włączone' : 'Wyłączone' }}</dd>
-                                </div>
-                                <div class="flex justify-between">
-                                    <dt class="text-gray-400">Real-time:</dt>
-                                    <dd class="font-medium text-white">{{ $enableWebhooks ? 'Webhooks' : 'Batch sync' }}</dd>
+                                <div class="text-xs font-medium text-gray-400 uppercase tracking-wider mb-1">Kierunek synchronizacji</div>
+                                @foreach ([
+                                    'Produkty' => $syncDirectionProducts,
+                                    'Kategorie' => $syncDirectionCategories,
+                                    'Ceny' => $syncDirectionPrices,
+                                    'Stany' => $syncDirectionStock,
+                                    'Zdjecia' => $syncDirectionImages,
+                                    'SEO' => $syncDirectionMetadata,
+                                ] as $catLabel => $catDir)
+                                    @php $dlf = $dirLabels[$catDir] ?? $dirLabels['disabled']; @endphp
+                                    <div class="flex justify-between">
+                                        <dt class="text-gray-400">{{ $catLabel }}:</dt>
+                                        <dd class="font-medium {{ $dlf['class'] }}">{!! $dlf['icon'] !!} {{ $dlf['text'] }}</dd>
+                                    </div>
+                                @endforeach
+                                <div class="border-t border-gray-700 pt-2 mt-2 space-y-2">
+                                    <div class="flex justify-between">
+                                        <dt class="text-gray-400">Batch size:</dt>
+                                        <dd class="font-medium text-white">{{ $syncBatchSize }} produktow</dd>
+                                    </div>
+                                    <div class="flex justify-between">
+                                        <dt class="text-gray-400">Timeout:</dt>
+                                        <dd class="font-medium text-white">{{ $syncTimeoutMinutes }} min</dd>
+                                    </div>
+                                    <div class="flex justify-between">
+                                        <dt class="text-gray-400">Retry:</dt>
+                                        <dd class="font-medium text-white">{{ $retryFailedSyncs ? $maxRetryAttempts . ' prob' : 'Wylaczone' }}</dd>
+                                    </div>
                                 </div>
                             </div>
                         </dl>

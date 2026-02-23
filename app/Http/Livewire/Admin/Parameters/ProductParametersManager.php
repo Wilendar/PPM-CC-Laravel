@@ -55,6 +55,16 @@ class ProductParametersManager extends Component
             'icon' => 'shield-check',
             'description' => 'Konfiguruj monitorowanie zgodności danych produktów z integracjami',
         ],
+        'smart-matching' => [
+            'label' => 'Smart Matching',
+            'icon' => 'sparkles',
+            'description' => 'Inteligentne reguly dopasowania czesci do pojazdow',
+        ],
+        'category-type-mappings' => [
+            'label' => 'Mapowanie typow',
+            'icon' => 'map',
+            'description' => 'Mapowanie kategorii PrestaShop na typy produktow PPM',
+        ],
     ];
 
     /**

@@ -246,11 +246,13 @@
                                                 $isOriginal = $this->isOriginal($vehicle->id);
                                                 $isZamiennik = $this->isZamiennik($vehicle->id);
                                                 $isBoth = $this->isBoth($vehicle->id);
+                                                $isAiSuggested = isset($suggestedVehicleScores[$vehicle->id]);
+                                                $aiScore = $suggestedVehicleScores[$vehicle->id] ?? null;
                                             @endphp
                                             <div wire:key="tile-{{ $vehicle->id }}"
                                                  wire:click="toggleVehicle({{ $vehicle->id }})"
-                                                 class="relative p-3 rounded-lg cursor-pointer transition-all
-                                                        border-2
+                                                 class="vehicle-tile {{ $stateClass }} {{ $isAiSuggested ? 'vehicle-tile--ai-suggested' : '' }}
+                                                        relative p-3 rounded-lg cursor-pointer transition-all border-2
                                                         {{ $isBoth ? 'bg-gradient-to-br from-blue-600/30 to-orange-600/30 border-purple-500' :
                                                            ($isOriginal ? 'bg-blue-600/20 border-blue-500' :
                                                            ($isZamiennik ? 'bg-orange-600/20 border-orange-500' :
@@ -277,6 +279,12 @@
                                                     <div class="absolute -top-1 -right-1 px-1.5 py-0.5 bg-orange-500 text-white text-xs font-bold rounded">
                                                         Z
                                                     </div>
+                                                @endif
+
+                                                {{-- AI Suggestion Highlight (visual only - no dismiss in modal) --}}
+                                                @if($isAiSuggested)
+                                                    <span class="vehicle-tile__ai-badge">AI</span>
+                                                    <span class="vehicle-tile__confidence">{{ round($aiScore * 100) }}%</span>
                                                 @endif
                                             </div>
                                         @endforeach

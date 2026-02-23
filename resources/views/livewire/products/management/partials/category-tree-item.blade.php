@@ -6,9 +6,9 @@
 
 @php
     $hasChildren = $category->children && $category->children->count() > 0;
-    // FIX #2 2025-11-21: Track category selection for reactive button visibility
-    $isSelected = in_array($category->id, $this->getPrestaShopCategoryIdsForContext($activeShopId));
-    $isPrimary = $this->getPrimaryPrestaShopCategoryIdForContext($activeShopId) == $category->id;
+    // BUG FIX 2026-02-20: Use pre-computed arrays instead of calling method per category (was causing memory exhaustion - 4780 calls)
+    $isSelected = in_array($category->id, $selectedCategoryIds ?? []);
+    $isPrimary = ($primaryCategoryId ?? null) == $category->id;
     // FIX #14 2025-11-21: Performance - expand ONLY if in expandedCategoryIds list
     $shouldExpand = in_array($category->id, $expandedCategoryIds ?? []);
     // FAZA 4.2: Prepare category name for search matching (lowercase)
@@ -350,7 +350,9 @@ wire:key="category-tree-{{ $context }}-{{ $category->id }}-{{ $isMarkedForDeleti
                     'category' => $child,
                     'level' => $level + 1,
                     'context' => $context,
-                    'expandedCategoryIds' => $expandedCategoryIds
+                    'expandedCategoryIds' => $expandedCategoryIds,
+                    'selectedCategoryIds' => $selectedCategoryIds ?? [],
+                    'primaryCategoryId' => $primaryCategoryId ?? null,
                 ])
             @endforeach
         </div>

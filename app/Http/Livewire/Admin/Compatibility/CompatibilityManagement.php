@@ -97,6 +97,9 @@ class CompatibilityManagement extends Component
     /** Timestamp when sync completed (for showing badge briefly) */
     public ?int $syncCompletedAt = null;
 
+    /** Map of vehicle_id => score for AI suggested vehicles */
+    public array $suggestedVehicleScores = [];
+
     protected $queryString = [
         'searchPart' => ['except' => ''],
         'shopContext' => ['except' => null],
@@ -417,10 +420,54 @@ class CompatibilityManagement extends Component
         $this->editingProductId = $productId;
         $this->initializeSelections($productId, $this->shopContext);
 
+        // Load AI suggestions for this product
+        $this->loadSuggestionsForProduct($productId);
+
         // Expand the part row
         if (!in_array($productId, $this->expandedPartIds)) {
             $this->expandedPartIds[] = $productId;
         }
+    }
+
+    /**
+     * Load AI suggestions from SmartSuggestionEngine for tile highlighting
+     */
+    public function loadSuggestionsForProduct(int $productId): void
+    {
+        $product = Product::find($productId);
+        if (!$product) {
+            $this->suggestedVehicleScores = [];
+            return;
+        }
+
+        try {
+            $suggestions = $this->suggestionEngine->generateForProductCentral($product);
+            $this->suggestedVehicleScores = [];
+            foreach ($suggestions as $suggestion) {
+                $this->suggestedVehicleScores[$suggestion['vehicle_id']] = $suggestion['score'];
+            }
+        } catch (\Exception $e) {
+            Log::error('CompatibilityManagement: loadSuggestionsForProduct failed', [
+                'product_id' => $productId,
+                'error' => $e->getMessage(),
+            ]);
+            $this->suggestedVehicleScores = [];
+        }
+    }
+
+    /**
+     * Dismiss an AI suggestion from tile highlight
+     */
+    public function dismissAiSuggestion(int $vehicleId): void
+    {
+        if (!$this->editingProductId) return;
+
+        \App\Models\SmartSuggestionDismissal::updateOrCreate(
+            ['product_id' => $this->editingProductId, 'vehicle_product_id' => $vehicleId],
+            ['dismissed_by' => auth()->id(), 'dismissed_at' => now(), 'restored_at' => null, 'restored_by' => null]
+        );
+
+        unset($this->suggestedVehicleScores[$vehicleId]);
     }
 
     /**

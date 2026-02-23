@@ -29,7 +29,8 @@
         'resources/css/products/compatibility-tiles.css',
         'resources/css/admin/supplier-panel.css',
         'resources/css/products/import-panel.css',
-        'resources/css/products/import-modals.css'
+        'resources/css/products/import-modals.css',
+        'resources/css/components/category-preview-modal.css'
     ])
 
     {{-- Alpine.js is included with Livewire 3.x - no need to load separately --}}
@@ -916,9 +917,7 @@
     <!-- Toast Notification Container -->
     <div id="toast-container"
          x-data="toastNotifications()"
-         x-init="init()"
-         class="fixed top-24 right-6 z-[9999999] space-y-3 pointer-events-none"
-         style="max-width: min(calc(100vw - 3rem), 420px); min-width: 360px; width: 360px;">
+         class="toast-container space-y-3">
 
         <template x-for="notification in notifications" :key="notification.id">
             <div x-show="notification.show"
@@ -1030,8 +1029,10 @@
             notifications: [],
 
             init() {
-                // Listen for Livewire events (success, error, warning, info)
-                document.addEventListener('livewire:init', () => {
+                // Register Livewire event listeners
+                // Livewire is available before Alpine init, so register directly
+                // Fallback: if not yet available, wait for livewire:init
+                const registerListeners = () => {
                     // Success notifications
                     Livewire.on('success', (event) => {
                         const data = Array.isArray(event) ? event[0] : event;
@@ -1041,13 +1042,13 @@
                     // Error notifications
                     Livewire.on('error', (event) => {
                         const data = Array.isArray(event) ? event[0] : event;
-                        this.showNotification('error', data.message || data, 'Błąd', 8000);
+                        this.showNotification('error', data.message || data, 'Blad', 8000);
                     });
 
                     // Warning notifications
                     Livewire.on('warning', (event) => {
                         const data = Array.isArray(event) ? event[0] : event;
-                        this.showNotification('warning', data.message || data, 'Ostrzeżenie', 6000);
+                        this.showNotification('warning', data.message || data, 'Ostrzezenie', 6000);
                     });
 
                     // Info notifications
@@ -1055,28 +1056,30 @@
                         const data = Array.isArray(event) ? event[0] : event;
                         this.showNotification('info', data.message || data, 'Informacja');
                     });
+                };
 
-                    // CSV Download listener (Livewire 3.x pattern - FIXED!)
-                    document.addEventListener('download-csv', (event) => {
-                        const data = event.detail; // Livewire 3.x uses event.detail
-                        const filename = data.filename || 'export.csv';
-                        const content = data.content || '';
+                if (window.Livewire) {
+                    registerListeners();
+                } else {
+                    document.addEventListener('livewire:init', () => registerListeners());
+                }
 
-                        // Create blob with UTF-8 BOM for Excel compatibility
-                        const BOM = '\uFEFF';
-                        const blob = new Blob([BOM + content], { type: 'text/csv;charset=utf-8;' });
-
-                        // Create download link
-                        const link = document.createElement('a');
-                        const url = URL.createObjectURL(blob);
-                        link.setAttribute('href', url);
-                        link.setAttribute('download', filename);
-                        link.style.visibility = 'hidden';
-                        document.body.appendChild(link);
-                        link.click();
-                        document.body.removeChild(link);
-                        URL.revokeObjectURL(url);
-                    });
+                // CSV Download listener
+                document.addEventListener('download-csv', (event) => {
+                    const data = event.detail;
+                    const filename = data.filename || 'export.csv';
+                    const content = data.content || '';
+                    const BOM = '\uFEFF';
+                    const blob = new Blob([BOM + content], { type: 'text/csv;charset=utf-8;' });
+                    const link = document.createElement('a');
+                    const url = URL.createObjectURL(blob);
+                    link.setAttribute('href', url);
+                    link.setAttribute('download', filename);
+                    link.style.visibility = 'hidden';
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    URL.revokeObjectURL(url);
                 });
             },
 

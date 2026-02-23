@@ -5,6 +5,7 @@ namespace App\Http\Livewire\Admin\Shops;
 use Livewire\Component;
 use Illuminate\Support\Facades\Log;
 use App\Models\PrestaShopShop;
+use App\Models\Warehouse;
 
 class AddShop extends Component
 {
@@ -39,6 +40,10 @@ class AddShop extends Component
     public bool $fetchingPriceGroups = false;
     public string $fetchPriceGroupsError = '';
 
+    // Step 4: Warehouse Mapping (NEW)
+    public ?int $selectedWarehouseId = null;
+    public array $availableWarehouses = [];
+
     // Tax Rules Mapping (FAZA 5.1 - 2025-11-14)
     public array $availableTaxRuleGroups = [];
     public ?int $taxRulesGroup23 = null;
@@ -47,18 +52,20 @@ class AddShop extends Component
     public ?int $taxRulesGroup0 = null;
     public bool $taxRulesFetched = false;
 
-    // Step 5: Initial Sync Settings (was Step 4)
+    // Step 5: Sync Direction per Category (4 options each)
     public $syncFrequency = 'hourly';
-    public $syncProducts = true;
-    public $syncCategories = true;
-    public $syncPrices = true;
     public $autoSyncEnabled = true;
-
-    // Step 6: Advanced Settings (was Step 5)
+    public string $syncDirectionProducts = 'ppm_to_ps';
+    public string $syncDirectionCategories = 'ppm_to_ps';
+    public string $syncDirectionPrices = 'ppm_to_ps';
+    public string $syncDirectionStock = 'ppm_to_ps';
+    public string $syncDirectionImages = 'ppm_to_ps';
+    public string $syncDirectionMetadata = 'disabled';
     public $conflictResolution = 'ppm_wins';
-    public $syncStock = true;
-    public $syncOrders = false;
-    public $syncCustomers = false;
+    public bool $filterOnlyActive = true;
+    public bool $filterPreserveImages = true;
+
+    // Step 6: Advanced Settings
     public $realTimeSyncEnabled = false;
     public $syncBatchSize = 50;
     public $syncTimeoutMinutes = 30;
@@ -67,9 +74,6 @@ class AddShop extends Component
     public $notifyOnSyncErrors = true;
     public $notifyOnSyncComplete = false;
     public $enableWebhooks = false;
-    public $syncOnlyActiveProducts = true;
-    public $preserveLocalImages = true;
-    public $syncMetaData = true;
     public $ppmModuleApiKey = '';
 
     // ETAP_07f: CSS/JS Sync Configuration (2025-12-16)
@@ -138,6 +142,9 @@ class AddShop extends Component
             'query_params' => request()->query()
         ]);
 
+        // Load available warehouses for Step 4 mapping
+        $this->loadWarehouses();
+
         if ($editId) {
             $this->editingShopId = $editId;
             $this->isEditing = true;
@@ -167,18 +174,23 @@ class AddShop extends Component
         $this->connectionMessage = '';
         $this->diagnostics = [];
         
-        // Step 4: Initial Sync Settings
+        // Step 4: Warehouse Mapping
+        $this->selectedWarehouseId = null;
+
+        // Step 5: Sync Direction Settings
         $this->syncFrequency = 'hourly';
-        $this->syncProducts = true;
-        $this->syncCategories = true;
-        $this->syncPrices = true;
         $this->autoSyncEnabled = true;
-        
-        // Step 5: Advanced Settings
+        $this->syncDirectionProducts = 'ppm_to_ps';
+        $this->syncDirectionCategories = 'ppm_to_ps';
+        $this->syncDirectionPrices = 'ppm_to_ps';
+        $this->syncDirectionStock = 'ppm_to_ps';
+        $this->syncDirectionImages = 'ppm_to_ps';
+        $this->syncDirectionMetadata = 'disabled';
         $this->conflictResolution = 'ppm_wins';
-        $this->syncStock = true;
-        $this->syncOrders = false;
-        $this->syncCustomers = false;
+        $this->filterOnlyActive = true;
+        $this->filterPreserveImages = true;
+
+        // Step 6: Advanced Settings
         $this->realTimeSyncEnabled = false;
         $this->syncBatchSize = 50;
         $this->syncTimeoutMinutes = 30;
@@ -187,9 +199,6 @@ class AddShop extends Component
         $this->notifyOnSyncErrors = true;
         $this->notifyOnSyncComplete = false;
         $this->enableWebhooks = false;
-        $this->syncOnlyActiveProducts = true;
-        $this->preserveLocalImages = true;
-        $this->syncMetaData = true;
         $this->ppmModuleApiKey = '';
 
         // ETAP_07f: CSS/JS Sync Configuration (FTP required)
@@ -264,23 +273,36 @@ class AddShop extends Component
         $this->connectionMessage = '';
         $this->diagnostics = [];
 
-        // Step 4: Initial Sync Settings
+        // Step 4: Warehouse Mapping
+        $warehouseMappings = $shop->warehouse_mappings ?? [];
+        $this->selectedWarehouseId = $warehouseMappings['ppm_warehouse_id'] ?? null;
+
+        // Step 5: Sync Direction Settings (with backwards compatibility)
         $this->syncFrequency = $shop->sync_frequency;
         $syncSettings = $shop->sync_settings ?? [];
-        $this->syncProducts = $syncSettings['sync_products'] ?? true;
-        $this->syncCategories = $syncSettings['sync_categories'] ?? true;
-        $this->syncPrices = $syncSettings['sync_prices'] ?? true;
         $this->autoSyncEnabled = $syncSettings['auto_sync_enabled'] ?? true;
 
-        // Step 5: Advanced Settings
+        // Migrate old boolean format to direction format (backwards compat)
+        $this->syncDirectionProducts = $syncSettings['direction_products']
+            ?? (($syncSettings['sync_products'] ?? true) ? 'ppm_to_ps' : 'disabled');
+        $this->syncDirectionCategories = $syncSettings['direction_categories']
+            ?? (($syncSettings['sync_categories'] ?? true) ? 'ppm_to_ps' : 'disabled');
+        $this->syncDirectionPrices = $syncSettings['direction_prices']
+            ?? (($syncSettings['sync_prices'] ?? true) ? 'ppm_to_ps' : 'disabled');
+        $this->syncDirectionStock = $syncSettings['direction_stock']
+            ?? (($syncSettings['sync_stock'] ?? true) ? 'ppm_to_ps' : 'disabled');
+        $this->syncDirectionImages = $syncSettings['direction_images'] ?? 'ppm_to_ps';
+        $this->syncDirectionMetadata = $syncSettings['direction_metadata']
+            ?? (($syncSettings['sync_metadata'] ?? true) ? 'ppm_to_ps' : 'disabled');
+
         $this->conflictResolution = $shop->conflict_resolution;
-        $this->syncStock = $syncSettings['sync_stock'] ?? true;
-        $this->syncOrders = $syncSettings['sync_orders'] ?? false;
-        $this->syncCustomers = $syncSettings['sync_customers'] ?? false;
+        $this->filterOnlyActive = $syncSettings['filter_only_active']
+            ?? ($syncSettings['sync_only_active'] ?? true);
+        $this->filterPreserveImages = $syncSettings['filter_preserve_images']
+            ?? ($syncSettings['preserve_images'] ?? true);
+
+        // Step 6: Advanced Settings
         $this->realTimeSyncEnabled = $syncSettings['real_time_sync'] ?? false;
-        $this->syncOnlyActiveProducts = $syncSettings['sync_only_active'] ?? true;
-        $this->preserveLocalImages = $syncSettings['preserve_images'] ?? true;
-        $this->syncMetaData = $syncSettings['sync_metadata'] ?? true;
         $this->enableWebhooks = $syncSettings['enable_webhooks'] ?? false;
         $this->ppmModuleApiKey = $syncSettings['ppm_module_api_key'] ?? '';
 
@@ -422,14 +444,30 @@ class AddShop extends Component
                     return;
                 }
             }
-            
+
             $this->currentStep = $step;
-            
+
             // Auto-run connection test on step 3
             if ($this->currentStep === 3) {
                 $this->testConnection();
             }
+
+            // Reload warehouses on step 4
+            if ($this->currentStep === 4) {
+                $this->loadWarehouses();
+            }
         }
+    }
+
+    /**
+     * Load available PPM warehouses for Step 4 mapping
+     */
+    public function loadWarehouses(): void
+    {
+        $this->availableWarehouses = Warehouse::active()
+            ->ordered()
+            ->get(['id', 'name', 'code', 'type'])
+            ->toArray();
     }
 
     protected function validateCurrentStep()
@@ -475,12 +513,23 @@ class AddShop extends Component
             case 5:
                 $this->validate([
                     'syncFrequency' => 'required|in:real-time,hourly,daily,manual',
+                    'syncDirectionProducts' => 'required|in:bidirectional,ppm_to_ps,ps_to_ppm,disabled',
+                    'syncDirectionCategories' => 'required|in:bidirectional,ppm_to_ps,ps_to_ppm,disabled',
+                    'syncDirectionPrices' => 'required|in:bidirectional,ppm_to_ps,ps_to_ppm,disabled',
+                    'syncDirectionStock' => 'required|in:bidirectional,ppm_to_ps,ps_to_ppm,disabled',
+                    'syncDirectionImages' => 'required|in:bidirectional,ppm_to_ps,ps_to_ppm,disabled',
+                    'syncDirectionMetadata' => 'required|in:bidirectional,ppm_to_ps,ps_to_ppm,disabled',
+                    'conflictResolution' => 'required|in:ppm_wins,prestashop_wins,manual,newest_wins',
                 ]);
+
+                // Warning: stock sync active but no warehouse mapped
+                if ($this->syncDirectionStock !== 'disabled' && !$this->selectedWarehouseId) {
+                    $this->addError('warehouse_warning', 'Synchronizacja stanow jest aktywna, ale nie wybrano magazynu w Kroku 4. Stany nie beda synchronizowane.');
+                }
                 break;
 
             case 6:
                 $this->validate([
-                    'conflictResolution' => 'required|in:ppm_wins,prestashop_wins,manual,newest_wins',
                     'syncBatchSize' => 'required|integer|min:1|max:500',
                     'syncTimeoutMinutes' => 'required|integer|min:5|max:180',
                     'maxRetryAttempts' => 'required|integer|min:1|max:10',
@@ -1326,20 +1375,26 @@ class AddShop extends Component
                 'tax_rules_group_id_0' => $this->taxRulesGroup0,
                 'tax_rules_last_fetched_at' => $this->taxRulesFetched ? now() : null,
                 'sync_settings' => [
-                    'sync_products' => $this->syncProducts,
-                    'sync_categories' => $this->syncCategories,
-                    'sync_prices' => $this->syncPrices,
-                    'sync_stock' => $this->syncStock,
-                    'sync_orders' => $this->syncOrders,
-                    'sync_customers' => $this->syncCustomers,
+                    // Direction per category (NEW)
+                    'direction_products' => $this->syncDirectionProducts,
+                    'direction_categories' => $this->syncDirectionCategories,
+                    'direction_prices' => $this->syncDirectionPrices,
+                    'direction_stock' => $this->syncDirectionStock,
+                    'direction_images' => $this->syncDirectionImages,
+                    'direction_metadata' => $this->syncDirectionMetadata,
+                    // Filters
+                    'filter_only_active' => $this->filterOnlyActive,
+                    'filter_preserve_images' => $this->filterPreserveImages,
+                    // General
                     'auto_sync_enabled' => $this->autoSyncEnabled,
                     'real_time_sync' => $this->realTimeSyncEnabled,
-                    'sync_only_active' => $this->syncOnlyActiveProducts,
-                    'preserve_images' => $this->preserveLocalImages,
-                    'sync_metadata' => $this->syncMetaData,
                     'enable_webhooks' => $this->enableWebhooks,
                     'ppm_module_api_key' => $this->ppmModuleApiKey,
                 ],
+                // Warehouse mapping (NEW)
+                'warehouse_mappings' => $this->selectedWarehouseId
+                    ? ['ppm_warehouse_id' => $this->selectedWarehouseId]
+                    : [],
                 'conflict_resolution' => $this->conflictResolution,
                 'notification_settings' => [
                     'notify_on_errors' => $this->notifyOnSyncErrors,
@@ -1409,13 +1464,12 @@ class AddShop extends Component
                     'last_error_message' => $this->connectionStatus === 'error' ? $this->connectionMessage : null,
                     'version_compatible' => true,
                     'supported_features' => [],
-                    'auto_sync_products' => $this->syncProducts,
-                    'auto_sync_categories' => $this->syncCategories,
-                    'auto_sync_prices' => $this->syncPrices,
-                    'auto_sync_stock' => $this->syncStock,
+                    'auto_sync_products' => $this->syncDirectionProducts !== 'disabled',
+                    'auto_sync_categories' => $this->syncDirectionCategories !== 'disabled',
+                    'auto_sync_prices' => $this->syncDirectionPrices !== 'disabled',
+                    'auto_sync_stock' => $this->syncDirectionStock !== 'disabled',
                     'category_mappings' => [],
                     'price_group_mappings' => [],
-                    'warehouse_mappings' => [],
                     'custom_field_mappings' => [],
                     'last_sync_at' => null,
                     'next_scheduled_sync' => null,
@@ -1482,9 +1536,9 @@ class AddShop extends Component
             1 => 'Podstawowe informacje',
             2 => 'Dane autoryzacji API',
             3 => 'Test połączenia',
-            4 => 'Mapowanie grup cenowych',
+            4 => 'Mapowania',
             5 => 'Ustawienia synchronizacji',
-            6 => 'Ustawienia zaawansowane'
+            6 => 'Zaawansowane ustawienia'
         ];
 
         return $titles[$step] ?? 'Krok ' . $step;
@@ -1496,9 +1550,9 @@ class AddShop extends Component
             1 => 'Podaj nazwę, URL i opis sklepu PrestaShop',
             2 => 'Wprowadź klucz API i wybierz wersję PrestaShop',
             3 => 'Sprawdź poprawność połączenia z sklepem',
-            4 => 'Zmapuj grupy cenowe PrestaShop z grupami PPM',
-            5 => 'Skonfiguruj częstotliwość i zakres synchronizacji',
-            6 => 'Zaawansowane opcje konfliktów, timeoutów i notyfikacji'
+            4 => 'Zmapuj grupy cenowe i magazyn PPM z PrestaShop',
+            5 => 'Kierunek synchronizacji, konflikty i filtry',
+            6 => 'FTP/CSS, wydajność, notyfikacje i podsumowanie'
         ];
 
         return $descriptions[$step] ?? '';

@@ -3,6 +3,7 @@
 namespace App\Services\Compatibility;
 
 use App\Models\PrestaShopShop;
+use App\Models\SmartSyncBrandRule;
 use App\Models\VehicleCompatibility;
 use App\Models\Product;
 use Illuminate\Support\Collection;
@@ -45,6 +46,37 @@ class ShopFilteringService
     protected const CACHE_TTL = 3600; // 1 hour
 
     /**
+     * Get allowed brands from smart_sync_brand_rules (priority)
+     * Falls back to legacy allowed_vehicle_brands if no smart rules exist
+     *
+     * @param PrestaShopShop $shop
+     * @return array|null null = all brands, [] = none, array = whitelist
+     */
+    public function getSmartAllowedBrands(PrestaShopShop $shop): ?array
+    {
+        // Check if smart rules exist for this shop
+        $smartRules = SmartSyncBrandRule::forShop($shop->id)->get();
+
+        if ($smartRules->isEmpty()) {
+            // No smart rules - fall back to legacy
+            return $shop->allowed_vehicle_brands;
+        }
+
+        // Smart rules exist - use them
+        $allowedBrands = $smartRules
+            ->where('is_allowed', true)
+            ->pluck('brand')
+            ->toArray();
+
+        // If all rules are "not allowed" → return empty (disabled)
+        if (empty($allowedBrands)) {
+            return [];
+        }
+
+        return $allowedBrands;
+    }
+
+    /**
      * Get allowed vehicle brands for a shop
      *
      * @param PrestaShopShop $shop
@@ -52,7 +84,7 @@ class ShopFilteringService
      */
     public function getAllowedBrands(PrestaShopShop $shop): ?array
     {
-        return $shop->allowed_vehicle_brands;
+        return $this->getSmartAllowedBrands($shop);
     }
 
     /**
@@ -111,7 +143,7 @@ class ShopFilteringService
     {
         $query = Product::byType('pojazd');
 
-        $allowedBrands = $shop->allowed_vehicle_brands;
+        $allowedBrands = $this->getSmartAllowedBrands($shop);
 
         if ($allowedBrands === null) {
             // null = all brands allowed, no filter
@@ -137,6 +169,31 @@ class ShopFilteringService
     public function getVehiclesGroupedByBrand(PrestaShopShop $shop): Collection
     {
         return $this->getFilteredVehicles($shop)->groupBy('manufacturer');
+    }
+
+    /**
+     * Get minimum confidence score for a specific brand in a shop
+     */
+    public function getMinConfidenceForBrand(PrestaShopShop $shop, string $brand): float
+    {
+        $rule = SmartSyncBrandRule::forShop($shop->id)
+            ->where('brand', $brand)
+            ->first();
+
+        return $rule ? (float) $rule->min_confidence : 0.50;
+    }
+
+    /**
+     * Check if auto-sync is enabled for a brand in a shop
+     */
+    public function isAutoSyncEnabled(PrestaShopShop $shop, string $brand): bool
+    {
+        $rule = SmartSyncBrandRule::forShop($shop->id)
+            ->where('brand', $brand)
+            ->where('is_allowed', true)
+            ->first();
+
+        return $rule ? $rule->auto_sync : false;
     }
 
     /**
@@ -336,6 +393,7 @@ class ShopFilteringService
     {
         Cache::forget("shop_{$shop->id}_filtered_vehicles");
         Cache::forget("shop_{$shop->id}_vehicle_count");
+        Cache::forget("smart_sync_rules_shop_{$shop->id}");
     }
 
     /**
@@ -350,6 +408,11 @@ class ShopFilteringService
         foreach ($shopIds as $shopId) {
             Cache::forget("shop_{$shopId}_filtered_vehicles");
             Cache::forget("shop_{$shopId}_vehicle_count");
+        }
+
+        // Clear smart sync rules cache
+        foreach ($shopIds as $shopId) {
+            Cache::forget("smart_sync_rules_shop_{$shopId}");
         }
     }
 }

@@ -1,6 +1,26 @@
 /* PPM-CC-Laravel - Admin Layout Styles */
 
 /* ========================================
+   Z-INDEX LAYER SYSTEM
+   ======================================== */
+
+.layer-base {
+    z-index: 1;
+}
+
+.layer-panel {
+    z-index: 10;
+}
+
+.layer-modal {
+    z-index: 100;
+}
+
+.layer-overlay {
+    z-index: 200;
+}
+
+/* ========================================
    ADMIN HEADER & NAVIGATION
    ======================================== */
 

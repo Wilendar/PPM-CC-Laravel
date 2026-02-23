@@ -81,6 +81,29 @@ trait ProductFormCompatibility
     public array $defaultCompatibilityOriginal = [];
     public array $defaultCompatibilityZamiennik = [];
 
+    /**
+     * Ghost suggestions from AI SmartSuggestionEngine
+     * Format: [['vehicle_id' => int, 'vehicle_name' => string, 'vehicle_manufacturer' => string,
+     *           'vehicle_sku' => string, 'score' => float, 'reason' => string, 'breakdown' => array]]
+     */
+    public array $ghostSuggestions = [];
+
+    /**
+     * Map of vehicle_id => score for AI suggested vehicles
+     * Used by blade to highlight existing tiles
+     */
+    public array $suggestedVehicleScores = [];
+
+    /**
+     * Whether to show dismissed suggestions
+     */
+    public bool $showDismissedSuggestions = false;
+
+    /**
+     * IDs of dismissed vehicles (for quick lookup)
+     */
+    public array $dismissedSuggestionIds = [];
+
     /*
     |--------------------------------------------------------------------------
     | COMPATIBILITY LOADING
@@ -554,5 +577,109 @@ trait ProductFormCompatibility
     protected function getDefaultShopId(): int
     {
         return \App\Models\PrestaShopShop::where('is_active', true)->orderBy('id')->value('id') ?? 1;
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | GHOST SUGGESTIONS (AI Smart Matching)
+    |--------------------------------------------------------------------------
+    */
+
+    /**
+     * Load ghost suggestions from SmartSuggestionEngine
+     * Called via wire:init on compatibility tab
+     */
+    public function loadGhostSuggestions(): void
+    {
+        if (!$this->product || !$this->product->id) {
+            return;
+        }
+
+        // Only for czesc-zamienna type
+        if ($this->product->productType?->slug !== 'czesc-zamienna') {
+            return;
+        }
+
+        try {
+            $engine = app(\App\Services\Compatibility\SmartSuggestionEngine::class);
+            $this->ghostSuggestions = $engine->generateForProductCentral($this->product);
+
+            // Load dismissed IDs
+            $this->dismissedSuggestionIds = \App\Models\SmartSuggestionDismissal::where('product_id', $this->product->id)
+                ->whereNull('restored_at')
+                ->pluck('vehicle_product_id')
+                ->toArray();
+
+            // Build suggestedVehicleScores map for blade tile highlighting
+            $this->suggestedVehicleScores = [];
+            foreach ($this->ghostSuggestions as $suggestion) {
+                $this->suggestedVehicleScores[$suggestion['vehicle_id']] = $suggestion['score'];
+            }
+
+        } catch (\Exception $e) {
+            Log::error('Ghost suggestions load failed', [
+                'product_id' => $this->product->id,
+                'error' => $e->getMessage(),
+            ]);
+            $this->ghostSuggestions = [];
+            $this->suggestedVehicleScores = [];
+        }
+    }
+
+    /**
+     * Dismiss a ghost suggestion
+     */
+    public function dismissGhostSuggestion(int $vehicleId): void
+    {
+        \App\Models\SmartSuggestionDismissal::updateOrCreate(
+            [
+                'product_id' => $this->product->id,
+                'vehicle_product_id' => $vehicleId,
+            ],
+            [
+                'dismissed_by' => auth()->id(),
+                'dismissed_at' => now(),
+                'restored_at' => null,
+                'restored_by' => null,
+            ]
+        );
+
+        // Remove from ghost suggestions
+        $this->ghostSuggestions = array_values(array_filter(
+            $this->ghostSuggestions,
+            fn($s) => $s['vehicle_id'] !== $vehicleId
+        ));
+
+        unset($this->suggestedVehicleScores[$vehicleId]);
+        $this->dismissedSuggestionIds[] = $vehicleId;
+    }
+
+    /**
+     * Restore a dismissed suggestion
+     */
+    public function restoreDismissedSuggestion(int $vehicleId): void
+    {
+        $dismissal = \App\Models\SmartSuggestionDismissal::where('product_id', $this->product->id)
+            ->where('vehicle_product_id', $vehicleId)
+            ->first();
+
+        if ($dismissal) {
+            $dismissal->restore(auth()->user());
+        }
+
+        $this->dismissedSuggestionIds = array_values(
+            array_diff($this->dismissedSuggestionIds, [$vehicleId])
+        );
+
+        // Reload ghost suggestions to include restored one
+        $this->loadGhostSuggestions();
+    }
+
+    /**
+     * Toggle show dismissed suggestions
+     */
+    public function toggleShowDismissed(): void
+    {
+        $this->showDismissedSuggestions = !$this->showDismissedSuggestions;
     }
 }

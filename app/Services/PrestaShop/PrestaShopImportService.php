@@ -18,6 +18,8 @@ use App\Models\FeatureGroup;
 use App\Models\ProductFeature;
 use App\Models\PrestashopFeatureMapping;
 use App\Services\PrestaShop\VehicleCompatibilitySyncService;
+use App\Services\Import\CategoryTypeMapper;
+use App\Services\Import\ProductTypeDetector;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use InvalidArgumentException;
@@ -75,7 +77,8 @@ class PrestaShopImportService
     public function __construct(
         protected PrestaShopClientFactory $clientFactory,
         protected ProductTransformer $productTransformer,
-        protected CategoryTransformer $categoryTransformer
+        protected CategoryTransformer $categoryTransformer,
+        protected CategoryTypeMapper $categoryTypeMapper,
     ) {}
 
     /**
@@ -131,6 +134,9 @@ class PrestaShopImportService
             $pricesData = $this->productTransformer->transformPriceToPPM($prestashopData, $shop);
             $stockData = $this->productTransformer->transformStockToPPM($prestashopData, $shop);
 
+            // 3b. Check if product is new before transaction
+            $isNewProduct = !Product::where('sku', $productData['sku'])->exists();
+
             // 4. Database transaction dla data integrity
             $product = DB::transaction(function () use (
                 $productData,
@@ -140,7 +146,8 @@ class PrestaShopImportService
                 $prestashopData,  // 🔧 FIX: Add $prestashopData for syncProductCategories()
                 $shop,
                 $client,  // 🔧 ETAP_07e FIX: Add $client for syncProductFeatures()
-                $importWithVariants  // 🔧 FIX: Add for variant import
+                $importWithVariants,  // 🔧 FIX: Add for variant import
+                $isNewProduct  // CategoryTypeMapper: resolve type for new + fallback 'inne' products
             ) {
                 // 5. Check if product exists (by SKU)
                 $existingProduct = Product::where('sku', $productData['sku'])->first();
@@ -273,32 +280,31 @@ class PrestaShopImportService
                 // CRITICAL: ProductForm reads from category_mappings, not product_categories!
                 $this->buildCategoryMappingsFromProductCategories($product, $shop);
 
-                // 11b. FIX 2025-12-22: Auto-detect ProductType from category hierarchy
-                // If product has no type, detect from level-2 (main) category
-                if (!$product->product_type_id) {
-                    $primaryCategory = $product->categories()
-                        ->wherePivot('is_primary', true)
-                        ->first();
+                // 11b. Resolve ProductType via CategoryTypeMapper cascade
+                // Runs for: new products OR existing products with fallback 'inne' type
+                // Preserves manually-set types (pojazd, czesc-zamienna, odziez)
+                $fallbackTypeId = $this->categoryTypeMapper->getFallbackTypeId();
+                $shouldResolveType = $isNewProduct || $product->product_type_id === $fallbackTypeId;
 
-                    if (!$primaryCategory) {
-                        $primaryCategory = $product->categories()->first();
-                    }
+                if ($shouldResolveType) {
+                    $psCategoryIds = collect(data_get($prestashopData, 'associations.categories', []))
+                        ->pluck('id')
+                        ->map(fn($id) => (int) $id)
+                        ->filter(fn($id) => $id > 2) // Skip PS root categories
+                        ->values()
+                        ->toArray();
 
-                    if ($primaryCategory) {
-                        $detectedType = \App\Models\ProductType::detectFromCategory($primaryCategory);
-
-                        if ($detectedType) {
-                            $product->update(['product_type_id' => $detectedType->id]);
-
-                            Log::info('ProductType auto-detected from category', [
-                                'product_id' => $product->id,
-                                'sku' => $product->sku,
-                                'category_id' => $primaryCategory->id,
-                                'category_name' => $primaryCategory->name,
-                                'detected_type_id' => $detectedType->id,
-                                'detected_type_name' => $detectedType->name,
-                            ]);
-                        }
+                    $resolvedTypeId = $this->categoryTypeMapper->resolveTypeForProduct($product, $shop->id, $psCategoryIds);
+                    if ($resolvedTypeId !== $product->product_type_id) {
+                        $product->update(['product_type_id' => $resolvedTypeId]);
+                        Log::info('CategoryTypeMapper: product type updated', [
+                            'product_id' => $product->id,
+                            'sku' => $product->sku,
+                            'old_type_id' => $fallbackTypeId,
+                            'new_type_id' => $resolvedTypeId,
+                            'is_new' => $isNewProduct,
+                            'ps_category_ids' => $psCategoryIds,
+                        ]);
                     }
                 }
 
@@ -1486,6 +1492,45 @@ class PrestaShopImportService
             Log::warning('ProductShopData not found - cannot save category_mappings', [
                 'product_id' => $product->id,
                 'shop_id' => $shop->id,
+            ]);
+        }
+    }
+
+    /**
+     * Detect and assign ProductType using ProductTypeDetector service
+     * Uses keyword-based detection on all category names assigned to product
+     *
+     * @deprecated Use CategoryTypeMapper::resolveTypeForProduct() instead.
+     *             Kept for backward compatibility - will be removed in future.
+     */
+    protected function detectAndAssignProductType(Product $product): void
+    {
+        try {
+            $categoryNames = $product->categories()
+                ->pluck('name')
+                ->toArray();
+
+            if (empty($categoryNames)) {
+                return;
+            }
+
+            $detector = app(ProductTypeDetector::class);
+            $detectedType = $detector->detect($categoryNames);
+
+            if ($detectedType) {
+                $product->update(['product_type_id' => $detectedType->id]);
+
+                Log::info('ProductType auto-detected', [
+                    'product_id' => $product->id,
+                    'sku' => $product->sku,
+                    'detected_type' => $detectedType->name,
+                    'category_names' => $categoryNames,
+                ]);
+            }
+        } catch (\Exception $e) {
+            Log::warning('ProductType detection failed', [
+                'product_id' => $product->id,
+                'error' => $e->getMessage(),
             ]);
         }
     }

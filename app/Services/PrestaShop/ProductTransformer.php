@@ -7,6 +7,7 @@ use App\Models\BusinessPartner;
 use App\Models\Manufacturer;
 use App\Models\Product;
 use App\Models\ProductDescription;
+use App\Models\ProductType;
 use App\Models\PrestaShopShop;
 use App\Services\PrestaShop\BasePrestaShopClient;
 use App\Services\PrestaShop\CategoryMapper;
@@ -962,7 +963,7 @@ class ProductTransformer
                 // PrestaShop types: Standard, virtual, Pack
                 // PPM types: 1=pojazd, 2=czesc-zamienna, 3=odziez, 4=inne
                 // User can change type manually in PPM if needed
-                'product_type_id' => 2, // Default: Część zamienna (spare_part)
+                'product_type_id' => $this->getDefaultProductTypeId(),
 
                 // Status (PrestaShop uses '0'/'1' strings, convert to bool)
                 'is_active' => $this->convertPrestaShopBoolean($prestashopProduct['active'] ?? '0'),
@@ -1591,5 +1592,18 @@ class ProductTransformer
         }
 
         return $importer->id;
+    }
+
+    /**
+     * Get default ProductType ID for imported products
+     *
+     * Returns 'inne' (catch-all) type ID instead of hardcoded value.
+     * Actual type detection happens later via CategoryTypeMapper cascade.
+     */
+    protected function getDefaultProductTypeId(): int
+    {
+        return ProductType::where('slug', 'inne')->value('id')
+            ?? ProductType::first()?->id
+            ?? 1;
     }
 }

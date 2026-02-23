@@ -1217,64 +1217,7 @@
         </div>
     </div>
 
-    {{-- Toast notifications --}}
-    <div x-data="{
-    show: false,
-    message: '',
-    type: 'success',
-    init() {
-        this.$wire.on('success', (data) => {
-            this.showToast(data.message, 'success');
-        });
-        this.$wire.on('error', (data) => {
-            this.showToast(data.message, 'error');
-        });
-    },
-    showToast(message, type) {
-        this.message = message;
-        this.type = type;
-        this.show = true;
-        setTimeout(() => { this.show = false; }, 5000);
-    }
-}"
-class="fixed top-4 right-4 z-50">
-    <div x-show="show"
-         x-transition:enter="transform ease-out duration-300 transition"
-         x-transition:enter-start="translate-y-2 opacity-0 sm:translate-y-0 sm:translate-x-2"
-         x-transition:enter-end="translate-y-0 opacity-100 sm:translate-x-0"
-         x-transition:leave="transition ease-in duration-100"
-         x-transition:leave-start="opacity-100"
-         x-transition:leave-end="opacity-0"
-         class="max-w-sm w-full card glass-effect shadow-lg rounded-lg pointer-events-auto ring-1 ring-orange-500 ring-opacity-20 overflow-hidden">
-        <div class="p-4">
-            <div class="flex items-start">
-                <div class="flex-shrink-0">
-                    <template x-if="type === 'success'">
-                        <svg class="h-6 w-6 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                        </svg>
-                    </template>
-                    <template x-if="type === 'error'">
-                        <svg class="h-6 w-6 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                        </svg>
-                    </template>
-                </div>
-                <div class="ml-3 w-0 flex-1 pt-0.5">
-                    <p class="text-sm font-medium text-primary" x-text="message"></p>
-                </div>
-                <div class="ml-4 flex-shrink-0 flex">
-                    <button @click="show = false"
-                            class="card rounded-md inline-flex text-muted hover:text-primary focus:outline-none transition-colors duration-300">
-                        <svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                            <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/>
-                        </svg>
-                    </button>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
+    {{-- Toast notifications handled by global toast system in admin.blade.php --}}
 
 {{-- QUICK SEND TO SHOPS MODAL --}}
 @if($showQuickSendModal)
@@ -1810,46 +1753,18 @@ class="fixed top-4 right-4 z-50">
 
 {{-- IMPORT FROM PRESTASHOP MODAL --}}
 @if($showImportModal)
-<div class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50">
+<div class="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center layer-overlay">
     <div class="bg-gray-800 rounded-lg shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden">
 
-        {{-- Facebook-style Stagger Animation for Categories --}}
-        <style>
-            /* Stagger fade-in animation for newly loaded categories */
-            [x-show][x-transition] {
-                animation: fadeInStagger 0.3s ease-out forwards;
-            }
-
-            @keyframes fadeInStagger {
-                from {
-                    opacity: 0;
-                    transform: translateY(-4px);
-                }
-                to {
-                    opacity: 1;
-                    transform: translateY(0);
-                }
-            }
-
-            /* Progressive delay for sequential children (Facebook-style) */
-            [x-show][x-transition]:nth-child(1) { animation-delay: 0ms; }
-            [x-show][x-transition]:nth-child(2) { animation-delay: 50ms; }
-            [x-show][x-transition]:nth-child(3) { animation-delay: 100ms; }
-            [x-show][x-transition]:nth-child(4) { animation-delay: 150ms; }
-            [x-show][x-transition]:nth-child(5) { animation-delay: 200ms; }
-            [x-show][x-transition]:nth-child(6) { animation-delay: 250ms; }
-            [x-show][x-transition]:nth-child(7) { animation-delay: 300ms; }
-            [x-show][x-transition]:nth-child(8) { animation-delay: 350ms; }
-            [x-show][x-transition]:nth-child(9) { animation-delay: 400ms; }
-            [x-show][x-transition]:nth-child(10) { animation-delay: 450ms; }
-        </style>
+        {{-- Stagger animation moved to import-panel.css --}}
 
         {{-- Modal Header --}}
         <div class="px-6 py-4 border-b border-gray-700 flex items-center justify-between">
             <h3 class="text-xl font-semibold text-white">
-                📥 Import produktów z PrestaShop
+                <svg class="w-5 h-5 inline-block mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                Import produktów z PrestaShop
             </h3>
-            <button wire:click="closeImportModal" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
+            <button wire:click="closeImportModal" class="text-gray-400 hover:text-gray-300 transition-colors">
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
                 </svg>
@@ -1863,11 +1778,11 @@ class="fixed top-4 right-4 z-50">
             @if(!$importShopId)
                 <div class="mb-6">
                     <label class="block text-sm font-medium text-gray-300 mb-2">
-                        1️⃣ Wybierz sklep PrestaShop
+                        <span class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-gray-700 text-xs font-bold text-gray-300 mr-1">1</span> Wybierz sklep PrestaShop
                     </label>
                     {{-- CRITICAL FIX: Use computed property $this->availableShops instead of inline query --}}
                     <select wire:model.live="importShopId"
-                            class="form-select w-full rounded-lg border-gray-600 dark:bg-gray-700 dark:text-white focus:ring-2 focus:ring-orange-500 focus:border-orange-500">
+                            class="form-input-enterprise w-full rounded-lg">
                         <option value="">-- Wybierz sklep --</option>
                         @foreach($this->availableShops as $shop)
                             <option value="{{ $shop->id }}">
@@ -1881,8 +1796,9 @@ class="fixed top-4 right-4 z-50">
 
                     {{-- CRITICAL FIX: Visual confirmation after shop selection --}}
                     @if($importShopId)
-                        <div class="mt-2 p-2 bg-green-50 dark:bg-green-900 dark:bg-opacity-20 rounded text-sm text-green-700 dark:text-green-300 border border-green-200 dark:border-green-800">
-                            ✅ Wybrany sklep: <strong>{{ $this->availableShops->find($importShopId)->name ?? 'N/A' }}</strong>
+                        <div class="mt-2 p-2 bg-green-900/20 rounded text-sm text-green-300 border border-green-800">
+                            <svg class="w-4 h-4 inline-block mr-1 text-green-400" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>
+                            Wybrany sklep: <strong>{{ $this->availableShops->find($importShopId)->name ?? 'N/A' }}</strong>
                         </div>
                     @endif
                 </div>
@@ -1902,26 +1818,30 @@ class="fixed top-4 right-4 z-50">
                     </div>
 
                     {{-- Mode Tabs --}}
-                    <div class="flex space-x-2 mb-4 border-b border-gray-700">
+                    <div class="flex gap-1 mb-4 bg-gray-900/50 rounded-lg p-1">
                         <button wire:click="$set('importMode', 'all')"
-                                class="px-4 py-2 border-b-2 {{ $importMode === 'all' ? 'border-orange-500 text-orange-500' : 'border-transparent text-gray-400' }}">
-                            📦 Wszystkie
+                                class="ps-import-tab {{ $importMode === 'all' ? 'ps-import-tab--active' : 'ps-import-tab--inactive' }}">
+                            <svg class="w-4 h-4 inline-block mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
+                            Wszystkie
                         </button>
                         <button wire:click="$set('importMode', 'category')"
-                                class="px-4 py-2 border-b-2 {{ $importMode === 'category' ? 'border-orange-500 text-orange-500' : 'border-transparent text-gray-400' }}">
-                            📁 Kategoria
+                                class="ps-import-tab {{ $importMode === 'category' ? 'ps-import-tab--active' : 'ps-import-tab--inactive' }}">
+                            <svg class="w-4 h-4 inline-block mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/></svg>
+                            Kategoria
                         </button>
                         <button wire:click="$set('importMode', 'individual')"
-                                class="px-4 py-2 border-b-2 {{ $importMode === 'individual' ? 'border-orange-500 text-orange-500' : 'border-transparent text-gray-400' }}">
-                            ✅ Wybrane produkty
+                                class="ps-import-tab {{ $importMode === 'individual' ? 'ps-import-tab--active' : 'ps-import-tab--inactive' }}">
+                            <svg class="w-4 h-4 inline-block mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                            Wybrane produkty
                         </button>
                     </div>
 
                     {{-- MODE: All Products --}}
                     @if($importMode === 'all')
-                        <div class="p-6 bg-yellow-50 dark:bg-yellow-900 dark:bg-opacity-20 rounded-lg">
+                        <div class="p-6 bg-yellow-900/20 rounded-lg">
                             <h4 class="font-semibold text-white mb-2">
-                                ⚠️ Import wszystkich produktów
+                                <svg class="w-5 h-5 inline-block mr-1 text-amber-400" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/></svg>
+                                Import wszystkich produktów
                             </h4>
                             <p class="text-sm text-gray-400 mb-4">
                                 Zaimportujesz WSZYSTKIE produkty ze sklepu PrestaShop.
@@ -1942,8 +1862,9 @@ class="fixed top-4 right-4 z-50">
                             </div>
 
                             <button wire:click="importAllProducts"
-                                    class="btn-primary inline-flex items-center px-4 py-2 text-white text-sm font-medium rounded-lg">
-                                🚀 Rozpocznij import wszystkich produktów
+                                    class="btn-enterprise-primary inline-flex items-center">
+                                <svg class="w-4 h-4 inline-block mr-1" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd"/></svg>
+                                Rozpocznij import wszystkich produktów
                             </button>
                         </div>
                     @endif
@@ -1964,8 +1885,9 @@ class="fixed top-4 right-4 z-50">
 
                                     {{-- Empty state - shows when not loading and no categories --}}
                                     <div wire:loading.remove wire:target="setImportShop,updatedImportShopId,loadPrestaShopCategories">
-                                        <p class="text-gray-500 dark:text-gray-400 text-sm">
-                                            ⏳ Kategorie zostaną załadowane automatycznie po wybrze sklepu
+                                        <p class="text-gray-400 text-sm">
+                                            <svg class="w-4 h-4 inline-block mr-1 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                                            Kategorie zostaną załadowane automatycznie po wybrze sklepu
                                         </p>
                                     </div>
                                 </div>
@@ -2040,27 +1962,11 @@ class="fixed top-4 right-4 z-50">
                                             // Level 3+ (subcategories) visible only when parent is expanded
                                             $alwaysVisible = $levelDepth <= 2;
 
-                                            // DEBUG: Log every category render to see level_depth values
-                                            if ($levelDepth > 2) {
-                                                \Log::debug("Rendering category with indent", [
-                                                    'id' => $categoryId,
-                                                    'name' => $categoryName,
-                                                    'level_depth' => $levelDepth,
-                                                    'indent_rem' => $indent,
-                                                    'parent_id' => $parentId,
-                                                ]);
-                                            }
                                         @endphp
 
-                                        {{-- DEBUG: data attributes for browser inspection --}}
                                         <div wire:key="cat-{{ $categoryId }}"
                                              class="flex items-center mb-1"
                                              style="padding-left: {{ $indent }}rem;"
-                                             data-cat-id="{{ $categoryId }}"
-                                             data-parent="{{ $parentId }}"
-                                             data-level="{{ $levelDepth }}"
-                                             data-name="{{ $categoryName }}"
-                                             data-indent="{{ $indent }}"
                                              @if($alwaysVisible)
                                                  {{-- Level 0-2: Always visible --}}
                                              @else
@@ -2123,17 +2029,17 @@ class="fixed top-4 right-4 z-50">
                                                 {{-- Skeleton Item 1 (wider) --}}
                                                 <div class="flex items-center mb-2 animate-pulse">
                                                     <span class="w-6 h-6 flex-shrink-0 mr-1"></span>
-                                                    <div class="h-4 bg-gray-300 dark:bg-gray-600 rounded w-3/4"></div>
+                                                    <div class="h-4 bg-gray-600 rounded w-3/4"></div>
                                                 </div>
                                                 {{-- Skeleton Item 2 (medium) --}}
-                                                <div class="flex items-center mb-2 animate-pulse" style="animation-delay: 75ms;">
+                                                <div class="flex items-center mb-2 animate-pulse ps-import-skeleton-delay-1">
                                                     <span class="w-6 h-6 flex-shrink-0 mr-1"></span>
-                                                    <div class="h-4 bg-gray-300 dark:bg-gray-600 rounded w-2/3"></div>
+                                                    <div class="h-4 bg-gray-600 rounded w-2/3"></div>
                                                 </div>
                                                 {{-- Skeleton Item 3 (narrower) --}}
-                                                <div class="flex items-center mb-2 animate-pulse" style="animation-delay: 150ms;">
+                                                <div class="flex items-center mb-2 animate-pulse ps-import-skeleton-delay-2">
                                                     <span class="w-6 h-6 flex-shrink-0 mr-1"></span>
-                                                    <div class="h-4 bg-gray-300 dark:bg-gray-600 rounded w-1/2"></div>
+                                                    <div class="h-4 bg-gray-600 rounded w-1/2"></div>
                                                 </div>
                                             </div>
                                         @endif
@@ -2155,8 +2061,9 @@ class="fixed top-4 right-4 z-50">
                                     </div>
 
                                     <button wire:click="importFromCategory"
-                                            class="btn-primary inline-flex items-center px-4 py-2 text-white text-sm font-medium rounded-lg">
-                                        🚀 Importuj z wybranej kategorii
+                                            class="btn-enterprise-primary inline-flex items-center">
+                                        <svg class="w-4 h-4 inline-block mr-1" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd"/></svg>
+                                        Importuj z wybranej kategorii
                                     </button>
                                 @endif
                             @endif
@@ -2169,13 +2076,14 @@ class="fixed top-4 right-4 z-50">
                             {{-- CRITICAL: Search Input --}}
                             <div class="mb-4">
                                 <label class="block text-sm font-medium text-gray-300 mb-2">
-                                    🔍 Wyszukaj produkt (po nazwie lub SKU)
+                                    <svg class="w-4 h-4 inline-block mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                                    Wyszukaj produkt (po nazwie lub SKU)
                                 </label>
                                 <div class="relative">
                                     <input type="text"
                                            wire:model.live.debounce.500ms="importSearch"
                                            placeholder="Wpisz min. 3 znaki nazwy lub SKU..."
-                                           class="form-input w-full rounded-lg border-gray-600 dark:bg-gray-700 dark:text-white pr-10">
+                                           class="form-input-enterprise w-full rounded-lg pr-10">
                                     <div wire:loading wire:target="loadPrestaShopProducts" class="absolute right-3 top-1/2 transform -translate-y-1/2">
                                         <svg class="animate-spin h-5 w-5 text-orange-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                                             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
@@ -2184,12 +2092,14 @@ class="fixed top-4 right-4 z-50">
                                     </div>
                                 </div>
                                 <p class="text-xs text-gray-500 mt-1">
-                                    💡 Wpisz minimum 3 znaki aby rozpocząć wyszukiwanie
+                                    <svg class="w-3.5 h-3.5 inline-block mr-1 text-gray-500" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/></svg>
+                                    Wpisz minimum 3 znaki aby rozpocząć wyszukiwanie
                                 </p>
 
                                 @if(!empty($importSearch))
                                     <p class="text-sm text-orange-500 mt-1">
-                                        🔎 Wyszukiwanie: "{{ $importSearch }}"
+                                        <svg class="w-3.5 h-3.5 inline-block mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                                        Wyszukiwanie: "{{ $importSearch }}"
                                     </p>
                                 @endif
                             </div>
@@ -2214,12 +2124,14 @@ class="fixed top-4 right-4 z-50">
                                     {{-- Empty state - shows when not loading and no products --}}
                                     <div wire:loading.remove wire:target="setImportShop,updatedImportShopId,loadPrestaShopProducts,updatedImportSearch">
                                         @if(!empty($importSearch))
-                                            <p class="text-gray-500 dark:text-gray-400 text-sm">
-                                                🔍 Brak produktów pasujących do wyszukiwania: <strong>"{{ $importSearch }}"</strong>
+                                            <p class="text-gray-400 text-sm">
+                                                <svg class="w-4 h-4 inline-block mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                                                Brak produktów pasujących do wyszukiwania: <strong>"{{ $importSearch }}"</strong>
                                             </p>
                                         @else
-                                            <p class="text-gray-500 dark:text-gray-400 text-sm">
-                                                ⏳ Produkty zostaną załadowane automatycznie po wyborze sklepu<br>
+                                            <p class="text-gray-400 text-sm">
+                                                <svg class="w-4 h-4 inline-block mr-1 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                                                Produkty zostaną załadowane automatycznie po wyborze sklepu<br>
                                                 lub użyj wyszukiwarki powyżej
                                             </p>
                                         @endif
@@ -2257,8 +2169,9 @@ class="fixed top-4 right-4 z-50">
                                             </div>
 
                                             @if($existsInPPM)
-                                                <span class="ml-2 px-2 py-1 bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 text-xs rounded">
-                                                    ✅ Istnieje w PPM
+                                                <span class="ml-2 px-2 py-1 bg-green-900/50 text-green-300 text-xs rounded">
+                                                    <svg class="w-3 h-3 inline-block mr-0.5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>
+                                                    Istnieje w PPM
                                                 </span>
                                             @endif
                                         </label>
@@ -2280,8 +2193,9 @@ class="fixed top-4 right-4 z-50">
                                     </div>
 
                                     <button wire:click="importSelectedProducts"
-                                            class="btn-primary inline-flex items-center px-4 py-2 text-white text-sm font-medium rounded-lg">
-                                        🚀 Importuj wybrane ({{ count($selectedProductsToImport) }})
+                                            class="btn-enterprise-primary inline-flex items-center">
+                                        <svg class="w-4 h-4 inline-block mr-1" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd"/></svg>
+                                        Importuj wybrane ({{ count($selectedProductsToImport) }})
                                     </button>
                                 @endif
                             @endif
@@ -2293,7 +2207,7 @@ class="fixed top-4 right-4 z-50">
 
         {{-- Modal Footer --}}
         <div class="px-6 py-4 border-t border-gray-700 flex justify-end">
-            <button wire:click="closeImportModal" class="btn-secondary px-4 py-2 text-sm font-medium rounded-lg">
+            <button wire:click="closeImportModal" class="btn-enterprise-secondary">
                 Anuluj
             </button>
         </div>
@@ -2303,7 +2217,7 @@ class="fixed top-4 right-4 z-50">
 
 {{-- ETAP_07 FAZA 3D: Category Analysis Loading Overlay --}}
 @if($isAnalyzingCategories)
-<div class="fixed inset-0 z-[60] flex items-center justify-center bg-gray-900 bg-opacity-75 backdrop-blur-sm">
+<div class="fixed inset-0 layer-overlay flex items-center justify-center bg-black/70 backdrop-blur-sm">
     <div class="bg-gradient-to-br from-gray-800 via-gray-900 to-black rounded-2xl shadow-2xl p-8 max-w-md w-full mx-4 border border-gray-700">
 
         {{-- Header --}}

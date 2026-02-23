@@ -951,6 +951,37 @@
                 @endphp
                 {{-- FIX 2025-11-25: Add frozen state when sync job is running for current shop --}}
                 {{-- FIX 2025-11-26: Added resize-y for expandable category tree --}}
+                {{-- BUG FIX 2026-02-20: Pre-compute selectedCategoryIds ONCE to avoid 4780x method calls (memory exhaustion) --}}
+                {{-- BUG FIX 2026-02-23: Compute expandedIds from PS tree directly (mappings don't contain parent IDs) --}}
+                @php
+                    $precomputedSelectedIds = $this->getPrestaShopCategoryIdsForContext($activeShopId);
+                    $precomputedPrimaryId = $this->getPrimaryPrestaShopCategoryIdForContext($activeShopId);
+
+                    // For shop context: traverse PS tree to find parents of selected categories
+                    // calculateExpandedCategoryIds() can't convert parent PPM→PS IDs (mappings only have assigned categories)
+                    if ($activeShopId !== null && !empty($precomputedSelectedIds)) {
+                        $treeExpandedIds = [];
+                        $findSelectedParents = function ($categories, $selectedIds, $parentChain = []) use (&$findSelectedParents, &$treeExpandedIds) {
+                            foreach ($categories as $cat) {
+                                if (in_array($cat->id, $selectedIds)) {
+                                    foreach ($parentChain as $parentId) {
+                                        $treeExpandedIds[] = $parentId;
+                                    }
+                                    if ($cat->children && $cat->children->count() > 0) {
+                                        $treeExpandedIds[] = $cat->id;
+                                    }
+                                }
+                                if ($cat->children && $cat->children->count() > 0) {
+                                    $findSelectedParents($cat->children, $selectedIds, array_merge($parentChain, [$cat->id]));
+                                }
+                            }
+                        };
+                        $findSelectedParents($availableCategories, $precomputedSelectedIds);
+                        $computedExpandedIds = array_values(array_unique($treeExpandedIds));
+                    } else {
+                        $computedExpandedIds = $this->expandedCategoryIds;
+                    }
+                @endphp
                 <div class="{{ $categoryContainerClasses }} min-h-40 max-h-96 overflow-y-auto resize-y"
                      wire:key="categories-ctx-{{ $activeShopId ?? 'default' }}"
                      :class="{ 'category-tree-frozen': $wire.activeShopId !== null && ($wire.activeJobStatus === 'pending' || $wire.activeJobStatus === 'processing') }">
@@ -959,7 +990,9 @@
                             'category' => $rootCategory,
                             'level' => 0,
                             'context' => $activeShopId ?? 'default',
-                            'expandedCategoryIds' => $this->expandedCategoryIds
+                            'expandedCategoryIds' => $computedExpandedIds,
+                            'selectedCategoryIds' => $precomputedSelectedIds,
+                            'primaryCategoryId' => $precomputedPrimaryId,
                         ])
                     @endforeach
                 </div>

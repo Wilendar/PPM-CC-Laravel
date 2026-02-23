@@ -39,6 +39,11 @@ class BulkPullProducts implements ShouldQueue
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     /**
+     * Last dispatched batch ID (used by dispatchSync caller to retrieve batch ID)
+     */
+    public static ?string $lastBatchId = null;
+
+    /**
      * Product to pull data for (SINGLE product)
      */
     public Product $product;
@@ -194,8 +199,11 @@ class BulkPullProducts implements ShouldQueue
                         'progress_percentage' => $batch->progress(),
                     ]);
                 })
-                ->onQueue('prestashop_sync')
+                ->onQueue('default')
                 ->dispatch();
+
+            // Store batch ID for dispatchSync caller access
+            self::$lastBatchId = $batch->id;
 
             Log::info('Bulk pull batch dispatched', [
                 'batch_id' => $batch->id,

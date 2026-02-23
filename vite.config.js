@@ -20,6 +20,7 @@ export default defineConfig({
                 'resources/css/admin/scan-products.css',
                 'resources/css/products/import-panel.css',
                 'resources/css/products/import-modals.css',
+                'resources/css/components/category-preview-modal.css',
                 'resources/css/visual-editor/editor.css',
                 'resources/css/visual-editor/preview.css',
                 'resources/js/app.js',

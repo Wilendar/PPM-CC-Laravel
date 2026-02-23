@@ -24,8 +24,8 @@
     --compat-zamiennik-bg: rgba(234, 88, 12, 0.15);
     --compat-both-start: #2563eb;
     --compat-both-end: #ea580c;
-    --compat-suggestion: #d97706;     /* Amber for suggestions */
-    --compat-suggestion-bg: rgba(217, 119, 6, 0.1);
+    --compat-suggestion: #8b5cf6;     /* Violet for AI suggestions (distinct from orange zamiennik) */
+    --compat-suggestion-bg: rgba(139, 92, 246, 0.1);
 }
 
 /* ==========================================================================
@@ -1747,4 +1747,280 @@
 .legend-item span:last-child {
     font-size: 13px;
     color: var(--color-text-secondary, #9ca3af);
+}
+
+/* ==========================================================================
+   Ghost Tiles - AI Smart Suggestions
+   Uses existing --compat-suggestion variables
+   ========================================================================== */
+
+/* Ghost Tile Base */
+.vehicle-tile--ghost {
+    border-style: dashed;
+    border-color: var(--compat-suggestion);
+    border-width: 2px;
+    background: var(--compat-suggestion-bg);
+    opacity: 0.85;
+    position: relative;
+    transition: all 0.2s ease;
+}
+
+.vehicle-tile--ghost:hover {
+    opacity: 1;
+    border-style: solid;
+    background: rgba(217, 119, 6, 0.15);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(217, 119, 6, 0.2);
+}
+
+/* AI Badge (top-left corner) */
+.vehicle-tile__ai-badge {
+    position: absolute;
+    top: -1px;
+    left: -1px;
+    padding: 2px 6px;
+    font-size: 9px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    background: var(--compat-suggestion);
+    color: #111827;
+    border-radius: 6px 0 6px 0;
+    z-index: 2;
+}
+
+/* Confidence percentage */
+.vehicle-tile__confidence {
+    font-size: 11px;
+    color: var(--compat-suggestion);
+    margin-top: 4px;
+    font-weight: 600;
+}
+
+/* Ghost Actions (visible on hover) */
+.vehicle-tile__ghost-actions {
+    position: absolute;
+    bottom: 4px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 4px;
+    opacity: 0;
+    transition: opacity 0.15s ease;
+    z-index: 3;
+}
+
+.vehicle-tile--ghost:hover .vehicle-tile__ghost-actions {
+    opacity: 1;
+}
+
+.ghost-action-btn {
+    padding: 3px 8px;
+    font-size: 10px;
+    font-weight: 600;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    white-space: nowrap;
+}
+
+.ghost-action-btn--accept {
+    background: #059669;
+    color: white;
+}
+
+.ghost-action-btn--accept:hover {
+    background: #047857;
+}
+
+.ghost-action-btn--dismiss {
+    background: rgba(239, 68, 68, 0.2);
+    color: #f87171;
+    border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.ghost-action-btn--dismiss:hover {
+    background: rgba(239, 68, 68, 0.3);
+}
+
+/* Dismissed Ghost Tile */
+.vehicle-tile--dismissed {
+    border-style: dotted;
+    border-color: var(--color-border-secondary, #374151);
+    background: rgba(107, 114, 128, 0.05);
+    opacity: 0.5;
+}
+
+.vehicle-tile--dismissed:hover {
+    opacity: 0.7;
+    border-color: var(--color-border-hover, #4b5563);
+    transform: none;
+    box-shadow: none;
+}
+
+.vehicle-tile--dismissed .vehicle-tile__ai-badge {
+    background: var(--color-text-muted, #6b7280);
+}
+
+.vehicle-tile--dismissed .vehicle-tile__confidence {
+    color: var(--color-text-muted, #6b7280);
+    text-decoration: line-through;
+}
+
+/* Ghost tile restore button (visible on dismissed hover) */
+.ghost-action-btn--restore {
+    background: rgba(217, 119, 6, 0.2);
+    color: var(--compat-suggestion);
+    border: 1px solid rgba(217, 119, 6, 0.3);
+}
+
+.ghost-action-btn--restore:hover {
+    background: rgba(217, 119, 6, 0.3);
+}
+
+/* Subtle pulse animation for ghost tiles */
+@keyframes ghost-pulse {
+    0%, 100% {
+        border-color: var(--compat-suggestion);
+    }
+    50% {
+        border-color: rgba(217, 119, 6, 0.4);
+    }
+}
+
+.vehicle-tile--ghost {
+    animation: ghost-pulse 3s ease-in-out infinite;
+}
+
+.vehicle-tile--ghost:hover {
+    animation: none;
+}
+
+/* ==========================================================================
+   AI Suggested Tile Highlight (inline among regular tiles)
+   Uses dashed border + amber/suggestion color to indicate AI recommendation
+   ========================================================================== */
+
+.vehicle-tile--ai-suggested {
+    border: 2px dashed var(--compat-suggestion) !important;
+    background: var(--compat-suggestion-bg) !important;
+    position: relative;
+    animation: ghost-pulse 3s ease-in-out infinite;
+}
+
+.vehicle-tile--ai-suggested:hover {
+    animation: none;
+    border-style: solid !important;
+    transform: translateY(-1px);
+}
+
+/* ==========================================================================
+   AI Hover Overlay - Split Accept/Dismiss
+   On hover, tile shows left (accept/green) and right (dismiss/red) halves
+   ========================================================================== */
+
+.ai-hover-overlay {
+    display: none;
+    position: absolute;
+    inset: 0;
+    z-index: 5;
+    border-radius: 6px;
+    overflow: hidden;
+}
+
+.vehicle-tile--ai-suggested:hover .ai-hover-overlay {
+    display: flex;
+}
+
+.ai-hover-overlay__accept {
+    flex: 1;
+    background: rgba(34, 197, 94, 0.3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: background 0.15s ease;
+    border-radius: 6px 0 0 6px;
+}
+
+.ai-hover-overlay__accept:hover {
+    background: rgba(34, 197, 94, 0.5);
+}
+
+.ai-hover-overlay__dismiss {
+    flex: 1;
+    background: rgba(239, 68, 68, 0.3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: background 0.15s ease;
+    border-radius: 0 6px 6px 0;
+}
+
+.ai-hover-overlay__dismiss:hover {
+    background: rgba(239, 68, 68, 0.5);
+}
+
+/* Ensure AI badge and confidence stay visible above overlay */
+.vehicle-tile--ai-suggested .vehicle-tile__ai-badge {
+    z-index: 6;
+}
+
+.vehicle-tile--ai-suggested .vehicle-tile__confidence {
+    z-index: 6;
+    position: relative;
+}
+
+/* Ghost Tiles Separator */
+.ghost-tiles-separator {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    margin: 8px 0;
+}
+
+.ghost-tiles-separator__line {
+    flex: 1;
+    height: 1px;
+    background: linear-gradient(to right, transparent, var(--compat-suggestion), transparent);
+}
+
+.ghost-tiles-separator__label {
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--compat-suggestion);
+    white-space: nowrap;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+/* Toggle dismissed suggestions */
+.ghost-tiles-toggle-dismissed {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    font-size: 11px;
+    color: var(--color-text-muted, #6b7280);
+    background: transparent;
+    border: 1px solid var(--color-border-secondary, #374151);
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.ghost-tiles-toggle-dismissed:hover {
+    background: var(--color-bg-tertiary, #374151);
+    color: var(--color-text-secondary, #9ca3af);
+}
+
+.ghost-tiles-toggle-dismissed--active {
+    border-color: var(--compat-suggestion);
+    color: var(--compat-suggestion);
 }

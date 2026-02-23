@@ -2423,20 +2423,8 @@ class ProductForm extends Component
             $mappingKey = (string) $ppmId;
             if (isset($mappings[$mappingKey])) {
                 $prestashopIds[] = (int) $mappings[$mappingKey];
-            } else {
-                Log::debug('[ETAP_07b] PPM category has no PrestaShop mapping', [
-                    'shop_id' => $contextShopId,
-                    'ppm_id' => $ppmId,
-                ]);
             }
         }
-
-        Log::debug('[ETAP_07b] Converted PPM IDs to PrestaShop IDs', [
-            'shop_id' => $contextShopId,
-            'ppm_ids' => $ppmIds,
-            'prestashop_ids' => $prestashopIds,
-            'mappings_used' => $mappings,
-        ]);
 
         return $prestashopIds;
     }
@@ -7777,17 +7765,16 @@ class ProductForm extends Component
                     'sync_direction' => \App\Models\ProductShopData::DIRECTION_PS_TO_PPM,
                 ]);
 
-            // Dispatch BulkPullProducts JOB (NEW from laravel-expert ETAP_13)
-            // Constructor: Product $product, Collection $shops, ?int $userId
-            $batch = BulkPullProducts::dispatch(
+            // BUG FIX: dispatchSync so orchestrator runs immediately (creates batch jobs right away)
+            // Previously dispatch() put orchestrator on queue → child jobs on wrong queue name → all stuck
+            BulkPullProducts::dispatchSync(
                 $this->product,
                 $shops,
                 auth()->id()
             );
 
-            // Capture job ID for monitoring
-            // NOTE: BulkPullProducts uses Laravel Bus::batch() - batch ID available
-            $this->activeJobId = $batch->id ?? null;
+            // Capture batch ID from static property (set during dispatchSync handle())
+            $this->activeJobId = BulkPullProducts::$lastBatchId;
             $this->activeJobType = 'pull';
             $this->jobCreatedAt = now()->toIso8601String();
             $this->activeJobStatus = 'pending';

@@ -58,6 +58,9 @@ class CompatibilityModal extends Component
     /** Processing flag */
     public bool $isProcessing = false;
 
+    /** Map of vehicle_id => score for AI suggested vehicles */
+    public array $suggestedVehicleScores = [];
+
     /*
     |--------------------------------------------------------------------------
     | BULK MODE STATE
@@ -143,6 +146,9 @@ class CompatibilityModal extends Component
         // Load existing compatibility data from JSON
         $existingData = $pendingProduct->compatibility_data ?? [];
         $this->loadFromCompatibilityData($existingData);
+
+        // Load AI suggestions if product exists in DB
+        $this->loadAiSuggestions();
 
         $this->showModal = true;
     }
@@ -269,7 +275,46 @@ class CompatibilityModal extends Component
     {
         $this->showModal = false;
         $this->reset(['pendingProductId', 'pendingProductData', 'editingProductId']);
+        $this->suggestedVehicleScores = [];
         $this->resetBulkMode();
+    }
+
+    /**
+     * Load AI suggestions for visual tile highlighting
+     * Only when a matching Product exists in DB by SKU
+     */
+    protected function loadAiSuggestions(): void
+    {
+        $this->suggestedVehicleScores = [];
+
+        if (!$this->pendingProductData) {
+            return;
+        }
+
+        $sku = $this->pendingProductData['sku'] ?? null;
+        if (!$sku) {
+            return;
+        }
+
+        $existingProduct = Product::where('sku', $sku)->first();
+        if (!$existingProduct) {
+            return;
+        }
+
+        try {
+            $engine = app(\App\Services\Compatibility\SmartSuggestionEngine::class);
+            $suggestions = $engine->generateForProductCentral($existingProduct);
+
+            foreach ($suggestions as $suggestion) {
+                $this->suggestedVehicleScores[$suggestion['vehicle_id']] = $suggestion['score'];
+            }
+        } catch (\Exception $e) {
+            Log::error('[CompatibilityModal] loadAiSuggestions failed', [
+                'sku' => $sku,
+                'error' => $e->getMessage(),
+            ]);
+            $this->suggestedVehicleScores = [];
+        }
     }
 
     /*

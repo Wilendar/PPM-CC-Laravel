@@ -9,7 +9,7 @@
     - Search and filter
     - Integration with ProductForm save flow
 --}}
-<div class="tab-content active space-y-6">
+<div class="tab-content active space-y-6" wire:init="loadGhostSuggestions">
     {{-- CSS loaded via admin.blade.php @vite - removed from here to fix Livewire DOM morphing issue --}}
 
     {{-- Header with counts --}}
@@ -131,6 +131,10 @@
             <span class="w-4 h-4 rounded border-2 mr-2 compat-legend-both"></span>
             <span>Oba typy</span>
         </div>
+        <div class="flex items-center">
+            <span class="w-4 h-4 rounded border-2 border-dashed border-amber-500 bg-amber-500/10 mr-2"></span>
+            <span>Sugestia AI</span>
+        </div>
     </div>
 
     {{-- Vehicle Tiles by Brand --}}
@@ -208,10 +212,12 @@
                                     $isOriginal = $this->isCompatibilityOriginal($vehicleId);
                                     $isZamiennik = $this->isCompatibilityZamiennik($vehicleId);
                                     $isBoth = $isOriginal && $isZamiennik;
+                                    $isAiSuggested = isset($suggestedVehicleScores[$vehicleId]);
+                                    $aiScore = $suggestedVehicleScores[$vehicleId] ?? null;
                                 @endphp
                                 <div wire:key="compat-tile-{{ $vehicleId }}"
                                      wire:click="toggleCompatibilityVehicle({{ $vehicleId }})"
-                                     class="vehicle-tile {{ $tileClass }}">
+                                     class="vehicle-tile {{ $tileClass }} {{ $isAiSuggested ? 'vehicle-tile--ai-suggested' : '' }}">
                                     <div class="vehicle-tile__content">
                                         <span class="vehicle-tile__brand">{{ $vehicle['manufacturer'] }}</span>
                                         <span class="vehicle-tile__model">{{ $vehicle['name'] }}</span>
@@ -232,6 +238,20 @@
                                     @elseif($isZamiennik)
                                         <div class="vehicle-tile__indicator vehicle-tile__indicator--zamiennik">
                                             <span>Z</span>
+                                        </div>
+                                    @endif
+
+                                    {{-- AI Suggestion Overlay --}}
+                                    @if($isAiSuggested)
+                                        <span class="vehicle-tile__ai-badge">AI</span>
+                                        <span class="vehicle-tile__confidence">{{ round($aiScore * 100) }}%</span>
+                                        <div class="ai-hover-overlay">
+                                            <div class="ai-hover-overlay__accept" wire:click.stop="toggleCompatibilityVehicle({{ $vehicleId }})">
+                                                <span class="text-white text-lg">&#10003;</span>
+                                            </div>
+                                            <div class="ai-hover-overlay__dismiss" wire:click.stop="dismissGhostSuggestion({{ $vehicleId }})">
+                                                <span class="text-white text-lg">&#10005;</span>
+                                            </div>
                                         </div>
                                     @endif
                                 </div>

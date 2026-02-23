@@ -1890,22 +1890,50 @@ class CategoryPreviewModal extends Component
             }
 
             $detector = app(\App\Services\Import\ProductTypeDetector::class);
+            $mapper = app(\App\Services\Import\CategoryTypeMapper::class);
+            $shopId = $preview->shop_id;
             $items = [];
 
             foreach ($products as $p) {
+                // Extract PS category IDs for CategoryTypeMapper
+                $psCategoryIds = [];
                 $categoryNames = [];
                 if (isset($p['categories']) && is_array($p['categories'])) {
                     foreach ($p['categories'] as $catId) {
                         if (is_array($catId)) {
+                            $psCategoryIds[] = (int) ($catId['id'] ?? 0);
                             $categoryNames[] = $catId['name'] ?? '';
                         } else {
+                            $psCategoryIds[] = (int) $catId;
                             $categoryNames[] = $categoryNameMap[(int) $catId] ?? '';
                         }
                     }
+                    $psCategoryIds = array_filter($psCategoryIds, fn($id) => $id > 2);
                     $categoryNames = array_filter($categoryNames);
                 }
 
-                $typeInfo = $detector->detectWithInfo($categoryNames);
+                // CASCADE: 1) CategoryTypeMapper (PS category ID mapping) → 2) ProductTypeDetector (keywords)
+                $typeInfo = null;
+                if (!empty($psCategoryIds) && $shopId) {
+                    $mapping = \App\Models\ShopCategoryTypeMapping::active()
+                        ->forShop($shopId)
+                        ->whereIn('category_id', $psCategoryIds)
+                        ->byPriority()
+                        ->first();
+
+                    if ($mapping && $mapping->productType) {
+                        $typeInfo = [
+                            'name' => $mapping->productType->name,
+                            'slug' => $mapping->productType->slug,
+                            'color' => $detector->getTypeColor($mapping->productType->slug),
+                        ];
+                    }
+                }
+
+                // Fallback to keyword detection
+                if (!$typeInfo) {
+                    $typeInfo = $detector->detectWithInfo($categoryNames);
+                }
 
                 $items[] = [
                     'sku' => $p['sku'] ?? $p['reference'] ?? '-',

@@ -86,6 +86,13 @@ class AnalyzeMissingCategories implements ShouldQueue
     protected array $originalImportOptions;
 
     /**
+     * Analyzed products basic info for ProductTypeDetector
+     *
+     * @var array
+     */
+    protected array $analyzedProducts = [];
+
+    /**
      * Number of tries for the job
      *
      * @var int
@@ -208,6 +215,9 @@ class AnalyzeMissingCategories implements ShouldQueue
                     'job_id' => $this->jobId,
                 ]);
 
+                // Enrich product data with category names (for ProductTypeDetector)
+                $this->enrichAnalyzedProductsWithCategoryNames([]);
+
                 // Create EMPTY preview with info message + import context
                 $preview = CategoryPreview::create([
                     'job_id' => $this->jobId,
@@ -219,7 +229,10 @@ class AnalyzeMissingCategories implements ShouldQueue
                         'message' => 'Wszystkie kategorie już istnieją w PPM. Możesz kontynuować import produktów.',
                     ],
                     'total_categories' => 0,
-                    'import_context_json' => $this->originalImportOptions,  // Store original import context
+                    'import_context_json' => array_merge($this->originalImportOptions, [
+                        'product_ids' => $this->productIds,
+                        'analyzed_products' => $this->analyzedProducts,
+                    ]),
                     'status' => CategoryPreview::STATUS_PENDING,
                 ]);
 
@@ -266,6 +279,9 @@ class AnalyzeMissingCategories implements ShouldQueue
             Log::info('Missing category details fetched', [
                 'fetched_count' => count($categories),
             ]);
+
+            // STEP 5a: Enrich product data with category names (for ProductTypeDetector)
+            $this->enrichAnalyzedProductsWithCategoryNames($categories);
 
             // STEP 6: Sort by level_depth (parents first - CRITICAL for hierarchy)
             usort($categories, function ($a, $b) {
@@ -405,24 +421,47 @@ class AnalyzeMissingCategories implements ShouldQueue
             $products = $response;
         }
 
-        // Extract category IDs from each product
+        // Extract category IDs from each product + store basic product info
+        $this->analyzedProducts = [];
+
         foreach ($products as $product) {
             // Unwrap 'product' key if nested
             $productData = $product['product'] ?? $product;
 
+            $productCategoryIds = [];
+
             // Add default category (PrestaShop API field is 'id_category_default' not 'id_default_category')
             if (isset($productData['id_category_default'])) {
-                $categoryIds[] = (int) $productData['id_category_default'];
+                $defaultCatId = (int) $productData['id_category_default'];
+                $categoryIds[] = $defaultCatId;
+                $productCategoryIds[] = $defaultCatId;
             }
 
             // Add associated categories
             if (isset($productData['associations']['categories'])) {
                 foreach ($productData['associations']['categories'] as $category) {
                     if (isset($category['id'])) {
-                        $categoryIds[] = (int) $category['id'];
+                        $catId = (int) $category['id'];
+                        $categoryIds[] = $catId;
+                        $productCategoryIds[] = $catId;
                     }
                 }
             }
+
+            // Extract product name (multilang or string)
+            $name = $productData['name'] ?? '';
+            if (is_array($name)) {
+                $firstLang = reset($name);
+                $name = is_array($firstLang) ? ($firstLang['value'] ?? '') : (string) $firstLang;
+            }
+
+            // Store basic product info for ProductTypeDetector
+            $this->analyzedProducts[] = [
+                'ps_id' => (int) ($productData['id'] ?? 0),
+                'reference' => $productData['reference'] ?? '',
+                'name' => $name,
+                'categories' => array_unique($productCategoryIds),
+            ];
         }
 
         // Remove duplicates and return
@@ -558,21 +597,22 @@ class AnalyzeMissingCategories implements ShouldQueue
         }
 
         // Build tree by attaching children to parents
-        $tree = [];
+        $childOfKnownParent = []; // Track categories attached to a parent in $nodes
         foreach ($nodes as $id => $node) {
             $parentId = $node['id_parent'];
 
             // Root categories (parent_id <= 2 in PrestaShop)
             if ($parentId <= 2) {
-                // Will be added to tree at the end
                 continue;
             }
 
-            // Attach to parent if exists
+            // Attach to parent if parent is also in the missing list
             if (isset($nodes[$parentId])) {
-                // Add reference to parent's children
                 $nodes[$parentId]['children'][] = $id;
+                $childOfKnownParent[$id] = true;
             }
+            // If parent NOT in missing list (exists in PPM), this category
+            // will be treated as a root in our tree (handled below)
         }
 
         // Recursive function to build nested structure
@@ -588,10 +628,19 @@ class AnalyzeMissingCategories implements ShouldQueue
             return $node;
         };
 
-        // Build tree from root nodes
+        // Build tree: root nodes (id_parent <= 2) + orphaned nodes (parent exists in PPM, not in missing list)
+        $tree = [];
         foreach ($nodes as $id => $node) {
-            if ($node['id_parent'] <= 2) {
-                $tree[] = $buildNode($id);
+            $isPrestaShopRoot = $node['id_parent'] <= 2;
+            $isOrphaned = !isset($childOfKnownParent[$id]) && !$isPrestaShopRoot;
+
+            if ($isPrestaShopRoot || $isOrphaned) {
+                $built = $buildNode($id);
+                // Store parent_name for orphaned nodes so mergeMissingIntoTree can place them
+                if ($isOrphaned) {
+                    $built['parent_ps_id'] = $node['id_parent'];
+                }
+                $tree[] = $built;
             }
         }
 
@@ -621,8 +670,67 @@ class AnalyzeMissingCategories implements ShouldQueue
                 'max_depth' => $maxDepth,
             ],
             'total_categories' => $totalCount,
-            'import_context_json' => $this->originalImportOptions,  // Store original import context
+            'import_context_json' => array_merge($this->originalImportOptions, [
+                'product_ids' => $this->productIds,
+                'analyzed_products' => $this->analyzedProducts,
+            ]),
             'status' => CategoryPreview::STATUS_PENDING,
+        ]);
+    }
+
+    /**
+     * Enrich analyzedProducts categories with names (for ProductTypeDetector)
+     *
+     * Converts categories from int[] (PS IDs) to [{id, name}][]
+     * so ProductTypeDetector gets actual category names instead of empty strings
+     *
+     * @param array $missingCategories Fetched missing category details
+     */
+    protected function enrichAnalyzedProductsWithCategoryNames(array $missingCategories): void
+    {
+        // 1. Build PS ID → name map for MISSING categories (from fetchCategoryDetails result)
+        $missingMap = [];
+        foreach ($missingCategories as $cat) {
+            $missingMap[$cat['prestashop_id']] = $cat['name'];
+        }
+
+        // 2. Collect ALL PS category IDs from products
+        $allPsIds = [];
+        foreach ($this->analyzedProducts as $p) {
+            foreach ($p['categories'] as $catId) {
+                $allPsIds[] = is_int($catId) ? $catId : (int) $catId;
+            }
+        }
+        $allPsIds = array_unique($allPsIds);
+
+        // 3. Build PS ID → name map for EXISTING categories via ShopMapping
+        $existingMap = [];
+        if (!empty($allPsIds)) {
+            $existingMap = ShopMapping::where('shop_id', $this->shop->id)
+                ->where('mapping_type', ShopMapping::TYPE_CATEGORY)
+                ->whereIn('prestashop_id', $allPsIds)
+                ->join('categories', 'shop_mappings.ppm_value', '=', 'categories.id')
+                ->pluck('categories.name', 'shop_mappings.prestashop_id')
+                ->toArray();
+        }
+
+        // 4. Merge maps (missing names take precedence - they're PS names, more accurate)
+        $nameMap = array_replace($existingMap, $missingMap);
+
+        // 5. Convert analyzedProducts categories from int[] to [{id, name}][]
+        foreach ($this->analyzedProducts as &$product) {
+            $enriched = [];
+            foreach ($product['categories'] as $catId) {
+                $id = is_int($catId) ? $catId : (int) $catId;
+                $enriched[] = ['id' => $id, 'name' => $nameMap[$id] ?? ''];
+            }
+            $product['categories'] = $enriched;
+        }
+
+        Log::debug('AnalyzeMissingCategories: Products enriched with category names', [
+            'products_count' => count($this->analyzedProducts),
+            'missing_names' => count($missingMap),
+            'existing_names' => count($existingMap),
         ]);
     }
 
