@@ -29,37 +29,23 @@ use Illuminate\Support\Facades\Log;
 class SmartSuggestionEngine
 {
     /**
-     * Scoring weights
+     * Legacy scoring weight constants - kept as reference for default values.
+     * Actual values are read from AiScoringConfig (SystemSetting DB).
+     *
+     * @see AiScoringConfig::DEFAULTS
      */
-    protected const WEIGHT_KEYWORD_RULE = 0.20;
-    protected const WEIGHT_MODEL_DETECTION_ALIAS_EXACT = 0.40;
-    protected const WEIGHT_MODEL_DETECTION_TOKEN = 0.30;
-    protected const WEIGHT_MODEL_DETECTION_ALIAS_SKU = 0.25;
-    protected const WEIGHT_BRAND_EXACT = 0.50;
-    protected const WEIGHT_BRAND_NAME = 0.30;
-    protected const WEIGHT_DESCRIPTION_MATCH = 0.10;
-    protected const WEIGHT_CATEGORY_MATCH = 0.10;
-
-    /**
-     * Minimum confidence threshold for suggestions
-     * Raised from 0.30 to 0.40 to prevent brand-only matches from passing
-     */
-    protected const MIN_CONFIDENCE_THRESHOLD = 0.40;
-
-    /**
-     * Auto-apply threshold (>=0.90 = very high confidence)
-     */
-    protected const AUTO_APPLY_THRESHOLD = 0.90;
-
-    /**
-     * Maximum suggestions per product per shop
-     */
-    protected const MAX_SUGGESTIONS_PER_PRODUCT = 50;
+    // protected const WEIGHT_KEYWORD_RULE = 0.20;
+    // protected const WEIGHT_DESCRIPTION_MATCH = 0.10;
+    // protected const WEIGHT_CATEGORY_MATCH = 0.10;
+    // protected const MIN_CONFIDENCE_THRESHOLD = 0.40;
+    // protected const AUTO_APPLY_THRESHOLD = 0.90;
+    // protected const MAX_SUGGESTIONS_PER_PRODUCT = 50;
 
     public function __construct(
         protected KeywordRuleMatcher $keywordMatcher,
         protected VehicleModelDetector $modelDetector,
         protected BrandDetector $brandDetector,
+        protected AiScoringConfig $config,
     ) {}
 
     /**
@@ -103,7 +89,7 @@ class SmartSuggestionEngine
         foreach ($vehicles as $vehicle) {
             $result = $this->calculateScore($product, $vehicle);
 
-            if ($result['score'] < max($minConfidence, self::MIN_CONFIDENCE_THRESHOLD)) {
+            if ($result['score'] < max($minConfidence, $this->config->get('min_confidence_threshold'))) {
                 continue;
             }
 
@@ -115,7 +101,7 @@ class SmartSuggestionEngine
                 $result['reason']
             ));
 
-            if ($suggestions->count() >= self::MAX_SUGGESTIONS_PER_PRODUCT) {
+            if ($suggestions->count() >= $this->config->get('max_suggestions_per_product')) {
                 break;
             }
         }
@@ -157,7 +143,7 @@ class SmartSuggestionEngine
         foreach ($vehicles as $vehicle) {
             $result = $this->calculateScore($product, $vehicle);
 
-            if ($result['score'] < self::MIN_CONFIDENCE_THRESHOLD) {
+            if ($result['score'] < $this->config->get('min_confidence_threshold')) {
                 continue;
             }
 
@@ -285,14 +271,14 @@ class SmartSuggestionEngine
 
         // Layer 4: Description match
         if ($this->matchesDescription($product, $vehicle)) {
-            $score += self::WEIGHT_DESCRIPTION_MATCH;
+            $score += $this->config->get('weight_description_match');
             $reasons[] = CompatibilitySuggestion::REASON_DESCRIPTION_MATCH;
             $breakdown['description'] = true;
         }
 
         // Layer 5: Category match
         if ($this->matchesCategory($product, $vehicle)) {
-            $score += self::WEIGHT_CATEGORY_MATCH;
+            $score += $this->config->get('weight_category_match');
             $reasons[] = CompatibilitySuggestion::REASON_CATEGORY_MATCH;
             $breakdown['category'] = true;
         }

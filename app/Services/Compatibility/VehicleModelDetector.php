@@ -11,14 +11,23 @@ use Illuminate\Support\Collection;
 class VehicleModelDetector
 {
     protected const ALIAS_CACHE_TTL = 3600;
-    protected const MIN_TOKEN_LENGTH = 3;
-    protected const MIN_TOKEN_MATCHES = 2;
+
+    /**
+     * Legacy constants - kept as reference. Actual values from AiScoringConfig.
+     * @see AiScoringConfig::DEFAULTS
+     */
+    // protected const MIN_TOKEN_LENGTH = 3;
+    // protected const MIN_TOKEN_MATCHES = 2;
 
     protected const STOP_WORDS = [
         'quad', 'buggy', 'motocykl', 'cross', 'enduro', 'pit', 'bike', 'dirt',
         'dla', 'do', 'na', 'ze', 'the', 'and', 'with', 'for',
         'nowy', 'nowa', 'nowe', 'mini', 'maxi',
     ];
+
+    public function __construct(
+        protected AiScoringConfig $config,
+    ) {}
 
     public function detect(Product $product, Product $vehicle): ModelDetectionResult
     {
@@ -45,11 +54,21 @@ class VehicleModelDetector
             $normalized = $alias->alias_normalized;
 
             if (!empty($productName) && str_contains($productName, $normalized)) {
-                return new ModelDetectionResult(true, 0.40, 'alias_exact', $alias->alias);
+                return new ModelDetectionResult(
+                    true,
+                    $this->config->get('weight_model_alias_exact'),
+                    'alias_exact',
+                    $alias->alias
+                );
             }
 
             if (!empty($productSku) && str_contains($productSku, $normalized)) {
-                return new ModelDetectionResult(true, 0.25, 'alias_sku', $alias->alias);
+                return new ModelDetectionResult(
+                    true,
+                    $this->config->get('weight_model_alias_sku'),
+                    'alias_sku',
+                    $alias->alias
+                );
             }
         }
 
@@ -78,14 +97,28 @@ class VehicleModelDetector
             }
         }
 
-        if ($matches >= self::MIN_TOKEN_MATCHES) {
-            return new ModelDetectionResult(true, 0.30, 'token_match', null, $matches);
+        $minTknMatches = $this->config->get('min_tkn_matches');
+
+        if ($matches >= $minTknMatches) {
+            return new ModelDetectionResult(
+                true,
+                $this->config->get('weight_model_tkn_match'),
+                'token_match',
+                null,
+                $matches
+            );
         }
 
         $vehicleNgrams = $this->generateNgrams($vehicleTokens, 2);
         foreach ($vehicleNgrams as $ngram) {
             if (str_contains($productName, $ngram)) {
-                return new ModelDetectionResult(true, 0.35, 'token_match', $ngram, 2);
+                return new ModelDetectionResult(
+                    true,
+                    $this->config->get('weight_model_tkn_ngram'),
+                    'token_match',
+                    $ngram,
+                    2
+                );
             }
         }
 
@@ -95,9 +128,10 @@ class VehicleModelDetector
     protected function tokenize(string $text): array
     {
         $tokens = preg_split('/[\s\-_\/\.]+/', $text, -1, PREG_SPLIT_NO_EMPTY);
+        $minLength = $this->config->get('min_tkn_length');
 
-        return array_values(array_filter($tokens, function ($token) {
-            return mb_strlen($token) >= self::MIN_TOKEN_LENGTH
+        return array_values(array_filter($tokens, function ($token) use ($minLength) {
+            return mb_strlen($token) >= $minLength
                 && !in_array($token, self::STOP_WORDS, true);
         }));
     }
