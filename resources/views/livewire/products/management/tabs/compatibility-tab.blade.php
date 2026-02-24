@@ -132,7 +132,7 @@
             <span>Oba typy</span>
         </div>
         <div class="flex items-center">
-            <span class="w-4 h-4 rounded border-2 border-dashed border-amber-500 bg-amber-500/10 mr-2"></span>
+            <span class="w-4 h-4 rounded border-2 border-dashed mr-2 compat-legend-suggestion"></span>
             <span>Sugestia AI</span>
         </div>
     </div>
@@ -212,8 +212,9 @@
                                     $isOriginal = $this->isCompatibilityOriginal($vehicleId);
                                     $isZamiennik = $this->isCompatibilityZamiennik($vehicleId);
                                     $isBoth = $isOriginal && $isZamiennik;
-                                    $isAiSuggested = isset($suggestedVehicleScores[$vehicleId]);
-                                    $aiScore = $suggestedVehicleScores[$vehicleId] ?? null;
+                                    // AI suggestion only when NOT already approved by user
+                                    $isAiSuggested = isset($suggestedVehicleScores[$vehicleId]) && !$isOriginal && !$isZamiennik;
+                                    $aiScore = $isAiSuggested ? ($suggestedVehicleScores[$vehicleId] ?? null) : null;
                                 @endphp
                                 <div wire:key="compat-tile-{{ $vehicleId }}"
                                      wire:click="toggleCompatibilityVehicle({{ $vehicleId }})"

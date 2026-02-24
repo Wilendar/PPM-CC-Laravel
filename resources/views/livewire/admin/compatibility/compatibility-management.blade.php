@@ -321,8 +321,9 @@
                                 <div class="vehicle-tiles-grid">
                                     @foreach($brandVehicles as $vehicle)
                                         @php
-                                            $isAiSuggested = isset($suggestedVehicleScores[$vehicle->id]);
-                                            $aiScore = $suggestedVehicleScores[$vehicle->id] ?? null;
+                                            $isApproved = $this->isOriginal($vehicle->id) || $this->isZamiennik($vehicle->id);
+                                            $isAiSuggested = isset($suggestedVehicleScores[$vehicle->id]) && !$isApproved;
+                                            $aiScore = $isAiSuggested ? ($suggestedVehicleScores[$vehicle->id] ?? null) : null;
                                         @endphp
                                         <div
                                             wire:key="tile-{{ $vehicle->id }}"
@@ -486,6 +487,10 @@
                         <div class="legend-item">
                             <span class="legend-color legend-color--both"></span>
                             <span>Oba - czesc jest zarowno oryginalem jak i zamiennikiem</span>
+                        </div>
+                        <div class="legend-item">
+                            <span class="legend-color legend-color--suggestion"></span>
+                            <span>Sugestia AI - propozycja systemu</span>
                         </div>
                     </div>
                 </div>

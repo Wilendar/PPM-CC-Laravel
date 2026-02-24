@@ -124,6 +124,9 @@
                                 Typ produktu
                             </th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                                Podglad
+                            </th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
                                 Slug
                             </th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
@@ -161,6 +164,9 @@
                                             @endif
                                         </div>
                                     </div>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <x-product-type-badge :type="$type" />
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap">
                                     <span class="text-sm text-gray-400 font-mono">{{ $type->slug }}</span>
@@ -212,7 +218,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="7" class="px-6 py-12 text-center">
+                                <td colspan="8" class="px-6 py-12 text-center">
                                     <div class="text-gray-400">
                                         <svg class="mx-auto h-12 w-12 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"/>
@@ -344,6 +350,29 @@
                             </div>
                         </div>
                         @error('icon') <span class="text-red-400 text-xs">{{ $message }}</span> @enderror
+                    </div>
+
+                    {{-- Label Color --}}
+                    <div>
+                        <label class="block text-sm font-medium text-gray-300 mb-1">Kolor etykiety</label>
+                        <div class="flex items-center space-x-3">
+                            <input wire:model.live="label_color" type="color"
+                                   class="h-10 w-14 rounded cursor-pointer border border-gray-600 bg-gray-800">
+                            <input wire:model.live="label_color" type="text" placeholder="#6b7280"
+                                   class="flex-1 px-3 py-2 border border-gray-600 rounded-md bg-gray-800 text-white font-mono text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent">
+                        </div>
+                        <div class="flex items-center space-x-2 mt-2">
+                            @foreach(['#3b82f6', '#f59e0b', '#10b981', '#a855f7', '#06b6d4', '#ef4444', '#6b7280', '#f97316'] as $presetColor)
+                                <button type="button" wire:click="$set('label_color', '{{ $presetColor }}')"
+                                        class="w-6 h-6 rounded-full border-2 transition-all {{ $label_color === $presetColor ? 'border-white scale-110' : 'border-gray-600 hover:border-gray-400' }}"
+                                        style="background-color: {{ $presetColor }}" title="{{ $presetColor }}"></button>
+                            @endforeach
+                        </div>
+                        <div class="mt-2">
+                            <span class="text-xs text-gray-500 mr-2">Podglad:</span>
+                            <x-product-type-badge :name="$name ?: 'Nazwa typu'" :color="$label_color" />
+                        </div>
+                        @error('label_color') <span class="text-red-400 text-xs">{{ $message }}</span> @enderror
                     </div>
 
                     {{-- Active Status --}}
@@ -482,6 +511,29 @@
                             </div>
                         </div>
                         @error('icon') <span class="text-red-400 text-xs">{{ $message }}</span> @enderror
+                    </div>
+
+                    {{-- Label Color --}}
+                    <div>
+                        <label class="block text-sm font-medium text-gray-300 mb-1">Kolor etykiety</label>
+                        <div class="flex items-center space-x-3">
+                            <input wire:model.live="label_color" type="color"
+                                   class="h-10 w-14 rounded cursor-pointer border border-gray-600 bg-gray-800">
+                            <input wire:model.live="label_color" type="text" placeholder="#6b7280"
+                                   class="flex-1 px-3 py-2 border border-gray-600 rounded-md bg-gray-800 text-white font-mono text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent">
+                        </div>
+                        <div class="flex items-center space-x-2 mt-2">
+                            @foreach(['#3b82f6', '#f59e0b', '#10b981', '#a855f7', '#06b6d4', '#ef4444', '#6b7280', '#f97316'] as $presetColor)
+                                <button type="button" wire:click="$set('label_color', '{{ $presetColor }}')"
+                                        class="w-6 h-6 rounded-full border-2 transition-all {{ $label_color === $presetColor ? 'border-white scale-110' : 'border-gray-600 hover:border-gray-400' }}"
+                                        style="background-color: {{ $presetColor }}" title="{{ $presetColor }}"></button>
+                            @endforeach
+                        </div>
+                        <div class="mt-2">
+                            <span class="text-xs text-gray-500 mr-2">Podglad:</span>
+                            <x-product-type-badge :name="$name ?: 'Nazwa typu'" :color="$label_color" />
+                        </div>
+                        @error('label_color') <span class="text-red-400 text-xs">{{ $message }}</span> @enderror
                     </div>
 
                     {{-- Sort Order --}}

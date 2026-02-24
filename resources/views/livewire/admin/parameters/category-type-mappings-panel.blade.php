@@ -81,9 +81,7 @@
 
                                     {{-- Product Type Badge --}}
                                     <td class="px-6 py-4">
-                                        <span class="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium {{ $this->getProductTypeBadgeClass($mapping['product_type_slug']) }}">
-                                            {{ $mapping['product_type_name'] }}
-                                        </span>
+                                        <x-product-type-badge :name="$mapping['product_type_name']" :color="$mapping['product_type_color']" size="md" />
                                     </td>
 
                                     {{-- Include Children --}}

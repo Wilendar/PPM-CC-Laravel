@@ -42,6 +42,7 @@ class ProductTypeManager extends Component
     public string $slug = '';
     public string $description = '';
     public string $icon = '';
+    public string $label_color = '#6b7280';
     public bool $is_active = true;
     public int $sort_order = 0;
 
@@ -76,6 +77,7 @@ class ProductTypeManager extends Component
             ],
             'description' => 'nullable|string|max:500',
             'icon' => 'nullable|string|max:100',
+            'label_color' => 'required|string|regex:/^#[0-9a-fA-F]{6}$/',
             'is_active' => 'boolean',
             'sort_order' => 'integer|min:0',
         ];
@@ -89,6 +91,7 @@ class ProductTypeManager extends Component
             'slug.required' => 'Slug jest wymagany.',
             'slug.unique' => 'Typ o tym slug już istnieje.',
             'slug.regex' => 'Slug może zawierać tylko małe litery, cyfry i myślniki.',
+            'label_color.regex' => 'Kolor musi byc w formacie HEX (np. #3b82f6).',
         ];
     }
 
@@ -187,6 +190,7 @@ class ProductTypeManager extends Component
                 'slug' => $this->slug,
                 'description' => $this->description ?: null,
                 'icon' => $this->icon ?: null,
+                'label_color' => $this->label_color,
                 'is_active' => $this->is_active,
                 'sort_order' => $this->sort_order,
             ]);
@@ -234,6 +238,7 @@ class ProductTypeManager extends Component
                 'slug' => $this->slug,
                 'description' => $this->description ?: null,
                 'icon' => $this->icon ?: null,
+                'label_color' => $this->label_color,
                 'is_active' => $this->is_active,
                 'sort_order' => $this->sort_order,
             ]);
@@ -432,6 +437,7 @@ class ProductTypeManager extends Component
         $this->slug = $this->selectedType->slug;
         $this->description = $this->selectedType->description ?? '';
         $this->icon = $this->selectedType->icon ?? '';
+        $this->label_color = $this->selectedType->label_color ?? '#6b7280';
         $this->is_active = $this->selectedType->is_active;
         $this->sort_order = $this->selectedType->sort_order;
     }
@@ -446,6 +452,7 @@ class ProductTypeManager extends Component
         $this->slug = '';
         $this->description = '';
         $this->icon = '';
+        $this->label_color = '#6b7280';
         $this->is_active = true;
         $this->sort_order = (ProductType::max('sort_order') ?? 0) + 10;
         $this->resetErrorBag();

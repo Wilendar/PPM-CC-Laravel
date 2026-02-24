@@ -24,8 +24,8 @@
     --compat-zamiennik-bg: rgba(234, 88, 12, 0.15);
     --compat-both-start: #2563eb;
     --compat-both-end: #ea580c;
-    --compat-suggestion: #8b5cf6;     /* Violet for AI suggestions (distinct from orange zamiennik) */
-    --compat-suggestion-bg: rgba(139, 92, 246, 0.1);
+    --compat-suggestion: #f59e0b;     /* Amber for AI suggestions (distinct from blue original & orange zamiennik) */
+    --compat-suggestion-bg: rgba(245, 158, 11, 0.1);
 }
 
 /* ==========================================================================
@@ -1723,6 +1723,17 @@
 
 .legend-color--both {
     background: linear-gradient(135deg, var(--compat-original), var(--compat-zamiennik));
+}
+
+/* Compatibility legend - AI suggestion indicator */
+.compat-legend-suggestion {
+    border-color: var(--compat-suggestion);
+    background: var(--compat-suggestion-bg);
+}
+
+.legend-color--suggestion {
+    background: var(--compat-suggestion);
+    border: 2px dashed var(--compat-suggestion);
 }
 
 /* Compatibility legend - both types indicator (used in compatibility-tab.blade.php) */

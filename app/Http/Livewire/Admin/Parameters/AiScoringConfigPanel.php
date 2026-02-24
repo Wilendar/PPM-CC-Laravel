@@ -28,6 +28,9 @@ class AiScoringConfigPanel extends Component
     /** @var bool Flaga: czy sa niezapisane zmiany */
     public bool $hasChanges = false;
 
+    /** @var array Dynamiczna lista typow pojazdow */
+    public array $vehicleTypes = [];
+
     public function mount(): void
     {
         $this->loadConfig();
@@ -42,6 +45,7 @@ class AiScoringConfigPanel extends Component
         $this->values = $config->all();
         $this->defaults = $config->getDefaults();
         $this->fieldDefinitions = $config->getFieldDefinitions();
+        $this->vehicleTypes = $config->getVehicleTypes();
     }
 
     /**
@@ -61,16 +65,18 @@ class AiScoringConfigPanel extends Component
         $config = app(AiScoringConfig::class);
 
         foreach ($this->values as $configKey => $value) {
-            // Rzutuj na odpowiedni typ (float/int) na podstawie defaultu
             $default = $this->defaults[$configKey] ?? 0;
             $typedValue = is_float($default) ? (float) $value : (int) $value;
-
             $config->set($configKey, $typedValue);
         }
+
+        // Save vehicle types
+        $config->setVehicleTypes($this->vehicleTypes);
 
         $this->hasChanges = false;
         Log::info('AI Scoring config saved', [
             'changed_keys' => $this->getChangedKeys(),
+            'vehicle_types_count' => count($this->vehicleTypes),
         ]);
 
         session()->flash('ai-config-success', 'Konfiguracja AI zapisana.');
@@ -83,13 +89,105 @@ class AiScoringConfigPanel extends Component
     {
         $config = app(AiScoringConfig::class);
         $config->resetToDefaults();
+        $config->resetVehicleTypesToDefaults();
 
         $this->values = $config->getDefaults();
+        $this->vehicleTypes = $config->getDefaultVehicleTypes();
         $this->hasChanges = false;
 
         Log::info('AI Scoring config reset to defaults');
 
         session()->flash('ai-config-success', 'Przywrocono domyslne wartosci.');
+    }
+
+    /**
+     * Dodaj nowy typ pojazdu.
+     */
+    public function addVehicleType(string $key, string $label, string $prefix, string $keywordsRaw): void
+    {
+        $key = trim($key);
+        $label = trim($label);
+        $prefix = mb_strtolower(trim($prefix));
+        $keywordsRaw = trim($keywordsRaw);
+
+        if (empty($key) || empty($label) || empty($prefix) || empty($keywordsRaw)) {
+            session()->flash('ai-config-error', 'Wypelnij wszystkie pola nowego typu.');
+            return;
+        }
+
+        foreach ($this->vehicleTypes as $type) {
+            if ($type['key'] === $key) {
+                session()->flash('ai-config-error', "Typ o kluczu '{$key}' juz istnieje.");
+                return;
+            }
+        }
+
+        $keywords = array_map('trim', explode(',', $keywordsRaw));
+        $keywords = array_values(array_filter($keywords, fn($k) => !empty($k)));
+        $keywords = array_map('mb_strtolower', $keywords);
+
+        $this->vehicleTypes[] = [
+            'key' => $key,
+            'label' => $label,
+            'prefix' => $prefix,
+            'keywords' => $keywords,
+        ];
+
+        $this->hasChanges = true;
+        session()->flash('ai-config-success', "Typ '{$label}' dodany. Kliknij 'Zapisz konfiguracje' aby zachowac zmiany.");
+    }
+
+    /**
+     * Usun typ pojazdu po kluczu.
+     */
+    public function removeVehicleType(string $typeKey): void
+    {
+        $this->vehicleTypes = array_values(array_filter(
+            $this->vehicleTypes,
+            fn($t) => $t['key'] !== $typeKey
+        ));
+        $this->hasChanges = true;
+        session()->flash('ai-config-success', "Typ usuniety. Kliknij 'Zapisz konfiguracje' aby zachowac zmiany.");
+    }
+
+    /**
+     * Dodaj slowo kluczowe do istniejacego typu.
+     */
+    public function addKeywordToType(string $typeKey, string $keyword): void
+    {
+        $keyword = mb_strtolower(trim($keyword));
+        if (empty($keyword)) {
+            return;
+        }
+
+        foreach ($this->vehicleTypes as &$type) {
+            if ($type['key'] === $typeKey) {
+                if (!in_array($keyword, $type['keywords'])) {
+                    $type['keywords'][] = $keyword;
+                    $this->hasChanges = true;
+                }
+                break;
+            }
+        }
+        unset($type);
+    }
+
+    /**
+     * Usun slowo kluczowe z typu.
+     */
+    public function removeKeywordFromType(string $typeKey, string $keyword): void
+    {
+        foreach ($this->vehicleTypes as &$type) {
+            if ($type['key'] === $typeKey) {
+                $type['keywords'] = array_values(array_filter(
+                    $type['keywords'],
+                    fn($k) => $k !== $keyword
+                ));
+                $this->hasChanges = true;
+                break;
+            }
+        }
+        unset($type);
     }
 
     /**
@@ -115,10 +213,10 @@ class AiScoringConfigPanel extends Component
         $config = app(AiScoringConfig::class);
         $saved = $config->all();
 
+        // Check scoring weight changes
         foreach ($this->values as $configKey => $value) {
             $savedValue = $saved[$configKey] ?? null;
 
-            // Porownuj jako float/int
             $default = $this->defaults[$configKey] ?? 0;
             if (is_float($default)) {
                 if (abs((float) $value - (float) $savedValue) > 0.001) {
@@ -131,6 +229,12 @@ class AiScoringConfigPanel extends Component
                     return;
                 }
             }
+        }
+
+        // Check vehicle type changes
+        $savedTypes = $config->getVehicleTypes();
+        if (json_encode($this->vehicleTypes) !== json_encode($savedTypes)) {
+            $this->hasChanges = true;
         }
     }
 

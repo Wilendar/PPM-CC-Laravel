@@ -253,6 +253,15 @@ trait ProductFormCompatibility
             $this->toggleCompatibilityZamiennik($vehicleId);
         }
 
+        // Clear AI suggestion state when user accepts a suggestion
+        if (isset($this->suggestedVehicleScores[$vehicleId])) {
+            unset($this->suggestedVehicleScores[$vehicleId]);
+            $this->ghostSuggestions = array_values(array_filter(
+                $this->ghostSuggestions,
+                fn($s) => $s['vehicle_id'] !== $vehicleId
+            ));
+        }
+
         $this->trackCompatibilityChange($vehicleId);
     }
 

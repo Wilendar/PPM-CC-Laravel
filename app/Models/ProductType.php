@@ -19,6 +19,7 @@ use Illuminate\Database\Eloquent\Builder;
  * @property string $slug Slug URL-friendly (np. "czesci-zamienne")
  * @property string|null $description Opis typu produktu
  * @property string|null $icon Ikona typu (CSS class lub SVG)
+ * @property string $label_color HEX kolor etykiety typu (np. "#3b82f6")
  * @property array|null $default_attributes Domyślne atrybuty dla typu
  * @property bool $is_active Status aktywności typu
  * @property int $sort_order Kolejność wyświetlania
@@ -26,6 +27,7 @@ use Illuminate\Database\Eloquent\Builder;
  * @property \Carbon\Carbon $updated_at
  * @property \Carbon\Carbon|null $deleted_at
  *
+ * @property-read string $label_badge_style Inline CSS dla badge typu produktu
  * @property-read \Illuminate\Database\Eloquent\Collection|\App\Models\Product[] $products
  * @property-read int $products_count
  *
@@ -41,6 +43,28 @@ class ProductType extends Model
     use HasFactory, SoftDeletes;
 
     /**
+     * Default label color when no specific color is assigned.
+     */
+    public const DEFAULT_LABEL_COLOR = '#6b7280';
+
+    /**
+     * Default label colors mapped by product type slug.
+     *
+     * @var array<string, string>
+     */
+    public const DEFAULT_LABEL_COLORS = [
+        'pojazdy' => '#3b82f6',
+        'pojazd' => '#3b82f6',
+        'czesci-zamienne' => '#f59e0b',
+        'czesc-zamienna' => '#f59e0b',
+        'akcesoria' => '#10b981',
+        'odziez' => '#a855f7',
+        'oleje-i-chemia' => '#06b6d4',
+        'outlet' => '#ef4444',
+        'inne' => '#6b7280',
+    ];
+
+    /**
      * The attributes that are mass assignable.
      *
      * @var array<string>
@@ -50,6 +74,7 @@ class ProductType extends Model
         'slug',
         'description',
         'icon',
+        'label_color',
         'default_attributes',
         'is_active',
         'sort_order',
@@ -127,6 +152,27 @@ class ProductType extends Model
         }
     }
 
+    /**
+     * Get label color with fallback to defaults by slug
+     */
+    public function getLabelColorAttribute($value): string
+    {
+        return $value ?? (self::DEFAULT_LABEL_COLORS[$this->slug] ?? self::DEFAULT_LABEL_COLOR);
+    }
+
+    /**
+     * Get inline CSS style for label badge rendering
+     */
+    public function getLabelBadgeStyleAttribute(): string
+    {
+        $hex = $this->label_color;
+        $r = hexdec(substr($hex, 1, 2));
+        $g = hexdec(substr($hex, 3, 2));
+        $b = hexdec(substr($hex, 5, 2));
+
+        return "background-color: rgba({$r},{$g},{$b},0.15); color: {$hex}; border: 1px solid rgba({$r},{$g},{$b},0.3);";
+    }
+
     /*
     |--------------------------------------------------------------------------
     | BUSINESS METHODS
@@ -155,6 +201,7 @@ class ProductType extends Model
                 'slug' => 'pojazdy',
                 'description' => 'Kompletne pojazdy - motocykle, quady, skutery, pitbike',
                 'icon' => 'fas fa-motorcycle',
+                'label_color' => '#3b82f6',
                 'is_active' => true,
                 'sort_order' => 1,
                 'default_attributes' => [
@@ -169,6 +216,7 @@ class ProductType extends Model
                 'slug' => 'czesci-zamienne',
                 'description' => 'Części zamienne do pojazdów - silnik, zawieszenie, hamulce',
                 'icon' => 'fas fa-cog',
+                'label_color' => '#f59e0b',
                 'is_active' => true,
                 'sort_order' => 2,
                 'default_attributes' => [
@@ -182,6 +230,7 @@ class ProductType extends Model
                 'slug' => 'akcesoria',
                 'description' => 'Akcesoria do pojazdów i motocykli',
                 'icon' => 'fas fa-puzzle-piece',
+                'label_color' => '#10b981',
                 'is_active' => true,
                 'sort_order' => 3,
                 'default_attributes' => []
@@ -191,6 +240,7 @@ class ProductType extends Model
                 'slug' => 'oleje-i-chemia',
                 'description' => 'Oleje silnikowe, płyny eksploatacyjne, chemia motocyklowa',
                 'icon' => 'fas fa-oil-can',
+                'label_color' => '#06b6d4',
                 'is_active' => true,
                 'sort_order' => 4,
                 'default_attributes' => [
@@ -203,6 +253,7 @@ class ProductType extends Model
                 'slug' => 'odziez',
                 'description' => 'Odzież motocyklowa - kurtki, spodnie, buty, kaski',
                 'icon' => 'fas fa-tshirt',
+                'label_color' => '#a855f7',
                 'is_active' => true,
                 'sort_order' => 5,
                 'default_attributes' => [
@@ -216,6 +267,7 @@ class ProductType extends Model
                 'slug' => 'outlet',
                 'description' => 'Produkty przecenione, końcówki kolekcji',
                 'icon' => 'fas fa-tags',
+                'label_color' => '#ef4444',
                 'is_active' => true,
                 'sort_order' => 6,
                 'default_attributes' => []
@@ -225,6 +277,7 @@ class ProductType extends Model
                 'slug' => 'inne',
                 'description' => 'Pozostałe produkty nieskategoryzowane',
                 'icon' => 'fas fa-box',
+                'label_color' => '#6b7280',
                 'is_active' => true,
                 'sort_order' => 99,
                 'default_attributes' => []

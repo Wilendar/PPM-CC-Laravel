@@ -104,7 +104,7 @@ class CategoryTypeMappingsPanel extends Component
     {
         $this->availableTypes = ProductType::active()
             ->ordered()
-            ->get(['id', 'name', 'slug'])
+            ->get(['id', 'name', 'slug', 'label_color'])
             ->toArray();
     }
 
@@ -116,7 +116,7 @@ class CategoryTypeMappingsPanel extends Component
         }
 
         $this->mappings = ShopCategoryTypeMapping::where('shop_id', $this->selectedShopId)
-            ->with(['productType:id,name,slug'])
+            ->with(['productType:id,name,slug,label_color'])
             ->orderBy('priority')
             ->orderBy('created_at', 'desc')
             ->get()
@@ -128,6 +128,7 @@ class CategoryTypeMappingsPanel extends Component
                     'product_type_id' => $m->product_type_id,
                     'product_type_name' => $m->productType?->name ?? '(usuniety)',
                     'product_type_slug' => $m->productType?->slug ?? 'inne',
+                    'product_type_color' => $m->productType?->label_color ?? '#6b7280',
                     'include_children' => $m->include_children,
                     'priority' => $m->priority,
                     'is_active' => $m->is_active,
@@ -400,19 +401,6 @@ class CategoryTypeMappingsPanel extends Component
     | HELPERS
     |--------------------------------------------------------------------------
     */
-
-    public function getProductTypeBadgeClass(string $slug): string
-    {
-        return match ($slug) {
-            'pojazdy', 'pojazd' => 'bg-blue-500/20 text-blue-400',
-            'czesci-zamienne', 'czesc-zamienna' => 'bg-yellow-500/20 text-yellow-400',
-            'akcesoria' => 'bg-green-500/20 text-green-400',
-            'oleje-i-chemia' => 'bg-cyan-500/20 text-cyan-400',
-            'odziez' => 'bg-purple-500/20 text-purple-400',
-            'outlet' => 'bg-red-500/20 text-red-400',
-            default => 'bg-gray-500/20 text-gray-400',
-        };
-    }
 
     /*
     |--------------------------------------------------------------------------

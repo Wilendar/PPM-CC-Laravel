@@ -298,6 +298,9 @@
     background: rgba(255, 255, 255, 0.03);
 }
 
+/* DEPRECATED - replaced by <x-product-type-badge> component with dynamic colors from DB */
+/* These classes are kept for backward compatibility but are no longer used */
+
 /* Product type badge - base */
 .category-preview-type-badge {
     display: inline-flex;

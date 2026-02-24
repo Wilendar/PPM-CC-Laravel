@@ -599,15 +599,7 @@
                                     {{-- Type --}}
                                     <td class="px-6 py-4 whitespace-nowrap">
                                         @if($product->productType)
-                                        <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium
-                                            @switch($product->productType->slug)
-                                                @case('pojazd') bg-green-800 text-green-200 @break
-                                                @case('czesc-zamienna') bg-blue-800 text-blue-200 @break
-                                                @case('odziez') bg-yellow-800 text-yellow-200 @break
-                                                @default bg-gray-800 text-gray-200
-                                            @endswitch">
-                                            {{ $product->productType->name }}
-                                        </span>
+                                            <x-product-type-badge :type="$product->productType" />
                                         @else
                                         <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-800 text-gray-200">
                                             Brak typu
@@ -766,14 +758,7 @@
                                             {{-- 5. Type --}}
                                             <td class="px-6 py-3 whitespace-nowrap">
                                                 @if($variant->product?->productType)
-                                                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium
-                                                        @switch($variant->product->productType->slug)
-                                                            @case('pojazd') bg-green-800/70 text-green-300 @break
-                                                            @case('czesc-zamienna') bg-blue-800/70 text-blue-300 @break
-                                                            @default bg-gray-700 text-gray-300
-                                                        @endswitch">
-                                                        {{ $variant->product->productType->name }}
-                                                    </span>
+                                                    <x-product-type-badge :type="$variant->product->productType" size="xs" />
                                                 @else
                                                     <span class="text-xs text-gray-500">-</span>
                                                 @endif
@@ -920,15 +905,7 @@
 
                             <div class="flex items-center justify-between mb-3" @click.stop>
                                 @if($product->productType)
-                                <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium
-                                    @switch($product->productType->slug)
-                                        @case('pojazd') bg-green-800 text-green-200 @break
-                                        @case('czesc-zamienna') bg-blue-800 text-blue-200 @break
-                                        @case('odziez') bg-yellow-800 text-yellow-200 @break
-                                        @default bg-gray-800 text-gray-200
-                                    @endswitch">
-                                    {{ $product->productType->name }}
-                                </span>
+                                    <x-product-type-badge :type="$product->productType" />
                                 @else
                                 <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-800 text-gray-200">
                                     Brak typu

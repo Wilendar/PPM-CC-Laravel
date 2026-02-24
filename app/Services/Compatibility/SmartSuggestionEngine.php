@@ -28,18 +28,8 @@ use Illuminate\Support\Facades\Log;
  */
 class SmartSuggestionEngine
 {
-    /**
-     * Legacy scoring weight constants - kept as reference for default values.
-     * Actual values are read from AiScoringConfig (SystemSetting DB).
-     *
-     * @see AiScoringConfig::DEFAULTS
-     */
-    // protected const WEIGHT_KEYWORD_RULE = 0.20;
-    // protected const WEIGHT_DESCRIPTION_MATCH = 0.10;
-    // protected const WEIGHT_CATEGORY_MATCH = 0.10;
-    // protected const MIN_CONFIDENCE_THRESHOLD = 0.40;
-    // protected const AUTO_APPLY_THRESHOLD = 0.90;
-    // protected const MAX_SUGGESTIONS_PER_PRODUCT = 50;
+    // Vehicle type keywords and prefixes are loaded dynamically from AiScoringConfig.
+    // See: AiScoringConfig::getVehicleTypeKeywords() and getVehicleTypePrefixes()
 
     public function __construct(
         protected KeywordRuleMatcher $keywordMatcher,
@@ -241,9 +231,39 @@ class SmartSuggestionEngine
      */
     protected function calculateScore(Product $product, Product $vehicle): array
     {
+        // Layer 0: Vehicle TYPE filter - reject type mismatches early
+        $productType = $this->detectVehicleType($product->name ?? '');
+        $vehicleType = $this->detectVehicleTypeFromVehicleName($vehicle->name ?? '');
+
+        if ($productType !== null && $vehicleType !== null && $productType !== $vehicleType) {
+            return [
+                'score' => 0.0,
+                'reason' => 'type_mismatch',
+                'breakdown' => [
+                    'type_filter' => [
+                        'product_type' => $productType,
+                        'vehicle_type' => $vehicleType,
+                        'rejected' => true,
+                    ],
+                ],
+            ];
+        }
+
         $score = 0.0;
         $reasons = [];
         $breakdown = [];
+
+        // Type match bonus: product type matches vehicle type
+        if ($productType !== null && $vehicleType !== null && $productType === $vehicleType) {
+            $typeBonus = $this->config->get('weight_type_match');
+            $score += $typeBonus;
+            $reasons[] = 'type_match';
+            $breakdown['type_match'] = [
+                'product_type' => $productType,
+                'vehicle_type' => $vehicleType,
+                'bonus' => $typeBonus,
+            ];
+        }
 
         // Layer 1: Keyword Rules (configurable bonus from rule)
         $keywordResult = $this->keywordMatcher->match($product, $vehicle);
@@ -292,6 +312,47 @@ class SmartSuggestionEngine
             'reason' => $primaryReason,
             'breakdown' => $breakdown,
         ];
+    }
+
+    /**
+     * Detect vehicle type keyword in text (product name, description).
+     * Types are loaded dynamically from AiScoringConfig (DB-backed).
+     *
+     * @return string|null Normalized type key (e.g. 'buggy', 'quad') or null
+     */
+    protected function detectVehicleType(string $text): ?string
+    {
+        $text = mb_strtolower(trim($text));
+
+        foreach ($this->config->getVehicleTypeKeywords() as $type => $keywords) {
+            foreach ($keywords as $keyword) {
+                if (str_contains($text, $keyword)) {
+                    return $type;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Detect vehicle type from vehicle product name prefix.
+     * Vehicle names follow pattern: "Type Brand Model" (e.g. "Buggy KAYO S70").
+     * Prefixes are loaded dynamically from AiScoringConfig (DB-backed).
+     *
+     * @return string|null Normalized type key or null
+     */
+    protected function detectVehicleTypeFromVehicleName(string $vehicleName): ?string
+    {
+        $name = mb_strtolower(trim($vehicleName));
+
+        foreach ($this->config->getVehicleTypePrefixes() as $type => $prefix) {
+            if (str_starts_with($name, $prefix)) {
+                return $type;
+            }
+        }
+
+        return null;
     }
 
     /**

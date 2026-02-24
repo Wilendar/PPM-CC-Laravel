@@ -129,16 +129,12 @@ class ProductTypeDetector
      */
     public function getTypeColor(?string $slug): string
     {
-        return match ($slug) {
-            'pojazd' => 'info',
-            'czesc-zamienna' => 'warning',
-            'akcesoria' => 'success',
-            'odziez' => 'purple',
-            'oleje-i-chemia' => 'cyan',
-            'outlet' => 'danger',
-            'inne' => 'default',
-            default => 'default',
-        };
+        if (!$slug) {
+            return \App\Models\ProductType::DEFAULT_LABEL_COLOR;
+        }
+
+        $type = $this->getType($slug);
+        return $type?->label_color ?? (\App\Models\ProductType::DEFAULT_LABEL_COLORS[$slug] ?? \App\Models\ProductType::DEFAULT_LABEL_COLOR);
     }
 
     /**

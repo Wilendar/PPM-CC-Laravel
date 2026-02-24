@@ -27,22 +27,27 @@ class AiScoringConfig
      */
     protected const DEFAULTS = [
         // Thresholds
-        'min_confidence_threshold' => 0.40,
+        'min_confidence_threshold' => 0.50,
         'auto_apply_threshold' => 0.90,
         'max_suggestions_per_product' => 50,
 
+        // Layer 0: Vehicle Type Match bonus
+        // Applied when product name contains vehicle type keyword AND vehicle matches that type
+        'weight_type_match' => 0.35,
+
         // Layer 2: Model Detection (VehicleModelDetector)
-        'weight_model_alias_exact' => 0.40,
-        'weight_model_alias_sku' => 0.25,
-        'weight_model_tkn_match' => 0.30,
+        'weight_model_alias_exact' => 0.60,
+        'weight_model_alias_sku' => 0.45,
+        'weight_model_tkn_match' => 0.40,
         'weight_model_tkn_ngram' => 0.35,
         'min_tkn_length' => 3,
         'min_tkn_matches' => 2,
 
-        // Layer 3: Brand Detection (BrandDetector)
-        'weight_brand_manufacturer_exact' => 0.50,
-        'weight_brand_name_contains' => 0.20,
-        'weight_brand_sku_contains' => 0.20,
+        // Layer 3: Brand Detection (BrandDetector) - supplementary only!
+        // Brand alone MUST NOT exceed min_confidence_threshold.
+        'weight_brand_manufacturer_exact' => 0.15,
+        'weight_brand_name_contains' => 0.10,
+        'weight_brand_sku_contains' => 0.10,
 
         // Layer 4-5: Description/Category
         'weight_description_match' => 0.10,
@@ -160,6 +165,18 @@ class AiScoringConfig
                     ],
                 ],
             ],
+            'type_detection' => [
+                'label' => 'Detekcja typu pojazdu (Layer 0)',
+                'fields' => [
+                    'weight_type_match' => [
+                        'label' => 'Bonus dopasowania typu',
+                        'min' => 0.0,
+                        'max' => 1.0,
+                        'step' => 0.05,
+                        'description' => 'Bonus gdy typ pojazdu w nazwie produktu pasuje do typu pojazdu (np. buggy, quad)',
+                    ],
+                ],
+            ],
             'model_detection' => [
                 'label' => 'Detekcja modelu (Layer 2)',
                 'fields' => [
@@ -242,6 +259,94 @@ class AiScoringConfig
                 ],
             ],
         ];
+    }
+
+    /**
+     * Default vehicle type definitions for Smart Matching type filter.
+     * Each type has: key, label (display), prefix (vehicle name prefix), keywords (search in product name).
+     */
+    protected const DEFAULT_VEHICLE_TYPES = [
+        ['key' => 'buggy', 'label' => 'Buggy', 'prefix' => 'buggy', 'keywords' => ['buggy']],
+        ['key' => 'dirt_bike', 'label' => 'Dirt Bike', 'prefix' => 'dirt bike', 'keywords' => ['dirt bike', 'dirt-bike', 'dirtbike']],
+        ['key' => 'pit_bike', 'label' => 'Pit Bike', 'prefix' => 'pit bike', 'keywords' => ['pit bike', 'pit-bike', 'pitbike']],
+        ['key' => 'quad', 'label' => 'Quad', 'prefix' => 'quad', 'keywords' => ['quad', 'atv']],
+        ['key' => 'mini_gp', 'label' => 'Mini GP', 'prefix' => 'mini gp', 'keywords' => ['mini gp', 'mini-gp', 'minigp']],
+    ];
+
+    /**
+     * Get vehicle type definitions (from DB or defaults).
+     *
+     * @return array<array{key: string, label: string, prefix: string, keywords: string[]}>
+     */
+    public function getVehicleTypes(): array
+    {
+        $json = SystemSetting::get('smart_matching.vehicle_types', null);
+
+        if ($json === null) {
+            return self::DEFAULT_VEHICLE_TYPES;
+        }
+
+        $types = is_string($json) ? json_decode($json, true) : $json;
+
+        return is_array($types) ? $types : self::DEFAULT_VEHICLE_TYPES;
+    }
+
+    /**
+     * Save vehicle type definitions to DB.
+     */
+    public function setVehicleTypes(array $types): void
+    {
+        SystemSetting::set(
+            'smart_matching.vehicle_types',
+            json_encode($types, JSON_UNESCAPED_UNICODE),
+            self::CATEGORY,
+            'json',
+            'Definicje typow pojazdow dla filtra Smart Matching'
+        );
+    }
+
+    /**
+     * Get default vehicle type definitions.
+     */
+    public function getDefaultVehicleTypes(): array
+    {
+        return self::DEFAULT_VEHICLE_TYPES;
+    }
+
+    /**
+     * Reset vehicle types to defaults.
+     */
+    public function resetVehicleTypesToDefaults(): void
+    {
+        SystemSetting::where('key', 'smart_matching.vehicle_types')->delete();
+    }
+
+    /**
+     * Build keyword map from vehicle types (for SmartSuggestionEngine).
+     *
+     * @return array<string, string[]> e.g. ['buggy' => ['buggy'], 'quad' => ['quad', 'atv']]
+     */
+    public function getVehicleTypeKeywords(): array
+    {
+        $map = [];
+        foreach ($this->getVehicleTypes() as $type) {
+            $map[$type['key']] = $type['keywords'];
+        }
+        return $map;
+    }
+
+    /**
+     * Build prefix map from vehicle types (for SmartSuggestionEngine).
+     *
+     * @return array<string, string> e.g. ['buggy' => 'buggy', 'dirt_bike' => 'dirt bike']
+     */
+    public function getVehicleTypePrefixes(): array
+    {
+        $map = [];
+        foreach ($this->getVehicleTypes() as $type) {
+            $map[$type['key']] = $type['prefix'];
+        }
+        return $map;
     }
 
     /**

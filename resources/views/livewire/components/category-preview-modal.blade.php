@@ -214,9 +214,7 @@
                                         <td class="px-4 py-2.5 text-sm text-gray-300 font-mono">{{ $product['sku'] }}</td>
                                         <td class="px-4 py-2.5 text-sm text-white">{{ Str::limit($product['name'], 60) }}</td>
                                         <td class="px-4 py-2.5">
-                                            <span class="category-preview-type-badge category-preview-type-badge--{{ $product['type_color'] }}">
-                                                {{ $product['detected_type'] }}
-                                            </span>
+                                            <x-product-type-badge :name="$product['detected_type']" :color="$product['type_color']" size="sm" />
                                         </td>
                                     </tr>
                                     @endforeach

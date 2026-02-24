@@ -87,6 +87,11 @@ trait ManagesVehicleSelection
             $this->toggleZamiennik($vehicleId);
         }
 
+        // Clear AI suggestion state when user accepts a suggestion
+        if (isset($this->suggestedVehicleScores[$vehicleId])) {
+            unset($this->suggestedVehicleScores[$vehicleId]);
+        }
+
         // Track change for pending save
         $this->trackChange($vehicleId, $this->selectionMode);
     }
