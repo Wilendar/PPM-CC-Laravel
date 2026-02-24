@@ -11,7 +11,7 @@
     $isNew = ($node['status'] ?? 'existing') === 'to_add';
     $hasNewDescendants = $node['has_new_descendants'] ?? false;
     $isProductCategory = $node['is_product_category'] ?? false;
-    $isExpanded = in_array($nodeId, $expandedNodes) || ($isNew && $hasChildren);
+    $isExpanded = in_array($nodeId, $expandedNodes);
     $isNumericId = is_int($nodeId);
     $prestashopId = $node['prestashop_id'] ?? null;
     $levelClamped = min($level, 5);

@@ -423,6 +423,30 @@ class CategoryPreviewModal extends Component
             // Pre-compute expanded nodes for product categories
             $this->initAutoExpandedNodes($preview);
 
+            // BUG1+BUG2+BUG3 FIX: Build merged tree ONCE in show() (before snapshot).
+            // autoExpandNewBranches() was previously called inside computed property
+            // getFullPpmTreeProperty(), causing expandedNodes changes to be lost
+            // after Livewire snapshot serialization.
+            try {
+                $mergedTree = $this->buildMergedPpmTree();
+                $this->autoExpandNewBranches($mergedTree);
+
+                // BUG3 FIX: Reconcile selectedCategoryIds with what's actually
+                // visible in the merged tree (after deduplication).
+                $visibleNewIds = $this->extractToAddIdsFromMergedTree($mergedTree);
+                $this->selectedCategoryIds = array_values(
+                    array_intersect($this->selectedCategoryIds, $visibleNewIds)
+                );
+                $this->totalCount = count($visibleNewIds);
+
+                // Update progress bar button to show reconciled count
+                $this->updateProgressBarLabel($preview, $this->totalCount);
+            } catch (\Exception $e) {
+                Log::warning('CategoryPreviewModal: tree reconciliation failed', [
+                    'error' => $e->getMessage(),
+                ]);
+            }
+
             Log::info('CategoryPreviewModal: Opened successfully', [
                 'preview_id' => $previewId,
                 'shop_name' => $this->shopName,
@@ -540,10 +564,21 @@ class CategoryPreviewModal extends Component
 
     /**
      * Select all NEW categories (skip existing)
+     * BUG3 FIX: Reconcile with merged tree to match visible count
      */
     public function selectAll(): void
     {
-        $this->selectedCategoryIds = $this->extractNewCategoryIds($this->categoryTree);
+        $rawNewIds = $this->extractNewCategoryIds($this->categoryTree);
+
+        try {
+            $mergedTree = $this->buildMergedPpmTree();
+            $visibleNewIds = $this->extractToAddIdsFromMergedTree($mergedTree);
+            $this->selectedCategoryIds = array_values(
+                array_intersect($rawNewIds, $visibleNewIds)
+            );
+        } catch (\Exception $e) {
+            $this->selectedCategoryIds = $rawNewIds;
+        }
 
         Log::info('CategoryPreviewModal: Selected all new categories', [
             'count' => count($this->selectedCategoryIds),
@@ -1346,6 +1381,35 @@ class CategoryPreviewModal extends Component
     }
 
     /**
+     * Update progress bar button label with reconciled category count.
+     * When count is 0, changes label to inform user all categories exist.
+     */
+    private function updateProgressBarLabel(CategoryPreview $preview, int $reconciledCount): void
+    {
+        try {
+            $jobProgress = \App\Models\JobProgress::where('job_id', $preview->job_id)->first();
+            if (!$jobProgress || empty($jobProgress->action_button)) {
+                return;
+            }
+
+            $actionButton = $jobProgress->action_button;
+
+            if ($reconciledCount > 0) {
+                $actionButton['label'] = 'Zobacz brakujace kategorie (' . $reconciledCount . ')';
+            } else {
+                $actionButton['label'] = 'Wszystkie kategorie istnieja - importuj';
+            }
+
+            $jobProgress->action_button = $actionButton;
+            $jobProgress->save();
+        } catch (\Exception $e) {
+            Log::debug('CategoryPreviewModal: Failed to update progress bar label', [
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    /**
      * Toggle tree node expand/collapse
      */
     public function toggleNode(int|string $categoryId): void
@@ -1422,38 +1486,59 @@ class CategoryPreviewModal extends Component
         }
 
         try {
-            // Get product category data for "produkt" badges
-            $productCatData = $this->getProductCategoryPpmIds();
-            $productPpmIds = $productCatData['ppm_ids'] ?? [];
-            $productPsIds = $productCatData['ps_ids'] ?? [];
-
-            // 1. Get full PPM tree (root categories with all descendants)
-            $ppmCategories = Category::whereNull('parent_id')
-                ->where('is_active', true)
-                ->orderBy('sort_order')
-                ->orderBy('name')
-                ->get();
-
-            // 2. Build tree with status markers and product flags
-            $tree = [];
-            foreach ($ppmCategories as $category) {
-                $tree[] = $this->buildTreeNode($category, $productPpmIds);
-            }
-
-            // 3. Merge missing categories from preview (with duplicate detection)
-            $missingCategories = $this->getMissingCategoriesFlat();
-            $tree = $this->mergeMissingIntoTree($tree, $missingCategories, $productPsIds);
-
-            // 4. Auto-expand branches with new categories
-            $this->autoExpandNewBranches($tree);
-
-            return $tree;
+            return $this->buildMergedPpmTree();
         } catch (\Exception $e) {
             Log::error('CategoryPreviewModal: Failed to build PPM tree', [
                 'error' => $e->getMessage(),
             ]);
             return [];
         }
+    }
+
+    /**
+     * Build merged PPM tree with missing categories from preview.
+     * Pure method - no side effects on component state.
+     * BUG FIX: Extracted from getFullPpmTreeProperty() to avoid
+     * modifying expandedNodes during render (Livewire snapshot issue).
+     */
+    private function buildMergedPpmTree(): array
+    {
+        $productCatData = $this->getProductCategoryPpmIds();
+        $productPpmIds = $productCatData['ppm_ids'] ?? [];
+        $productPsIds = $productCatData['ps_ids'] ?? [];
+
+        $ppmCategories = Category::whereNull('parent_id')
+            ->where('is_active', true)
+            ->orderBy('sort_order')
+            ->orderBy('name')
+            ->get();
+
+        $tree = [];
+        foreach ($ppmCategories as $category) {
+            $tree[] = $this->buildTreeNode($category, $productPpmIds);
+        }
+
+        $missingCategories = $this->getMissingCategoriesFlat();
+        return $this->mergeMissingIntoTree($tree, $missingCategories, $productPsIds);
+    }
+
+    /**
+     * Extract PS IDs of 'to_add' categories from merged tree.
+     * BUG3 FIX: Counts only categories ACTUALLY visible in tree
+     * (after deduplication by mergeMissingIntoTree).
+     */
+    private function extractToAddIdsFromMergedTree(array $tree): array
+    {
+        $ids = [];
+        foreach ($tree as $node) {
+            if (($node['status'] ?? '') === 'to_add' && !empty($node['prestashop_id'])) {
+                $ids[] = (int) $node['prestashop_id'];
+            }
+            if (!empty($node['children'])) {
+                $ids = array_merge($ids, $this->extractToAddIdsFromMergedTree($node['children']));
+            }
+        }
+        return $ids;
     }
 
     /**
@@ -1524,6 +1609,42 @@ class CategoryPreviewModal extends Component
 
             $path = $effectiveParentPath ? $effectiveParentPath . ' > ' . $name : $name;
 
+            // BUG3 FIX: Resolve this category's full PPM path so children
+            // get correct PPM-root-relative parent paths for addMissingToParent.
+            // 1. Try ShopMapping (most accurate), 2. Fallback: name match in PPM DB.
+            $childParentPath = $path;
+            $childParentPpmId = $effectiveParentPpmId;
+            $resolvedToPpm = false;
+
+            $psId = $cat['prestashop_id'] ?? $cat['id'] ?? 0;
+
+            // Strategy 1: ShopMapping lookup (works when mappings exist)
+            if (!$resolvedToPpm && $this->shopId && $psId) {
+                $resolved = $this->resolveParentPathFromPsId((int) $psId);
+                if ($resolved) {
+                    $childParentPath = $resolved['path'];
+                    $childParentPpmId = $resolved['ppm_id'];
+                    $resolvedToPpm = true;
+                }
+            }
+
+            // Strategy 2: Name match in PPM (for shops without mappings)
+            if (!$resolvedToPpm) {
+                $ppmCategory = Category::where('name', $name)
+                    ->where('is_active', true)
+                    ->first();
+                if ($ppmCategory) {
+                    $pathParts = [$ppmCategory->name];
+                    $ancestor = $ppmCategory->parent;
+                    while ($ancestor) {
+                        array_unshift($pathParts, $ancestor->name);
+                        $ancestor = $ancestor->parent;
+                    }
+                    $childParentPath = implode(' > ', $pathParts);
+                    $childParentPpmId = $ppmCategory->id;
+                }
+            }
+
             if (!$isExisting) {
                 $result[] = [
                     'name' => $name,
@@ -1536,7 +1657,7 @@ class CategoryPreviewModal extends Component
             }
 
             if (!empty($cat['children'])) {
-                $this->flattenMissingCategories($cat['children'], $result, $path, $effectiveParentPpmId);
+                $this->flattenMissingCategories($cat['children'], $result, $childParentPath, $childParentPpmId);
             }
         }
     }
@@ -1704,7 +1825,9 @@ class CategoryPreviewModal extends Component
     }
 
     /**
-     * FIX #1: Find existing category in tree by name (case-insensitive)
+     * FIX #1: Find existing category in tree by name (case-insensitive).
+     * Recursive search prevents duplicate categories when the same name
+     * exists anywhere in the PPM tree (e.g. "Wszystko" under "Baza").
      *
      * @param array $tree
      * @param string $name
@@ -1816,9 +1939,9 @@ class CategoryPreviewModal extends Component
     /**
      * Auto-expand branches that contain new categories
      */
-    protected function autoExpandNewBranches(array &$tree): void
+    protected function autoExpandNewBranches(array $tree): void
     {
-        foreach ($tree as &$node) {
+        foreach ($tree as $node) {
             $shouldExpand = ($node['has_new_descendants'] ?? false)
                 || ($node['status'] ?? '') === 'to_add'
                 || ($node['has_product_descendants'] ?? false);
