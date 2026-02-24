@@ -47,7 +47,7 @@
 @endphp
 
 <div class="inline-category-select relative"
-     wire:ignore.self
+     wire:key="cat-select-{{ $product->id }}-L{{ $level }}-p{{ $parentCategoryId ?? 0 }}-s{{ $selectedId ?? 0 }}"
      x-data="{
          open: false,
          search: '',
