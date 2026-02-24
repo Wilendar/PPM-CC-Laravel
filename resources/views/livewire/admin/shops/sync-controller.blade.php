@@ -7,7 +7,7 @@
     </div>
     
     <!-- Page Header -->
-    <div class="relative backdrop-blur-xl shadow-2xl" style="background: linear-gradient(135deg, rgba(31, 41, 55, 0.95), rgba(17, 24, 39, 0.95)); border-bottom: 1px solid rgba(224, 172, 126, 0.3); z-index: 10000;">
+    <div class="relative backdrop-blur-xl shadow-2xl" style="background: linear-gradient(135deg, rgba(31, 41, 55, 0.95), rgba(17, 24, 39, 0.95)); border-bottom: 1px solid rgba(224, 172, 126, 0.3);">
         <div class="max-w-7xl mx-auto px-6 sm:px-8 lg:px-12">
             <div class="flex items-center justify-between h-24">
                 <div class="flex items-center">
@@ -242,6 +242,7 @@
                         $statusColors = [
                             'idle' => 'bg-green-500',
                             'processing' => 'bg-blue-500',
+                            'scheduled' => 'bg-purple-500',
                             'stopped' => 'bg-red-500',
                             'unknown' => 'bg-gray-500',
                             'error' => 'bg-red-500',
@@ -249,6 +250,7 @@
                         $statusLabels = [
                             'idle' => 'Bezczynny',
                             'processing' => 'Przetwarza',
+                            'scheduled' => 'Zaplanowane',
                             'stopped' => 'Zatrzymany',
                             'unknown' => 'Nieznany',
                             'error' => 'Błąd',
@@ -277,9 +279,16 @@
                     </svg>
                     <span wire:loading.remove wire:target="runQueueWorker">Uruchom Worker</span>
                     <span wire:loading wire:target="runQueueWorker">Przetwarzam...</span>
-                    @if($queueWorkerStatus['total_pending'] > 0)
+                    @if(($queueWorkerStatus['ready_count'] ?? 0) > 0)
                         <span class="ml-2 inline-flex items-center justify-center px-2 py-0.5 rounded-full text-xs font-bold bg-yellow-500 text-black">
-                            {{ $queueWorkerStatus['total_pending'] }}
+                            {{ $queueWorkerStatus['ready_count'] }}
+                        </span>
+                    @elseif(($queueWorkerStatus['delayed_count'] ?? 0) > 0)
+                        <span class="ml-2 inline-flex items-center justify-center px-2 py-0.5 rounded-full text-xs font-bold bg-purple-400 text-white">
+                            {{ $queueWorkerStatus['delayed_count'] }}
+                            <svg class="w-3 h-3 ml-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
                         </span>
                     @endif
                 </button>
@@ -298,6 +307,18 @@
                                 </div>
                             @endforeach
                         </div>
+                        @if(($queueWorkerStatus['delayed_count'] ?? 0) > 0)
+                            <div class="mt-2 pt-2 border-t border-gray-700">
+                                <div class="flex justify-between items-center">
+                                    <span class="text-xs text-purple-400">Opoznione</span>
+                                    <span class="text-sm font-bold text-purple-400">{{ $queueWorkerStatus['delayed_count'] }}</span>
+                                </div>
+                                <div class="flex justify-between items-center">
+                                    <span class="text-xs text-green-400">Gotowe</span>
+                                    <span class="text-sm font-bold text-green-400">{{ $queueWorkerStatus['ready_count'] ?? 0 }}</span>
+                                </div>
+                            </div>
+                        @endif
                     @else
                         <p class="text-green-400 text-sm font-medium">Brak oczekujących</p>
                     @endif
@@ -368,6 +389,59 @@
                             <strong>Queue Worker prawdopodobnie zatrzymany!</strong>
                             Jobs czekają ponad 5 minut bez przetwarzania. Kliknij "Uruchom Worker" aby przetworzyć oczekujące zadania.
                         </p>
+                    </div>
+                </div>
+            @endif
+
+            <!-- Delayed (scheduled) jobs panel -->
+            @if(count($queueWorkerStatus['delayed_jobs'] ?? []) > 0)
+                <div class="mt-4 p-4 rounded-lg bg-purple-500 bg-opacity-10 border border-purple-500 border-opacity-30">
+                    <div class="flex items-center justify-between mb-3">
+                        <div class="flex items-center">
+                            <svg class="w-5 h-5 text-purple-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                            <p class="text-sm text-purple-300 font-medium">
+                                Zaplanowane zadania ({{ count($queueWorkerStatus['delayed_jobs']) }})
+                            </p>
+                        </div>
+                        <button wire:click="cancelDelayedJobs"
+                                wire:loading.attr="disabled"
+                                wire:confirm="Czy na pewno chcesz anulowac wszystkie zaplanowane zadania?"
+                                class="inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-lg text-red-300 border border-red-500 border-opacity-40 hover:bg-red-500 hover:bg-opacity-20 transition-colors">
+                            <svg class="w-3.5 h-3.5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                            </svg>
+                            <span wire:loading.remove wire:target="cancelDelayedJobs">Anuluj wszystkie</span>
+                            <span wire:loading wire:target="cancelDelayedJobs">Anulowanie...</span>
+                        </button>
+                    </div>
+                    <div class="space-y-2">
+                        @foreach($queueWorkerStatus['delayed_jobs'] as $delayedJob)
+                            <div class="flex items-center justify-between p-2 rounded-lg bg-gray-800 bg-opacity-50">
+                                <div class="flex items-center gap-3">
+                                    <span class="text-xs text-gray-400 font-mono">#{{ $delayedJob['id'] }}</span>
+                                    <span class="text-sm text-gray-200">{{ $delayedJob['class'] }}</span>
+                                    <span class="text-xs text-gray-500">{{ $delayedJob['queue'] }}</span>
+                                </div>
+                                <div class="flex items-center gap-3">
+                                    @php
+                                        $mins = ceil($delayedJob['available_in_seconds'] / 60);
+                                    @endphp
+                                    <span class="text-xs text-purple-400">
+                                        za {{ $mins }} min ({{ $delayedJob['available_at'] }})
+                                    </span>
+                                    <button wire:click="cancelDelayedJobs({{ $delayedJob['id'] }})"
+                                            wire:loading.attr="disabled"
+                                            class="p-1 rounded text-gray-500 hover:text-red-400 hover:bg-red-500 hover:bg-opacity-10 transition-colors"
+                                            title="Anuluj to zadanie">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                                        </svg>
+                                    </button>
+                                </div>
+                            </div>
+                        @endforeach
                     </div>
                 </div>
             @endif
@@ -2790,8 +2864,16 @@
                                         <div class="text-xs text-gray-400">{{ \Carbon\Carbon::parse($job['failed_at'])->diffForHumans() }}</div>
                                     </td>
                                     <td class="px-4 py-3">
-                                        <div class="text-xs text-red-300 truncate max-w-md" title="{{ $job['exception_message'] ?? 'Unknown error' }}">
-                                            {{ Str::limit($job['exception_message'] ?? 'Unknown error', 80) }}
+                                        <div x-data="{ expanded: false }" class="max-w-md">
+                                            <div class="text-xs text-red-300 cursor-pointer" @click="expanded = !expanded">
+                                                <span x-show="!expanded" class="truncate block">
+                                                    {{ Str::limit($job['exception_message'] ?? 'Unknown error', 80) }}
+                                                    @if(strlen($job['exception_message'] ?? '') > 80)
+                                                        <span class="text-red-400 underline ml-1">rozwin</span>
+                                                    @endif
+                                                </span>
+                                                <span x-show="expanded" x-cloak class="whitespace-pre-wrap break-all block">{{ $job['exception_message'] ?? 'Unknown error' }}<span class="text-gray-500 underline ml-1 cursor-pointer">zwin</span></span>
+                                            </div>
                                         </div>
                                     </td>
                                     <td class="px-4 py-3 text-right">

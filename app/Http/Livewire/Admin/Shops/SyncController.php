@@ -2276,25 +2276,45 @@ class SyncController extends Component
     public function getQueueWorkerStatus(): array
     {
         try {
-            // Get jobs by queue
-            $jobsByQueue = DB::table('jobs')
-                ->select('queue', DB::raw('COUNT(*) as count'))
-                ->groupBy('queue')
-                ->pluck('count', 'queue')
+            $nowTimestamp = now()->timestamp;
+
+            // Get ALL jobs
+            $allJobs = DB::table('jobs')->get();
+            $totalPending = $allJobs->count();
+
+            // Separate ready vs delayed jobs
+            $readyJobs = $allJobs->filter(fn ($j) => $j->available_at <= $nowTimestamp);
+            $delayedJobs = $allJobs->filter(fn ($j) => $j->available_at > $nowTimestamp);
+            $readyCount = $readyJobs->count();
+            $delayedCount = $delayedJobs->count();
+
+            // Jobs by queue (all)
+            $jobsByQueue = $allJobs->groupBy('queue')
+                ->map(fn ($group) => $group->count())
                 ->toArray();
 
-            $totalPending = array_sum($jobsByQueue);
+            // Build delayed jobs details for UI
+            $delayedJobDetails = [];
+            foreach ($delayedJobs as $job) {
+                $payload = json_decode($job->payload, true);
+                $availableIn = $job->available_at - $nowTimestamp;
+                $delayedJobDetails[] = [
+                    'id' => $job->id,
+                    'queue' => $job->queue,
+                    'class' => class_basename($payload['displayName'] ?? 'Unknown'),
+                    'available_in_seconds' => $availableIn,
+                    'available_at' => date('H:i:s', $job->available_at),
+                    'created_at' => date('H:i:s', $job->created_at),
+                ];
+            }
 
-            // Get oldest job (longest waiting)
-            $oldestJob = DB::table('jobs')
-                ->orderBy('created_at', 'asc')
-                ->first();
-
+            // Get oldest READY job (for worker status estimation)
+            $oldestReadyJob = $readyJobs->sortBy('created_at')->first();
             $oldestJobAge = null;
             $oldestJobQueue = null;
-            if ($oldestJob) {
-                $oldestJobAge = now()->timestamp - $oldestJob->created_at;
-                $oldestJobQueue = $oldestJob->queue;
+            if ($oldestReadyJob) {
+                $oldestJobAge = $nowTimestamp - $oldestReadyJob->created_at;
+                $oldestJobQueue = $oldestReadyJob->queue;
             }
 
             // Get last processed job from sync_jobs
@@ -2309,16 +2329,18 @@ class SyncController extends Component
             // Get failed jobs count
             $failedJobsCount = DB::table('failed_jobs')->count();
 
-            // Estimate worker status
-            // If oldest job is >5 minutes old and no recent completions, worker is likely stopped
+            // Estimate worker status - account for delayed jobs
             $workerStatus = 'unknown';
             $workerStatusColor = 'gray';
 
             if ($totalPending === 0 && $failedJobsCount === 0) {
                 $workerStatus = 'idle';
                 $workerStatusColor = 'green';
-            } elseif ($oldestJobAge !== null && $oldestJobAge > 300) { // 5 minutes
-                // Check if any job was processed recently
+            } elseif ($readyCount === 0 && $delayedCount > 0) {
+                // Only delayed jobs - worker is idle, waiting for scheduled time
+                $workerStatus = 'scheduled';
+                $workerStatusColor = 'purple';
+            } elseif ($oldestJobAge !== null && $oldestJobAge > 300) {
                 $recentCompletion = $lastProcessedJob &&
                     $lastProcessedJob->completed_at &&
                     $lastProcessedJob->completed_at->diffInMinutes(now()) < 5;
@@ -2339,6 +2361,9 @@ class SyncController extends Component
                 'status' => $workerStatus,
                 'status_color' => $workerStatusColor,
                 'total_pending' => $totalPending,
+                'ready_count' => $readyCount,
+                'delayed_count' => $delayedCount,
+                'delayed_jobs' => $delayedJobDetails,
                 'jobs_by_queue' => $jobsByQueue,
                 'oldest_job_age_seconds' => $oldestJobAge,
                 'oldest_job_queue' => $oldestJobQueue,
@@ -2356,6 +2381,9 @@ class SyncController extends Component
                 'status' => 'error',
                 'status_color' => 'red',
                 'total_pending' => 0,
+                'ready_count' => 0,
+                'delayed_count' => 0,
+                'delayed_jobs' => [],
                 'jobs_by_queue' => [],
                 'oldest_job_age_seconds' => null,
                 'oldest_job_queue' => null,
@@ -2437,10 +2465,27 @@ class SyncController extends Component
                     'message' => 'Brak zadan do przetworzenia - kolejka jest pusta.'
                 ]);
             } else {
-                // Jobs exist but none processed - might be an issue
-                $this->dispatch('warning', [
-                    'message' => "Queue worker nie przetworzyl zadnych zadan. Oczekujacych: {$pendingAfter}. Sprawdz logi."
-                ]);
+                // Check if remaining jobs are all delayed (not yet available)
+                $nowTs = now()->timestamp;
+                $delayedCount = DB::table('jobs')
+                    ->where('available_at', '>', $nowTs)
+                    ->count();
+
+                if ($delayedCount === $pendingAfter) {
+                    // All remaining jobs are delayed - this is normal
+                    $this->dispatch('info', [
+                        'message' => "Wszystkie {$pendingAfter} zadania sa opoznione (zaplanowane). Zostana przetworzone automatycznie."
+                    ]);
+                } elseif ($delayedCount > 0) {
+                    $readyCount = $pendingAfter - $delayedCount;
+                    $this->dispatch('warning', [
+                        'message' => "Worker nie przetworzyl {$readyCount} gotowych zadan (+ {$delayedCount} opoznionych). Sprawdz logi."
+                    ]);
+                } else {
+                    $this->dispatch('warning', [
+                        'message' => "Queue worker nie przetworzyl zadnych zadan. Oczekujacych: {$pendingAfter}. Sprawdz logi."
+                    ]);
+                }
             }
 
             // Refresh page data
@@ -2455,6 +2500,97 @@ class SyncController extends Component
 
             $this->dispatch('error', [
                 'message' => 'Blad queue workera: ' . Str::limit($e->getMessage(), 100)
+            ]);
+        }
+    }
+
+    /**
+     * Cancel delayed (scheduled) jobs that haven't been processed yet.
+     *
+     * Removes delayed jobs from the queue and expires their associated
+     * CategoryPreview records so they don't show as "pending" forever.
+     *
+     * @param int|null $jobId Specific job DB ID to cancel, or null to cancel all delayed
+     * @return void
+     */
+    public function cancelDelayedJobs(?int $jobId = null): void
+    {
+        try {
+            $nowTs = now()->timestamp;
+
+            $query = DB::table('jobs')->where('available_at', '>', $nowTs);
+            if ($jobId !== null) {
+                $query->where('id', $jobId);
+            }
+
+            $delayedJobs = $query->get();
+            $cancelledCount = 0;
+
+            foreach ($delayedJobs as $job) {
+                $payload = json_decode($job->payload, true);
+                $jobClass = $payload['displayName'] ?? '';
+
+                // If it's an ExpirePendingCategoryPreview, also expire the preview now
+                if (str_contains($jobClass, 'ExpirePendingCategoryPreview')) {
+                    try {
+                        $command = unserialize($payload['data']['command'] ?? '');
+                        if ($command) {
+                            // previewId is protected, use Reflection to access it
+                            $ref = new \ReflectionProperty($command, 'previewId');
+                            $ref->setAccessible(true);
+                            $previewId = $ref->getValue($command);
+
+                            $preview = \App\Models\CategoryPreview::find($previewId);
+                            if ($preview && $preview->status === \App\Models\CategoryPreview::STATUS_PENDING) {
+                                $preview->update(['status' => \App\Models\CategoryPreview::STATUS_EXPIRED]);
+
+                                $jobProgress = \App\Models\JobProgress::where('job_id', $preview->job_id)->first();
+                                if ($jobProgress && $jobProgress->status === 'pending') {
+                                    $jobProgress->update([
+                                        'status' => 'failed',
+                                        'completed_at' => now(),
+                                    ]);
+                                }
+                            }
+                        }
+                    } catch (\Exception $e) {
+                        Log::debug('Failed to expire preview for cancelled job', [
+                            'job_id' => $job->id,
+                            'error' => $e->getMessage(),
+                        ]);
+                    }
+                }
+
+                DB::table('jobs')->where('id', $job->id)->delete();
+                $cancelledCount++;
+            }
+
+            Log::info('Delayed jobs cancelled', [
+                'user_id' => auth()->id(),
+                'cancelled_count' => $cancelledCount,
+                'specific_job_id' => $jobId,
+            ]);
+
+            if ($cancelledCount > 0) {
+                $this->dispatch('success', [
+                    'message' => "Anulowano {$cancelledCount} opoznionych zadan."
+                ]);
+            } else {
+                $this->dispatch('info', [
+                    'message' => 'Brak opoznionych zadan do anulowania.'
+                ]);
+            }
+
+            $this->loadActiveSyncJobs();
+
+        } catch (\Exception $e) {
+            Log::error('Failed to cancel delayed jobs', [
+                'error' => $e->getMessage(),
+                'user_id' => auth()->id(),
+            ]);
+
+            $this->dispatch('error', [
+                'message' => 'Blad anulowania: ' . Str::limit($e->getMessage(), 100)
             ]);
         }
     }

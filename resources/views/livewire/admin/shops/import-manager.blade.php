@@ -7,7 +7,7 @@
     </div>
 
     <!-- Page Header -->
-    <div class="relative backdrop-blur-xl shadow-2xl" style="background: linear-gradient(135deg, rgba(31, 41, 55, 0.95), rgba(17, 24, 39, 0.95)); border-bottom: 1px solid rgba(224, 172, 126, 0.3); z-index: 10000;">
+    <div class="relative backdrop-blur-xl shadow-2xl" style="background: linear-gradient(135deg, rgba(31, 41, 55, 0.95), rgba(17, 24, 39, 0.95)); border-bottom: 1px solid rgba(224, 172, 126, 0.3);">
         <div class="max-w-7xl mx-auto px-6 sm:px-8 lg:px-12">
             <div class="flex items-center justify-between h-24">
                 <div class="flex items-center">

@@ -165,6 +165,11 @@ class BulkCreateCategories implements ShouldQueue
                 $progressId = $progressService->startPendingJob($preview->job_id, $total);
             }
 
+            // STEP 4.5: Ensure ancestor category mappings exist for this shop
+            // For shops without prior imports (0 mappings), we need to create mappings
+            // for existing PPM categories that match PS ancestors by name.
+            $this->ensureAncestorMappings($categoriesToImport, $shop);
+
             // STEP 5: Import each category (non-recursive - already sorted by level_depth)
             $imported = 0;
             $skipped = 0;
@@ -181,11 +186,15 @@ class BulkCreateCategories implements ShouldQueue
                     }
 
                     // Import category using PrestaShopImportService
-                    // NOTE: non-recursive mode because we already sorted by level_depth
+                    // Use recursive mode if shop has no prior mappings (safe fallback)
+                    $hasShopMappings = \App\Models\ShopMapping::where('shop_id', $shop->id)
+                        ->where('mapping_type', \App\Models\ShopMapping::TYPE_CATEGORY)
+                        ->exists();
+
                     $category = $importService->importCategoryFromPrestaShop(
                         $prestashopCategoryId,
                         $shop,
-                        false // non-recursive (already sorted!)
+                        !$hasShopMappings // recursive if no mappings exist yet
                     );
 
                     $imported++;
@@ -275,9 +284,166 @@ class BulkCreateCategories implements ShouldQueue
                         'trace' => $e->getTraceAsString(),
                     ]);
                 }
+
+                // Also mark SyncJob as failed (prevents stuck "running" status)
+                DB::table('sync_jobs')
+                    ->where('job_id', $preview->job_id)
+                    ->whereIn('status', ['pending', 'running', 'processing'])
+                    ->update([
+                        'status' => 'failed',
+                        'completed_at' => now(),
+                        'error_message' => substr($e->getMessage(), 0, 500),
+                        'updated_at' => now(),
+                    ]);
             }
 
             throw $e;
+        }
+    }
+
+    /**
+     * Ensure ancestor category mappings exist for this shop.
+     *
+     * For shops with no prior imports (0 mappings), parent categories that already
+     * exist in PPM won't have ShopMapping records. This causes importCategoryFromPrestaShop()
+     * in non-recursive mode to fail with "Parent category not found in mappings".
+     *
+     * This method creates mappings for existing PPM categories that match PS ancestors
+     * by name, enabling non-recursive import to find parent references.
+     *
+     * @param array $categoriesToImport Flat list of categories to import
+     * @param PrestaShopShop $shop The shop being imported from
+     * @param PrestaShopImportService $importService Import service for API access
+     */
+    protected function ensureAncestorMappings(
+        array $categoriesToImport,
+        PrestaShopShop $shop
+    ): void {
+        // Collect all unique parent PS IDs that we'll need mappings for
+        $neededParentPsIds = [];
+        $selectedPsIds = array_column($categoriesToImport, 'prestashop_id');
+
+        foreach ($categoriesToImport as $cat) {
+            $parentPsId = (int) ($cat['parent_id'] ?? $cat['id_parent'] ?? 0);
+            // Only need mapping if parent is NOT in our import list (it's an existing category)
+            if ($parentPsId > 2 && !in_array($parentPsId, $selectedPsIds)) {
+                $neededParentPsIds[$parentPsId] = true;
+            }
+        }
+
+        if (empty($neededParentPsIds)) {
+            return;
+        }
+
+        $neededParentPsIds = array_keys($neededParentPsIds);
+
+        Log::info('BulkCreateCategories: Checking ancestor mappings', [
+            'shop_id' => $shop->id,
+            'needed_parent_ps_ids' => $neededParentPsIds,
+        ]);
+
+        // Check which of these already have mappings
+        $existingMappings = \App\Models\ShopMapping::where('shop_id', $shop->id)
+            ->where('mapping_type', \App\Models\ShopMapping::TYPE_CATEGORY)
+            ->whereIn('prestashop_id', $neededParentPsIds)
+            ->pluck('prestashop_id')
+            ->toArray();
+
+        $missingPsIds = array_diff($neededParentPsIds, $existingMappings);
+
+        if (empty($missingPsIds)) {
+            Log::info('BulkCreateCategories: All ancestor mappings exist', [
+                'shop_id' => $shop->id,
+            ]);
+            return;
+        }
+
+        Log::info('BulkCreateCategories: Creating ancestor mappings', [
+            'shop_id' => $shop->id,
+            'missing_ps_ids' => array_values($missingPsIds),
+        ]);
+
+        // For each missing parent, try to find matching PPM category by name
+        try {
+            $client = \App\Services\PrestaShop\PrestaShopClientFactory::create($shop);
+        } catch (\Exception $e) {
+            Log::warning('BulkCreateCategories: Could not create API client for ancestor resolution', [
+                'error' => $e->getMessage(),
+            ]);
+            return;
+        }
+
+        foreach ($missingPsIds as $psId) {
+            try {
+                // Fetch category name from PrestaShop API
+                $psData = $client->getCategory((int) $psId);
+                if (isset($psData['category'])) {
+                    $psData = $psData['category'];
+                }
+
+                $psName = '';
+                $nameData = $psData['name'] ?? '';
+                if (is_array($nameData)) {
+                    // Multi-language: pick first language value
+                    $first = reset($nameData);
+                    $psName = is_array($first) ? ($first['value'] ?? '') : (string) $first;
+                } else {
+                    $psName = (string) $nameData;
+                }
+
+                if (empty($psName)) {
+                    continue;
+                }
+
+                // Find matching PPM category by name (smart matching)
+                $ppmCategory = \App\Models\Category::where('name', $psName)
+                    ->where('is_active', true)
+                    ->first();
+
+                if ($ppmCategory) {
+                    // Create mapping for this existing category
+                    \App\Models\ShopMapping::firstOrCreate(
+                        [
+                            'shop_id' => $shop->id,
+                            'mapping_type' => \App\Models\ShopMapping::TYPE_CATEGORY,
+                            'prestashop_id' => (int) $psId,
+                        ],
+                        [
+                            'ppm_value' => $ppmCategory->id,
+                            'prestashop_value' => $psName,
+                            'is_active' => true,
+                        ]
+                    );
+
+                    Log::info('BulkCreateCategories: Ancestor mapping created', [
+                        'ps_id' => $psId,
+                        'ps_name' => $psName,
+                        'ppm_id' => $ppmCategory->id,
+                        'ppm_name' => $ppmCategory->name,
+                        'shop_id' => $shop->id,
+                    ]);
+
+                    // Also ensure THIS category's parent has a mapping (recursive up)
+                    $ancestorParentPsId = (int) ($psData['id_parent'] ?? 0);
+                    if ($ancestorParentPsId > 2) {
+                        $this->ensureAncestorMappings(
+                            [['prestashop_id' => $psId, 'parent_id' => $ancestorParentPsId]],
+                            $shop
+                        );
+                    }
+                } else {
+                    Log::info('BulkCreateCategories: No PPM match for ancestor', [
+                        'ps_id' => $psId,
+                        'ps_name' => $psName,
+                        'shop_id' => $shop->id,
+                    ]);
+                }
+            } catch (\Exception $e) {
+                Log::warning('BulkCreateCategories: Failed to resolve ancestor', [
+                    'ps_id' => $psId,
+                    'error' => $e->getMessage(),
+                ]);
+            }
         }
     }
 
