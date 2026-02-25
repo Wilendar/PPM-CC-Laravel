@@ -268,6 +268,15 @@
                                              {{ $viewMode === 'tree' && ($category->level ?? 0) > 0 ? 'text-sm' : 'text-base' }}">
                                             {{ $category->name }}
 
+                                            {{-- Inline Insert Trigger (+) - adds sibling category on same level --}}
+                                            @if($viewMode === 'tree' && ($category->level ?? 0) >= 2)
+                                                <button class="category-insert-trigger--inline"
+                                                        @click="$dispatch('open-insert-line', { id: {{ $category->id }} })"
+                                                        title="Dodaj kategorię na tym poziomie">
+                                                    <i class="fas fa-plus"></i>
+                                                </button>
+                                            @endif
+
                                             {{-- Child Count Badge (Tree Mode) --}}
                                             @if($viewMode === 'tree' && $category->children_count > 0)
                                                 <span class="ml-2 category-badge-subcategories category-badge-subcategories-level-{{ min($category->level ?? 0, 2) }}">
@@ -301,6 +310,7 @@
                                             </div>
                                             @endif
                                         @endif
+
                                     </div>
                                 </div>
                             </td>
@@ -456,45 +466,31 @@
                             </td>
                         </tr>
 
-                        {{-- Inline Insert Line (+ between categories) - FAZA 2 ETAP_15 --}}
-                        {{-- RESTRICTION: Levels 0 and 1 are reserved for PrestaShop structure - no insert allowed --}}
+                        {{-- Insert-line <tr> between rows - form opens via dispatch from inline trigger --}}
                         @if($viewMode === 'tree' && ($category->level ?? 0) >= 2)
                             @php
                                 $insertLevel = $category->level ?? 0;
                                 $insertParentId = $category->parent_id;
-                                // Level colors match main category icons from components.css
                                 $iconLevelClass = match($insertLevel) {
-                                    0 => 'category-insert-icon--level-0', // Blue (never shown - restricted)
-                                    1 => 'category-insert-icon--level-1', // Green (never shown - restricted)
-                                    2 => 'category-insert-icon--level-2', // Purple
-                                    3 => 'category-insert-icon--level-3', // Orange
-                                    4 => 'category-insert-icon--level-4', // Pink
-                                    default => 'category-insert-icon--level-5', // Teal (5+)
+                                    2 => 'category-insert-icon--level-2',
+                                    3 => 'category-insert-icon--level-3',
+                                    4 => 'category-insert-icon--level-4',
+                                    default => 'category-insert-icon--level-5',
                                 };
                             @endphp
                             <tr class="category-insert-line"
                                 wire:key="insert-line-{{ $category->id }}"
                                 x-data="categoryInlineForm({ parentId: {{ $insertParentId ?? 'null' }}, level: {{ $insertLevel }} })"
+                                x-on:open-insert-line.window="if ($event.detail.id === {{ $category->id }}) open()"
                                 :class="{ 'is-adding': isOpen }">
                                 <td class="w-12"></td>
                                 <td colspan="5" class="px-6 category-insert-cell">
-                                    {{-- Trigger button --}}
-                                    <button class="category-insert-trigger"
-                                            @click="open()"
-                                            x-show="!isOpen"
-                                            title="Dodaj kategorię na tym poziomie">
-                                        <i class="fas fa-plus"></i>
-                                    </button>
-
-                                    {{-- Inline form --}}
+                                    {{-- Inline form (no trigger button - trigger is in the row above) --}}
                                     <div class="category-insert-form" x-show="isOpen" x-cloak>
                                         <div class="category-insert-form-row">
-                                            {{-- Folder icon (auto-color based on level) --}}
                                             <div class="category-insert-icon {{ $iconLevelClass }}">
                                                 <i class="fas fa-folder"></i>
                                             </div>
-
-                                            {{-- Input wrapper with +OPIS button --}}
                                             <div class="category-insert-input-wrapper">
                                                 <input type="text"
                                                        x-model="name"
@@ -510,8 +506,6 @@
                                                     <i class="fas fa-plus mr-1"></i>OPIS
                                                 </button>
                                             </div>
-
-                                            {{-- Action buttons --}}
                                             <div class="category-insert-form-actions">
                                                 <button type="button"
                                                         @click="save()"
@@ -527,8 +521,6 @@
                                                 </button>
                                             </div>
                                         </div>
-
-                                        {{-- Description textarea (expandable) --}}
                                         <div class="category-insert-desc-row" :class="{ 'is-visible': showDescription }">
                                             <textarea x-model="description"
                                                       @keydown.escape="close()"

@@ -286,7 +286,53 @@ body.category-dragging * {
 }
 
 /* ----------------------------------------
-   4. INLINE INSERT LINE (+)
+   4. INLINE INSERT TRIGGER (+ next to category name)
+   ---------------------------------------- */
+
+/* Inline trigger button - appears on row hover between name and badge */
+.category-insert-trigger--inline {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: rgba(224, 172, 126, 0.15);
+    border: 1.5px solid var(--mpp-primary, #e0ac7e);
+    color: var(--mpp-primary, #e0ac7e);
+    cursor: pointer;
+    opacity: 0;
+    pointer-events: none;
+    transition: all 0.2s ease;
+    vertical-align: middle;
+    margin: 0 6px;
+    font-size: 10px;
+    line-height: 1;
+    padding: 0;
+    flex-shrink: 0;
+}
+
+/* Show trigger on row hover */
+.category-row:hover .category-insert-trigger--inline {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.category-insert-trigger--inline:hover {
+    background: var(--mpp-primary, #e0ac7e);
+    border-color: var(--mpp-primary, #e0ac7e);
+    color: white;
+    transform: scale(1.15);
+    box-shadow: 0 4px 12px rgba(224, 172, 126, 0.4);
+}
+
+.category-insert-trigger--inline i {
+    font-size: 10px;
+    font-weight: bold;
+}
+
+/* ----------------------------------------
+   4.1 INSERT LINE <tr> (form between rows)
    ---------------------------------------- */
 
 .category-insert-line {
