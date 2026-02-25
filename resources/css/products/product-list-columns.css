@@ -1,0 +1,109 @@
+/* Product List - Price & Stock Columns */
+
+/* Stock & Price Tooltip - fixed positioning to avoid overflow clipping */
+.stock-tooltip,
+.price-tooltip {
+    position: fixed;
+    z-index: 100;
+    padding: 0.5rem 0.75rem;
+    background: #111827;
+    border: 1px solid rgba(75, 85, 99, 0.5);
+    border-radius: 0.5rem;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4);
+    white-space: nowrap;
+    pointer-events: none;
+}
+
+.stock-tooltip {
+    min-width: 340px;
+    max-height: 340px;
+    overflow-y: auto;
+}
+
+.price-tooltip {
+    min-width: 200px;
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.stock-tooltip__table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.stock-tooltip__table th {
+    font-weight: 500;
+}
+
+.stock-tooltip__row--out td {
+    background: rgba(239, 68, 68, 0.08);
+}
+
+.stock-tooltip__row--low td {
+    background: rgba(251, 191, 36, 0.06);
+}
+
+/* Stock Indicators */
+.stock-indicator--high {
+    color: #34d399;
+    font-weight: 500;
+}
+
+.stock-indicator--low {
+    color: #fbbf24;
+    font-weight: 500;
+}
+
+.stock-indicator--zero {
+    color: #f87171;
+    font-weight: 600;
+}
+
+.stock-indicator--unknown {
+    color: #6b7280;
+}
+
+/* ========================================
+   Sticky Table Header
+   ======================================== */
+.product-list-table thead {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background: #1f2937;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+.product-list-table thead th {
+    background: #1f2937;
+}
+
+/* ========================================
+   Row Coloring (Status-based)
+   ======================================== */
+.product-row--error {
+    background: rgba(239, 68, 68, 0.05) !important;
+    border-left: 3px solid rgba(239, 68, 68, 0.5);
+}
+
+.product-row--error:hover {
+    background: rgba(239, 68, 68, 0.08) !important;
+}
+
+.product-row--warning {
+    background: rgba(251, 191, 36, 0.05) !important;
+    border-left: 3px solid rgba(251, 191, 36, 0.5);
+}
+
+.product-row--warning:hover {
+    background: rgba(251, 191, 36, 0.08) !important;
+}
+
+.product-row--syncing {
+    background: rgba(59, 130, 246, 0.05) !important;
+    border-left: 3px solid rgba(59, 130, 246, 0.5);
+}
+
+.product-row--syncing:hover {
+    background: rgba(59, 130, 246, 0.08) !important;
+}

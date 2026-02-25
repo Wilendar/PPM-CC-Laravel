@@ -83,6 +83,12 @@
         {{ $variant->product?->manufacturer ?? '-' }}
     </td>
 
+    {{-- 6b. Price (variant) --}}
+    <td class="px-4 py-2 text-sm text-gray-500">-</td>
+
+    {{-- 6c. Stock (variant) --}}
+    <td class="px-4 py-2 text-sm text-gray-500">-</td>
+
     {{-- 7. Status --}}
     <td class="px-4 py-2">
         <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium

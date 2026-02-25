@@ -1,5 +1,9 @@
 /* PPM-CC-Laravel - Main Application Styles */
 
+/* All @import statements MUST come first (CSS spec) */
+@import 'products/product-list-search.css';
+@import 'products/product-list-columns.css';
+
 /* Import Tailwind CSS */
 @tailwind base;
 @tailwind components;
