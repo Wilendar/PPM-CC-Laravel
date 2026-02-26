@@ -62,7 +62,8 @@ tmpclaude-*-cwd
 /.parallel-work/
 /.ma-orchestrator/
 /.playwright-mcp/
-/.Release_docs/
+# /.Release_docs/ - tracked: release documentation
+!/.Release_docs/
 
 # Project documentation (not source code)
 /CLAUDE.md
