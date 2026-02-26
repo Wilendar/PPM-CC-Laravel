@@ -143,6 +143,20 @@
             Synchronizacja
         </a>
         @endcan
+
+        {{-- Cross-Source Matrix --}}
+        <a href="/admin/scan-products"
+           class="group flex items-center px-2 py-2 text-sm font-medium rounded-md
+                  {{ request()->is('admin/scan-products*')
+                      ? 'bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-200'
+                      : 'text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700'
+                  }}">
+            <svg class="mr-3 h-5 w-5 {{ request()->is('admin/scan-products*') ? 'text-purple-500' : 'text-gray-400' }}"
+                 fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path>
+            </svg>
+            Macierz Produktow
+        </a>
     </div>
     
     <hr class="my-4 border-gray-200 dark:border-gray-700">

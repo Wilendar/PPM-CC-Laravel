@@ -533,8 +533,31 @@ class ProductPublicationService
             return;
         }
 
+        // Filter to only valid PPM category IDs (prevent FK constraint violation
+        // when category_ids contains stale PrestaShop IDs from import)
+        $validCategoryIds = \App\Models\Category::whereIn('id', $categoryIds)
+            ->pluck('id')
+            ->toArray();
+
+        if (empty($validCategoryIds)) {
+            Log::warning('No valid PPM categories found for product', [
+                'product_id' => $product->id,
+                'pending_category_ids' => $categoryIds,
+            ]);
+            return;
+        }
+
+        if (count($validCategoryIds) < count($categoryIds)) {
+            $invalid = array_diff($categoryIds, $validCategoryIds);
+            Log::warning('Filtered out invalid category IDs during publication', [
+                'product_id' => $product->id,
+                'invalid_ids' => array_values($invalid),
+                'valid_count' => count($validCategoryIds),
+            ]);
+        }
+
         // Sync categories through relationship
-        $product->categories()->sync($categoryIds);
+        $product->categories()->sync($validCategoryIds);
     }
 
     /**

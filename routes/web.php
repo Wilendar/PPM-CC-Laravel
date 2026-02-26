@@ -437,9 +437,13 @@ Route::prefix('admin')->name('admin.')->middleware($adminMiddleware)->group(func
     // PRODUCT SCAN SYSTEM - ETAP_10
     // ==========================================
 
-    // Product Scanning and Linking Panel
-    Route::get('/scan-products', \App\Http\Livewire\Admin\Scan\ScanProductsPanel::class)
+    // Cross-Source Matrix Panel (replaces old ScanProductsPanel)
+    Route::get('/scan-products', \App\Http\Livewire\Admin\Scan\CrossSourceMatrixPanel::class)
         ->name('scan-products');
+
+    // Legacy Scan Panel (backup)
+    Route::get('/scan-products/legacy', \App\Http\Livewire\Admin\Scan\ScanProductsPanel::class)
+        ->name('scan-products.legacy');
 
     // ==========================================
     // SESSION MANAGEMENT - FAZA C User Management

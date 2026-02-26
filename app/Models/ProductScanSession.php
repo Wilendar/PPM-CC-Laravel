@@ -110,6 +110,13 @@ class ProductScanSession extends Model
         // Related entities
         'sync_job_id',
         'user_id',
+
+        // Chunked scan tracking (added by migration 2026_02_25_100000)
+        'total_chunks',
+        'processed_chunks',
+        'chunk_size',
+        'source_cache_key',
+        'scan_mode',
     ];
 
     protected $casts = [
@@ -125,6 +132,9 @@ class ProductScanSession extends Model
         'matched_count' => 'integer',
         'unmatched_count' => 'integer',
         'errors_count' => 'integer',
+        'total_chunks' => 'integer',
+        'processed_chunks' => 'integer',
+        'chunk_size' => 'integer',
         'source_id' => 'integer',
         'sync_job_id' => 'integer',
         'user_id' => 'integer',

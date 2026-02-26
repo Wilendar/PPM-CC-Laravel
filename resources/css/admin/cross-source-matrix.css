@@ -1,0 +1,479 @@
+/* ========================================
+   Cross-Source Matrix - Table
+   ======================================== */
+
+.matrix-table-wrapper {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+/* Sticky first column (SKU) */
+.matrix-sticky-col {
+    position: sticky;
+    left: 0;
+    z-index: 2;
+    background: inherit;
+}
+
+thead .matrix-sticky-col {
+    background: rgb(31 41 55); /* bg-gray-800 */
+    z-index: 3;
+}
+
+tbody tr:nth-child(odd) .matrix-sticky-col {
+    background: rgba(31, 41, 55, 0.3);
+}
+
+tbody tr:nth-child(even) .matrix-sticky-col {
+    background: rgb(17 24 39); /* bg-gray-900 */
+}
+
+tbody tr:hover .matrix-sticky-col {
+    background: rgb(55 65 81); /* bg-gray-700 */
+}
+
+/* ========================================
+   Cross-Source Matrix - Cell Statuses
+   ======================================== */
+
+.matrix-cell {
+    transition: background-color 0.15s ease;
+    cursor: pointer;
+}
+
+/* Hover: ukryj ikone statusu, pokaz przyciski akcji */
+.matrix-cell-hover-parent .matrix-cell-actions {
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.1s ease;
+    z-index: 1;
+    background: inherit;
+}
+
+.matrix-cell-hover-parent:hover .matrix-cell-actions {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.matrix-cell-hover-parent:hover .matrix-cell-icon {
+    opacity: 0;
+}
+
+.matrix-cell:hover {
+    filter: brightness(1.2);
+}
+
+.matrix-cell--linked { background: rgba(22, 101, 52, 0.15); }
+.matrix-cell--not_linked { background: rgba(37, 99, 235, 0.12); }
+.matrix-cell--not_found { background: rgba(220, 38, 38, 0.12); }
+.matrix-cell--unknown { background: rgba(75, 85, 99, 0.08); }
+.matrix-cell--ignored { background: rgba(55, 65, 81, 0.2); opacity: 0.6; }
+.matrix-cell--conflict { background: rgba(133, 77, 14, 0.15); }
+.matrix-cell--brand_not_allowed { background: rgba(75, 85, 99, 0.15); }
+.matrix-cell--pending_sync { background: rgba(30, 58, 138, 0.15); }
+
+/* ========================================
+   Cross-Source Matrix - Source Headers
+   ======================================== */
+
+.matrix-source-header {
+    border-top: 3px solid var(--source-color, #6b7280);
+    text-align: center;
+    white-space: nowrap;
+    min-width: 100px;
+}
+
+/* ========================================
+   Cross-Source Matrix - Cell Popup
+   ======================================== */
+
+.matrix-popup-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 50;
+    background: rgba(0, 0, 0, 0.3);
+}
+
+.matrix-popup {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgb(31 41 55);
+    border: 1px solid rgb(75 85 99);
+    border-radius: 0.5rem;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3);
+    padding: 0.75rem;
+    min-width: 220px;
+    z-index: 51;
+}
+
+.matrix-popup-action {
+    display: block;
+    width: 100%;
+    text-align: left;
+    padding: 0.375rem 0.75rem;
+    font-size: 0.875rem;
+    color: rgb(209 213 219);
+    border-radius: 0.25rem;
+    transition: background-color 0.15s ease;
+}
+
+.matrix-popup-action:hover {
+    background: rgb(55 65 81);
+}
+
+/* ========================================
+   Cross-Source Matrix - Diff Viewer
+   ======================================== */
+
+.matrix-diff-row {
+    background: rgba(17, 24, 39, 0.8);
+    border-top: 1px solid rgb(75 85 99);
+    border-bottom: 1px solid rgb(75 85 99);
+}
+
+.matrix-diff-table td {
+    padding: 0.375rem 0.5rem;
+}
+
+.matrix-diff-ppm {
+    color: rgb(74 222 128); /* green-400 */
+}
+
+.matrix-diff-source {
+    color: rgb(248 113 113); /* red-400 */
+}
+
+/* ========================================
+   Cross-Source Matrix - Scan Progress
+   ======================================== */
+
+.matrix-progress-bar {
+    width: 100%;
+    height: 0.75rem;
+    background: rgb(55 65 81);
+    border-radius: 9999px;
+    overflow: hidden;
+}
+
+.matrix-progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #22c55e, #16a34a);
+    border-radius: 9999px;
+    transition: width 0.3s ease;
+    background-size: 1rem 1rem;
+    animation: matrix-progress-stripes 1s linear infinite;
+}
+
+@keyframes matrix-progress-stripes {
+    0% { background-position: 1rem 0; }
+    100% { background-position: 0 0; }
+}
+
+/* ========================================
+   Cross-Source Matrix - Summary Cards (Enterprise Fill Pattern)
+   ======================================== */
+
+.matrix-summary-card {
+    border-radius: 0.5rem;
+    padding: 1rem;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+/* Wariant: Total (szary) */
+.matrix-stat-total {
+    background: linear-gradient(135deg, rgba(107, 114, 128, 0.1), rgba(75, 85, 99, 0.08));
+    border: 1px solid rgba(107, 114, 128, 0.4);
+    box-shadow: 0 0 20px rgba(107, 114, 128, 0.1);
+}
+
+.matrix-stat-total:hover {
+    border-color: rgba(107, 114, 128, 0.6);
+    box-shadow: 0 0 24px rgba(107, 114, 128, 0.18);
+}
+
+/* Wariant: Powiazane (zielony) */
+.matrix-stat-linked {
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(5, 150, 105, 0.08));
+    border: 1px solid rgba(16, 185, 129, 0.4);
+    box-shadow: 0 0 20px rgba(16, 185, 129, 0.15);
+}
+
+.matrix-stat-linked:hover {
+    border-color: rgba(16, 185, 129, 0.6);
+    box-shadow: 0 0 24px rgba(16, 185, 129, 0.22);
+}
+
+/* Wariant: Niepowiazane (niebieski - istnieje w zrodle) */
+.matrix-stat-not-linked {
+    background: linear-gradient(135deg, rgba(37, 99, 235, 0.1), rgba(29, 78, 216, 0.08));
+    border: 1px solid rgba(37, 99, 235, 0.35);
+    box-shadow: 0 0 20px rgba(37, 99, 235, 0.1);
+}
+
+.matrix-stat-not-linked:hover {
+    border-color: rgba(37, 99, 235, 0.55);
+    box-shadow: 0 0 24px rgba(37, 99, 235, 0.18);
+}
+
+/* Wariant: Nie znaleziono (czerwony - nie istnieje) */
+.matrix-stat-not-found {
+    background: linear-gradient(135deg, rgba(220, 38, 38, 0.1), rgba(185, 28, 28, 0.08));
+    border: 1px solid rgba(220, 38, 38, 0.35);
+    box-shadow: 0 0 20px rgba(220, 38, 38, 0.1);
+}
+
+.matrix-stat-not-found:hover {
+    border-color: rgba(220, 38, 38, 0.55);
+    box-shadow: 0 0 24px rgba(220, 38, 38, 0.18);
+}
+
+/* Wariant: Nieznany (szary - brak skanu) */
+.matrix-stat-unknown {
+    background: linear-gradient(135deg, rgba(107, 114, 128, 0.08), rgba(75, 85, 99, 0.06));
+    border: 1px solid rgba(107, 114, 128, 0.3);
+    box-shadow: 0 0 20px rgba(107, 114, 128, 0.08);
+}
+
+.matrix-stat-unknown:hover {
+    border-color: rgba(107, 114, 128, 0.5);
+    box-shadow: 0 0 24px rgba(107, 114, 128, 0.14);
+}
+
+/* Wariant: Konflikty (zolty/amber) */
+.matrix-stat-conflicts {
+    background: linear-gradient(135deg, rgba(245, 158, 11, 0.1), rgba(217, 119, 6, 0.08));
+    border: 1px solid rgba(245, 158, 11, 0.4);
+    box-shadow: 0 0 20px rgba(245, 158, 11, 0.15);
+}
+
+.matrix-stat-conflicts:hover {
+    border-color: rgba(245, 158, 11, 0.6);
+    box-shadow: 0 0 24px rgba(245, 158, 11, 0.22);
+}
+
+/* Wariant: Zablokowane (neutralny szary) */
+.matrix-stat-blocked {
+    background: linear-gradient(135deg, rgba(107, 114, 128, 0.08), rgba(75, 85, 99, 0.06));
+    border: 1px solid rgba(107, 114, 128, 0.3);
+    box-shadow: 0 0 20px rgba(107, 114, 128, 0.1);
+}
+
+.matrix-stat-blocked:hover {
+    border-color: rgba(107, 114, 128, 0.5);
+    box-shadow: 0 0 24px rgba(107, 114, 128, 0.16);
+}
+
+/* Wartosci liczbowe na kartach */
+.matrix-stat-value-total    { color: #ffffff; }
+.matrix-stat-value-linked   { color: #6ee7b7; }
+.matrix-stat-value-not-linked { color: #60a5fa; }
+.matrix-stat-value-not-found  { color: #f87171; }
+.matrix-stat-value-unknown    { color: #9ca3af; }
+.matrix-stat-value-conflicts { color: #fbbf24; }
+.matrix-stat-value-blocked  { color: #9ca3af; }
+
+/* ========================================
+   Cross-Source Matrix - Brand Suggestions (Enterprise Fill Pattern)
+   ======================================== */
+
+/* Aktywna sugestia brandu (amber/warning) */
+.matrix-brand-suggestion {
+    background: linear-gradient(135deg, rgba(245, 158, 11, 0.1), rgba(217, 119, 6, 0.08));
+    border: 1px solid rgba(245, 158, 11, 0.3);
+    border-radius: 0.5rem;
+    padding: 0.75rem;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.matrix-brand-suggestion:hover {
+    border-color: rgba(245, 158, 11, 0.5);
+    box-shadow: 0 0 12px rgba(245, 158, 11, 0.15);
+}
+
+.matrix-brand-suggestion-icon {
+    color: #fbbf24;
+}
+
+.matrix-brand-suggestion-title {
+    color: #fbbf24;
+    font-size: 0.875rem;
+}
+
+/* Chip aktywnej sugestii */
+.matrix-brand-chip {
+    background: rgba(245, 158, 11, 0.15);
+    border: 1px solid rgba(245, 158, 11, 0.25);
+    border-radius: 9999px;
+    padding: 0.25rem 0.75rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.matrix-brand-chip-text {
+    color: #fcd34d;
+    font-size: 0.75rem;
+}
+
+.matrix-source-filter-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 1.25rem;
+    height: 1.25rem;
+    border-radius: 9999px;
+    font-size: 0.625rem;
+    font-weight: 600;
+    background: rgba(224, 172, 126, 0.2);
+    color: #e0ac7e;
+    padding: 0 0.25rem;
+}
+
+.matrix-brand-chip-show {
+    color: #60a5fa;
+    font-size: 0.75rem;
+    font-weight: 500;
+    margin-left: 0.25rem;
+    transition: color 0.15s ease;
+}
+
+.matrix-brand-chip-show:hover {
+    color: #93c5fd;
+}
+
+.matrix-brand-chip-add {
+    color: #6ee7b7;
+    font-size: 0.75rem;
+    font-weight: 500;
+    margin-left: 0.25rem;
+    transition: color 0.15s ease;
+}
+
+.matrix-brand-chip-add:hover {
+    color: #a7f3d0;
+}
+
+.matrix-brand-chip-dismiss {
+    color: #9ca3af;
+    font-size: 0.75rem;
+    font-weight: 500;
+    margin-left: 0.25rem;
+    transition: color 0.15s ease;
+}
+
+.matrix-brand-chip-dismiss:hover {
+    color: #d1d5db;
+}
+
+/* Przelacznik odrzuconych */
+.matrix-brand-toggle-dismissed {
+    color: #6b7280;
+    font-size: 0.75rem;
+    transition: color 0.15s ease;
+}
+
+.matrix-brand-toggle-dismissed:hover {
+    color: #d1d5db;
+}
+
+/* Odrzucone sugestie (wyciszone) */
+.matrix-brand-dismissed {
+    background: rgba(107, 114, 128, 0.1);
+    border: 1px solid rgba(107, 114, 128, 0.3);
+    border-radius: 0.5rem;
+    padding: 0.75rem;
+    opacity: 0.65;
+    transition: opacity 0.15s ease;
+}
+
+.matrix-brand-dismissed:hover {
+    opacity: 0.85;
+}
+
+/* Chip odrzuconej sugestii */
+.matrix-brand-dismissed-chip {
+    background: rgba(107, 114, 128, 0.15);
+    border: 1px solid rgba(107, 114, 128, 0.25);
+    border-radius: 9999px;
+    padding: 0.25rem 0.75rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.matrix-brand-restore {
+    color: #fbbf24;
+    font-size: 0.75rem;
+    font-weight: 500;
+    margin-left: 0.25rem;
+    transition: color 0.15s ease;
+}
+
+.matrix-brand-restore:hover {
+    color: #fcd34d;
+}
+
+/* ========================================
+   Cross-Source Matrix - Infinite Scroll
+   ======================================== */
+
+.matrix-load-more-sentinel {
+    padding: 1rem;
+    text-align: center;
+}
+
+.matrix-load-more-spinner {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+}
+
+.matrix-load-more-end {
+    padding: 0.75rem;
+    text-align: center;
+    font-size: 0.875rem;
+    color: #6b7280;
+}
+
+/* ========================================
+   Cross-Source Matrix - Grouped View
+   ======================================== */
+
+.matrix-group-header {
+    background: rgba(31, 41, 55, 0.8);
+    cursor: pointer;
+    transition: background-color 0.15s ease;
+}
+
+.matrix-group-header:hover {
+    background: rgba(55, 65, 81, 0.8);
+}
+
+/* ========================================
+   Cross-Source Matrix - Tab Styles
+   ======================================== */
+
+.matrix-tab-active {
+    background-color: #e0ac7e;
+    color: rgb(17 24 39);
+}
+
+/* ========================================
+   Cross-Source Matrix - Responsive
+   ======================================== */
+
+@media (max-width: 1024px) {
+    .matrix-summary-card {
+        padding: 0.75rem;
+    }
+}
+
+@media (max-width: 768px) {
+    .matrix-source-header {
+        min-width: 80px;
+        font-size: 0.75rem;
+    }
+}

@@ -31,8 +31,8 @@
             <template x-for="col in columns" :key="col.key">
                 <label class="flex items-center px-2 py-1.5 rounded hover:bg-gray-700/50 cursor-pointer transition-colors">
                     <input type="checkbox"
-                           :checked="col.visible"
-                           @change="toggleColumn(col.key)"
+                           x-model="col.visible"
+                           @change="saveState(); broadcastState()"
                            :disabled="col.required"
                            class="mr-2 rounded border-gray-600 text-orange-500 focus:ring-orange-500"
                            :class="{ 'opacity-50 cursor-not-allowed': col.required }">
@@ -95,6 +95,8 @@ Alpine.data('columnCustomizer', () => ({
             this.broadcastState();
         }
     },
+
+    /** @deprecated Use x-model binding instead */
 
     resetToDefaults() {
         this.columns.forEach(col => col.visible = true);
