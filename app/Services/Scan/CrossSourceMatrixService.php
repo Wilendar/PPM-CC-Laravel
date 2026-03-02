@@ -326,8 +326,39 @@ class CrossSourceMatrixService
         ], true) ? self::CELL_PENDING_SYNC : self::CELL_LINKED;
     }
 
+    /**
+     * Zwraca liczbę produktów pasujących do filtrów (bez paginacji).
+     */
+    public function getFilteredProductCount(array $filters = []): int
+    {
+        $sources = $this->getAvailableSources();
+        $query = Product::whereNotNull('sku')->where('sku', '!=', '');
+        $this->applyFilters($query, $filters, $sources);
+
+        return $query->count();
+    }
+
+    /**
+     * Zwraca wszystkie ID produktów pasujących do filtrów (bez paginacji).
+     *
+     * @return int[]
+     */
+    public function getFilteredProductIds(array $filters = []): array
+    {
+        $sources = $this->getAvailableSources();
+        $query = Product::whereNotNull('sku')->where('sku', '!=', '');
+        $this->applyFilters($query, $filters, $sources);
+
+        return $query->pluck('id')->toArray();
+    }
+
     private function applyFilters(Builder $query, array $filters, array $sources): void
     {
+        // Filtr po konkretnych ID (dla chunked bulk actions)
+        if (!empty($filters['ids'])) {
+            $query->whereIn('id', $filters['ids']);
+        }
+
         if (!empty($filters['search'])) {
             $term = '%' . $filters['search'] . '%';
             $query->where(fn (Builder $q) =>
@@ -343,19 +374,9 @@ class CrossSourceMatrixService
             );
         }
 
-        // Filtr statusu - filtruje produkty BEZ linka do jakiegokolwiek zrodla
-        $statusFilter = $filters['status'] ?? '';
-        if (in_array($statusFilter, ['not_linked', 'not_found', 'unknown', 'missing'])) {
-            $query->where(function (Builder $q) use ($sources) {
-                foreach ($sources as $s) {
-                    if ($s['is_shop']) {
-                        $q->orWhereDoesntHave('shopData', fn (Builder $sq) => $sq->where('shop_id', $s['id']));
-                    } else {
-                        $q->orWhereDoesntHave('erpData', fn (Builder $eq) => $eq->where('erp_connection_id', $s['id']));
-                    }
-                }
-            });
-        }
+        // Filtr statusu - filtruje produkty wg statusu komorki macierzy
+        // Uwzglednia widoczne zrodla (visibleSources) - filtruje TYLKO po widocznych kolumnach
+        $this->applyStatusFilter($query, $filters['status'] ?? '', $sources, $filters['visible_sources'] ?? []);
 
         // Sortowanie
         $sortField     = $filters['sort_field'] ?? 'sku';
@@ -420,5 +441,179 @@ class CrossSourceMatrixService
         }
 
         return $result;
+    }
+
+    /**
+     * Filtruje query produktow wg statusu komorki macierzy.
+     * Kazdy filtr szuka produktow ktore maja PRZYNAJMNIEJ JEDNA komorke z danym statusem.
+     * Uwzglednia widoczne zrodla - jesli ustawione, filtruje TYLKO po tych zrodlach.
+     *
+     * @param Builder  $query
+     * @param string   $status            Wartosc filtra statusu
+     * @param array    $allSources        Wszystkie dostepne zrodla
+     * @param string[] $visibleSourceKeys Klucze widocznych zrodel (np. ['prestashop_1']). Puste = wszystkie.
+     */
+    private function applyStatusFilter(
+        Builder $query,
+        string $status,
+        array $allSources,
+        array $visibleSourceKeys = []
+    ): void {
+        if (empty($status) || $status === 'all') {
+            return;
+        }
+
+        // Wyznacz zrodla do filtrowania: widoczne lub wszystkie
+        $activeSources = $allSources;
+        if (!empty($visibleSourceKeys)) {
+            $activeSources = array_values(array_filter(
+                $allSources,
+                fn (array $s) => in_array($s['type'] . '_' . $s['id'], $visibleSourceKeys)
+            ));
+        }
+
+        if (empty($activeSources)) {
+            return;
+        }
+
+        $pendingStatuses = [
+            ProductShopData::STATUS_PENDING,
+            ProductShopData::STATUS_SYNCING,
+        ];
+
+        switch ($status) {
+            case self::CELL_LINKED:
+                $query->where(function (Builder $q) use ($pendingStatuses, $activeSources) {
+                    foreach ($activeSources as $s) {
+                        if ($s['is_shop']) {
+                            $q->orWhereHas('shopData', fn (Builder $sq) =>
+                                $sq->where('shop_id', $s['id'])
+                                   ->whereNotIn('sync_status', $pendingStatuses)
+                            );
+                        } else {
+                            $q->orWhereHas('erpData', fn (Builder $eq) =>
+                                $eq->where('erp_connection_id', $s['id'])
+                                   ->whereNotIn('sync_status', $pendingStatuses)
+                            );
+                        }
+                    }
+                });
+                break;
+
+            case self::CELL_PENDING_SYNC:
+                $query->where(function (Builder $q) use ($pendingStatuses, $activeSources) {
+                    foreach ($activeSources as $s) {
+                        if ($s['is_shop']) {
+                            $q->orWhereHas('shopData', fn (Builder $sq) =>
+                                $sq->where('shop_id', $s['id'])
+                                   ->whereIn('sync_status', $pendingStatuses)
+                            );
+                        } else {
+                            $q->orWhereHas('erpData', fn (Builder $eq) =>
+                                $eq->where('erp_connection_id', $s['id'])
+                                   ->whereIn('sync_status', $pendingStatuses)
+                            );
+                        }
+                    }
+                });
+                break;
+
+            case self::CELL_NOT_LINKED:
+                $matchStatuses = [
+                    ProductScanResult::MATCH_MATCHED,
+                    ProductScanResult::MATCH_CONFLICT,
+                    ProductScanResult::MATCH_MULTIPLE,
+                    ProductScanResult::MATCH_ALREADY_LINKED,
+                ];
+                $query->whereHas('scanResults', function (Builder $sq) use ($matchStatuses, $activeSources) {
+                    $sq->whereIn('match_status', $matchStatuses)
+                       ->where(fn (Builder $r) =>
+                           $r->where('resolution_status', '!=', ProductScanResult::RESOLUTION_IGNORED)
+                             ->orWhereNull('resolution_status')
+                       );
+                    $this->constrainToSources($sq, $activeSources);
+                });
+                break;
+
+            case self::CELL_NOT_FOUND:
+                $query->whereHas('scanResults', function (Builder $sq) use ($activeSources) {
+                    $sq->where('match_status', ProductScanResult::MATCH_UNMATCHED);
+                    $this->constrainToSources($sq, $activeSources);
+                });
+                break;
+
+            case self::CELL_UNKNOWN:
+                // Brak wynikow skanu dla aktywnych zrodel I brak linkow do aktywnych zrodel
+                $query->whereDoesntHave('scanResults', function (Builder $sq) use ($activeSources) {
+                    $this->constrainToSources($sq, $activeSources);
+                });
+                foreach ($activeSources as $s) {
+                    if ($s['is_shop']) {
+                        $query->whereDoesntHave('shopData', fn (Builder $sq) =>
+                            $sq->where('shop_id', $s['id'])
+                        );
+                    } else {
+                        $query->whereDoesntHave('erpData', fn (Builder $eq) =>
+                            $eq->where('erp_connection_id', $s['id'])
+                        );
+                    }
+                }
+                break;
+
+            case self::CELL_IGNORED:
+                $query->whereHas('scanResults', function (Builder $sq) use ($activeSources) {
+                    $sq->where('resolution_status', ProductScanResult::RESOLUTION_IGNORED);
+                    $this->constrainToSources($sq, $activeSources);
+                });
+                break;
+
+            case self::CELL_CONFLICT:
+                $query->whereHas('scanResults', function (Builder $sq) use ($activeSources) {
+                    $sq->where('match_status', ProductScanResult::MATCH_CONFLICT);
+                    $this->constrainToSources($sq, $activeSources);
+                });
+                break;
+
+            case self::CELL_BRAND_NOT_ALLOWED:
+                $psShopIds = array_values(array_map(
+                    fn ($s) => $s['id'],
+                    array_filter($activeSources, fn ($s) => $s['type'] === 'prestashop')
+                ));
+
+                if (empty($psShopIds)) {
+                    $query->whereRaw('1 = 0');
+                    break;
+                }
+
+                $blockedBrandNames = SmartSyncBrandRule::where('is_allowed', false)
+                    ->whereIn('shop_id', $psShopIds)
+                    ->pluck('brand')
+                    ->unique()
+                    ->toArray();
+
+                if (!empty($blockedBrandNames)) {
+                    $query->whereHas('manufacturerRelation', fn (Builder $mq) =>
+                        $mq->whereIn('name', $blockedBrandNames)
+                    );
+                } else {
+                    $query->whereRaw('1 = 0');
+                }
+                break;
+        }
+    }
+
+    /**
+     * Ogranicza query scan_results do konkretnych zrodel (external_source_type + external_source_id).
+     */
+    private function constrainToSources(Builder $query, array $sources): void
+    {
+        $query->where(function (Builder $q) use ($sources) {
+            foreach ($sources as $s) {
+                $q->orWhere(function (Builder $sq) use ($s) {
+                    $sq->where('external_source_type', $s['type'])
+                       ->where('external_source_id', $s['id']);
+                });
+            }
+        });
     }
 }

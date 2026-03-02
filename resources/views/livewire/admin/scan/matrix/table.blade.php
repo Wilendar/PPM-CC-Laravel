@@ -91,10 +91,12 @@
                         </span>
                     </th>
 
-                    {{-- Source headers (filterable) --}}
+                    {{-- Source headers (filterable) - wire:key MANDATORY for Livewire morph --}}
                     @foreach($sources as $source)
-                        @if($this->isSourceVisible($source['type'] . '_' . $source['id']))
-                        <th class="px-3 py-3 text-center whitespace-nowrap min-w-[100px]"
+                        @php $srcKey = $source['type'] . '_' . $source['id']; @endphp
+                        @if($this->isSourceVisible($srcKey))
+                        <th wire:key="th-src-{{ $srcKey }}"
+                            class="px-3 py-3 text-center whitespace-nowrap min-w-[100px]"
                             style="border-top: 3px solid {{ $source['color'] ?? '#6b7280' }}">
                             <div class="flex flex-col items-center space-y-1">
                                 <span class="font-semibold text-gray-200 text-xs leading-tight">

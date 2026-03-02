@@ -813,6 +813,16 @@ class Product extends Model
     }
 
     /**
+     * Scan results linked to this product (via ppm_product_id).
+     *
+     * @return \Illuminate\Database\Eloquent\Relations\HasMany
+     */
+    public function scanResults(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(\App\Models\ProductScanResult::class, 'ppm_product_id', 'id');
+    }
+
+    /**
      * Active ERP data only (sync enabled)
      *
      * @return \Illuminate\Database\Eloquent\Relations\HasMany

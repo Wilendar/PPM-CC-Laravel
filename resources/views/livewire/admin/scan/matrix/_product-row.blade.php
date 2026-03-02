@@ -29,11 +29,11 @@
         </span>
     </td>
 
-    {{-- Nazwa --}}
-    <td class="px-3 py-2">
-        <div class="flex items-center space-x-1 max-w-[200px]">
+    {{-- Nazwa - dynamiczne obcinanie przez CSS truncate --}}
+    <td class="px-3 py-2 matrix-name-col">
+        <div class="flex items-center space-x-1 min-w-0">
             <span class="truncate text-gray-200" title="{{ $product->name }}">
-                {{ Str::limit($product->name, 40) }}
+                {{ $product->name }}
             </span>
             <button wire:click="toggleDiffViewer({{ $product->id }})"
                     class="flex-shrink-0 text-gray-500 hover:text-gray-300 transition-colors duration-100"
@@ -65,7 +65,8 @@
         @endphp
         @if($this->isSourceVisible($sourceKey))
 
-        <td class="px-1 py-1.5 text-center matrix-cell matrix-cell--{{ $status }} matrix-cell-hover-parent"
+        <td wire:key="td-{{ $product->id }}-{{ $sourceKey }}"
+            class="px-1 py-1.5 text-center matrix-cell matrix-cell--{{ $status }} matrix-cell-hover-parent"
             style="position:relative; min-width:60px; height:36px;">
 
             {{-- Default icon (hidden via CSS parent:hover for actionable cells) --}}

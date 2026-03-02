@@ -24,8 +24,8 @@
         <option value="not_found">Nie znaleziono</option>
         <option value="unknown">Nieznany (brak skanu)</option>
         <option value="ignored">Ignorowane</option>
-        <option value="conflicts">Konflikty</option>
-        <option value="brand_blocked">Zablokowane marki</option>
+        <option value="conflict">Konflikty</option>
+        <option value="brand_not_allowed">Zablokowane marki</option>
         <option value="pending_sync">Oczekuje sync</option>
     </select>
 

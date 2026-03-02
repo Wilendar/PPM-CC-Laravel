@@ -1,9 +1,9 @@
 # PPM - Cross-Source Matrix Panel Documentation
 
-> **Wersja:** 1.0.0
+> **Wersja:** 1.1.0
 > **Data:** 2026-02-26
 > **Status:** Production Ready
-> **Changelog:** Inicjalna wersja - kompletny panel macierzy cross-source zastepujacy stary ScanProductsPanel
+> **Changelog:** v1.1.0 - Gmail "Select All Matching" pattern dla bulk operations z infinite scroll
 
 ---
 
@@ -60,6 +60,7 @@
 - **CSS Hover Actions** - ikony akcji pojawiaja sie na hover nad komorka (bez klikania)
 - **Cell Popup** - kontekstowe menu z akcjami per status komorki
 - **Bulk Operations** - zaznaczanie wierszy + masowe: link, publish, ignore
+- **Select All Matching** - Gmail pattern: zaznaczanie WSZYSTKICH produktow pasujacych do filtrow (nie tylko zaladowanych)
 - **Diff Viewer** - rozwijany wiersz z porownaniem PPM vs Source per pole
 - **Brand Suggestions** - inteligentne sugestie dodania marki do dozwolonych per sklep
 - **Export** - XLSX/CSV z aktywnych filtrow macierzy
@@ -111,9 +112,9 @@
 | Plik | LOC | Opis |
 |------|-----|------|
 | `app/Http/Livewire/Admin/Scan/CrossSourceMatrixPanel.php` | 148 | Glowny komponent (mount, render, 2 zakladki) |
-| `app/Http/Livewire/Admin/Scan/Traits/MatrixDataTrait.php` | 191 | Ladowanie sources, Quick Matrix data, statystyki |
-| `app/Http/Livewire/Admin/Scan/Traits/MatrixFiltersTrait.php` | 223 | Filtry, sortowanie, visibility, paginacja |
-| `app/Http/Livewire/Admin/Scan/Traits/MatrixActionsTrait.php` | 577 | Akcje na komorkach, bulk, popup, diff, brand suggestions |
+| `app/Http/Livewire/Admin/Scan/Traits/MatrixDataTrait.php` | 232 | Ladowanie sources, Quick Matrix data, statystyki, selectAllMatching helpers |
+| `app/Http/Livewire/Admin/Scan/Traits/MatrixFiltersTrait.php` | 234 | Filtry, sortowanie, visibility, paginacja, reset selekcji |
+| `app/Http/Livewire/Admin/Scan/Traits/MatrixActionsTrait.php` | 702 | Akcje na komorkach, bulk, popup, diff, brand suggestions, selectAllMatching |
 | `app/Http/Livewire/Admin/Scan/Traits/ChunkedScanTrait.php` | 381 | Chunked scan orchestration (start/process/finalize/cancel/resume) |
 | `app/Http/Livewire/Admin/Scan/Traits/ScanSourcesTrait.php` | ~80 | Reused - getAvailableSources(), getGroupedSources() |
 
@@ -121,7 +122,7 @@
 
 | Plik | LOC | Opis |
 |------|-----|------|
-| `app/Services/Scan/CrossSourceMatrixService.php` | 424 | Quick Matrix query, resolveCell, summary stats, brand suggestions |
+| `app/Services/Scan/CrossSourceMatrixService.php` | 455 | Quick Matrix query, resolveCell, summary stats, brand suggestions, filtered count/IDs |
 | `app/Services/Scan/ChunkedScanEngine.php` | 450 | Prefetch source data, chunk processing, diff detection |
 
 ### 2.3 Backend - Model & Export
@@ -139,7 +140,7 @@
 | `resources/views/livewire/admin/scan/matrix/summary-bar.blade.php` | 106 | Karty statystyk + export buttons |
 | `resources/views/livewire/admin/scan/matrix/brand-suggestions.blade.php` | 101 | Sugestie marek (active + dismissed) |
 | `resources/views/livewire/admin/scan/matrix/toolbar.blade.php` | 133 | Filtry, sort, scan button |
-| `resources/views/livewire/admin/scan/matrix/bulk-actions-bar.blade.php` | 75 | Sticky bulk action bar |
+| `resources/views/livewire/admin/scan/matrix/bulk-actions-bar.blade.php` | 92 | Sticky bulk action bar + selectAllMatching banner |
 | `resources/views/livewire/admin/scan/matrix/scan-progress.blade.php` | 93 | Progress bar + ETA + resume banner |
 | `resources/views/livewire/admin/scan/matrix/table.blade.php` | 260 | Tabela macierzowa (flat + grouped view) |
 | `resources/views/livewire/admin/scan/matrix/_product-row.blade.php` | 166 | Wiersz produktu z cell rendering + hover actions |
@@ -251,8 +252,11 @@ Nowe kolumny dodane migracja `2026_02_25_100000`:
 |----------|-----|---------|------|
 | `$expandedDiffs` | array | `[]` | ID produktow z otwartym diff viewerem |
 | `$activePopup` | ?array | `null` | {productId, sourceKey} aktywnego popup |
-| `$selectedProducts` | array | `[]` | Zaznaczone produkty (checkbox) |
-| `$selectAll` | bool | `false` | Zaznacz wszystkie |
+| `$selectedProducts` | array | `[]` | Zaznaczone produkty (widoczne checkboxy) |
+| `$selectAll` | bool | `false` | Zaznacz wszystkie widoczne |
+| `$selectAllMatching` | bool | `false` | Tryb "zaznacz wszystkie pasujace" (Gmail pattern) |
+| `$excludedProducts` | array | `[]` | Wykluczone produkty w trybie selectAllMatching |
+| `$totalMatchingCount` | int | `0` | Calkowita liczba produktow pasujacych do filtrow |
 | `$showDismissedSuggestions` | bool | `false` | Pokaz odrzucone sugestie |
 
 ### 4.5 ChunkedScanTrait
@@ -288,7 +292,9 @@ Nowe kolumny dodane migracja `2026_02_25_100000`:
 |--------|--------|------|
 | `loadSources()` | void | Laduje dostepne zrodla z CrossSourceMatrixService |
 | `getMatrixData()` | LengthAwarePaginator | Zwraca paginowane dane macierzy z infinite scroll |
-| `loadMore()` | void | Laduje +50 produktow (infinite scroll sentinel) |
+| `loadMore()` | void | Laduje +50 produktow (infinite scroll sentinel), auto-selects w trybie selectAllMatching |
+| `getTotalMatchingCount()` | int | Zwraca calkowita liczbe produktow pasujacych do filtrow (bez paginacji) |
+| `getAllMatchingProductIds()` | array | Zwraca WSZYSTKIE ID produktow pasujacych do filtrow |
 | `getSummaryStatsData()` | array | Statystyki: linked, not_linked, not_found, etc. |
 | `loadBrandSuggestions()` | array{active, dismissed} | Sugestie marek per sklep |
 | `getAvailableBrands()` | Collection | Lista dostepnych marek do filtrowania |
@@ -298,9 +304,9 @@ Nowe kolumny dodane migracja `2026_02_25_100000`:
 
 | Metoda | Return | Opis |
 |--------|--------|------|
-| `updatedSearch()` | void | Reset infinite scroll przy zmianie szukania |
-| `updatedStatusFilter()` | void | Reset infinite scroll przy zmianie filtra statusu |
-| `updatedBrandFilter()` | void | Reset infinite scroll przy zmianie filtra marki |
+| `updatedSearch()` | void | Reset infinite scroll + selekcji przy zmianie szukania |
+| `updatedStatusFilter()` | void | Reset infinite scroll + selekcji przy zmianie filtra statusu |
+| `updatedBrandFilter()` | void | Reset infinite scroll + selekcji przy zmianie filtra marki |
 | `toggleGroupedView()` | void | Toggle grupowania po marce |
 | `resetFilters()` | void | Reset wszystkich filtrow do domyslnych |
 | `toggleSourceVisibility(string $key)` | void | Pokaz/ukryj kolumne zrodla |
@@ -321,7 +327,10 @@ Nowe kolumny dodane migracja `2026_02_25_100000`:
 | `unignoreProduct(int $productId, string $type, int $id)` | void | Przywroc z ignored |
 | `unlinkProduct(int $productId, string $type, int $id)` | void | Usun link |
 | `forceSync(int $productId, string $type, int $id)` | void | Wymus ponowna synchronizacje |
-| `bulkAction(string $action, ?string $sourceKey)` | void | Masowa operacja na zaznaczonych |
+| `bulkAction(string $action, ?string $sourceKey)` | void | Masowa operacja na zaznaczonych (obsluguje tryb selectAllMatching z chunking) |
+| `enableSelectAllMatching()` | void | Wchodzi w tryb "zaznacz wszystkie pasujace" (Gmail pattern) |
+| `clearSelection()` | void | Czysci cala selekcje (wyjscie z trybu selectAllMatching) |
+| `getEffectiveSelectedCount()` | int | Zwraca efektywna liczbe zaznaczonych (total - excluded w trybie selectAllMatching) |
 | `toggleDiffViewer(int $productId)` | void | Rozwin/zwin porownanie danych |
 | `openPopup(int $productId, string $sourceKey)` | void | Otworz popup komorki |
 | `closePopup()` | void | Zamknij popup |
@@ -512,7 +521,48 @@ Dostepne via `bulkAction(string $action, ?string $sourceKey)`:
 | `export_xlsx` | Export do XLSX | Nie |
 | `export_csv` | Export do CSV | Nie |
 
-### 9.4 CSS Hover Actions
+### 9.4 Select All Matching (Gmail Pattern)
+
+**Problem:** Infinite scroll laduje 50 produktow naraz. Checkbox "zaznacz wszystkie" w naglowku zaznacza TYLKO widoczne (zaladowane) produkty, ignorujac reszte.
+
+**Rozwiazanie:** Dwufazowy wzorzec Gmail:
+
+```
+Faza 1: Klik "Select All" checkbox w naglowku
+  → Zaznacza widoczne produkty (np. 50)
+  → Banner: "Zaznaczono 50 na tej stronie. Zaznacz wszystkie 319 pasujacych"
+
+Faza 2: Klik "Zaznacz wszystkie 319 pasujacych"
+  → $selectAllMatching = true
+  → Banner: "✓ Zaznaczono wszystkie 319 pasujacych produktow" + "Wyczysc zaznaczenie"
+  → Bulk actions operuja na WSZYSTKICH pasujacych (query DB, nie tablica ID)
+```
+
+**Kluczowe mechanizmy:**
+
+| Mechanizm | Opis |
+|-----------|------|
+| `$selectAllMatching` | Flag trybu "wszystkie pasujace" |
+| `$excludedProducts` | Lista ID odznaczonych produktow (inverse selection) |
+| `$totalMatchingCount` | Calkowita liczba pasujacych produktow (z DB) |
+| `getEffectiveSelectedCount()` | `totalMatchingCount - count(excludedProducts)` |
+| Chunked processing | W trybie selectAllMatching bulk operacje przetwarzaja ALL matching IDs w chunkach po 200 |
+| Auto-select on scroll | `loadMore()` automatycznie zaznacza nowo zaladowane produkty |
+| Filter reset | Zmiana filtra (search/status/brand) czysci selekcje |
+
+**Livewire property/method naming:**
+> W Livewire 3 NIE mozna miec property i metody o tej samej nazwie!
+> Property `$selectAllMatching` (bool) + metoda `enableSelectAllMatching()` (NIE `selectAllMatching()`)
+
+**UI stany bulk-actions-bar:**
+
+| Stan | Warunek | Wyglad |
+|------|---------|--------|
+| Normalna selekcja | `count($selectedProducts) > 0` | "X zaznaczonych" + przyciski akcji |
+| Wszystkie na stronie | `$selectAll && !$selectAllMatching` | Banner: "Zaznaczono X na tej stronie. **Zaznacz wszystkie Y pasujacych**" |
+| Select All Matching | `$selectAllMatching` | Zielony checkmark + "Zaznaczono wszystkie Y pasujacych produktow" + "Wyczysc zaznaczenie" |
+
+### 9.5 CSS Hover Actions
 
 Komorki z `$hasDirectAction` (not_linked, not_found, unknown, ignored) maja dwie warstwy:
 1. `.matrix-cell-icon` - domyslna ikona statusu (ukrywana na hover)
@@ -879,7 +929,12 @@ tail -n 50 storage/logs/laravel.log  # Sprawdz logi
 - Czy `$hasMoreProducts` jest true
 - Czy `wire:key` na sentinelu jest unikalny
 
-### 16.7 Brand suggestions nie pokazuja sie
+### 16.7 "Zaznacz wszystkie" nie przechodzi w tryb selectAllMatching
+
+**Przyczyna:** W Livewire 3 property i metoda NIE MOGA miec tej samej nazwy. `wire:click="selectAllMatching"` probuje togglowac bool property zamiast wywolac metode.
+**Rozwiazanie:** Metoda MUSI miec inna nazwe niz property. Uzywamy `enableSelectAllMatching()` (metoda) + `$selectAllMatching` (property).
+
+### 16.8 Brand suggestions nie pokazuja sie
 
 **Przyczyna:** Brak produktow spelniajacych kryteria (min 5 produktow per marka bez linka do sklepu).
 **Sprawdz:**
@@ -890,6 +945,24 @@ tail -n 50 storage/logs/laravel.log  # Sprawdz logi
 ---
 
 ## 17. Changelog
+
+### v1.1.0 (2026-02-26)
+
+**Select All Matching (Gmail pattern):**
+- Dwufazowe zaznaczanie: najpierw widoczne, potem WSZYSTKIE pasujace do filtrow
+- Inverse selection via `$excludedProducts` - odznaczanie pojedynczych w trybie "wszystkie"
+- Chunked bulk processing (200 produktow/chunk) dla operacji na tysiacach produktow
+- Auto-select nowo zaladowanych produktow przy infinite scroll
+- Reset selekcji przy zmianie filtrow (search, status, brand)
+- UI: banner informacyjny z 3 stanami (normalna/strona/wszystkie)
+- Bugfix: Livewire 3 name collision - property i metoda nie moga miec tej samej nazwy
+
+**Zmienione pliki:**
+- `MatrixActionsTrait.php` (577 -> 702 LOC): +3 properties, +3 methods, zmodyfikowane `updatedSelectAll/updatedSelectedProducts/bulkAction`
+- `MatrixDataTrait.php` (191 -> 232 LOC): +`getTotalMatchingCount()`, +`getAllMatchingProductIds()`, +`syncSelectedWithMatching()`
+- `MatrixFiltersTrait.php` (223 -> 234 LOC): +`resetScrollAndSelection()` helper
+- `CrossSourceMatrixService.php` (424 -> 455 LOC): +`getFilteredProductCount()`, +`getFilteredProductIds()`, +`ids` filter
+- `bulk-actions-bar.blade.php` (75 -> 92 LOC): 3-stanowy banner selectAllMatching
 
 ### v1.0.0 (2026-02-26)
 

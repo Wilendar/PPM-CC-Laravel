@@ -33,6 +33,15 @@ tbody tr:hover .matrix-sticky-col {
 }
 
 /* ========================================
+   Cross-Source Matrix - Name Column (dynamic width)
+   ======================================== */
+
+.matrix-name-col {
+    max-width: 0;      /* table cell trick: use allocated width, truncate overflow */
+    overflow: hidden;
+}
+
+/* ========================================
    Cross-Source Matrix - Cell Statuses
    ======================================== */
 

@@ -22,7 +22,7 @@ trait MatrixFiltersTrait
 
     /**
      * Filtr statusu komorki macierzy.
-     * Mozliwe wartosci: all | missing | linked | conflict | brand_not_allowed | pending_sync
+     * Mozliwe wartosci: all | linked | not_linked | not_found | unknown | ignored | conflict | brand_not_allowed | pending_sync
      */
     #[Url]
     public string $statusFilter = 'all';
@@ -62,30 +62,41 @@ trait MatrixFiltersTrait
      */
     public function updatedSearch(): void
     {
-        $this->loadedCount      = 0;
-        $this->hasMoreProducts  = true;
+        $this->resetScrollAndSelection();
     }
 
     /**
-     * Reaguje na zmiane statusFilter - resetuje infinite scroll.
+     * Reaguje na zmiane statusFilter - resetuje infinite scroll i selekcje.
      *
      * @return void
      */
     public function updatedStatusFilter(): void
     {
-        $this->loadedCount      = 0;
-        $this->hasMoreProducts  = true;
+        $this->resetScrollAndSelection();
     }
 
     /**
-     * Reaguje na zmiane brandFilter - resetuje infinite scroll.
+     * Reaguje na zmiane brandFilter - resetuje infinite scroll i selekcje.
      *
      * @return void
      */
     public function updatedBrandFilter(): void
     {
-        $this->loadedCount      = 0;
-        $this->hasMoreProducts  = true;
+        $this->resetScrollAndSelection();
+    }
+
+    /**
+     * Resetuje infinite scroll i selekcje przy zmianie filtrow.
+     */
+    private function resetScrollAndSelection(): void
+    {
+        $this->loadedCount     = 0;
+        $this->hasMoreProducts = true;
+
+        // Reset selekcji (selectAllMatching traci sens przy nowych filtrach)
+        if (method_exists($this, 'clearSelection')) {
+            $this->clearSelection();
+        }
     }
 
     /**
@@ -138,6 +149,11 @@ trait MatrixFiltersTrait
         }
 
         if (in_array($sourceKey, $this->visibleSources)) {
+            // Zabezpieczenie: nie pozwol odznczyc ostatniego zrodla
+            // Pusta tablica = "wszystkie widoczne" co jest nieintuicyjne
+            if (count($this->visibleSources) <= 1) {
+                return;
+            }
             $this->visibleSources = array_values(
                 array_diff($this->visibleSources, [$sourceKey])
             );

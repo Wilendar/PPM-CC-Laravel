@@ -38,11 +38,20 @@ trait MatrixActionsTrait
     /** @var array{productId: int, sourceKey: string}|null Aktywny popup */
     public ?array $activePopup = null;
 
-    /** @var array<int> Zaznaczone produkty */
+    /** @var array<int> Zaznaczone produkty (widoczne) */
     public array $selectedProducts = [];
 
-    /** Checkbox "zaznacz wszystkie" */
+    /** Checkbox "zaznacz wszystkie" w naglowku */
     public bool $selectAll = false;
+
+    /** Tryb "zaznacz wszystkie pasujace" (Gmail pattern) */
+    public bool $selectAllMatching = false;
+
+    /** @var array<int> Wykluczone produkty w trybie selectAllMatching */
+    public array $excludedProducts = [];
+
+    /** Calkowita liczba produktow pasujacych do filtrow */
+    public int $totalMatchingCount = 0;
 
     /** Sekcja odrzuconych sugestii brandow */
     public bool $showDismissedSuggestions = false;
@@ -408,66 +417,63 @@ trait MatrixActionsTrait
 
     /**
      * Bulk action na zaznaczonych produktach.
+     * Obsluguje tryb selectAllMatching (Gmail pattern) - przetwarza WSZYSTKIE pasujace produkty w chunkach.
      *
-     * @param string $action    link_all|export_all|ignore_all|link_source|export_source|ignore_source
-     * @param string|null $sourceKey  Opcjonalny klucz zrodla (np. 'prestashop_1')
+     * @param string      $action    link_all|export_all|ignore_all|link_source|export_source|ignore_source
+     * @param string|null $sourceKey Opcjonalny klucz zrodla (np. 'prestashop_1')
      */
     public function bulkAction(string $action, ?string $sourceKey = null): void
     {
-        if (empty($this->selectedProducts)) {
+        $effectiveCount = $this->getEffectiveSelectedCount();
+        if ($effectiveCount === 0) {
             session()->flash('error', 'Nie zaznaczono zadnych produktow.');
             return;
         }
 
-        $count = 0;
-        $matrixData = $this->getMatrixData();
+        $baseAction = str_replace(['_all', '_source'], '', $action);
 
-        // Resolve source jeśli podany
+        // Resolve target sources
         $targetSources = $this->sources;
         if ($sourceKey) {
             $targetSources = array_filter($this->sources, fn ($s) => ($s['type'] . '_' . $s['id']) === $sourceKey);
         }
 
-        foreach ($this->selectedProducts as $productId) {
-            $product = $matrixData->firstWhere('id', $productId);
-            if (!$product) {
-                continue;
-            }
+        $count = 0;
 
-            foreach ($targetSources as $source) {
-                $key = $source['type'] . '_' . $source['id'];
-                $cellStatus = $product->matrix_cells[$key]['status'] ?? 'unknown';
+        if ($this->selectAllMatching) {
+            // Tryb "wszystkie pasujace" - przetwarzaj w chunkach po 200
+            $allIds = array_values(array_diff(
+                $this->getAllMatchingProductIds(),
+                $this->excludedProducts
+            ));
 
-                $baseAction = str_replace(['_all', '_source'], '', $action);
+            /** @var CrossSourceMatrixService $service */
+            $service = app(CrossSourceMatrixService::class);
 
-                // Wykonaj akcje tylko na odpowiednich statusach
-                $shouldAct = match ($baseAction) {
-                    'link'   => $cellStatus === CrossSourceMatrixService::CELL_NOT_LINKED,
-                    'export' => $cellStatus === CrossSourceMatrixService::CELL_NOT_FOUND,
-                    'ignore' => in_array($cellStatus, [
-                        CrossSourceMatrixService::CELL_NOT_LINKED,
-                        CrossSourceMatrixService::CELL_NOT_FOUND,
-                        CrossSourceMatrixService::CELL_UNKNOWN,
-                    ]),
-                    default  => false,
-                };
+            foreach (array_chunk($allIds, 200) as $chunk) {
+                $chunkFilters = array_merge($this->getActiveFilters(), ['ids' => $chunk]);
+                $chunkData = $service->getQuickMatrixData($chunkFilters, count($chunk));
 
-                if ($shouldAct) {
-                    match ($baseAction) {
-                        'link'   => $this->linkProduct($productId, $source['type'], $source['id']),
-                        'export' => $this->publishToSource($productId, $source['type'], $source['id']),
-                        'ignore' => $this->ignoreProduct($productId, $source['type'], $source['id']),
-                        default  => null,
-                    };
-                    $count++;
+                foreach ($chunkData as $product) {
+                    $count += $this->processProductBulkAction($product, $baseAction, $targetSources);
                 }
+            }
+        } else {
+            // Tryb normalny - tylko widoczne zaznaczone produkty
+            $matrixData = $this->getMatrixData();
+            foreach ($this->selectedProducts as $productId) {
+                $product = $matrixData->firstWhere('id', $productId);
+                if (!$product) {
+                    continue;
+                }
+                $count += $this->processProductBulkAction($product, $baseAction, $targetSources);
             }
         }
 
-        $this->selectedProducts = [];
-        $this->selectAll = false;
+        // Reset selekcji
+        $this->clearSelection();
 
-        $actionLabel = match (str_replace(['_all', '_source'], '', $action)) {
+        $actionLabel = match ($baseAction) {
             'link'   => 'powiazanych',
             'export' => 'eksportowanych',
             'ignore' => 'zignorowanych',
@@ -476,6 +482,42 @@ trait MatrixActionsTrait
 
         session()->flash('success', "Operacja bulk: {$count} komorek {$actionLabel}.");
         $this->refreshMatrix();
+    }
+
+    /**
+     * Przetwarza bulk action dla jednego produktu we wszystkich target sources.
+     */
+    private function processProductBulkAction($product, string $baseAction, array $targetSources): int
+    {
+        $count = 0;
+
+        foreach ($targetSources as $source) {
+            $key = $source['type'] . '_' . $source['id'];
+            $cellStatus = $product->matrix_cells[$key]['status'] ?? 'unknown';
+
+            $shouldAct = match ($baseAction) {
+                'link'   => $cellStatus === CrossSourceMatrixService::CELL_NOT_LINKED,
+                'export' => $cellStatus === CrossSourceMatrixService::CELL_NOT_FOUND,
+                'ignore' => in_array($cellStatus, [
+                    CrossSourceMatrixService::CELL_NOT_LINKED,
+                    CrossSourceMatrixService::CELL_NOT_FOUND,
+                    CrossSourceMatrixService::CELL_UNKNOWN,
+                ]),
+                default  => false,
+            };
+
+            if ($shouldAct) {
+                match ($baseAction) {
+                    'link'   => $this->linkProduct($product->id, $source['type'], $source['id']),
+                    'export' => $this->publishToSource($product->id, $source['type'], $source['id']),
+                    'ignore' => $this->ignoreProduct($product->id, $source['type'], $source['id']),
+                    default  => null,
+                };
+                $count++;
+            }
+        }
+
+        return $count;
     }
 
     // =========================================================================
@@ -561,16 +603,100 @@ trait MatrixActionsTrait
     {
         if ($this->selectAll) {
             $matrixData = $this->getMatrixData();
-            $this->selectedProducts = collect($matrixData->items())->pluck('id')->map(fn ($id) => (int) $id)->toArray();
+            $this->selectedProducts = collect($matrixData->items())
+                ->pluck('id')
+                ->map(fn ($id) => (int) $id)
+                ->toArray();
+
+            // Oblicz total matching count (do bannera "Zaznacz wszystkie X pasujacych")
+            $this->totalMatchingCount = $this->getTotalMatchingCount();
         } else {
-            $this->selectedProducts = [];
+            $this->clearSelection();
         }
     }
 
     public function updatedSelectedProducts(): void
     {
+        if ($this->selectAllMatching) {
+            // W trybie selectAllMatching: zarzadzaj lista wykluczonych
+            $matrixData = $this->getMatrixData();
+            $allVisibleIds = collect($matrixData->items())
+                ->pluck('id')
+                ->map(fn ($id) => (int) $id)
+                ->toArray();
+
+            // Widoczne ale niezaznaczone = nowo wykluczone
+            $uncheckedVisible = array_values(array_diff($allVisibleIds, $this->selectedProducts));
+
+            // Wykluczone ale zaznaczone ponownie = przywrocone
+            $rechecked = array_values(array_intersect($this->selectedProducts, $this->excludedProducts));
+
+            // Aktualizuj liste wykluczonych
+            $this->excludedProducts = array_values(array_unique(array_merge(
+                array_diff($this->excludedProducts, $rechecked),
+                $uncheckedVisible
+            )));
+
+            // Aktualizuj header checkbox
+            $this->selectAll = count($uncheckedVisible) === 0;
+
+            // Jesli wszystkie widoczne odznaczone - wyjdz z trybu selectAllMatching
+            if (empty($this->selectedProducts)) {
+                $this->selectAllMatching = false;
+                $this->excludedProducts = [];
+                $this->totalMatchingCount = 0;
+            }
+        } else {
+            // Tryb normalny
+            $matrixData = $this->getMatrixData();
+            $totalVisible = $matrixData->count();
+            $this->selectAll = $totalVisible > 0 && count($this->selectedProducts) >= $totalVisible;
+        }
+    }
+
+    /**
+     * Wchodzi w tryb "zaznacz wszystkie pasujace" (Gmail pattern).
+     * Zaznacza WSZYSTKIE produkty pasujace do aktywnych filtrow.
+     */
+    public function enableSelectAllMatching(): void
+    {
+        $this->selectAllMatching = true;
+        $this->excludedProducts = [];
+        $this->totalMatchingCount = $this->getTotalMatchingCount();
+
+        // Zaznacz widoczne checkboxy
         $matrixData = $this->getMatrixData();
-        $totalVisible = $matrixData->count();
-        $this->selectAll = $totalVisible > 0 && count($this->selectedProducts) >= $totalVisible;
+        $this->selectedProducts = collect($matrixData->items())
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->toArray();
+
+        $this->selectAll = true;
+    }
+
+    /**
+     * Czysci cala selekcje (wyjscie z trybu selectAllMatching).
+     */
+    public function clearSelection(): void
+    {
+        $this->selectAllMatching = false;
+        $this->selectAll = false;
+        $this->selectedProducts = [];
+        $this->excludedProducts = [];
+        $this->totalMatchingCount = 0;
+    }
+
+    /**
+     * Zwraca efektywna liczbe zaznaczonych produktow.
+     * W trybie selectAllMatching: totalMatching - excluded.
+     * W trybie normalnym: count(selectedProducts).
+     */
+    public function getEffectiveSelectedCount(): int
+    {
+        if ($this->selectAllMatching) {
+            return $this->totalMatchingCount - count($this->excludedProducts);
+        }
+
+        return count($this->selectedProducts);
     }
 }

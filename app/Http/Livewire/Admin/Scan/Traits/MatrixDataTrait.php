@@ -68,13 +68,55 @@ trait MatrixDataTrait
 
     /**
      * Laduje kolejna porcje produktow (infinite scroll).
-     * Zwiekszenie loadedCount spowoduje pobranie wiekszej liczby produktow przy nastepnym render().
+     * W trybie selectAllMatching auto-zaznacza nowo zaladowane produkty.
      *
      * @return void
      */
     public function loadMore(): void
     {
         $this->loadedCount += $this->perPage;
+
+        // W trybie selectAllMatching: auto-zaznacz nowo zaladowane produkty
+        if ($this->selectAllMatching) {
+            $this->syncSelectedWithMatching();
+        }
+    }
+
+    /**
+     * Zwraca calkowita liczbe produktow pasujacych do aktywnych filtrow (bez paginacji).
+     */
+    public function getTotalMatchingCount(): int
+    {
+        return app(CrossSourceMatrixService::class)
+            ->getFilteredProductCount($this->getActiveFilters());
+    }
+
+    /**
+     * Zwraca wszystkie ID produktow pasujacych do aktywnych filtrow (bez paginacji).
+     *
+     * @return int[]
+     */
+    public function getAllMatchingProductIds(): array
+    {
+        return app(CrossSourceMatrixService::class)
+            ->getFilteredProductIds($this->getActiveFilters());
+    }
+
+    /**
+     * Synchronizuje selectedProducts z wszystkimi widocznymi produktami (minus wykluczone).
+     * Uzywane w trybie selectAllMatching po loadMore().
+     */
+    private function syncSelectedWithMatching(): void
+    {
+        $matrixData = $this->getMatrixData();
+        $allVisibleIds = collect($matrixData->items())
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->toArray();
+
+        $this->selectedProducts = array_values(
+            array_diff($allVisibleIds, $this->excludedProducts)
+        );
     }
 
     /**
@@ -166,6 +208,10 @@ trait MatrixDataTrait
 
         if ($this->brandFilter !== null) {
             $filters['manufacturer_id'] = $this->brandFilter;
+        }
+
+        if (!empty($this->visibleSources)) {
+            $filters['visible_sources'] = $this->visibleSources;
         }
 
         if (!empty($this->sortField)) {
