@@ -12,6 +12,7 @@ use App\Services\JobProgressService;
 use App\Services\Product\FeatureManager;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Livewire\Component;
@@ -51,6 +52,8 @@ use Livewire\Component;
  */
 class VehicleFeatureManagement extends Component
 {
+    use AuthorizesRequests;
+
     // ========================================
     // TAB NAVIGATION (ETAP_07e Phase 2)
     // ========================================
@@ -368,6 +371,7 @@ class VehicleFeatureManagement extends Component
      */
     public function mount(): void
     {
+        $this->authorize('products.update');
         $this->loadPredefinedTemplates();
         $this->loadCustomTemplates();
         $this->loadFeatureLibrary();

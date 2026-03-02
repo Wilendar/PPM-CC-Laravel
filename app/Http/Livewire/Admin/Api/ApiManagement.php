@@ -4,12 +4,14 @@ namespace App\Http\Livewire\Admin\Api;
 
 use App\Services\ApiMonitoringService;
 use App\Models\ApiUsageLog;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Component;
 use Livewire\WithPagination;
 use Carbon\Carbon;
 
 class ApiManagement extends Component
 {
+    use AuthorizesRequests;
     use WithPagination;
 
     public $activeTab = 'overview';
@@ -30,6 +32,7 @@ class ApiManagement extends Component
 
     public function mount()
     {
+        $this->authorize('admin.settings.manage');
         $this->dateFrom = now()->subHours(24)->format('Y-m-d\TH:i');
         $this->dateTo = now()->format('Y-m-d\TH:i');
     }

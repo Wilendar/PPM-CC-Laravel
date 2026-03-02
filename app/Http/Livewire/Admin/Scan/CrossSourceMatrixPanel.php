@@ -8,6 +8,7 @@ use App\Http\Livewire\Admin\Scan\Traits\MatrixDataTrait;
 use App\Http\Livewire\Admin\Scan\Traits\MatrixFiltersTrait;
 use App\Http\Livewire\Admin\Scan\Traits\ScanSourcesTrait;
 use App\Models\ProductScanSession;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\View\View;
 use Livewire\Component;
 
@@ -32,6 +33,7 @@ use Livewire\Component;
  */
 class CrossSourceMatrixPanel extends Component
 {
+    use AuthorizesRequests;
     use MatrixDataTrait;
     use MatrixFiltersTrait;
     use MatrixActionsTrait;
@@ -51,6 +53,7 @@ class CrossSourceMatrixPanel extends Component
      */
     public function mount(): void
     {
+        $this->authorize('admin.scan.view');
         $this->loadSources();
         $this->detectActiveChunkedScan();
     }

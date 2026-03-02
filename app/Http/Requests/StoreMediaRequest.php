@@ -159,6 +159,11 @@ class StoreMediaRequest extends FormRequest
         $id = $this->input('mediable_id');
         
         if ($type && $id) {
+            $allowedTypes = ['App\\Models\\Product', 'App\\Models\\ProductVariant'];
+            if (!in_array($type, $allowedTypes)) {
+                $validator->errors()->add('mediable_type', 'Niedozwolony typ obiektu.');
+                return;
+            }
             $model = app($type);
             $exists = $model::where('id', $id)->exists();
             

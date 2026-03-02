@@ -4,12 +4,14 @@ namespace App\Http\Livewire\Admin\Notifications;
 
 use App\Models\AdminNotification;
 use App\Services\NotificationService;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Component;
 use Livewire\WithPagination;
 use Illuminate\Support\Collection;
 
 class NotificationCenter extends Component
 {
+    use AuthorizesRequests;
     use WithPagination;
 
     public $showDropdown = false;
@@ -31,6 +33,7 @@ class NotificationCenter extends Component
 
     public function mount()
     {
+        $this->authorize('admin.settings.manage');
         $this->loadNotifications();
     }
 

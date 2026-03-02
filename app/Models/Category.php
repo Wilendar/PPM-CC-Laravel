@@ -286,7 +286,7 @@ class Category extends Model
                 }
 
                 return static::whereIn('id', $ancestorIds)
-                            ->orderByRaw('FIELD(id, ' . implode(',', $ancestorIds) . ')')
+                            ->orderByRaw('FIELD(id, ' . implode(',', array_map('intval', $ancestorIds)) . ')')
                             ->get();
             }
         );

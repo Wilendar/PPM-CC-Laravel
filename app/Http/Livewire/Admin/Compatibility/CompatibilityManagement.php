@@ -16,6 +16,7 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Support\Str;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Livewire\Component;
@@ -35,6 +36,7 @@ use Livewire\WithPagination;
  */
 class CompatibilityManagement extends Component
 {
+    use AuthorizesRequests;
     use WithPagination, ManagesVehicleSelection;
 
     /*
@@ -128,6 +130,7 @@ class CompatibilityManagement extends Component
 
     public function mount(): void
     {
+        $this->authorize('products.update');
         $this->expandedPartIds = [];
         $this->selectedPartIds = [];
         $this->collapsedBrands = [];

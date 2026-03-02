@@ -7,6 +7,7 @@ use Livewire\Attributes\On;
 use Livewire\Attributes\Computed;
 use App\Models\PrestaShopShop;
 use App\Services\VisualEditor\PrestaShopCssFetcher;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Cache;
 
@@ -27,6 +28,8 @@ use Illuminate\Support\Facades\Cache;
  */
 class ShopCssEditor extends Component
 {
+    use AuthorizesRequests;
+
     /**
      * Lock configuration.
      */
@@ -98,6 +101,7 @@ class ShopCssEditor extends Component
      */
     public function mount(int $shopId): void
     {
+        $this->authorize('admin.shops.edit');
         $this->shopId = $shopId;
         $this->shop = PrestaShopShop::find($shopId);
 

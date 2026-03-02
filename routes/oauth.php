@@ -219,18 +219,34 @@ Route::prefix('api/oauth')->name('api.oauth.')->middleware(['auth', 'api'])->gro
 // OAUTH WEBHOOK ROUTES (for provider notifications)
 // ==========================================
 
-Route::prefix('webhooks/oauth')->name('webhooks.oauth.')->group(function () {
-    
+Route::prefix('webhooks/oauth')->name('webhooks.oauth.')->middleware('throttle:30,1')->group(function () {
+
     // Google Workspace security notifications
-    Route::post('/google/security', function () {
+    Route::post('/google/security', function (Request $request) {
+        // Verify webhook signature from Google
+        $signature = $request->header('X-Goog-Channel-Token');
+        $expectedToken = config('services.google.webhook_token');
+        if (!$expectedToken || !hash_equals($expectedToken, $signature ?? '')) {
+            abort(403, 'Invalid webhook signature');
+        }
         // Handle Google security notifications
-        // This would process events like account compromises, etc.
+        Log::info('Google OAuth webhook received', ['event' => $request->input('event_type')]);
         return response()->json(['status' => 'received']);
     })->name('google.security');
-    
-    // Microsoft Graph security notifications  
-    Route::post('/microsoft/security', function () {
-        // Handle Microsoft security notifications
+
+    // Microsoft Graph security notifications
+    Route::post('/microsoft/security', function (Request $request) {
+        // Verify webhook validation token from Microsoft
+        if ($request->has('validationToken')) {
+            return response($request->input('validationToken'), 200)
+                ->header('Content-Type', 'text/plain');
+        }
+        $clientState = $request->input('value.0.clientState');
+        $expectedState = config('services.microsoft.webhook_secret');
+        if ($expectedState && $clientState !== $expectedState) {
+            abort(403, 'Invalid webhook client state');
+        }
+        Log::info('Microsoft OAuth webhook received', ['type' => $request->input('value.0.changeType')]);
         return response()->json(['status' => 'received']);
     })->name('microsoft.security');
 });

@@ -121,8 +121,7 @@ class ShopManager extends Component
      */
     public function mount()
     {
-        // DEVELOPMENT: authorize tymczasowo wyłączone dla testów
-        // $this->authorize('admin.shops.view');
+        $this->authorize('admin.shops.view');
     }
 
     /**

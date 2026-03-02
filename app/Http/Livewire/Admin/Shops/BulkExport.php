@@ -107,8 +107,7 @@ class BulkExport extends Component
      */
     public function mount()
     {
-        // DEVELOPMENT: authorize tymczasowo wyłączone dla testów
-        // $this->authorize('admin.shops.export');
+        $this->authorize('admin.shops.export');
         
         $this->loadActiveExports();
     }

@@ -226,7 +226,11 @@
                         <h4 class="text-sm font-medium text-gray-300 mb-2">Podglad:</h4>
                         <div class="p-4 bg-white rounded-lg">
                             <div class="prose prose-sm max-w-none">
-                                {!! $previewHtml !!}
+                                @php
+                                    // Strip dangerous tags - previewHtml originates from PrestaShop sourceHtml or admin render template
+                                    $safePreviewHtml = strip_tags($previewHtml, '<div><span><p><br><b><strong><i><em><u><s><ul><ol><li><table><thead><tbody><tr><th><td><h1><h2><h3><h4><h5><h6><a><img><figure><figcaption><section><article><header><footer><aside><hr>');
+                                @endphp
+                                {!! $safePreviewHtml !!}
                             </div>
                         </div>
                     </div>

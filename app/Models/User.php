@@ -54,7 +54,6 @@ class User extends Authenticatable implements MustVerifyEmail
         'phone',
         'company',
         'position',
-        'is_active',
         'last_login_at',
         'avatar',
         'preferred_language',
@@ -62,18 +61,13 @@ class User extends Authenticatable implements MustVerifyEmail
         'date_format',
         'ui_preferences',
         'notification_settings',
-        'email_verified_at',
-        'oauth_provider',
-        'oauth_id',
         'oauth_email',
         'oauth_provider_data',
         'oauth_avatar_url',
-        'oauth_verified',
         'oauth_linked_at',
         'oauth_domain',
         'oauth_last_used_at',
-        'oauth_linked_providers',
-        'primary_auth_method'
+        'oauth_linked_providers'
     ];
 
     /**

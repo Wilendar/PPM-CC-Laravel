@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
@@ -21,6 +22,8 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
  */
 class ExportDownloadController extends Controller
 {
+    use AuthorizesRequests;
+
     /**
      * Download an export file.
      *
@@ -30,8 +33,15 @@ class ExportDownloadController extends Controller
      */
     public function download(Request $request, string $file)
     {
+        $this->authorize('products.export');
+
         // Decode file path
         $filePath = base64_decode($file);
+
+        // Security: Prevent path traversal attacks
+        if (str_contains($filePath, '..') || str_contains($filePath, "\0")) {
+            abort(403, 'Invalid file path');
+        }
 
         // Security: Only allow exports from specific directories
         $allowedPrefixes = [
@@ -76,7 +86,14 @@ class ExportDownloadController extends Controller
      */
     public function delete(Request $request, string $file)
     {
+        $this->authorize('products.export');
+
         $filePath = base64_decode($file);
+
+        // Security: Prevent path traversal attacks
+        if (str_contains($filePath, '..') || str_contains($filePath, "\0")) {
+            return response()->json(['error' => 'Invalid file path'], 403);
+        }
 
         // Security check
         if (!str_starts_with($filePath, 'exports/')) {

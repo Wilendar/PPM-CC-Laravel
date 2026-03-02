@@ -93,8 +93,7 @@ class PriceGroups extends Component
      */
     public function mount(): void
     {
-        // DEVELOPMENT: Auth disabled for testing
-        // $this->authorize('prices.groups');
+        $this->authorize('prices.groups');
     }
 
     /**

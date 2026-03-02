@@ -22,14 +22,12 @@ class DevAuthBypass
      */
     public function handle(Request $request, Closure $next): Response
     {
-        // Sprawdź czy dev_auth_bypass jest włączony
-        $devAuthBypass = false;
-
-        try {
-            $devAuthBypass = SystemSetting::get('dev_auth_bypass', env('DEV_AUTH_BYPASS', false));
-        } catch (\Exception $e) {
-            $devAuthBypass = env('DEV_AUTH_BYPASS', false);
+        // SECURITY: Bypass działa TYLKO w środowisku local
+        if (!app()->environment('local')) {
+            return $next($request);
         }
+
+        $devAuthBypass = env('DEV_AUTH_BYPASS', false);
 
         // Jeśli dev mode i brak zalogowanego użytkownika - auto-login admin
         if ($devAuthBypass && !Auth::check()) {

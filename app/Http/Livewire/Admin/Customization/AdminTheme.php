@@ -4,11 +4,13 @@ namespace App\Http\Livewire\Admin\Customization;
 
 use App\Models\AdminTheme as AdminThemeModel;
 use App\Services\ThemeService;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Component;
 use Livewire\WithFileUploads;
 
 class AdminTheme extends Component
 {
+    use AuthorizesRequests;
     use WithFileUploads;
 
     // Theme properties
@@ -60,6 +62,7 @@ class AdminTheme extends Component
 
     public function mount(ThemeService $themeService)
     {
+        $this->authorize('admin.settings.manage');
         $this->loadCurrentTheme($themeService);
         $this->loadAvailableThemes($themeService);
     }

@@ -96,8 +96,7 @@ class ScanProductsPanel extends Component
      */
     public function mount(): void
     {
-        // DEVELOPMENT: Authorization temporarily disabled
-        // $this->authorize('admin.scan.view');
+        $this->authorize('admin.scan.view');
 
         // Load last active scan if any
         $activeScan = ProductScanSession::running()

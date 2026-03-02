@@ -40,6 +40,7 @@
                         <ol class="space-y-3 text-gray-300">
                             @foreach($steps as $step)
                                 <li class="flex items-start">
+                                    {{-- @safe: steps are hardcoded PHP string literals in routes/web.php, never user input --}}
                                     <span class="mr-3">{!! $step !!}</span>
                                 </li>
                             @endforeach

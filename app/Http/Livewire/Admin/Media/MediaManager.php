@@ -87,8 +87,7 @@ class MediaManager extends Component
 
     public function mount(): void
     {
-        // TODO: Re-enable after permissions seeder update
-        // $this->authorize('admin.media.manage');
+        $this->authorize('admin.media.manage');
         $this->loadStats();
     }
 

@@ -24,29 +24,14 @@ use App\Http\Controllers\ThumbnailController;
 // Thumbnail generation route (on-demand, cached)
 Route::get('/thumbnail/{mediaId}', [ThumbnailController::class, 'show'])
     ->name('thumbnail')
-    ->where('mediaId', '[0-9]+');
+    ->where('mediaId', '[0-9]+')
+    ->middleware('throttle:60,1');
 
 // Variant Image thumbnail (on-demand, cached)
 Route::get('/thumbnail/variant/{variantImageId}', [ThumbnailController::class, 'showVariant'])
     ->name('thumbnail.variant')
-    ->where('variantImageId', '[0-9]+');
-
-// Test CSS loading
-Route::get('/test-css', function () {
-    return view('test-css');
-});
-
-// POC: Color Picker with vanilla-colorful + Alpine.js (DISABLED - old POC)
-// Route::get('/test-color-picker-poc', \App\Http\Livewire\Test\ColorPickerPOC::class)
-//     ->middleware(['auth'])
-//     ->name('test.color-picker-poc');
-
-// ETAP_05b Phase 3: Production AttributeColorPicker Component Test
-Route::get('/test-attribute-color-picker', function () {
-    return view('test-attribute-color-picker');
-})
-    ->middleware(['auth'])
-    ->name('test.attribute-color-picker');
+    ->where('variantImageId', '[0-9]+')
+    ->middleware('throttle:60,1');
 
 Route::get('/', function () {
     if (Auth::check()) {
@@ -59,73 +44,6 @@ Route::get('/', function () {
 Route::get('/up', function () {
     return response()->json(['status' => 'ok', 'timestamp' => now()]);
 })->name('health');
-
-// Subiekt GT REST API Integration Test
-Route::get('/test-subiekt-api', function () {
-    try {
-        $config = [
-            'rest_api_url' => 'https://sapi.mpptrade.pl',
-            'rest_api_key' => 'YHZ4AtJiNBrEFhez7AvPTGJK3XKCrX4NCyGLwrQpecqCyvP3XxxCGYRvjdmtGkRb',
-            'rest_api_timeout' => 30,
-            'rest_api_connect_timeout' => 10,
-            'rest_api_verify_ssl' => false,
-            'connection_mode' => 'rest_api',
-        ];
-
-        $client = new \App\Services\ERP\SubiektGT\SubiektRestApiClient([
-            'base_url' => $config['rest_api_url'],
-            'api_key' => $config['rest_api_key'],
-            'timeout' => $config['rest_api_timeout'],
-            'connect_timeout' => $config['rest_api_connect_timeout'],
-            'verify_ssl' => $config['rest_api_verify_ssl'],
-        ]);
-
-        $results = ['tests' => []];
-
-        // Test 1: Health check
-        try {
-            $health = $client->healthCheck();
-            $results['tests']['health'] = [
-                'success' => true,
-                'data' => $health,
-            ];
-        } catch (\Exception $e) {
-            $results['tests']['health'] = [
-                'success' => false,
-                'error' => $e->getMessage(),
-            ];
-        }
-
-        // Test 2: Get products
-        try {
-            $products = $client->getProducts(['page' => 1, 'pageSize' => 3]);
-            $results['tests']['products'] = [
-                'success' => $products['success'] ?? false,
-                'count' => count($products['data'] ?? []),
-                'total' => $products['pagination']['total_items'] ?? 0,
-                'sample' => array_slice($products['data'] ?? [], 0, 1),
-            ];
-        } catch (\Exception $e) {
-            $results['tests']['products'] = [
-                'success' => false,
-                'error' => $e->getMessage(),
-            ];
-        }
-
-        return response()->json([
-            'status' => 'completed',
-            'api_url' => $config['rest_api_url'],
-            'results' => $results,
-        ]);
-
-    } catch (\Exception $e) {
-        return response()->json([
-            'status' => 'error',
-            'error' => $e->getMessage(),
-            'trace' => $e->getTraceAsString(),
-        ], 500);
-    }
-})->name('test.subiekt-api');
 
 // ==========================================
 // AUTHENTICATION ROUTES
@@ -161,10 +79,17 @@ Route::post('/login', function (Request $request) {
     return back()->withErrors([
         'email' => 'Podane dane logowania są nieprawidłowe.'
     ])->withInput($request->only('email'));
-})->name('login.store');
+})->name('login.store')->middleware('throttle:5,1');
 
-Route::post('/logout', function () {
+// OAuth approval pending page
+Route::get('/approval/pending', function () {
+    return view('auth.approval-pending');
+})->name('approval.pending')->middleware('auth');
+
+Route::post('/logout', function (Request $request) {
     Auth::logout();
+    $request->session()->invalidate();
+    $request->session()->regenerateToken();
     return redirect()->route('home');
 })->name('logout');
 
@@ -228,7 +153,7 @@ Route::middleware(['auth'])->group(function () {
         $user->save();
 
         return redirect()->route('profile.show')->with('success', 'Profil zaktualizowany pomyslnie.');
-    })->name('profile.update');
+    })->name('profile.update')->middleware('throttle:5,1');
 
     Route::delete('/profile', function (\Illuminate\Http\Request $request) {
         $user = auth()->user();
@@ -318,18 +243,11 @@ Route::middleware(['auth'])->prefix('help')->name('help.')->group(function () {
 // ADMIN ROUTES (tylko istniejące komponenty Livewire)
 // ==========================================
 
-// DEV_AUTH_BYPASS: Controlled via SystemSettings or .env fallback
-// Admin Panel → System Settings → Security → "Development Mode"
-// WARNING: NEVER enable in production!
-$devAuthBypass = false;
-try {
-    // Try database setting first, fallback to .env
-    $devAuthBypass = \App\Models\SystemSetting::get('dev_auth_bypass', env('DEV_AUTH_BYPASS', false));
-} catch (\Exception $e) {
-    // Database not ready - use .env fallback
-    $devAuthBypass = env('DEV_AUTH_BYPASS', false);
-}
-$adminMiddleware = $devAuthBypass ? [] : ['auth'];
+// Admin routes - full security middleware stack
+// DevAuthBypass middleware (in bootstrap/app.php) handles auto-login only in APP_ENV=local
+// Auth + security middleware - autoryzacja per-zasób via $this->authorize() w komponentach
+// Wszystkie role mogą wejść do /admin/*, ale każdy komponent sprawdza uprawnienia
+$adminMiddleware = ['auth', 'check_account_lock', 'force_password_change', 'check.blocked.ip'];
 
 Route::prefix('admin')->name('admin.')->middleware($adminMiddleware)->group(function () {
     
@@ -475,16 +393,6 @@ Route::prefix('admin')->name('admin.')->middleware($adminMiddleware)->group(func
             return view('pages.product-form-create');
         })->name('create');
 
-        // Test route - Simple HTML form (diagnostic)
-        Route::get('/create-test', function () {
-            return view('pages.simple-product-create');
-        })->name('create-test');
-
-        // Diagnostic tool for /create issues
-        Route::get('/create-diagnostic', function () {
-            return view('pages.create-diagnostic');
-        })->name('create-diagnostic');
-
         // ==========================================
         // ETAP_06: Product Import Panel
         // ==========================================
@@ -507,11 +415,6 @@ Route::prefix('admin')->name('admin.')->middleware($adminMiddleware)->group(func
             Route::get('/', function () {
                 return view('pages.category-tree');
             })->name('index');
-
-            // Simple test in categories group
-            Route::get('/test', function () {
-                return 'CATEGORIES GROUP TEST WORKS!';
-            })->name('test');
 
             // Category creation - Using blade wrapper like other routes
             Route::get('/create', function () {
@@ -644,10 +547,8 @@ Route::prefix('admin')->name('admin.')->middleware($adminMiddleware)->group(func
     Route::get('/variants-panel', fn() => view('admin.variants.panel'))->name('variants.panel');
 
     // Vehicle Features Management (Phase 2 - ETAP_05a)
-    // DEVELOPMENT: Auth disabled (consistent with other ETAP_05a routes)
     Route::get('/features/vehicles', [VehicleFeatureController::class, 'index'])
-        ->name('admin.features.vehicles.index')
-        ->withoutMiddleware(['auth']);
+        ->name('admin.features.vehicles.index');
 
     // ETAP_05d FAZA 1: Global Compatibility Management Panel
     // DEVELOPMENT: Auth disabled (consistent with other ETAP_05a routes)
@@ -844,141 +745,6 @@ Route::get('/products/create', function () {
 Route::get('/products/{product}/edit', function ($product) {
     return redirect()->to("/admin/products/{$product}/edit");
 })->name('products.edit');
-
-// ==========================================
-// TEST ROUTES
-// ==========================================
-
-// Test routes
-Route::get('/test-dashboard', function () {
-    return 'Dashboard test works!';
-});
-
-// UI Test page for category fixes
-Route::get('/test-category-ui', function () {
-    return view('pages.category-ui-test');
-})->name('test.category-ui');
-
-// Dropdown Debug page - Alpine x-teleport test
-Route::get('/test-dropdown-debug', function () {
-    return view('pages.dropdown-debug');
-})->name('test.dropdown-debug');
-
-// CategoryForm Debug page
-Route::get('/debug-category-form', function () {
-    return view('debug-category');
-})->name('debug.category-form');
-
-// Simple Test Page
-Route::get('/simple-test', function () {
-    return view('simple-test');
-})->name('simple.test');
-
-// Route Test Page - test what happens with admin routes
-Route::get('/route-test-categories-create', function () {
-    return view('route-test');
-})->name('route.test.categories');
-
-// Test admin categories create - bez middleware
-Route::get('/test-admin-categories-create', function () {
-    return view('test-admin-categories-create');
-})->name('test.admin.categories.create');
-
-// Debug route for products issue
-Route::get('/debug-products', function () {
-    try {
-        $productList = new \App\Http\Livewire\Products\Listing\ProductList();
-        $productList->mount();
-        return 'ProductList component mount() OK';
-    } catch (\Exception $e) {
-        return 'Error: ' . $e->getMessage() . ' in ' . $e->getFile() . ' line ' . $e->getLine();
-    }
-});
-
-// Debug route for ProductForm
-Route::get('/debug-productform', function () {
-    try {
-        $productForm = new \App\Http\Livewire\Products\Management\ProductForm();
-        $productForm->mount();
-        return 'ProductForm component mount() OK - CREATE MODE';
-    } catch (\Exception $e) {
-        return 'ProductForm Error: ' . $e->getMessage() . ' in ' . $e->getFile() . ' line ' . $e->getLine();
-    }
-});
-
-// Test route with /create pattern
-Route::get('/test-create', \App\Http\Livewire\Products\Management\ProductForm::class)->name('test.create');
-
-// Debug route for Livewire render
-Route::get('/debug-livewire-products', function () {
-    try {
-        $test = app('livewire')->test(\App\Http\Livewire\Products\Listing\ProductList::class);
-        return 'Livewire test OK - check if it renders: ' . $test->getViewData()['name'];
-    } catch (\Exception $e) {
-        return 'Livewire Error: ' . $e->getMessage() . ' in ' . $e->getFile() . ' line ' . $e->getLine();
-    }
-});
-
-// Debug route for ProductForm rendering
-Route::get('/debug-livewire-productform', function () {
-    try {
-        $test = app('livewire')->test(\App\Http\Livewire\Products\Management\ProductForm::class);
-        return 'ProductForm Livewire test OK - component can be rendered';
-    } catch (\Exception $e) {
-        return 'ProductForm Livewire Error: ' . $e->getMessage() . ' in ' . $e->getFile() . ' line ' . $e->getLine();
-    }
-});
-
-// Debug Livewire component discovery
-Route::get('/debug-component-discovery', function () {
-    try {
-        $manager = app(\Livewire\Mechanisms\ComponentRegistry::class);
-        $componentName = 'products.management.product-form';
-
-        $output = "=== LIVEWIRE COMPONENT DISCOVERY DEBUG ===\n";
-        $output .= "Checking component: $componentName\n";
-
-        // Check if component is registered
-        try {
-            $class = $manager->getClass($componentName);
-            $output .= "✅ Component resolved to class: $class\n";
-        } catch (\Exception $e) {
-            $output .= "❌ Component resolution failed: " . $e->getMessage() . "\n";
-        }
-
-        // Test direct class resolution
-        $directClass = \App\Http\Livewire\Products\Management\ProductForm::class;
-        $output .= "Direct class: $directClass\n";
-        $output .= "Class exists: " . (class_exists($directClass) ? 'YES' : 'NO') . "\n";
-
-        return response($output)->header('Content-Type', 'text/plain');
-    } catch (\Exception $e) {
-        return 'Discovery Error: ' . $e->getMessage() . ' in ' . $e->getFile() . ' line ' . $e->getLine();
-    }
-});
-
-// Direct products route test
-Route::get('/test-products-direct', \App\Http\Livewire\Products\Listing\ProductList::class)->name('test.products');
-
-// Test: Swap ProductList with ProductForm in working route pattern
-Route::get('/test-swap-productform', \App\Http\Livewire\Products\Management\ProductForm::class)->name('test.swap');
-
-// Direct ProductForm route test (clone of working route above)
-Route::get('/test-productform-direct', \App\Http\Livewire\Products\Management\ProductForm::class)->name('test.productform');
-
-// Test ProductForm with simplified render
-Route::get('/test-productform-simple', function () {
-    try {
-        $component = new \App\Http\Livewire\Products\Management\ProductForm();
-        $component->mount();
-
-        // Test if render() method works
-        $view = $component->render();
-        return 'ProductForm render() works - view name: ' . $view->getName();
-    } catch (\Exception $e) {
-        return 'ProductForm render() Error: ' . $e->getMessage() . ' in ' . $e->getFile() . ' line ' . $e->getLine();
-    }
-});
 
 // 403 Forbidden page
 Route::get('/forbidden', function () {

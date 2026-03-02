@@ -6,6 +6,7 @@ use App\Services\CSV\BulkOperationService;
 use App\Services\CSV\ErrorReporter;
 use App\Services\CSV\ImportMapper;
 use App\Services\CSV\ImportValidator;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Component;
@@ -30,6 +31,7 @@ use Livewire\WithFileUploads;
  */
 class ImportPreview extends Component
 {
+    use AuthorizesRequests;
     use WithFileUploads;
 
     /**
@@ -98,6 +100,7 @@ class ImportPreview extends Component
      */
     public function mount(string $importType = 'variants')
     {
+        $this->authorize('import.manage');
         $this->importType = $importType;
     }
 

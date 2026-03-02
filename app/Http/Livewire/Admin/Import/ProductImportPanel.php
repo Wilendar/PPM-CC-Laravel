@@ -5,6 +5,7 @@ namespace App\Http\Livewire\Admin\Import;
 use Livewire\Component;
 use Livewire\WithPagination;
 use Livewire\Attributes\Computed;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Attributes\On;
 use App\Models\PendingProduct;
 use App\Models\ImportSession;
@@ -39,6 +40,7 @@ use Illuminate\Support\Facades\Auth;
  */
 class ProductImportPanel extends Component
 {
+    use AuthorizesRequests;
     use WithPagination;
     use Traits\ImportPanelBulkActions;
     use Traits\ImportPanelFilters;
@@ -90,6 +92,7 @@ class ProductImportPanel extends Component
      */
     public function mount(): void
     {
+        $this->authorize('import.manage');
         // Load active session if exists
         $this->activeSessionId = ImportSession::active()
             ->byUser(Auth::id())

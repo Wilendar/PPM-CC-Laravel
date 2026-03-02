@@ -4,6 +4,7 @@ namespace App\Http\Livewire\Admin\Products;
 
 use Livewire\Component;
 use App\Models\ProductType;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -25,6 +26,8 @@ use Illuminate\Validation\ValidationException;
  */
 class ProductTypeManager extends Component
 {
+    use AuthorizesRequests;
+
     /*
     |--------------------------------------------------------------------------
     | COMPONENT PROPERTIES
@@ -103,6 +106,7 @@ class ProductTypeManager extends Component
 
     public function mount(): void
     {
+        $this->authorize('products.update');
         // Initialize sort_order for new types
         $this->sort_order = (ProductType::max('sort_order') ?? 0) + 10;
     }

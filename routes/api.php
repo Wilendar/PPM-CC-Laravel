@@ -27,8 +27,7 @@ Route::get('/health', function () {
     return response()->json([
         'status' => 'ok',
         'version' => '1.0.0',
-        'timestamp' => now(),
-        'environment' => app()->environment()
+        'timestamp' => now()
     ]);
 });
 
@@ -83,7 +82,7 @@ Route::prefix('v1')->middleware(['api_access'])->group(function () {
             'message' => 'Product updated successfully',
             'product' => null
         ]);
-    })->middleware(['permission:products.edit'])->name('api.products.update');
+    })->middleware(['permission:products.update'])->name('api.products.update');
     
     // Product deletion (Manager+)
     Route::delete('/products/{sku}', function ($sku) {
@@ -131,7 +130,7 @@ Route::prefix('v1')->middleware(['api_access'])->group(function () {
             'message' => 'Category updated successfully',
             'category' => null
         ]);
-    })->middleware(['permission:categories.edit'])->name('api.categories.update');
+    })->middleware(['permission:categories.update'])->name('api.categories.update');
     
     Route::delete('/categories/{id}', function ($id) {
         return response()->json([

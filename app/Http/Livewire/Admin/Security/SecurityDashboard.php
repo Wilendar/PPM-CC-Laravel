@@ -5,6 +5,7 @@ namespace App\Http\Livewire\Admin\Security;
 use Livewire\Component;
 use Livewire\WithPagination;
 use App\Models\AuditLog;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use App\Models\BlockedIp;
 use App\Models\UserSession;
 use App\Models\LoginAttempt;
@@ -27,6 +28,7 @@ use Illuminate\Support\Collection;
  */
 class SecurityDashboard extends Component
 {
+    use AuthorizesRequests;
     use WithPagination;
 
     // ==========================================
@@ -64,6 +66,7 @@ class SecurityDashboard extends Component
 
     public function mount(): void
     {
+        $this->authorize('admin.settings.manage');
         $this->recentAlerts = collect();
         $this->topAttackingIPs = collect();
         $this->lockedOutUsers = collect();

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 
 /**
  * VehicleFeatureController
@@ -32,6 +33,8 @@ use App\Http\Controllers\Controller;
  */
 class VehicleFeatureController extends Controller
 {
+    use AuthorizesRequests;
+
     /**
      * Display Vehicle Features Management page
      *
@@ -39,6 +42,8 @@ class VehicleFeatureController extends Controller
      */
     public function index()
     {
+        $this->authorize('products.read');
+
         return view('admin.features.index');
     }
 }

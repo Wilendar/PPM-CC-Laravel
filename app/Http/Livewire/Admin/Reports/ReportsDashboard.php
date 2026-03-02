@@ -4,12 +4,14 @@ namespace App\Http\Livewire\Admin\Reports;
 
 use App\Models\SystemReport;
 use App\Services\ReportsService;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Component;
 use Livewire\WithPagination;
 use Carbon\Carbon;
 
 class ReportsDashboard extends Component
 {
+    use AuthorizesRequests;
     use WithPagination;
 
     public $activeTab = 'overview';
@@ -31,6 +33,7 @@ class ReportsDashboard extends Component
 
     public function mount()
     {
+        $this->authorize('system.reports');
         $this->dateFrom = now()->subDays(7)->format('Y-m-d');
         $this->dateTo = now()->format('Y-m-d');
         $this->generateDate = now()->format('Y-m-d');

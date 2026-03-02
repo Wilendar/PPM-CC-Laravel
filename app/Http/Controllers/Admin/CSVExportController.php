@@ -8,6 +8,7 @@ use App\Models\ProductVariant;
 use App\Models\VehicleCompatibility;
 use App\Services\CSV\ExportFormatter;
 use App\Services\CSV\TemplateGenerator;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Log;
@@ -26,6 +27,8 @@ use Symfony\Component\HttpFoundation\BinaryFileResponse;
  */
 class CSVExportController extends Controller
 {
+    use AuthorizesRequests;
+
     protected TemplateGenerator $templateGenerator;
     protected ExportFormatter $exportFormatter;
 
@@ -45,6 +48,8 @@ class CSVExportController extends Controller
      */
     public function downloadTemplate(string $type): BinaryFileResponse
     {
+        $this->authorize('products.export');
+
         Log::info('CSVExportController: Template download requested', ['type' => $type]);
 
         // Validate template type
@@ -79,6 +84,8 @@ class CSVExportController extends Controller
      */
     public function exportVariants(int $productId, Request $request): BinaryFileResponse
     {
+        $this->authorize('products.export');
+
         Log::info('CSVExportController: Variants export requested', ['product_id' => $productId]);
 
         $product = Product::findOrFail($productId);
@@ -134,6 +141,8 @@ class CSVExportController extends Controller
      */
     public function exportFeatures(int $productId, Request $request): BinaryFileResponse
     {
+        $this->authorize('products.export');
+
         Log::info('CSVExportController: Features export requested', ['product_id' => $productId]);
 
         $product = Product::with(['features.featureType'])->findOrFail($productId);
@@ -182,6 +191,8 @@ class CSVExportController extends Controller
      */
     public function exportCompatibility(int $productId, Request $request): BinaryFileResponse
     {
+        $this->authorize('products.export');
+
         Log::info('CSVExportController: Compatibility export requested', ['product_id' => $productId]);
 
         $product = Product::findOrFail($productId);
@@ -236,6 +247,8 @@ class CSVExportController extends Controller
      */
     public function exportMultipleProducts(Request $request): BinaryFileResponse
     {
+        $this->authorize('products.export');
+
         $request->validate([
             'product_ids' => 'required|array',
             'product_ids.*' => 'integer|exists:products,id',

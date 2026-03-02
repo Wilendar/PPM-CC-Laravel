@@ -7,6 +7,7 @@ use Livewire\WithPagination;
 use Livewire\WithFileUploads;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Url;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 
 /**
  * BusinessPartnerPanel - Panel zarzadzania dostawcami/producentami/importerami
@@ -23,6 +24,7 @@ use Livewire\Attributes\Url;
 #[Layout('layouts.admin')]
 class BusinessPartnerPanel extends Component
 {
+    use AuthorizesRequests;
     use WithPagination;
     use WithFileUploads;
     use Traits\BusinessPartnerCrudTrait;
@@ -101,6 +103,11 @@ class BusinessPartnerPanel extends Component
         $this->selectedEntityId = null;
         $this->productSearch = '';
         $this->resetPage('products');
+    }
+
+    public function mount(): void
+    {
+        $this->authorize('products.read');
     }
 
     public function render()

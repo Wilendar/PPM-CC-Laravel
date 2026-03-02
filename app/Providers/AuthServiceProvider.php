@@ -3,9 +3,20 @@
 namespace App\Providers;
 
 use App\Models\BugReport;
+use App\Models\Category;
+use App\Models\ERPConnection;
+use App\Models\PrestaShopShop;
+use App\Models\Product;
+use App\Models\SystemSetting;
 use App\Policies\BugReportPolicy;
-use App\Policies\RolePolicy;
+use App\Policies\CategoryPolicy;
+use App\Policies\ERPConnectionPolicy;
 use App\Policies\PermissionPolicy;
+use App\Policies\PrestaShopShopPolicy;
+use App\Policies\ProductPolicy;
+use App\Policies\RolePolicy;
+use App\Policies\SystemSettingPolicy;
+use App\Policies\UserPolicy;
 use Illuminate\Foundation\Support\Providers\AuthServiceProvider as ServiceProvider;
 use Illuminate\Support\Facades\Gate;
 use App\Models\User;
@@ -21,8 +32,14 @@ class AuthServiceProvider extends ServiceProvider
      */
     protected $policies = [
         BugReport::class => BugReportPolicy::class,
-        Role::class => RolePolicy::class,
+        Category::class => CategoryPolicy::class,
+        ERPConnection::class => ERPConnectionPolicy::class,
         Permission::class => PermissionPolicy::class,
+        PrestaShopShop::class => PrestaShopShopPolicy::class,
+        Product::class => ProductPolicy::class,
+        Role::class => RolePolicy::class,
+        SystemSetting::class => SystemSettingPolicy::class,
+        User::class => UserPolicy::class,
     ];
 
     /**

@@ -208,8 +208,7 @@ class SyncController extends Component
             'timestamp' => now()->toDateTimeString(),
         ]);
 
-        // DEVELOPMENT: authorize tymczasowo wyłączone dla testów
-        // $this->authorize('admin.shops.sync');
+        $this->authorize('admin.shops.sync');
 
         $this->loadActiveSyncJobs();
         $this->selectedSyncTypes = ['products']; // Default selection

@@ -92,6 +92,9 @@
                         {{-- Preview Content --}}
                         <div class="p-4">
                             <div class="bg-white rounded-lg p-4 text-gray-900 prose prose-sm max-w-none">
+                                {{-- @safe: versionPreviewHtml comes from BlockRenderer (internal renderer) or
+                                     rendered_html stored in DB after internal render. PrestaShop-section blocks
+                                     retain original HTML - if XSS risk grows, apply strip_tags here. --}}
                                 {!! $this->versionPreviewHtml !!}
                             </div>
                         </div>

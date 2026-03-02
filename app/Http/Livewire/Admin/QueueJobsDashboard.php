@@ -4,15 +4,26 @@ namespace App\Http\Livewire\Admin;
 
 use Livewire\Component;
 use App\Services\QueueJobsService;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Artisan;
 
 class QueueJobsDashboard extends Component
 {
+    use AuthorizesRequests;
+
     public $filter = 'all'; // all, pending, processing, failed, stuck
     public $selectedQueue = 'all';
 
     protected $queueService;
+
+    /**
+     * Mount component and check authorization.
+     */
+    public function mount(): void
+    {
+        $this->authorize('admin.settings.manage');
+    }
 
     /**
      * Boot method for service injection (Livewire 3.x pattern)

@@ -5,6 +5,7 @@ namespace App\Http\Livewire\Admin\Compatibility;
 use App\Models\Product;
 use App\Models\VehicleModel;
 use App\Services\CompatibilityManager;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Collection;
 use Livewire\Attributes\Computed;
 use Livewire\Component;
@@ -52,6 +53,8 @@ use Livewire\Component;
  */
 class BulkEditCompatibilityModal extends Component
 {
+    use AuthorizesRequests;
+
     /*
     |--------------------------------------------------------------------------
     | MODAL STATE
@@ -135,6 +138,7 @@ class BulkEditCompatibilityModal extends Component
 
     public function mount(): void
     {
+        $this->authorize('products.update');
         $this->searchResults = collect([]);
     }
 

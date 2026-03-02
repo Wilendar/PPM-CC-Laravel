@@ -20,7 +20,10 @@ use App\Services\Permissions\PermissionModuleLoader;
 use App\Services\Product\FeatureManager;
 use App\Services\Product\ProductStatusAggregator;
 use App\Services\Product\VariantManager;
+use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -56,6 +59,48 @@ class AppServiceProvider extends ServiceProvider
         DB::statement("SET time_zone = '" . now()->format('P') . "'");
 
         $this->registerProductStatusCacheObservers();
+        $this->registerOAuthRateLimiters();
+        $this->registerSocialiteProviders();
+    }
+
+    /**
+     * Register OAuth rate limiters
+     */
+    private function registerOAuthRateLimiters(): void
+    {
+        RateLimiter::for('oauth-redirect', function ($request) {
+            return Limit::perMinute(10)->by($request->ip());
+        });
+
+        RateLimiter::for('oauth-callback', function ($request) {
+            return Limit::perMinute(20)->by($request->ip());
+        });
+
+        RateLimiter::for('oauth-verify', function ($request) {
+            return Limit::perMinute(5)->by($request->ip());
+        });
+
+        RateLimiter::for('oauth-link', function ($request) {
+            return Limit::perMinute(5)->by(optional($request->user())->id ?: $request->ip());
+        });
+
+        RateLimiter::for('oauth-unlink', function ($request) {
+            return Limit::perMinute(3)->by(optional($request->user())->id ?: $request->ip());
+        });
+
+        RateLimiter::for('oauth-revoke', function ($request) {
+            return Limit::perMinute(2)->by(optional($request->user())->id ?: $request->ip());
+        });
+    }
+
+    /**
+     * Register third-party Socialite providers
+     */
+    private function registerSocialiteProviders(): void
+    {
+        Event::listen(function (\SocialiteProviders\Manager\SocialiteWasCalled $event) {
+            $event->extendSocialite('microsoft', \SocialiteProviders\Microsoft\Provider::class);
+        });
     }
 
     /**

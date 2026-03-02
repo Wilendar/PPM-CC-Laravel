@@ -173,8 +173,7 @@ class ERPManager extends Component
      */
     public function mount()
     {
-        // DEVELOPMENT: Autoryzacja tymczasowo wyłączona
-        // $this->authorize('admin.erp.view');
+        $this->authorize('admin.erp.view');
 
         // Load API key from environment (not hardcoded)
         $this->subiektConfig['rest_api_key'] = env('SUBIEKT_GT_API_KEY', '');

@@ -9,6 +9,7 @@ use App\Models\SmartKeywordRule;
 use App\Models\SmartSyncBrandRule;
 use App\Models\SmartVehicleAlias;
 use App\Services\Compatibility\VehicleModelDetector;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Component;
 use Livewire\WithPagination;
 
@@ -22,6 +23,7 @@ use Livewire\WithPagination;
  */
 class SmartMatchingPanel extends Component
 {
+    use AuthorizesRequests;
     use WithPagination;
 
     // ─── Sekcje ───────────────────────────────────────────────────────────────
@@ -147,6 +149,7 @@ class SmartMatchingPanel extends Component
 
     public function mount(): void
     {
+        $this->authorize('products.update');
         $this->loadKeywordRules();
         $this->loadAvailableShops();
         $this->loadAvailableBrands();
@@ -265,8 +268,13 @@ class SmartMatchingPanel extends Component
             default => ['name', 'sku'],
         };
 
-        $query->where(function ($q) use ($fieldMap, $keyword, $rule) {
+        $allowedFields = ['name', 'sku'];
+
+        $query->where(function ($q) use ($fieldMap, $keyword, $rule, $allowedFields) {
             foreach ($fieldMap as $field) {
+                if (!in_array($field, $allowedFields)) {
+                    continue;
+                }
                 $q->orWhere(function ($sub) use ($field, $keyword, $rule) {
                     match ($rule->match_type) {
                         'starts_with' => $sub->whereRaw("LOWER({$field}) LIKE ?", [$keyword . '%']),

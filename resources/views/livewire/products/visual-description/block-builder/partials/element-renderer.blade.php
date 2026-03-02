@@ -422,11 +422,15 @@
             @break
 
         @case('raw-html')
+            @php
+                // Strip dangerous tags from raw-html blocks - content may originate from PrestaShop imports
+                $safeRawContent = strip_tags($content, '<div><span><p><br><b><strong><i><em><u><s><ul><ol><li><table><thead><tbody><tr><th><td><h1><h2><h3><h4><h5><h6><a><img><figure><figcaption><section><article><header><footer><aside><hr>');
+            @endphp
             <div
                 @class($classes)
                 style="{{ collect($styles)->map(fn($v, $k) => \Illuminate\Support\Str::kebab($k) . ': ' . $v)->implode('; ') }}"
             >
-                {!! $content !!}
+                {!! $safeRawContent !!}
             </div>
             @break
 

@@ -44,7 +44,7 @@ class MicrosoftAuthController extends Controller
                 'user_agent' => request()->userAgent()
             ]);
 
-            $driver = Socialite::driver('microsoft-azure');
+            $driver = Socialite::driver('microsoft');
             
             // Microsoft Entra ID specific parameters
             $scopes = config('services.microsoft.scopes', ['openid', 'profile', 'email', 'User.Read']);
@@ -95,7 +95,7 @@ class MicrosoftAuthController extends Controller
             }
 
             // Get user data from Microsoft
-            $microsoftUser = Socialite::driver('microsoft-azure')->user();
+            $microsoftUser = Socialite::driver('microsoft')->user();
             
             // Verify domain restrictions
             if (!$this->isAllowedDomain($microsoftUser->getEmail())) {
@@ -145,10 +145,22 @@ class MicrosoftAuthController extends Controller
 
             // Authenticate user
             Auth::login($user, config('services.oauth.remember_oauth_sessions', true));
-            
+
             // Update last login
             $user->updateLastLogin();
             $user->updateOAuthActivity();
+
+            // New users require admin approval before accessing the panel
+            if (!$user->is_approved) {
+                $this->logAuditEvent('oauth.login.pending_approval', [
+                    'user_id' => $user->id,
+                    'provider' => 'microsoft',
+                    'email' => $user->email,
+                    'ip' => $request->ip()
+                ]);
+
+                return redirect()->route('approval.pending');
+            }
 
             // Redirect to intended page or dashboard
             return redirect()->intended(route('dashboard'));
@@ -186,7 +198,7 @@ class MicrosoftAuthController extends Controller
 
         try {
             $user = Auth::user();
-            $microsoftUser = Socialite::driver('microsoft-azure')->user();
+            $microsoftUser = Socialite::driver('microsoft')->user();
             
             // Check if Microsoft account is already linked to another user
             $existingUser = User::where('oauth_provider', 'microsoft')
@@ -349,6 +361,7 @@ class MicrosoftAuthController extends Controller
                 'oauth_domain' => $this->extractDomain($microsoftUser->getEmail()),
                 'primary_auth_method' => 'microsoft',
                 'is_active' => true,
+                'is_approved' => false, // New OAuth users require admin approval
                 'ui_preferences' => User::getDefaultUIPreferences(),
                 'notification_settings' => User::getDefaultNotificationSettings(),
             ]);

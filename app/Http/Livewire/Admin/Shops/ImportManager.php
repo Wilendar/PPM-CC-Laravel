@@ -128,8 +128,7 @@ class ImportManager extends Component
      */
     public function mount()
     {
-        // DEVELOPMENT: authorize tymczasowo wyłączone dla testów
-        // $this->authorize('admin.shops.import');
+        $this->authorize('admin.shops.import');
 
         $this->loadActiveImportJobs();
         $this->loadRollbackHistory();
