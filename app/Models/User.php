@@ -37,7 +37,9 @@ use Spatie\Permission\Traits\HasRoles;
  */
 class User extends Authenticatable implements MustVerifyEmail
 {
-    use HasFactory, Notifiable, HasRoles; // SoftDeletes removed for now
+    use HasFactory, Notifiable, HasRoles {
+        HasRoles::hasPermissionTo as protected spatieHasPermissionTo;
+    }
 
     /**
      * The attributes that are mass assignable.
@@ -341,8 +343,8 @@ class User extends Authenticatable implements MustVerifyEmail
             return true;
         }
 
-        // Use parent Spatie method for regular check
-        return parent::hasPermissionTo($permission, $guardName);
+        // Use aliased Spatie trait method (parent:: doesn't work for trait methods)
+        return $this->spatieHasPermissionTo($permission, $guardName);
     }
 
     /**
