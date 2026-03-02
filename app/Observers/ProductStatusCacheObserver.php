@@ -8,7 +8,6 @@ use App\Models\ERPConnection;
 use App\Models\PrestaShopShop;
 use App\Models\Product;
 use App\Models\ProductErpData;
-use App\Models\ProductMedia;
 use App\Models\ProductPrice;
 use App\Models\ProductShopData;
 use App\Models\ProductStock;
@@ -21,7 +20,7 @@ use Illuminate\Support\Facades\Log;
  * Observer for invalidating product status cache when related models change.
  *
  * Monitors: Product, ProductShopData, ProductErpData, ProductPrice, ProductStock,
- * ProductMedia, ProductVariant
+ * ProductVariant
  *
  * @package App\Observers
  * @since 2026-02-04
@@ -89,16 +88,6 @@ class ProductStatusCacheObserver
             $this->invalidateProductCache($stock->product_id);
         } elseif ($stock->variant_id) {
             $this->invalidateVariantParentCache($stock->variant_id);
-        }
-    }
-
-    /**
-     * Handle the ProductMedia "saved" event.
-     */
-    public function mediaSaved(ProductMedia $media): void
-    {
-        if ($media->mediable_type === Product::class) {
-            $this->invalidateProductCache($media->mediable_id);
         }
     }
 

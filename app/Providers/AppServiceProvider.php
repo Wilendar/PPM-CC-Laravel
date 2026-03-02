@@ -6,7 +6,6 @@ use App\Models\ERPConnection;
 use App\Models\PrestaShopShop;
 use App\Models\Product;
 use App\Models\ProductErpData;
-use App\Models\ProductMedia;
 use App\Models\ProductPrice;
 use App\Models\ProductShopData;
 use App\Models\ProductStock;
@@ -117,7 +116,7 @@ class AppServiceProvider extends ServiceProvider
         ProductErpData::saved(fn(ProductErpData $d) => $observer->erpDataSaved($d));
         ProductPrice::saved(fn(ProductPrice $p) => $observer->priceSaved($p));
         ProductStock::saved(fn(ProductStock $s) => $observer->stockSaved($s));
-        ProductMedia::saved(fn(ProductMedia $m) => $observer->mediaSaved($m));
+        // ProductMedia observer disabled - model not yet implemented
         ProductVariant::saved(fn(ProductVariant $v) => $observer->variantSaved($v));
 
         // INTEGRATION_LABELS.md: Invalidate cache when shop/ERP labels change
