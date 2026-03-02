@@ -113,7 +113,7 @@
                 class="bg-gray-800/30 backdrop-blur-md rounded-2xl p-8 border border-gray-600/30 shadow-2xl"
                 style="width: 384px; max-width: calc(100vw - 2rem); margin: 0 auto;"
             >
-                <form method="POST" action="{{ route('login.store') }}" class="space-y-6">
+                <form method="POST" action="{{ route('login.store') }}" class="space-y-6" x-data="{ loading: false }" @submit="loading = true">
                     @csrf
                     
                     {{-- Email Field --}}
@@ -204,10 +204,8 @@
 
                     {{-- Submit Button --}}
                     <div class="flex justify-center">
-                        <button 
-                            type="submit" 
-                            x-data="{ loading: false }"
-                            @click="loading = true"
+                        <button
+                            type="submit"
                             :disabled="loading"
                             :class="loading ? 'opacity-75 cursor-not-allowed' : ''"
                             class="group relative w-80 max-w-full mx-auto flex justify-center items-center py-3 px-4 

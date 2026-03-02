@@ -90,8 +90,12 @@ Route::post('/logout', function (Request $request) {
     Auth::logout();
     $request->session()->invalidate();
     $request->session()->regenerateToken();
-    return redirect()->route('home');
+    return redirect()->route('login');
 })->name('logout');
+
+Route::get('/logout', function () {
+    return redirect()->route('login');
+})->name('logout.redirect');
 
 // ==========================================
 // AUTHENTICATED ROUTES

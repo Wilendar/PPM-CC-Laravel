@@ -66,7 +66,7 @@
                 <button type="button" 
                         wire:click="switchCategory('{{ $category }}')"
                         class="flex items-center px-3 py-2 text-sm rounded-md transition-colors {{ $activeCategory === $category ? 'bg-blue-100 text-blue-700 border-r-2 border-blue-500' : 'text-gray-600 hover:bg-gray-100' }}">
-                    <i class="mr-3 {{ $this->getCategoryIcon($category) }}"></i>
+                    <i class="mr-3 {{ getCategoryIcon($category) }}"></i>
                     {{ $label }}
                 </button>
                 @endforeach
