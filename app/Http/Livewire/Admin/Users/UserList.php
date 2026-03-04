@@ -8,6 +8,9 @@ use App\Models\User;
 use Spatie\Permission\Models\Role;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Mail;
+use App\Mail\UserApprovedMail;
+use App\Mail\UserRejectedMail;
 
 /**
  * Admin User Management List Component
@@ -56,6 +59,7 @@ class UserList extends Component
         'company' => true,
         'roles' => true,
         'status' => true,
+        'auth_method' => true,
         'last_login' => true,
         'created_at' => true,
         'actions' => true
@@ -283,6 +287,12 @@ class UserList extends Component
             case 'force_logout':
                 $this->bulkForceLogoutUsers();
                 break;
+            case 'enable_microsoft_only':
+                $this->bulkEnableMicrosoftOnly();
+                break;
+            case 'disable_microsoft_only':
+                $this->bulkDisableMicrosoftOnly();
+                break;
         }
 
         $this->closeBulkModal();
@@ -403,6 +413,20 @@ class UserList extends Component
         session()->flash('success', "Wylogowano {$users->count()} uzytkownikow ({$totalSessions} sesji).");
     }
 
+    protected function bulkEnableMicrosoftOnly()
+    {
+        $this->authorize('update', User::class);
+        User::whereIn('id', $this->selectedUsers)->update(['microsoft_only' => true]);
+        session()->flash('success', 'Wlaczono Microsoft-only login dla ' . count($this->selectedUsers) . ' uzytkownikow.');
+    }
+
+    protected function bulkDisableMicrosoftOnly()
+    {
+        $this->authorize('update', User::class);
+        User::whereIn('id', $this->selectedUsers)->update(['microsoft_only' => false]);
+        session()->flash('success', 'Wylaczono Microsoft-only login dla ' . count($this->selectedUsers) . ' uzytkownikow.');
+    }
+
     // ==========================================
     // INDIVIDUAL USER ACTIONS
     // ==========================================
@@ -463,6 +487,38 @@ class UserList extends Component
         $user->delete();
         
         session()->flash('success', "Użytkownik {$userName} został usunięty.");
+    }
+
+    public function toggleMicrosoftOnly($userId)
+    {
+        $this->authorize('update', User::class);
+        $user = User::findOrFail($userId);
+        $user->update(['microsoft_only' => !$user->microsoft_only]);
+        $status = $user->microsoft_only ? 'wlaczono' : 'wylaczono';
+        session()->flash('success', "Microsoft-only login {$status} dla {$user->full_name}.");
+    }
+
+    public function approveUser($userId)
+    {
+        $this->authorize('update', User::class);
+        $user = User::findOrFail($userId);
+        $user->update([
+            'is_approved' => true,
+            'is_active' => true,
+        ]);
+        Mail::to($user->email)->queue(new UserApprovedMail($user));
+        session()->flash('success', "Uzytkownik {$user->full_name} zatwierdzony i aktywowany.");
+    }
+
+    public function rejectUser($userId, $reason = null)
+    {
+        $this->authorize('update', User::class);
+        $user = User::findOrFail($userId);
+        $user->update([
+            'is_active' => false,
+        ]);
+        Mail::to($user->email)->queue(new UserRejectedMail($user, $reason));
+        session()->flash('success', "Uzytkownik {$user->full_name} odrzucony.");
     }
 
     // ==========================================

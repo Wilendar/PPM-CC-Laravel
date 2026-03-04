@@ -158,3 +158,6 @@ tmpclaude-*-cwd
 # - phpunit.xml
 # - .env.example
 # ============================================
+
+# Microsoft Auth setup guide (contains sensitive config info)
+.Release_docs/MICROSOFT_AUTH_SETUP.md

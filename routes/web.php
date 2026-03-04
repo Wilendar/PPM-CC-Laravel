@@ -63,17 +63,23 @@ Route::post('/login', function (Request $request) {
     $remember = $request->boolean('remember');
     
     if (Auth::attempt($credentials, $remember)) {
-        $request->session()->regenerate();
         $user = Auth::user();
-        
-        Log::info('Successful login for user: ' . $user->email);
-        
-        // Redirect based on user role – Admin do panelu, pozostali na dashboard
-        if ($user->hasRole('Admin')) {
-            return redirect()->intended('/admin');
+
+        // Sprawdz czy user ma wymuszone logowanie Microsoft
+        if ($user->microsoft_only) {
+            Auth::logout();
+            $request->session()->invalidate();
+            return back()->withErrors([
+                'email' => 'Logowanie dla tego konta jest dostepne wylacznie przez Microsoft. Uzyj przycisku "Zaloguj przez Microsoft".'
+            ])->withInput($request->only('email'));
         }
 
-        return redirect()->intended('/dashboard');
+        $request->session()->regenerate();
+
+        Log::info('Successful login for user: ' . $user->email);
+
+        // Wszystkie zalogowane role trafiają na /admin
+        return redirect()->intended('/admin');
     }
     
     return back()->withErrors([
@@ -96,6 +102,14 @@ Route::post('/logout', function (Request $request) {
 Route::get('/logout', function () {
     return redirect()->route('login');
 })->name('logout.redirect');
+
+// Microsoft OAuth Routes
+Route::prefix('auth/microsoft')->name('auth.microsoft.')->group(function () {
+    Route::get('/redirect', [\App\Http\Controllers\Auth\MicrosoftAuthController::class, 'redirect'])
+        ->name('redirect');
+    Route::get('/callback', [\App\Http\Controllers\Auth\MicrosoftAuthController::class, 'callback'])
+        ->name('callback');
+});
 
 // ==========================================
 // AUTHENTICATED ROUTES
@@ -256,42 +270,42 @@ $adminMiddleware = ['auth', 'check_account_lock', 'force_password_change', 'chec
 Route::prefix('admin')->name('admin.')->middleware($adminMiddleware)->group(function () {
     
     // Admin Dashboard - działający komponent Livewire
-    Route::get('/', \App\Http\Livewire\Dashboard\AdminDashboard::class)->name('dashboard');
+    Route::get('/', \App\Http\Livewire\Dashboard\AdminDashboard::class)->name('dashboard')->middleware('permission:dashboard.read');
     
     // System Settings - działający komponent
     Route::get('/system-settings', \App\Http\Livewire\Admin\Settings\SystemSettings::class)
-         ->name('system-settings.index');
+         ->name('system-settings.index')->middleware('permission:system.manage');
     
     // Backup Management - działający komponent
-    Route::prefix('backup')->name('backup.')->group(function () {
+    Route::prefix('backup')->name('backup.')->middleware('permission:backup.manage')->group(function () {
         Route::get('/', \App\Http\Livewire\Admin\Backup\BackupManager::class)->name('index');
     });
     
     // Maintenance Management - działający komponent
     Route::get('/maintenance', \App\Http\Livewire\Admin\Maintenance\DatabaseMaintenance::class)
-         ->name('maintenance.index');
+         ->name('maintenance.index')->middleware('permission:maintenance.manage');
 
     // Media Management - ETAP_07d Phase 8: Admin Media Panel
     Route::get('/media', \App\Http\Livewire\Admin\Media\MediaManager::class)
-         ->name('media.index');
+         ->name('media.index')->middleware('permission:media.read');
 
     // Shop Management - działający komponent
-    Route::get('/shops', \App\Http\Livewire\Admin\Shops\ShopManager::class)->name('shops');
+    Route::get('/shops', \App\Http\Livewire\Admin\Shops\ShopManager::class)->name('shops')->middleware('permission:shops.read');
     
     // Add New Shop - wizard component
-    Route::get('/shops/add', \App\Http\Livewire\Admin\Shops\AddShop::class)->name('shops.add');
+    Route::get('/shops/add', \App\Http\Livewire\Admin\Shops\AddShop::class)->name('shops.add')->middleware('permission:shops.create');
     
     // Shop CSS Editor - ETAP_07h FAZA 8: Direct CSS editing
-    Route::get('/shops/{shopId}/css-editor', \App\Http\Livewire\Admin\Shops\ShopCssEditor::class)->name('shops.css-editor');
+    Route::get('/shops/{shopId}/css-editor', \App\Http\Livewire\Admin\Shops\ShopCssEditor::class)->name('shops.css-editor')->middleware('permission:shops.css_edit');
 
     // Shop Synchronization Control - sync management panel
-    Route::get('/shops/sync', \App\Http\Livewire\Admin\Shops\SyncController::class)->name('shops.sync');
+    Route::get('/shops/sync', \App\Http\Livewire\Admin\Shops\SyncController::class)->name('shops.sync')->middleware('permission:shops.sync');
 
     // Price Management - FAZA 4: PRICE MANAGEMENT SYSTEM
     Route::prefix('price-management')->name('price-management.')->group(function () {
         // Price Groups Management - działający komponent
         Route::get('/price-groups', \App\Http\Livewire\Admin\PriceManagement\PriceGroups::class)
-             ->name('price-groups.index');
+             ->name('price-groups.index')->middleware('permission:price_groups.read');
 
         // Product Prices Management - FUTURE (Price Management Module)
         Route::get('/product-prices', function () {
@@ -313,10 +327,10 @@ Route::prefix('admin')->name('admin.')->middleware($adminMiddleware)->group(func
     });
     
     // Bulk Product Export - mass export to PrestaShop stores
-    Route::get('/shops/export', \App\Http\Livewire\Admin\Shops\BulkExport::class)->name('shops.export');
+    Route::get('/shops/export', \App\Http\Livewire\Admin\Shops\BulkExport::class)->name('shops.export')->middleware('permission:shops.export');
 
     // Import Management - SEKCJA 2.2.2.2 Import Management
-    Route::get('/shops/import', \App\Http\Livewire\Admin\Shops\ImportManager::class)->name('shops.import');
+    Route::get('/shops/import', \App\Http\Livewire\Admin\Shops\ImportManager::class)->name('shops.import')->middleware('permission:shops.import');
 
     // ==========================================
     // CSV IMPORT/EXPORT SYSTEM - FAZA 6
@@ -325,35 +339,37 @@ Route::prefix('admin')->name('admin.')->middleware($adminMiddleware)->group(func
     // CSV Template Downloads
     Route::get('/csv/templates/{type}', [\App\Http\Controllers\Admin\CSVExportController::class, 'downloadTemplate'])
         ->name('csv.template')
-        ->where('type', 'variants|features|compatibility');
+        ->where('type', 'variants|features|compatibility')
+        ->middleware('permission:products.export');
 
     // Product-specific Exports
     Route::get('/products/{product}/export/variants', [\App\Http\Controllers\Admin\CSVExportController::class, 'exportVariants'])
-        ->name('products.export.variants');
+        ->name('products.export.variants')->middleware('permission:products.export');
     Route::get('/products/{product}/export/features', [\App\Http\Controllers\Admin\CSVExportController::class, 'exportFeatures'])
-        ->name('products.export.features');
+        ->name('products.export.features')->middleware('permission:products.export');
     Route::get('/products/{product}/export/compatibility', [\App\Http\Controllers\Admin\CSVExportController::class, 'exportCompatibility'])
-        ->name('products.export.compatibility');
+        ->name('products.export.compatibility')->middleware('permission:products.export');
 
     // Bulk Export (all products)
     Route::post('/csv/export/multiple', [\App\Http\Controllers\Admin\CSVExportController::class, 'exportMultipleProducts'])
-        ->name('csv.export.multiple');
+        ->name('csv.export.multiple')->middleware('permission:products.export');
 
     // Import Preview Page
     Route::get('/csv/import/{type?}', \App\Http\Livewire\Admin\CSV\ImportPreview::class)
         ->name('csv.import')
-        ->where('type', 'variants|features|compatibility');
+        ->where('type', 'variants|features|compatibility')
+        ->middleware('permission:products.import');
 
     // ==========================================
     // EXPORTS DOWNLOAD - ETAP_07f Faza 6.2
     // ==========================================
     Route::get('/exports/download/{file}', [\App\Http\Controllers\Admin\ExportDownloadController::class, 'download'])
-        ->name('exports.download');
+        ->name('exports.download')->middleware('permission:products.export');
     Route::delete('/exports/{file}', [\App\Http\Controllers\Admin\ExportDownloadController::class, 'delete'])
-        ->name('exports.delete');
+        ->name('exports.delete')->middleware('permission:products.export');
 
     // ERP Integration Management - działający komponent
-    Route::get('/integrations', \App\Http\Livewire\Admin\ERP\ERPManager::class)->name('integrations');
+    Route::get('/integrations', \App\Http\Livewire\Admin\ERP\ERPManager::class)->name('integrations')->middleware('permission:integrations.read');
 
     // ==========================================
     // PRODUCT SCAN SYSTEM - ETAP_10
@@ -361,21 +377,21 @@ Route::prefix('admin')->name('admin.')->middleware($adminMiddleware)->group(func
 
     // Cross-Source Matrix Panel (replaces old ScanProductsPanel)
     Route::get('/scan-products', \App\Http\Livewire\Admin\Scan\CrossSourceMatrixPanel::class)
-        ->name('scan-products');
+        ->name('scan-products')->middleware('permission:scan.read');
 
     // Legacy Scan Panel (backup)
     Route::get('/scan-products/legacy', \App\Http\Livewire\Admin\Scan\ScanProductsPanel::class)
-        ->name('scan-products.legacy');
+        ->name('scan-products.legacy')->middleware('permission:scan.read');
 
     // ==========================================
     // SESSION MANAGEMENT - FAZA C User Management
     // ==========================================
-    Route::get('/sessions', \App\Http\Livewire\Admin\Sessions::class)->name('sessions');
+    Route::get('/sessions', \App\Http\Livewire\Admin\Sessions::class)->name('sessions')->middleware('permission:sessions.read');
 
     // ==========================================
     // BUG REPORTS / HELPDESK SYSTEM
     // ==========================================
-    Route::prefix('bug-reports')->name('bug-reports.')->group(function () {
+    Route::prefix('bug-reports')->name('bug-reports.')->middleware('permission:bug-reports.read')->group(function () {
         Route::get('/', \App\Http\Livewire\Admin\BugReports\BugReportList::class)->name('index');
         Route::get('/solutions', \App\Http\Livewire\Admin\BugReports\SolutionsLibrary::class)->name('solutions');
         Route::get('/{report}', \App\Http\Livewire\Admin\BugReports\BugReportDetail::class)->name('show');
@@ -390,25 +406,25 @@ Route::prefix('admin')->name('admin.')->middleware($adminMiddleware)->group(func
         // Products list (main listing page) - Using blade wrapper for better compatibility
         Route::get('/', function () {
             return view('pages.product-list');
-        })->name('index');
+        })->name('index')->middleware('permission:products.read');
 
         // Product creation - Blade wrapper with admin layout
         Route::get('/create', function () {
             return view('pages.product-form-create');
-        })->name('create');
+        })->name('create')->middleware('permission:products.create');
 
         // ==========================================
         // ETAP_06: Product Import Panel
         // ==========================================
         Route::get('/import', function () {
             return view('pages.product-import');
-        })->name('import');
+        })->name('import')->middleware('permission:products.import');
 
         // Product editing - Blade wrapper with admin layout
         Route::get('/{product}/edit', function ($product) {
             $productModel = \App\Models\Product::find($product);
             return view('pages.product-form-edit', compact('product', 'productModel'));
-        })->name('edit');
+        })->name('edit')->middleware('permission:products.read');
 
         // Product view (public preview) - TODO: Create ProductView component
         // Route::get('/{product}', \App\Http\Livewire\Products\Management\ProductView::class)->name('show');
@@ -418,22 +434,22 @@ Route::prefix('admin')->name('admin.')->middleware($adminMiddleware)->group(func
             // Categories list - Using blade wrapper for better compatibility
             Route::get('/', function () {
                 return view('pages.category-tree');
-            })->name('index');
+            })->name('index')->middleware('permission:categories.read');
 
             // Category creation - Using blade wrapper like other routes
             Route::get('/create', function () {
                 return view('pages.category-form-create');
-            })->name('create');
+            })->name('create')->middleware('permission:categories.create');
 
             // Category editing - Using blade wrapper for better compatibility
             Route::get('/{category}/edit', function ($category) {
                 $categoryModel = \App\Models\Category::find($category);
                 return view('pages.category-form-edit', compact('category', 'categoryModel'));
-            })->name('edit');
+            })->name('edit')->middleware('permission:categories.read');
         });
 
         // Product Types Management - ETAP_05 FAZA 4: Editable Product Types
-        Route::get('/types', \App\Http\Livewire\Admin\Products\ProductTypeManager::class)->name('types.index');
+        Route::get('/types', \App\Http\Livewire\Admin\Products\ProductTypeManager::class)->name('types.index')->middleware('permission:parameters.read');
 
         // Bulk Operations - TODO: Create BulkOperations component
         // Route::prefix('bulk')->name('bulk.')->group(function () {
@@ -452,7 +468,7 @@ Route::prefix('admin')->name('admin.')->middleware($adminMiddleware)->group(func
 
     // Visual Editor Routes - FAZA 9 Admin Panel
     // Using blade wrapper pattern for Livewire 3.x compatibility
-    Route::prefix('visual-editor')->name('visual-editor.')->group(function () {
+    Route::prefix('visual-editor')->name('visual-editor.')->middleware('permission:visual-editor.read')->group(function () {
         // Block Manager - admin panel for managing blocks (FAZA 9.1)
         Route::get('/blocks', fn() => view('admin.visual-editor.blocks'))
             ->name('blocks');
@@ -479,25 +495,25 @@ Route::prefix('admin')->name('admin.')->middleware($adminMiddleware)->group(func
     // ==========================================
     // USER MANAGEMENT - ETAP_04 FAZA A (ACTIVE)
     // ==========================================
-    Route::prefix('users')->name('users.')->group(function () {
+    Route::prefix('users')->name('users.')->middleware('permission:users.read')->group(function () {
         Route::get('/', \App\Http\Livewire\Admin\Users\UserList::class)->name('index');
         // UserForm używa wrapper views z powodu problemów z Livewire 3 full-page component routing
-        Route::get('/create', [\App\Http\Controllers\Admin\UserFormController::class, 'create'])->name('create');
+        Route::get('/create', [\App\Http\Controllers\Admin\UserFormController::class, 'create'])->name('create')->middleware('permission:users.create');
         Route::get('/{user}', \App\Http\Livewire\Admin\Users\UserDetail::class)->name('show')->whereNumber('user');
-        Route::get('/{user}/edit', [\App\Http\Controllers\Admin\UserFormController::class, 'edit'])->name('edit')->whereNumber('user');
+        Route::get('/{user}/edit', [\App\Http\Controllers\Admin\UserFormController::class, 'edit'])->name('edit')->whereNumber('user')->middleware('permission:users.update');
     });
 
     // ==========================================
     // ROLES & PERMISSIONS MANAGEMENT
     // ==========================================
-    Route::get('/roles', \App\Http\Livewire\Admin\Roles\RoleList::class)->name('roles.index');
-    Route::get('/permissions', \App\Http\Livewire\Admin\Permissions\PermissionMatrix::class)->name('permissions.index');
+    Route::get('/roles', \App\Http\Livewire\Admin\Roles\RoleList::class)->name('roles.index')->middleware('permission:users.roles');
+    Route::get('/permissions', \App\Http\Livewire\Admin\Permissions\PermissionMatrix::class)->name('permissions.index')->middleware('permission:users.roles');
 
     // ==========================================
     // SECURITY DASHBOARD & AUDIT LOGS
     // ==========================================
-    Route::get('/security', \App\Http\Livewire\Admin\Security\SecurityDashboard::class)->name('security.index');
-    Route::get('/activity-log', \App\Http\Livewire\Admin\AuditLogs::class)->name('activity-log.index');
+    Route::get('/security', \App\Http\Livewire\Admin\Security\SecurityDashboard::class)->name('security.index')->middleware('permission:system.manage');
+    Route::get('/activity-log', \App\Http\Livewire\Admin\AuditLogs::class)->name('activity-log.index')->middleware('permission:audit.read');
     // Legacy alias for backward compatibility
     Route::get('/users-legacy', function () {
         return redirect()->route('admin.users.index');
@@ -508,7 +524,7 @@ Route::prefix('admin')->name('admin.')->middleware($adminMiddleware)->group(func
     // Route::get('/notifications', \App\Http\Livewire\Admin\Notifications\NotificationCenter::class)->name('notifications');
 
     // Reports & Analytics - działający komponent
-    Route::get('/reports', \App\Http\Livewire\Admin\Reports\ReportsDashboard::class)->name('reports');
+    Route::get('/reports', \App\Http\Livewire\Admin\Reports\ReportsDashboard::class)->name('reports')->middleware('permission:reports.read');
 
     // API Management - działający komponent
     // Route::get('/api', \App\Http\Livewire\Admin\Api\ApiManagement::class)->name('api');
@@ -530,16 +546,16 @@ Route::prefix('admin')->name('admin.')->middleware($adminMiddleware)->group(func
     // Panel Zarządzania Parametrami Produktu (Atrybuty, Marki, Magazyny, Typy)
     // Unified panel with tabs - replaces old /variants route
     Route::get('/product-parameters', fn() => view('admin.product-parameters'))
-        ->name('product-parameters');
+        ->name('product-parameters')->middleware('permission:parameters.read');
 
     // Supplier Management Panel (ETAP_15)
     Route::get('/suppliers', \App\Http\Livewire\Admin\Suppliers\BusinessPartnerPanel::class)
-        ->name('suppliers.index');
+        ->name('suppliers.index')->middleware('permission:suppliers.read');
 
     // ETAP_07g: Manufacturer Management Panel
     // Dedicated panel for manufacturer/brand management with PrestaShop sync
     Route::get('/manufacturers', fn() => view('admin.manufacturers'))
-        ->name('manufacturers.index');
+        ->name('manufacturers.index')->middleware('permission:parameters.read');
 
     // Legacy redirect (keep old route working)
     Route::get('/variants', fn() => redirect('/admin/product-parameters?tab=attributes'))
@@ -548,11 +564,11 @@ Route::prefix('admin')->name('admin.')->middleware($adminMiddleware)->group(func
     // Variant Panel Redesign - 3-Panel Layout with Product Search
     // NEW: Search products by variant attribute values (OR/AND filtering)
     // Using blade wrapper pattern for Livewire 3.x compatibility
-    Route::get('/variants-panel', fn() => view('admin.variants.panel'))->name('variants.panel');
+    Route::get('/variants-panel', fn() => view('admin.variants.panel'))->name('variants.panel')->middleware('permission:parameters.read');
 
     // Vehicle Features Management (Phase 2 - ETAP_05a)
     Route::get('/features/vehicles', [VehicleFeatureController::class, 'index'])
-        ->name('admin.features.vehicles.index');
+        ->name('admin.features.vehicles.index')->middleware('permission:vehicle_features.browser.read');
 
     // ETAP_05d FAZA 1: Global Compatibility Management Panel
     // DEVELOPMENT: Auth disabled (consistent with other ETAP_05a routes)
@@ -560,11 +576,11 @@ Route::prefix('admin')->name('admin.')->middleware($adminMiddleware)->group(func
     // NOTE: Inside admin prefix group, so actual path is /admin/compatibility
     Route::get('/compatibility', function () {
         return view('admin.compatibility-management');
-    })->name('compatibility.index');
+    })->name('compatibility.index')->middleware('permission:compatibility.read');
 
     // ETAP_06 FAZA 2 - Panel Importu Produktow (UKOŃCZONE)
     Route::get('/products/import', fn() => view('pages.product-import'))
-        ->name('products.import');
+        ->name('products.import')->middleware('permission:import.read');
 
     Route::get('/products/import-history', function () {
         return view('placeholder-page', [
@@ -584,7 +600,7 @@ Route::prefix('admin')->name('admin.')->middleware($adminMiddleware)->group(func
     })->name('products.search');
 
     // ETAP_10 (not started) - Dostawy
-    Route::prefix('deliveries')->name('deliveries.')->group(function () {
+    Route::prefix('deliveries')->name('deliveries.')->middleware('permission:deliveries.read')->group(function () {
         Route::get('/', function () {
             return view('placeholder-page', [
                 'title' => 'Lista Dostaw',
@@ -619,7 +635,7 @@ Route::prefix('admin')->name('admin.')->middleware($adminMiddleware)->group(func
     });
 
     // FUTURE (planned) - Zamówienia
-    Route::prefix('orders')->name('orders.')->group(function () {
+    Route::prefix('orders')->name('orders.')->middleware('permission:orders.read')->group(function () {
         Route::get('/', function () {
             return view('placeholder-page', [
                 'title' => 'Lista Zamówień',
@@ -646,7 +662,7 @@ Route::prefix('admin')->name('admin.')->middleware($adminMiddleware)->group(func
     });
 
     // FUTURE (planned) - Reklamacje
-    Route::prefix('claims')->name('claims.')->group(function () {
+    Route::prefix('claims')->name('claims.')->middleware('permission:claims.read')->group(function () {
         Route::get('/', function () {
             return view('placeholder-page', [
                 'title' => 'Lista Reklamacji',
@@ -673,7 +689,7 @@ Route::prefix('admin')->name('admin.')->middleware($adminMiddleware)->group(func
     });
 
     // FUTURE (planned) - Raporty & Statystyki
-    Route::prefix('reports')->name('reports.')->group(function () {
+    Route::prefix('reports')->name('reports.')->middleware('permission:reports.read')->group(function () {
         Route::get('/products', function () {
             return view('placeholder-page', [
                 'title' => 'Raporty Produktowe',

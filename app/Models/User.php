@@ -69,7 +69,8 @@ class User extends Authenticatable implements MustVerifyEmail
         'oauth_linked_at',
         'oauth_domain',
         'oauth_last_used_at',
-        'oauth_linked_providers'
+        'oauth_linked_providers',
+        'microsoft_only',
     ];
 
     /**
@@ -101,6 +102,7 @@ class User extends Authenticatable implements MustVerifyEmail
         'oauth_token_expires_at' => 'datetime',
         'oauth_locked_until' => 'datetime',
         'oauth_linked_providers' => 'array',
+        'microsoft_only' => 'boolean',
     ];
 
     // Removed dates array - no soft deletes for now
@@ -637,6 +639,14 @@ class User extends Authenticatable implements MustVerifyEmail
         $userDomain = $this->getOAuthDomainAttribute();
         
         return in_array($userDomain, $allowedDomains);
+    }
+
+    /**
+     * Check if user requires Microsoft-only login.
+     */
+    public function isMicrosoftOnlyLogin(): bool
+    {
+        return (bool) $this->microsoft_only;
     }
 
     /**

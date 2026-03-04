@@ -235,6 +235,35 @@
                         </button>
                     </div>
 
+                    {{-- OAuth Error --}}
+                    @error('oauth')
+                        <div class="mt-3 text-sm text-red-300 text-center">{{ $message }}</div>
+                    @enderror
+
+                    {{-- Divider --}}
+                    <div class="relative my-5">
+                        <div class="absolute inset-0 flex items-center">
+                            <div class="w-full border-t border-gray-600/50"></div>
+                        </div>
+                        <div class="relative flex justify-center text-sm">
+                            <span class="px-3 text-gray-500 bg-gray-800/30 rounded">lub</span>
+                        </div>
+                    </div>
+
+                    {{-- Microsoft Login Button --}}
+                    <div class="flex justify-center">
+                        <a href="{{ route('auth.microsoft.redirect') }}"
+                           class="microsoft-login-btn w-80 max-w-full">
+                            <svg class="w-5 h-5 mr-3 flex-shrink-0" viewBox="0 0 21 21">
+                                <rect x="1" y="1" width="9" height="9" fill="#f25022"/>
+                                <rect x="11" y="1" width="9" height="9" fill="#7fba00"/>
+                                <rect x="1" y="11" width="9" height="9" fill="#00a4ef"/>
+                                <rect x="11" y="11" width="9" height="9" fill="#ffb900"/>
+                            </svg>
+                            Zaloguj przez Microsoft
+                        </a>
+                    </div>
+
                     {{-- Additional Info --}}
                     <div class="text-center">
                         <p class="text-xs text-gray-400">
@@ -372,6 +401,28 @@
     input[type="email"], input[type="password"] {
         transform: translateZ(0);
         will-change: transform;
+    }
+
+    /* Microsoft OAuth Button */
+    .microsoft-login-btn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0.75rem 1rem;
+        border-radius: 0.75rem;
+        background: rgba(55, 65, 81, 0.3);
+        border: 1px solid rgba(107, 114, 128, 0.5);
+        color: white;
+        font-weight: 500;
+        font-size: 0.875rem;
+        transition: all 0.2s ease;
+        text-decoration: none;
+    }
+    .microsoft-login-btn:hover {
+        background: rgba(55, 65, 81, 0.5);
+        border-color: rgba(156, 163, 175, 0.5);
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
     }
 </style>
 

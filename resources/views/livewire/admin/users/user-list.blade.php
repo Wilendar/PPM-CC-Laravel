@@ -332,6 +332,13 @@
                                 </th>
                             @endif
 
+                            {{-- Auth Method Column --}}
+                            @if($visibleColumns['auth_method'] ?? false)
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                                    Auth
+                                </th>
+                            @endif
+
                             {{-- Last Login Column --}}
                             @if($visibleColumns['last_login'])
                                 <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
@@ -481,6 +488,29 @@
                                     </td>
                                 @endif
 
+                                {{-- Auth Method Column --}}
+                                @if($visibleColumns['auth_method'] ?? false)
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <button wire:click="toggleMicrosoftOnly({{ $user->id }})"
+                                                class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium transition-colors duration-150
+                                                       {{ $user->microsoft_only ? 'bg-blue-900/50 text-blue-300 border border-blue-700' : 'bg-gray-700/50 text-gray-300 border border-gray-600' }}
+                                                       hover:opacity-75"
+                                                title="{{ $user->microsoft_only ? 'Microsoft-only - kliknij aby wylaczyc' : 'Email+haslo - kliknij aby wymusic Microsoft' }}">
+                                            @if($user->microsoft_only)
+                                                <svg class="w-3 h-3 mr-1" viewBox="0 0 21 21"><rect x="1" y="1" width="9" height="9" fill="#f25022"/><rect x="11" y="1" width="9" height="9" fill="#7fba00"/><rect x="1" y="11" width="9" height="9" fill="#00a4ef"/><rect x="11" y="11" width="9" height="9" fill="#ffb900"/></svg>
+                                                Microsoft
+                                            @else
+                                                Email
+                                            @endif
+                                        </button>
+                                        @if(!($user->is_approved ?? true))
+                                            <span class="ml-1 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-900/50 text-yellow-300 border border-yellow-700">
+                                                Oczekuje
+                                            </span>
+                                        @endif
+                                    </td>
+                                @endif
+
                                 {{-- Last Login Column --}}
                                 @if($visibleColumns['last_login'])
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-white">
@@ -506,8 +536,26 @@
                                 {{-- Actions Column --}}
                                 <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                                     <div class="flex items-center justify-end space-x-2">
+                                        {{-- Approve/Reject for pending users --}}
+                                        @if(!($user->is_approved ?? true))
+                                            <button wire:click="approveUser({{ $user->id }})"
+                                                    class="text-emerald-400 hover:text-emerald-300"
+                                                    title="Zatwierdz uzytkownika">
+                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                                                </svg>
+                                            </button>
+                                            <button wire:click="rejectUser({{ $user->id }})"
+                                                    class="text-red-400 hover:text-red-300"
+                                                    title="Odrzuc uzytkownika">
+                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                                                </svg>
+                                            </button>
+                                        @endif
+
                                         {{-- View User --}}
-                                        <a href="{{ route('admin.users.show', $user) }}" 
+                                        <a href="{{ route('admin.users.show', $user) }}"
                                            class="text-blue-400 hover:text-blue-300"
                                            title="Podgląd użytkownika">
                                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -635,6 +683,8 @@
                                 <option value="assign_role">Przypisz rolę</option>
                                 <option value="export">Eksportuj użytkowników</option>
                                 <option value="delete">Usuń użytkowników</option>
+                                <option value="enable_microsoft_only">Wlacz Microsoft-only login</option>
+                                <option value="disable_microsoft_only">Wylacz Microsoft-only login</option>
                             </select>
                         </div>
 

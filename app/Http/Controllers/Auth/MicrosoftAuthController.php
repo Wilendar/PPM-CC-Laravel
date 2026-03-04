@@ -146,6 +146,13 @@ class MicrosoftAuthController extends Controller
             // Authenticate user
             Auth::login($user, config('services.oauth.remember_oauth_sessions', true));
 
+            // Check if user is active
+            if (!$user->is_active) {
+                Auth::logout();
+                return redirect()->route('login')
+                    ->withErrors(['oauth' => 'Konto jest nieaktywne. Skontaktuj sie z administratorem.']);
+            }
+
             // Update last login
             $user->updateLastLogin();
             $user->updateOAuthActivity();
@@ -376,7 +383,14 @@ class MicrosoftAuthController extends Controller
                 'domain' => $user->oauth_domain,
                 'ip' => $request->ip()
             ]);
-            
+
+            // Powiadom adminow o nowym userze oczekujacym na zatwierdzenie
+            $admins = User::role('Admin')->where('is_active', true)->get();
+            foreach ($admins as $admin) {
+                \Illuminate\Support\Facades\Mail::to($admin->email)
+                    ->queue(new \App\Mail\NewUserPendingApprovalMail($user));
+            }
+
             return $user;
         }
 

@@ -46,7 +46,8 @@ class UserForm extends Component
     public $company = '';
     public $position = '';
     public $is_active = true;
-    
+    public $microsoft_only = false;
+
     // Password fields
     public $password = '';
     public $password_confirmation = '';
@@ -92,11 +93,12 @@ class UserForm extends Component
 
     public function mount(User $user = null)
     {
+        $this->authorize('users.read');
         if ($user && $user->exists) {
             $this->isEditing = true;
             $this->user = $user;
             $this->loadUserData();
-            
+
             $this->authorize('update', $user);
         } else {
             $this->authorize('create', User::class);
@@ -115,6 +117,7 @@ class UserForm extends Component
         $this->company = $this->user->company;
         $this->position = $this->user->position;
         $this->is_active = $this->user->is_active;
+        $this->microsoft_only = $this->user->microsoft_only ?? false;
         $this->existing_avatar = $this->user->avatar;
         
         $this->preferred_language = $this->user->preferred_language ?? 'pl';
@@ -507,6 +510,7 @@ class UserForm extends Component
                 'company' => $this->company,
                 'position' => $this->position,
                 'is_active' => $this->is_active,
+                'microsoft_only' => $this->microsoft_only,
                 'preferred_language' => $this->preferred_language,
                 'timezone' => $this->timezone,
                 'date_format' => $this->date_format,

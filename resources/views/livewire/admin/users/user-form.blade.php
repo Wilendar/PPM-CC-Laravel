@@ -201,6 +201,22 @@
                         </span>
                     </div>
 
+                    {{-- Microsoft-only Login Toggle --}}
+                    <div class="flex items-center justify-between p-4 bg-gray-700/30 rounded-lg border border-gray-600/50">
+                        <div>
+                            <h4 class="text-sm font-medium text-white">Wymagaj logowania przez Microsoft</h4>
+                            <p class="text-xs text-gray-400 mt-1">Blokuje logowanie emailem i haslem</p>
+                        </div>
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input type="checkbox" wire:model="microsoft_only" class="sr-only peer">
+                            <div class="w-11 h-6 bg-gray-600 rounded-full peer peer-checked:bg-blue-500
+                                 peer-focus:ring-2 peer-focus:ring-blue-300 after:content-['']
+                                 after:absolute after:top-0.5 after:start-[2px] after:bg-white
+                                 after:rounded-full after:h-5 after:w-5 after:transition-all
+                                 peer-checked:after:translate-x-full"></div>
+                        </label>
+                    </div>
+
                     {{-- Password Section --}}
                     <div class="border border-gray-600 rounded-lg p-4">
                         <h4 class="text-md font-medium text-white mb-4">Hasło</h4>
