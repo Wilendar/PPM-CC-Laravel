@@ -27,7 +27,10 @@
 
             {{-- Right: Import button (FAZA 9.2 - unified modal) --}}
             <div class="flex items-center gap-2">
-                <button wire:click="openImportModal()" class="btn-enterprise-primary btn-sm flex items-center gap-1.5">
+                <button wire:click="openImportModal()"
+                        @disabled(!$this->canSeeBasicData())
+                        class="btn-enterprise-primary btn-sm flex items-center gap-1.5 {{ !$this->canSeeBasicData() ? 'opacity-30 cursor-not-allowed' : '' }}"
+                        title="{{ !$this->canSeeBasicData() ? 'Brak uprawnien do importu' : 'Importuj produkty' }}">
                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                               d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
@@ -110,19 +113,27 @@
                     </span>
                     <button wire:click="bulkDelete"
                             wire:confirm="Czy na pewno usunac {{ count($selectedIds) }} produktow?"
-                            class="btn-enterprise-danger btn-sm flex items-center gap-1">
+                            @disabled(!$this->canDuplicateDelete())
+                            class="btn-enterprise-danger btn-sm flex items-center gap-1 {{ !$this->canDuplicateDelete() ? 'opacity-30 cursor-not-allowed' : '' }}"
+                            title="{{ !$this->canDuplicateDelete() ? 'Brak uprawnien' : 'Usun zaznaczone' }}">
                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
                         </svg>
                         Usun
                     </button>
-                    <button wire:click="bulkEditCompatibility" class="px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs transition-colors flex items-center gap-1">
+                    <button wire:click="bulkEditCompatibility"
+                            @disabled(!$this->canManageCompatibility())
+                            class="px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs transition-colors flex items-center gap-1 {{ !$this->canManageCompatibility() ? 'opacity-30 cursor-not-allowed' : '' }}"
+                            title="{{ !$this->canManageCompatibility() ? 'Brak uprawnien' : 'Dopasowania' }}">
                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/>
                         </svg>
                         Dopasowania
                     </button>
-                    <button wire:click="bulkPublish" class="btn-enterprise-success btn-sm flex items-center gap-1">
+                    <button wire:click="bulkPublish"
+                            @disabled(!$this->canPublish())
+                            class="btn-enterprise-success btn-sm flex items-center gap-1 {{ !$this->canPublish() ? 'opacity-30 cursor-not-allowed' : '' }}"
+                            title="{{ !$this->canPublish() ? 'Brak uprawnien' : 'Publikuj zaznaczone' }}">
                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
                         </svg>
@@ -208,37 +219,38 @@
                                    wire:click="selectAllOnPage"
                                    class="form-checkbox-dark">
                         </th>
-                        <th class="w-14 px-2">Obraz</th>
-                        <th class="px-2 cursor-pointer hover:bg-gray-700/50 relative resizable-column" data-column-id="sku" style="width: 100px;">
+                        <th class="w-14 px-2 {{ !$this->canSeeImages() ? 'opacity-30' : '' }}">Obraz</th>
+                        <th class="px-2 cursor-pointer hover:bg-gray-700/50 relative resizable-column {{ !$this->canSeeBasicData() ? 'opacity-30 pointer-events-none' : '' }}" data-column-id="sku" style="width: 100px;">
                             <div class="flex items-center gap-1" wire:click="sortBy('sku')">
                                 SKU
                                 @include('livewire.products.import.partials.sort-indicator', ['field' => 'sku'])
                             </div>
                             <div class="resize-handle" x-on:mousedown="startResize($event, 'sku')"></div>
                         </th>
-                        <th class="px-2 cursor-pointer hover:bg-gray-700/50 relative resizable-column" data-column-id="name" style="width: 140px;">
+                        <th class="px-2 cursor-pointer hover:bg-gray-700/50 relative resizable-column {{ !$this->canSeeBasicData() ? 'opacity-30 pointer-events-none' : '' }}" data-column-id="name" style="width: 140px;">
                             <div class="flex items-center gap-1" wire:click="sortBy('name')">
                                 Nazwa
                                 @include('livewire.products.import.partials.sort-indicator', ['field' => 'name'])
                             </div>
                             <div class="resize-handle" x-on:mousedown="startResize($event, 'name')"></div>
                         </th>
-                        <th class="px-2 w-24 relative resizable-column" data-column-id="type" style="width: 96px;">
+                        <th class="px-2 w-24 relative resizable-column {{ !$this->canSeeBasicData() ? 'opacity-30' : '' }}" data-column-id="type" style="width: 96px;">
                             <span class="text-xs">Typ</span>
                             <div class="resize-handle" x-on:mousedown="startResize($event, 'type')"></div>
                         </th>
 
                         {{-- MARKA (manufacturer_id) --}}
-                        <th class="px-2 w-24 relative resizable-column" data-column-id="manufacturer" style="width: 96px;">
+                        <th class="px-2 w-24 relative resizable-column {{ !$this->canSeeBasicData() ? 'opacity-30' : '' }}" data-column-id="manufacturer" style="width: 96px;">
                             <span class="text-xs text-gray-400">Marka</span>
                             <div class="resize-handle" x-on:mousedown="startResize($event, 'manufacturer')"></div>
                         </th>
 
                         {{-- CENA - klik otwiera modal cen (FAZA 9.4) --}}
-                        <th class="px-2 w-20 relative resizable-column" data-column-id="price" style="width: 80px;">
+                        <th class="px-2 w-20 relative resizable-column {{ !$this->canSeePrices() ? 'opacity-30 pointer-events-none' : '' }}" data-column-id="price" style="width: 80px;">
                             <div class="flex items-center gap-1">
                                 <span class="text-xs text-gray-400">Cena</span>
                                 <button wire:click="togglePriceDisplay"
+                                        @disabled(!$this->canSeePrices())
                                         class="import-price-toggle-btn {{ $priceDisplayMode === 'net' ? 'import-price-toggle-net' : 'import-price-toggle-gross' }}"
                                         title="Przelacz netto/brutto">
                                     {{ $priceDisplayMode === 'net' ? 'NETTO' : 'BRUTTO' }}
@@ -253,7 +265,7 @@
                             $effectiveCategoryMaxLevel = $this->effectiveCategoryMaxLevel;
                         @endphp
 
-                        <th class="px-1 w-24 text-xs relative resizable-column" data-column-id="cat_l3" style="width: 96px;">
+                        <th class="px-1 w-24 text-xs relative resizable-column {{ !$this->canSeeCategories() ? 'opacity-30 pointer-events-none' : '' }}" data-column-id="cat_l3" style="width: 96px;">
                             @if($hasSelection)
                                 <div class="flex items-center gap-1">
                                     <span class="text-gray-500">L3</span>
@@ -264,7 +276,7 @@
                             @endif
                             <div class="resize-handle" x-on:mousedown="startResize($event, 'cat_l3')"></div>
                         </th>
-                        <th class="px-1 w-24 text-xs relative resizable-column" data-column-id="cat_l4" style="width: 96px;">
+                        <th class="px-1 w-24 text-xs relative resizable-column {{ !$this->canSeeCategories() ? 'opacity-30 pointer-events-none' : '' }}" data-column-id="cat_l4" style="width: 96px;">
                             @if($hasSelection)
                                 <div class="flex items-center gap-1">
                                     <span class="text-gray-500">L4</span>
@@ -275,7 +287,7 @@
                             @endif
                             <div class="resize-handle" x-on:mousedown="startResize($event, 'cat_l4')"></div>
                         </th>
-                        <th class="px-1 w-24 text-xs relative resizable-column" data-column-id="cat_l5" style="width: 96px;">
+                        <th class="px-1 w-24 text-xs relative resizable-column {{ !$this->canSeeCategories() ? 'opacity-30 pointer-events-none' : '' }}" data-column-id="cat_l5" style="width: 96px;">
                             @if($hasSelection)
                                 <div class="flex items-center gap-1">
                                     <span class="text-gray-500">L5</span>
@@ -346,17 +358,17 @@
                         @endif
 
                         {{-- PUBLIKACJA (FAZA 9.3 - zastepuje Sklepy) --}}
-                        <th class="px-1 w-28 relative resizable-column" data-column-id="publication" style="width: 112px;">
+                        <th class="px-1 w-28 relative resizable-column {{ !$this->canSeePublication() ? 'opacity-30' : '' }}" data-column-id="publication" style="width: 112px;">
                             <span class="text-gray-400 text-xs">Publikacja</span>
                             <div class="resize-handle" x-on:mousedown="startResize($event, 'publication')"></div>
                         </th>
                         {{-- DATA PUBLIKACJI (FAZA 9.3) --}}
-                        <th class="px-2 w-36 relative resizable-column" data-column-id="schedule" style="width: 144px;">
+                        <th class="px-2 w-36 relative resizable-column {{ !$this->canSeeScheduleDate() ? 'opacity-30' : '' }}" data-column-id="schedule" style="width: 144px;">
                             <span class="text-gray-400 text-xs">Data publikacji</span>
                             <div class="resize-handle" x-on:mousedown="startResize($event, 'schedule')"></div>
                         </th>
                         {{-- PUBLIKUJ button (FAZA 9.3) --}}
-                        <th class="px-2 w-24 text-center relative resizable-column" data-column-id="publish" style="width: 96px;">
+                        <th class="px-2 w-24 text-center relative resizable-column {{ !$this->canPublish() ? 'opacity-30' : '' }}" data-column-id="publish" style="width: 96px;">
                             <span class="text-gray-400 text-xs">Publikuj</span>
                             <div class="resize-handle" x-on:mousedown="startResize($event, 'publish')"></div>
                         </th>

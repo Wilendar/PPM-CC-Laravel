@@ -548,27 +548,104 @@ class PermissionMatrix extends Component
 
     public function toggleModuleExpansion($module)
     {
-        $this->expandedModules[$module] = !$this->expandedModules[$module];
+        $this->expandedModules[$module] = !($this->expandedModules[$module] ?? true);
+    }
+
+    /**
+     * Toggle all permissions in a parent module including all children.
+     *
+     * @param string $parentModuleName Display name of the parent module
+     */
+    public function toggleGroupedModule(string $parentModuleName)
+    {
+        $grouped = $this->getPermissionModulesGrouped();
+
+        if (!isset($grouped[$parentModuleName])) {
+            return;
+        }
+
+        $parent = $grouped[$parentModuleName];
+
+        // Collect all permissions (parent + children)
+        $allPerms = collect();
+        if ($parent['permissions']) {
+            $allPerms = $allPerms->merge($parent['permissions']);
+        }
+        foreach ($parent['children'] ?? [] as $child) {
+            $allPerms = $allPerms->merge($child['permissions']);
+        }
+
+        // Check if all are enabled
+        $allEnabled = $allPerms->every(fn($p) => $this->permissionMatrix[$p->id] ?? false);
+
+        // Toggle: if all enabled -> disable all, otherwise enable all
+        foreach ($allPerms as $p) {
+            $this->permissionMatrix[$p->id] = !$allEnabled;
+        }
+
+        $this->checkForChanges();
+        $this->calculateModuleStats();
     }
 
     protected function calculateModuleStats()
     {
+        // Flat module stats (for backward compatibility)
         $modules = $this->getPermissionModules();
-        
+
         foreach ($modules as $module => $permissions) {
             $total = $permissions->count();
             $enabled = 0;
-            
+
             foreach ($permissions as $permission) {
                 if ($this->permissionMatrix[$permission->id] ?? false) {
                     $enabled++;
                 }
             }
-            
+
             $this->moduleStats[$module] = [
                 'total' => $total,
                 'enabled' => $enabled,
                 'percentage' => $total > 0 ? round(($enabled / $total) * 100) : 0
+            ];
+        }
+
+        // Grouped module stats (parent + children aggregated)
+        $grouped = $this->getPermissionModulesGrouped();
+
+        foreach ($grouped as $parentName => $parent) {
+            $totalWithChildren = $parent['permissions'] ? $parent['permissions']->count() : 0;
+            $enabledWithChildren = 0;
+
+            foreach ($parent['permissions'] ?? collect() as $p) {
+                if ($this->permissionMatrix[$p->id] ?? false) {
+                    $enabledWithChildren++;
+                }
+            }
+
+            foreach ($parent['children'] ?? [] as $childName => $child) {
+                $childTotal = $child['permissions']->count();
+                $childEnabled = 0;
+
+                foreach ($child['permissions'] as $p) {
+                    if ($this->permissionMatrix[$p->id] ?? false) {
+                        $childEnabled++;
+                        $enabledWithChildren++;
+                    }
+                }
+
+                $totalWithChildren += $childTotal;
+
+                $this->moduleStats[$childName] = [
+                    'total' => $childTotal,
+                    'enabled' => $childEnabled,
+                    'percentage' => $childTotal > 0 ? round(($childEnabled / $childTotal) * 100) : 0,
+                ];
+            }
+
+            $this->moduleStats[$parentName . '_grouped'] = [
+                'total' => $totalWithChildren,
+                'enabled' => $enabledWithChildren,
+                'percentage' => $totalWithChildren > 0 ? round(($enabledWithChildren / $totalWithChildren) * 100) : 0,
             ];
         }
     }
@@ -746,14 +823,98 @@ class PermissionMatrix extends Component
     public function getPermissionsByModuleProperty()
     {
         $modules = $this->getPermissionModules();
-        
+
         if ($this->selectedModule === 'all') {
             return $modules;
         }
-        
+
         return array_filter($modules, function ($key) {
             return $key === $this->selectedModule;
         }, ARRAY_FILTER_USE_KEY);
+    }
+
+    /**
+     * Get permission modules grouped by parent for hierarchical display.
+     *
+     * Uses PermissionModuleLoader::getGroupedByParent() and resolves
+     * config permission entries to actual DB Permission objects.
+     *
+     * @return array
+     */
+    public function getPermissionModulesGrouped(): array
+    {
+        $moduleLoader = app(PermissionModuleLoader::class);
+        $grouped = $moduleLoader->getGroupedByParent();
+        $dbPermissions = Permission::orderBy('name')->get()->keyBy('name');
+
+        $result = [];
+
+        foreach ($grouped as $parentName => $parentData) {
+            $parentPerms = $this->resolveModulePermissions($parentData, $dbPermissions);
+
+            $entry = [
+                'module' => $parentData['module'],
+                'name' => $parentName,
+                'icon' => $parentData['icon'] ?? 'document',
+                'color' => $parentData['color'] ?? 'gray',
+                'permissions' => $parentPerms,
+                'children' => [],
+            ];
+
+            foreach ($parentData['children'] ?? [] as $childName => $childData) {
+                $childPerms = $this->resolveModulePermissions($childData, $dbPermissions);
+                if ($childPerms->isNotEmpty()) {
+                    $entry['children'][$childName] = [
+                        'module' => $childData['module'],
+                        'name' => $childName,
+                        'icon' => $childData['icon'] ?? 'document',
+                        'color' => $childData['color'] ?? 'gray',
+                        'permissions' => $childPerms,
+                    ];
+                }
+            }
+
+            if ($parentPerms->isNotEmpty() || !empty($entry['children'])) {
+                $result[$parentName] = $entry;
+            }
+        }
+
+        return $result;
+    }
+
+    /**
+     * Resolve config permissions to DB Permission objects with metadata.
+     *
+     * @param array $moduleData Module data from PermissionModuleLoader
+     * @param Collection $dbPermissions DB permissions keyed by name
+     * @return Collection
+     */
+    private function resolveModulePermissions(array $moduleData, Collection $dbPermissions): Collection
+    {
+        $modulePermissions = collect();
+
+        foreach ($moduleData['permissions'] ?? [] as $permConfig) {
+            $permName = $permConfig['name'];
+            if ($dbPermissions->has($permName)) {
+                $permission = $dbPermissions->get($permName);
+                $permission->label = $permConfig['label'] ?? $permName;
+                $permission->description = $permConfig['description'] ?? '';
+                $permission->dangerous = $permConfig['dangerous'] ?? false;
+                $modulePermissions->push($permission);
+            }
+        }
+
+        return $modulePermissions;
+    }
+
+    /**
+     * Computed property for grouped modules (hierarchical view).
+     *
+     * @return array
+     */
+    public function getGroupedModulesProperty(): array
+    {
+        return $this->getPermissionModulesGrouped();
     }
 
     // ==========================================
@@ -766,6 +927,7 @@ class PermissionMatrix extends Component
             'roles' => $this->roles,
             'selectedRoleData' => $this->selectedRoleData,
             'permissionsByModule' => $this->permissionsByModule,
+            'groupedModules' => $this->groupedModules,
         ])->layout('layouts.admin', [
             'title' => 'Macierz Uprawnien - Admin PPM',
             'breadcrumb' => 'Uprawnienia'

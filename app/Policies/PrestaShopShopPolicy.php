@@ -13,31 +13,31 @@ class PrestaShopShopPolicy extends BasePolicy
 {
     public function viewAny(User $user): bool
     {
-        return $this->hasPermission($user, 'admin.shops.view');
+        return $this->hasPermission($user, 'shops.read');
     }
 
     public function view(User $user, $shop): bool
     {
-        return $this->hasPermission($user, 'admin.shops.view');
+        return $this->hasPermission($user, 'shops.read');
     }
 
     public function create(User $user): bool
     {
-        return $this->hasPermission($user, 'admin.shops.create');
+        return $this->hasPermission($user, 'shops.create');
     }
 
     public function update(User $user, $shop): bool
     {
-        return $this->hasPermission($user, 'admin.shops.edit');
+        return $this->hasPermission($user, 'shops.update');
     }
 
     public function delete(User $user, $shop): bool
     {
-        return $this->hasPermission($user, 'admin.shops.delete');
+        return $this->hasPermission($user, 'shops.delete');
     }
 
     public function sync(User $user): bool
     {
-        return $this->hasPermission($user, 'admin.shops.sync');
+        return $this->hasPermission($user, 'shops.sync');
     }
 }

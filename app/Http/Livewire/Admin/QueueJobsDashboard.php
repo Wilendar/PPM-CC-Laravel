@@ -22,7 +22,7 @@ class QueueJobsDashboard extends Component
      */
     public function mount(): void
     {
-        $this->authorize('admin.settings.manage');
+        $this->authorize('system.manage');
     }
 
     /**

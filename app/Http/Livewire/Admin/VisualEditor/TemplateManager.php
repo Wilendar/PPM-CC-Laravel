@@ -9,6 +9,7 @@ use App\Models\PrestaShopShop;
 use App\Services\VisualEditor\TemplateCategoryService;
 use App\Services\VisualEditor\TemplateVariableService;
 use Illuminate\Contracts\View\View;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Collection;
 use Livewire\Attributes\Computed;
 use Livewire\Component;
@@ -22,7 +23,7 @@ use Livewire\WithPagination;
  */
 class TemplateManager extends Component
 {
-    use WithPagination;
+    use WithPagination, AuthorizesRequests;
 
     // =====================
     // PUBLIC PROPERTIES
@@ -70,6 +71,8 @@ class TemplateManager extends Component
 
     public function mount(): void
     {
+        $this->authorize('visual-editor.read');
+
         // Initialize with first available category
         $categoryService = app(TemplateCategoryService::class);
         $this->formCategory = array_key_first($categoryService->getCategories()) ?? 'other';

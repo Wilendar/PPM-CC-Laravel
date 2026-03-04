@@ -4,6 +4,7 @@ namespace App\Http\Livewire\Admin\Parameters;
 
 use App\Models\Warehouse;
 use App\Models\PrestaShopShop;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Str;
 use Livewire\Component;
 use Livewire\Attributes\Computed;
@@ -19,6 +20,8 @@ use Livewire\Attributes\Computed;
  */
 class WarehouseManager extends Component
 {
+    use AuthorizesRequests;
+
     // Modal states
     public bool $showModal = false;
     public bool $showDeleteModal = false;
@@ -56,6 +59,13 @@ class WarehouseManager extends Component
     public string $deleteName = '';
 
     protected $listeners = ['refreshWarehouses' => '$refresh'];
+
+    public function mount(): void
+    {
+        if (!auth()->user()->canAny(['parameters.warehouses.read', 'parameters.read'])) {
+            abort(403);
+        }
+    }
 
     #[Computed]
     public function warehouses()

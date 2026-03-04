@@ -64,7 +64,7 @@ class DatabaseMaintenance extends Component
 
     public function mount()
     {
-        $this->authorize('admin.maintenance.manage');
+        $this->authorize('maintenance.manage');
         $this->loadStats();
         $this->loadSystemHealth();
         $this->resetTaskConfiguration();
@@ -178,6 +178,7 @@ class DatabaseMaintenance extends Component
      */
     public function createTask()
     {
+        $this->authorize('maintenance.manage');
         try {
             $this->validate([
                 'newTaskType' => 'required|string',
@@ -220,6 +221,7 @@ class DatabaseMaintenance extends Component
      */
     public function executeTask($taskId)
     {
+        $this->authorize('maintenance.manage');
         try {
             $task = MaintenanceTask::findOrFail($taskId);
             
@@ -253,6 +255,7 @@ class DatabaseMaintenance extends Component
      */
     public function deleteTask($taskId)
     {
+        $this->authorize('maintenance.manage');
         try {
             $task = MaintenanceTask::findOrFail($taskId);
             
@@ -275,6 +278,7 @@ class DatabaseMaintenance extends Component
      */
     public function runQuickOptimization()
     {
+        $this->authorize('maintenance.manage');
         try {
             $this->isLoading = true;
 
@@ -312,6 +316,7 @@ class DatabaseMaintenance extends Component
      */
     public function cleanupLogs()
     {
+        $this->authorize('maintenance.manage');
         try {
             $this->isLoading = true;
 
@@ -348,6 +353,7 @@ class DatabaseMaintenance extends Component
      */
     public function clearAllCache()
     {
+        $this->authorize('maintenance.manage');
         try {
             $this->isLoading = true;
 
@@ -385,6 +391,7 @@ class DatabaseMaintenance extends Component
      */
     public function runSecurityCheck()
     {
+        $this->authorize('maintenance.manage');
         try {
             $this->isLoading = true;
 
@@ -421,6 +428,7 @@ class DatabaseMaintenance extends Component
      */
     public function runDueTasks()
     {
+        $this->authorize('maintenance.manage');
         try {
             $this->isLoading = true;
 

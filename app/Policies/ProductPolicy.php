@@ -5,13 +5,13 @@ namespace App\Policies;
 use App\Models\User;
 
 /**
- * PPM Product Policy  
- * 
+ * PPM Product Policy
+ *
  * Policy dla zarządzania produktami w systemie PPM.
  * Implementuje complex authorization logic dla product operations.
- * 
+ *
  * FAZA A: Spatie Setup + Middleware - Product Management Policy
- * 
+ *
  * Permissions per Role:
  * - Admin: Wszystko
  * - Manager: CRUD + bulk operations + sync
@@ -20,7 +20,7 @@ use App\Models\User;
  * - Salesperson: View + pricing (bez cen zakupu)
  * - Claims: View (dla reklamacji)
  * - User: View only (search/browse)
- * 
+ *
  * Special considerations:
  * - SKU jako primary key zamiast ID
  * - Multi-store product variations
@@ -35,8 +35,7 @@ class ProductPolicy extends BasePolicy
      */
     public function viewAny(User $user): bool
     {
-        // Wszyscy zalogowani mogą browse products
-        $canView = $this->isActiveUser($user);
+        $canView = $this->checkPermission($user, 'products.read');
         $this->logAuthAttempt($user, 'viewAny', 'Product', $canView);
         return $canView;
     }
@@ -46,13 +45,12 @@ class ProductPolicy extends BasePolicy
      */
     public function view(User $user, $product = null): bool
     {
-        // Wszyscy zalogowani mogą view products
-        $canView = $this->isActiveUser($user);
-        
+        $canView = $this->checkPermission($user, 'products.read');
+
         if ($product) {
             $this->logAuthAttempt($user, 'view', "Product:{$product->sku}", $canView);
         }
-        
+
         return $canView;
     }
 
@@ -61,8 +59,7 @@ class ProductPolicy extends BasePolicy
      */
     public function create(User $user): bool
     {
-        // Manager+ mogą tworzyć produkty
-        $canCreate = $this->hasRoleOrHigher($user, 'Manager') && $this->isActiveUser($user);
+        $canCreate = $this->checkPermission($user, 'products.create');
         $this->logAuthAttempt($user, 'create', 'Product', $canCreate);
         return $canCreate;
     }
@@ -72,13 +69,12 @@ class ProductPolicy extends BasePolicy
      */
     public function update(User $user, $product = null): bool
     {
-        // Editor+ mogą edytować produkty
-        $canUpdate = $this->hasRoleOrHigher($user, 'Editor') && $this->isActiveUser($user);
-        
+        $canUpdate = $this->checkPermission($user, 'products.update');
+
         if ($product) {
             $this->logAuthAttempt($user, 'update', "Product:{$product->sku}", $canUpdate);
         }
-        
+
         return $canUpdate;
     }
 
@@ -87,13 +83,12 @@ class ProductPolicy extends BasePolicy
      */
     public function delete(User $user, $product = null): bool
     {
-        // Tylko Manager+ mogą usuwać produkty
-        $canDelete = $this->hasRoleOrHigher($user, 'Manager') && $this->isActiveUser($user);
-        
+        $canDelete = $this->checkPermission($user, 'products.delete');
+
         if ($product) {
             $this->logAuthAttempt($user, 'delete', "Product:{$product->sku}", $canDelete);
         }
-        
+
         return $canDelete;
     }
 
@@ -102,12 +97,12 @@ class ProductPolicy extends BasePolicy
      */
     public function restore(User $user, $product = null): bool
     {
-        $canRestore = $this->hasRoleOrHigher($user, 'Manager') && $this->isActiveUser($user);
-        
+        $canRestore = $this->checkPermission($user, 'products.update');
+
         if ($product) {
             $this->logAuthAttempt($user, 'restore', "Product:{$product->sku}", $canRestore);
         }
-        
+
         return $canRestore;
     }
 
@@ -116,13 +111,12 @@ class ProductPolicy extends BasePolicy
      */
     public function forceDelete(User $user, $product = null): bool
     {
-        // Permanent delete - tylko Admin
-        $canForceDelete = $this->canAccessAdmin($user);
-        
+        $canForceDelete = $this->checkPermission($user, 'products.delete');
+
         if ($product) {
             $this->logAuthAttempt($user, 'forceDelete', "Product:{$product->sku}", $canForceDelete);
         }
-        
+
         return $canForceDelete;
     }
 
@@ -131,13 +125,12 @@ class ProductPolicy extends BasePolicy
      */
     public function managePrices(User $user, $product = null): bool
     {
-        // Manager+ mogą zarządzać cenami
-        $canManagePrices = $this->hasRoleOrHigher($user, 'Manager') && $this->isActiveUser($user);
-        
+        $canManagePrices = $this->checkPermission($user, 'prices.update');
+
         if ($product) {
             $this->logAuthAttempt($user, 'managePrices', "Product:{$product->sku}", $canManagePrices);
         }
-        
+
         return $canManagePrices;
     }
 
@@ -146,13 +139,12 @@ class ProductPolicy extends BasePolicy
      */
     public function viewPurchasePrices(User $user, $product = null): bool
     {
-        // Tylko Manager+ mogą view ceny zakupu (Salesperson nie może)
-        $canViewPurchasePrices = $this->hasRoleOrHigher($user, 'Manager') && $this->isActiveUser($user);
-        
+        $canViewPurchasePrices = $this->checkPermission($user, 'prices.cost');
+
         if ($product) {
             $this->logAuthAttempt($user, 'viewPurchasePrices', "Product:{$product->sku}", $canViewPurchasePrices);
         }
-        
+
         return $canViewPurchasePrices;
     }
 
@@ -161,13 +153,12 @@ class ProductPolicy extends BasePolicy
      */
     public function manageStock(User $user, $product = null): bool
     {
-        // Warehouseman+ mogą zarządzać stanem magazynowym
-        $canManageStock = $this->hasRoleOrHigher($user, 'Warehouseman') && $this->isActiveUser($user);
-        
+        $canManageStock = $this->checkPermission($user, 'stock.update');
+
         if ($product) {
             $this->logAuthAttempt($user, 'manageStock', "Product:{$product->sku}", $canManageStock);
         }
-        
+
         return $canManageStock;
     }
 
@@ -176,13 +167,12 @@ class ProductPolicy extends BasePolicy
      */
     public function manageMedia(User $user, $product = null): bool
     {
-        // Editor+ mogą zarządzać mediami
-        $canManageMedia = $this->hasRoleOrHigher($user, 'Editor') && $this->isActiveUser($user);
-        
+        $canManageMedia = $this->checkPermission($user, 'media.update');
+
         if ($product) {
             $this->logAuthAttempt($user, 'manageMedia', "Product:{$product->sku}", $canManageMedia);
         }
-        
+
         return $canManageMedia;
     }
 
@@ -191,13 +181,12 @@ class ProductPolicy extends BasePolicy
      */
     public function syncToPrestashop(User $user, $product = null): bool
     {
-        // Manager+ mogą sync do Prestashop
-        $canSync = $this->hasRoleOrHigher($user, 'Manager') && $this->isActiveUser($user);
-        
+        $canSync = $this->checkPermission($user, 'shops.sync');
+
         if ($product) {
             $this->logAuthAttempt($user, 'syncToPrestashop', "Product:{$product->sku}", $canSync);
         }
-        
+
         return $canSync;
     }
 
@@ -206,13 +195,12 @@ class ProductPolicy extends BasePolicy
      */
     public function syncToERP(User $user, $product = null): bool
     {
-        // Manager+ mogą sync do ERP
-        $canSyncERP = $this->hasRoleOrHigher($user, 'Manager') && $this->isActiveUser($user);
-        
+        $canSyncERP = $this->checkPermission($user, 'integrations.sync');
+
         if ($product) {
             $this->logAuthAttempt($user, 'syncToERP', "Product:{$product->sku}", $canSyncERP);
         }
-        
+
         return $canSyncERP;
     }
 
@@ -221,7 +209,7 @@ class ProductPolicy extends BasePolicy
      */
     public function bulkOperations(User $user): bool
     {
-        $canBulk = $this->canBulkAction($user);
+        $canBulk = $this->checkPermission($user, 'products.delete');
         $this->logAuthAttempt($user, 'bulkOperations', 'Product', $canBulk);
         return $canBulk;
     }
@@ -231,8 +219,7 @@ class ProductPolicy extends BasePolicy
      */
     public function export(User $user): bool
     {
-        // Editor+ mogą eksportować
-        $canExport = $this->canExport($user);
+        $canExport = $this->checkPermission($user, 'products.export');
         $this->logAuthAttempt($user, 'export', 'Product', $canExport);
         return $canExport;
     }
@@ -242,8 +229,7 @@ class ProductPolicy extends BasePolicy
      */
     public function import(User $user): bool
     {
-        // Manager+ mogą importować
-        $canImport = $this->canImport($user);
+        $canImport = $this->checkPermission($user, 'products.import');
         $this->logAuthAttempt($user, 'import', 'Product', $canImport);
         return $canImport;
     }
@@ -253,13 +239,12 @@ class ProductPolicy extends BasePolicy
      */
     public function manageCategories(User $user, $product = null): bool
     {
-        // Editor+ mogą zarządzać kategoriami produktów
-        $canManageCategories = $this->hasRoleOrHigher($user, 'Editor') && $this->isActiveUser($user);
-        
+        $canManageCategories = $this->checkPermission($user, 'categories.update');
+
         if ($product) {
             $this->logAuthAttempt($user, 'manageCategories', "Product:{$product->sku}", $canManageCategories);
         }
-        
+
         return $canManageCategories;
     }
 
@@ -268,13 +253,12 @@ class ProductPolicy extends BasePolicy
      */
     public function manageVariants(User $user, $product = null): bool
     {
-        // Manager+ mogą zarządzać wariantami
-        $canManageVariants = $this->hasRoleOrHigher($user, 'Manager') && $this->isActiveUser($user);
-        
+        $canManageVariants = $this->checkPermission($user, 'products.variants');
+
         if ($product) {
             $this->logAuthAttempt($user, 'manageVariants', "Product:{$product->sku}", $canManageVariants);
         }
-        
+
         return $canManageVariants;
     }
 
@@ -283,13 +267,12 @@ class ProductPolicy extends BasePolicy
      */
     public function manageAttributes(User $user, $product = null): bool
     {
-        // Editor+ mogą zarządzać atrybutami
-        $canManageAttributes = $this->hasRoleOrHigher($user, 'Editor') && $this->isActiveUser($user);
-        
+        $canManageAttributes = $this->checkPermission($user, 'products.update');
+
         if ($product) {
             $this->logAuthAttempt($user, 'manageAttributes', "Product:{$product->sku}", $canManageAttributes);
         }
-        
+
         return $canManageAttributes;
     }
 
@@ -298,13 +281,12 @@ class ProductPolicy extends BasePolicy
      */
     public function makeReservations(User $user, $product = null): bool
     {
-        // Salesperson+ mogą robić rezerwacje z kontenera
-        $canReserve = $this->hasRoleOrHigher($user, 'Salesperson') && $this->isActiveUser($user);
-        
+        $canReserve = $this->checkPermission($user, 'orders.reservations');
+
         if ($product) {
             $this->logAuthAttempt($user, 'makeReservations', "Product:{$product->sku}", $canReserve);
         }
-        
+
         return $canReserve;
     }
 
@@ -313,13 +295,12 @@ class ProductPolicy extends BasePolicy
      */
     public function accessForClaims(User $user, $product = null): bool
     {
-        // Claims+ mogą access produkty dla reklamacji
-        $canAccessClaims = $this->hasRoleOrHigher($user, 'Claims') && $this->isActiveUser($user);
-        
+        $canAccessClaims = $this->checkPermission($user, 'claims.read');
+
         if ($product) {
             $this->logAuthAttempt($user, 'accessForClaims', "Product:{$product->sku}", $canAccessClaims);
         }
-        
+
         return $canAccessClaims;
     }
 }

@@ -21,6 +21,7 @@ use App\Http\Livewire\Products\VisualDescription\Traits\UVE_ResponsiveStyles;
 use App\Http\Livewire\Products\VisualDescription\Traits\UVE_CssClassGeneration;
 use App\Http\Livewire\Products\VisualDescription\Traits\UVE_MediaPicker;
 use App\Jobs\PrestaShop\SyncProductToPrestaShop;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -31,6 +32,7 @@ use Illuminate\Support\Facades\Log;
  */
 class UnifiedVisualEditor extends Component
 {
+    use AuthorizesRequests;
     use WithFileUploads;
     use UVE_BlockManagement;
     use UVE_Preview;
@@ -150,6 +152,8 @@ class UnifiedVisualEditor extends Component
      */
     public function mount($product = null, $shop = null): void
     {
+        $this->authorize('visual-editor.read');
+
         // Resolve product
         if ($product instanceof Product) {
             $this->productId = $product->id;

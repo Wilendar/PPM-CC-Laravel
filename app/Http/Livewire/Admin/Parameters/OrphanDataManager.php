@@ -71,6 +71,9 @@ class OrphanDataManager extends Component
 
     public function mount(): void
     {
+        if (!auth()->user()->canAny(['parameters.data_cleanup.read', 'parameters.read'])) {
+            abort(403);
+        }
         $this->orphanTypes = OrphanDataCleanupService::ORPHAN_TYPES;
         $this->refreshStats();
     }

@@ -18,6 +18,14 @@ return [
     'color' => 'green',
 
     'permissions' => [
+        // P0: Dostep do panelu importu (read gate)
+        'read' => [
+            'name' => 'import.read',
+            'label' => 'Dostep do panelu',
+            'description' => 'Mozliwosc wejscia do panelu importu i przeglądania danych',
+            'dangerous' => false,
+        ],
+
         // P1: Obraz + Zdjecia
         'images' => [
             'name' => 'import.images',
@@ -117,23 +125,23 @@ return [
 
     'role_defaults' => [
         'Admin' => [
-            'images', 'basic_data', 'prices', 'categories', 'publication_targets',
+            'read', 'images', 'basic_data', 'prices', 'categories', 'publication_targets',
             'variants', 'compatibility', 'descriptions', 'schedule', 'publish', 'manage', 'unpublish',
         ],
         'Manager' => [
-            'images', 'basic_data', 'prices', 'categories', 'publication_targets',
+            'read', 'images', 'basic_data', 'prices', 'categories', 'publication_targets',
             'variants', 'compatibility', 'descriptions', 'schedule', 'publish', 'manage', 'unpublish',
         ],
-        'Editor' => [
-            'images', 'basic_data', 'categories', 'descriptions',
+        'Edytor' => [
+            'read', 'images', 'basic_data', 'categories', 'descriptions',
         ],
-        'Warehouseman' => [
-            'basic_data',
+        'Magazyn' => [
+            'read', 'basic_data',
         ],
-        'Salesperson' => [
-            'basic_data', 'prices',
+        'Handlowy' => [
+            'read', 'basic_data', 'prices',
         ],
-        'Claims' => [],
+        'Reklamacje' => [],
         'User' => [],
     ],
 ];

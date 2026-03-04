@@ -7,6 +7,7 @@ use App\Models\AttributeValue;
 use App\Services\Product\ProductVariantSearchService;
 use App\Http\Livewire\Admin\Variants\Traits\TypeInlineCrud;
 use App\Http\Livewire\Admin\Variants\Traits\ValueInlineCrud;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Collection;
 use Livewire\Component;
 use Livewire\Attributes\Computed;
@@ -30,7 +31,7 @@ use Livewire\WithPagination;
  */
 class VariantPanelContainer extends Component
 {
-    use WithPagination;
+    use WithPagination, AuthorizesRequests;
     use TypeInlineCrud;
     use ValueInlineCrud;
 
@@ -62,6 +63,8 @@ class VariantPanelContainer extends Component
 
     public function mount(): void
     {
+        $this->authorize('parameters.read');
+
         // Auto-select first type if none selected
         if (!$this->selectedTypeId) {
             $firstType = AttributeType::active()->ordered()->first();

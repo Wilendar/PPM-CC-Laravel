@@ -28,6 +28,7 @@
             {{-- Primary Actions --}}
             <div class="flex flex-wrap items-center gap-2 sm:gap-3">
                 {{-- Add Product Button --}}
+                @if($this->userCan('create'))
                 <a href="{{ route('admin.products.create') }}"
                    class="btn-primary inline-flex items-center px-3 sm:px-4 py-2 text-white text-sm font-medium rounded-lg transition-all duration-300 whitespace-nowrap">
                     <svg class="w-4 h-4 sm:w-5 sm:h-5 sm:mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -36,8 +37,10 @@
                     <span class="hidden sm:inline">Dodaj produkt</span>
                     <span class="sm:hidden ml-1">Dodaj</span>
                 </a>
+                @endif
 
                 {{-- Import from PrestaShop Button --}}
+                @if($this->userCan('import'))
                 <button wire:click="openImportModal('all')"
                         class="btn-secondary inline-flex items-center px-3 sm:px-4 py-2 text-sm font-medium rounded-lg transition-all duration-300 whitespace-nowrap">
                     <svg class="w-4 h-4 sm:w-5 sm:h-5 sm:mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -47,8 +50,10 @@
                     <span class="hidden lg:inline">Importuj z PrestaShop</span>
                     <span class="lg:hidden ml-1">Import</span>
                 </button>
+                @endif
 
                 {{-- Import from ERP Button (FAZA 10) --}}
+                @if($this->userCan('import'))
                 <button wire:click="openERPImportModal"
                         class="btn-secondary inline-flex items-center px-3 sm:px-4 py-2 text-sm font-medium rounded-lg transition-all duration-300 whitespace-nowrap">
                     <svg class="w-4 h-4 sm:w-5 sm:h-5 sm:mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -58,6 +63,7 @@
                     <span class="hidden lg:inline">Import z ERP</span>
                     <span class="lg:hidden ml-1">ERP</span>
                 </button>
+                @endif
 
                 {{-- View Mode Toggle --}}
                 <div class="flex bg-card rounded-lg p-1">

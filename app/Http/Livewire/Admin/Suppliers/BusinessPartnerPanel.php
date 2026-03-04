@@ -107,7 +107,7 @@ class BusinessPartnerPanel extends Component
 
     public function mount(): void
     {
-        $this->authorize('products.read');
+        $this->authorize('suppliers.read');
     }
 
     public function render()

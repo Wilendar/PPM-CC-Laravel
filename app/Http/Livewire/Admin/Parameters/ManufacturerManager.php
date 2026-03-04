@@ -9,6 +9,7 @@ use App\Services\PrestaShop\ManufacturerSyncService;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Component;
 use Livewire\WithFileUploads;
 use Livewire\Attributes\Computed;
@@ -27,7 +28,7 @@ use Livewire\Attributes\Computed;
  */
 class ManufacturerManager extends Component
 {
-    use WithFileUploads;
+    use WithFileUploads, AuthorizesRequests;
 
     // Modal states
     public bool $showModal = false;
@@ -75,6 +76,13 @@ class ManufacturerManager extends Component
     public string $deleteName = '';
 
     protected $listeners = ['refreshManufacturers' => '$refresh'];
+
+    public function mount(): void
+    {
+        if (!auth()->user()->canAny(['parameters.manufacturers.read', 'parameters.read'])) {
+            abort(403);
+        }
+    }
 
     #[Computed]
     public function manufacturers()

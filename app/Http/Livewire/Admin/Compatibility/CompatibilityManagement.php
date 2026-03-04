@@ -130,7 +130,7 @@ class CompatibilityManagement extends Component
 
     public function mount(): void
     {
-        $this->authorize('products.update');
+        $this->authorize('compatibility.read');
         $this->expandedPartIds = [];
         $this->selectedPartIds = [];
         $this->collapsedBrands = [];

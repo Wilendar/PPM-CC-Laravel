@@ -44,10 +44,10 @@ return [
     'role_defaults' => [
         'Admin' => ['read', 'create', 'update', 'reservations'],
         'Manager' => ['read', 'create', 'update', 'reservations'],
-        'Editor' => [],
-        'Warehouseman' => [],
-        'Salesperson' => ['read', 'create', 'update', 'reservations'],
-        'Claims' => ['read'],
+        'Edytor' => [],
+        'Magazyn' => [],
+        'Handlowy' => ['read', 'create', 'update', 'reservations'],
+        'Reklamacje' => ['read'],
         'User' => [],
     ],
 ];

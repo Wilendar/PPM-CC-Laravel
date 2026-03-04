@@ -57,7 +57,7 @@ class SystemSettings extends Component
 
     public function mount()
     {
-        $this->authorize('admin.settings.manage');
+        $this->authorize('system.manage');
         $this->categories = SystemSetting::getCategories();
         $this->loadSettings();
     }
@@ -462,6 +462,7 @@ class SystemSettings extends Component
      */
     public function saveSettings()
     {
+        $this->authorize('system.manage');
         try {
             $this->isLoading = true;
             
@@ -514,6 +515,7 @@ class SystemSettings extends Component
      */
     public function resetCategoryToDefaults()
     {
+        $this->authorize('system.manage');
         try {
             $this->settingsService->resetToDefaults($this->activeCategory);
             $this->loadSettings();
@@ -528,6 +530,7 @@ class SystemSettings extends Component
      */
     public function testEmailConnection()
     {
+        $this->authorize('system.manage');
         try {
             // Wysyłanie testowego emaila
             $settings = $this->settingsService->getEmailSettings();

@@ -128,7 +128,7 @@ class ImportManager extends Component
      */
     public function mount()
     {
-        $this->authorize('admin.shops.import');
+        $this->authorize('shops.import');
 
         $this->loadActiveImportJobs();
         $this->loadRollbackHistory();

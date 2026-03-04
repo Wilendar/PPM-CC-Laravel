@@ -18,7 +18,7 @@ class RolePolicy extends BasePolicy
      */
     public function viewAny(User $user): bool
     {
-        return $this->hasRoleOrHigher($user, 'Manager') && $this->isActiveUser($user);
+        return $this->checkPermission($user, 'users.roles');
     }
 
     /**
@@ -26,30 +26,27 @@ class RolePolicy extends BasePolicy
      */
     public function view(User $user, Role $role): bool
     {
-        return $this->hasRoleOrHigher($user, 'Manager') && $this->isActiveUser($user);
+        return $this->checkPermission($user, 'users.roles');
     }
 
     /**
      * Determine whether the user can create roles.
-     * Only Admin can create roles.
      */
     public function create(User $user): bool
     {
-        return $user->hasRole('Admin') && $this->isActiveUser($user);
+        return $this->checkPermission($user, 'users.roles');
     }
 
     /**
      * Determine whether the user can update the role.
-     * Only Admin can update roles.
      */
     public function update(User $user, Role $role): bool
     {
-        return $user->hasRole('Admin') && $this->isActiveUser($user);
+        return $this->checkPermission($user, 'users.roles');
     }
 
     /**
      * Determine whether the user can delete the role.
-     * Only Admin can delete roles.
      */
     public function delete(User $user, Role $role): bool
     {
@@ -58,6 +55,6 @@ class RolePolicy extends BasePolicy
             return false;
         }
 
-        return $user->hasRole('Admin') && $this->isActiveUser($user);
+        return $this->checkPermission($user, 'users.roles');
     }
 }

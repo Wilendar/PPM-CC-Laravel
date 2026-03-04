@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Intervention\Image\ImageManager;
+use App\Http\Livewire\Concerns\AuthorizesWithSpatie;
 
 /**
  * CategoryForm Livewire Component - Advanced Category Create/Edit Form
@@ -33,6 +34,17 @@ use Intervention\Image\ImageManager;
 class CategoryForm extends Component
 {
     use WithFileUploads;
+    use AuthorizesWithSpatie;
+
+    protected function getPermissionModule(): string
+    {
+        return 'categories';
+    }
+
+    protected function getModuleActions(): array
+    {
+        return ['read', 'create', 'update', 'delete', 'tree'];
+    }
 
     // ==========================================
     // FORM STATE PROPERTIES
@@ -273,6 +285,8 @@ class CategoryForm extends Component
      */
     public function mount(?Category $category = null): void
     {
+        $this->initializePermissions();
+
         if ($category) {
             $this->category = $category;
             $this->mode = 'edit';
@@ -568,6 +582,8 @@ class CategoryForm extends Component
      */
     public function save(): void
     {
+        $this->authorizeAction($this->mode === 'create' ? 'create' : 'update');
+
         $this->loadingStates['save'] = true;
 
         try {

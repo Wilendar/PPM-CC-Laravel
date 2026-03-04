@@ -32,7 +32,7 @@ class ApiManagement extends Component
 
     public function mount()
     {
-        $this->authorize('admin.settings.manage');
+        $this->authorize('system.manage');
         $this->dateFrom = now()->subHours(24)->format('Y-m-d\TH:i');
         $this->dateTo = now()->format('Y-m-d\TH:i');
     }
@@ -224,6 +224,7 @@ class ApiManagement extends Component
      */
     public function cleanupOldLogs()
     {
+        $this->authorize('system.manage');
         $apiService = app(ApiMonitoringService::class);
         $deletedCount = $apiService->cleanupOldLogs(90);
         

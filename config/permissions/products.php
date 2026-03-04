@@ -62,10 +62,10 @@ return [
     'role_defaults' => [
         'Admin' => ['create', 'read', 'update', 'delete', 'export', 'import', 'variants'],
         'Manager' => ['create', 'read', 'update', 'delete', 'export', 'import', 'variants'],
-        'Editor' => ['read', 'update', 'export'],
-        'Warehouseman' => ['read'],
-        'Salesperson' => ['read'],
-        'Claims' => ['read'],
+        'Edytor' => ['read', 'update', 'export'],
+        'Magazyn' => ['read'],
+        'Handlowy' => ['read'],
+        'Reklamacje' => ['read'],
         'User' => ['read'],
     ],
 ];

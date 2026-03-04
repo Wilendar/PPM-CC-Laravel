@@ -199,6 +199,8 @@ trait ProductListQuickActions
 
     public function deleteProduct(): void
     {
+        $this->authorizeAction('delete');
+
         if (!$this->productToDelete) {
             $this->dispatch('error', message: 'Brak produktu do usunięcia');
             return;
@@ -248,6 +250,8 @@ trait ProductListQuickActions
 
     public function duplicateProduct(int $productId): void
     {
+        $this->authorizeAction('create');
+
         $product = Product::find($productId);
 
         if (!$product) {

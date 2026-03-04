@@ -88,6 +88,11 @@ trait ImportPanelBulkOperations
      */
     public function bulkDelete(): void
     {
+        if (!$this->canDuplicateDelete()) {
+            $this->dispatch('flash-message', type: 'error', message: 'Brak uprawnien do usuwania');
+            return;
+        }
+
         if (empty($this->selectedIds)) {
             $this->dispatch('flash-message', [
                 'type' => 'warning',
@@ -122,6 +127,11 @@ trait ImportPanelBulkOperations
      */
     public function bulkSetType(int $typeId): void
     {
+        if (!$this->canSeeBasicData()) {
+            $this->dispatch('flash-message', type: 'error', message: 'Brak uprawnien');
+            return;
+        }
+
         if (empty($this->selectedIds)) {
             return;
         }
@@ -148,6 +158,11 @@ trait ImportPanelBulkOperations
      */
     public function bulkSetShops(array $shopIds): void
     {
+        if (!$this->canSeePublication()) {
+            $this->dispatch('flash-message', type: 'error', message: 'Brak uprawnien do zarzadzania publikacja');
+            return;
+        }
+
         if (empty($this->selectedIds)) {
             return;
         }
@@ -174,6 +189,11 @@ trait ImportPanelBulkOperations
      */
     public function bulkSetCategory(array $categoryIds): void
     {
+        if (!$this->canSeeCategories()) {
+            $this->dispatch('flash-message', type: 'error', message: 'Brak uprawnien do zarzadzania kategoriami');
+            return;
+        }
+
         if (empty($this->selectedIds)) {
             return;
         }
@@ -202,6 +222,11 @@ trait ImportPanelBulkOperations
      */
     public function bulkPublish(): void
     {
+        if (!$this->canPublish()) {
+            $this->dispatch('flash-message', type: 'error', message: 'Brak uprawnien do publikacji');
+            return;
+        }
+
         if (empty($this->selectedIds)) {
             $this->dispatch('flash-message', [
                 'type' => 'warning',
@@ -298,6 +323,11 @@ trait ImportPanelBulkOperations
      */
     public function bulkSetCategoryLevel(int $level, int $categoryId): void
     {
+        if (!$this->canSeeCategories()) {
+            $this->dispatch('flash-message', type: 'error', message: 'Brak uprawnien do zarzadzania kategoriami');
+            return;
+        }
+
         if (empty($this->selectedIds)) {
             $this->dispatch('flash-message', [
                 'type' => 'warning',
@@ -336,6 +366,11 @@ trait ImportPanelBulkOperations
      */
     public function bulkAddShop(int $shopId): void
     {
+        if (!$this->canSeePublication()) {
+            $this->dispatch('flash-message', type: 'error', message: 'Brak uprawnien do zarzadzania publikacja');
+            return;
+        }
+
         if (empty($this->selectedIds)) {
             $this->dispatch('flash-message', [
                 'type' => 'warning',
@@ -378,6 +413,11 @@ trait ImportPanelBulkOperations
      */
     public function bulkClearShops(): void
     {
+        if (!$this->canSeePublication()) {
+            $this->dispatch('flash-message', type: 'error', message: 'Brak uprawnien do zarzadzania publikacja');
+            return;
+        }
+
         if (empty($this->selectedIds)) {
             $this->dispatch('flash-message', [
                 'type' => 'warning',
@@ -408,6 +448,11 @@ trait ImportPanelBulkOperations
      */
     public function bulkEditCompatibility(): void
     {
+        if (!$this->canManageCompatibility()) {
+            $this->dispatch('flash-message', type: 'error', message: 'Brak uprawnien do zarzadzania dopasowaniami');
+            return;
+        }
+
         if (empty($this->selectedIds)) {
             $this->dispatch('flash-message', [
                 'type' => 'warning',
@@ -425,6 +470,11 @@ trait ImportPanelBulkOperations
      */
     public function bulkClearCategoryLevel(int $level): void
     {
+        if (!$this->canSeeCategories()) {
+            $this->dispatch('flash-message', type: 'error', message: 'Brak uprawnien do zarzadzania kategoriami');
+            return;
+        }
+
         if (empty($this->selectedIds)) {
             $this->dispatch('flash-message', [
                 'type' => 'warning',
@@ -470,6 +520,10 @@ trait ImportPanelBulkOperations
      */
     public function createBulkCategory(int $level, int $parentId, string $name): ?array
     {
+        if (!$this->canSeeCategories()) {
+            return null;
+        }
+
         try {
             $parent = \App\Models\Category::find($parentId);
             if (!$parent) {

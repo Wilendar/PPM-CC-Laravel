@@ -10,7 +10,7 @@
     Column widths controlled by colgroup in parent table
 --}}
 
-<tr class="variant-subrow bg-gray-800/30 hover:bg-gray-700/40 transition-colors border-b border-gray-700/50">
+<tr x-show="expanded" x-cloak class="variant-subrow bg-gray-800/30 hover:bg-gray-700/40 transition-colors border-b border-gray-700/50">
     {{-- 1. Checkbox for bulk selection --}}
     <td class="px-4 py-2">
         <input type="checkbox"

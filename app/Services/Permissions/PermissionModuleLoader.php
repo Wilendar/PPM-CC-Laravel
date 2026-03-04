@@ -151,6 +151,7 @@ class PermissionModuleLoader
                 'icon' => $module['icon'] ?? 'document',
                 'color' => $module['color'] ?? 'gray',
                 'order' => $module['order'] ?? 100,
+                'parent_module' => $module['parent_module'] ?? null,
                 'permissions' => collect($module['permissions'])->map(function ($perm) use ($module) {
                     return [
                         'name' => $perm['name'],
@@ -160,6 +161,56 @@ class PermissionModuleLoader
                     ];
                 })->values()->all(),
             ];
+        }
+
+        return $result;
+    }
+
+    /**
+     * Get modules grouped by parent for hierarchical UI display
+     *
+     * Top-level modules (without parent_module) appear as-is.
+     * Child modules (with parent_module) are nested under their parent's 'children' key.
+     *
+     * @return array<string, array>
+     */
+    public function getGroupedByParent(): array
+    {
+        $flat = $this->getPermissionsByModule();
+
+        // Index by module key for quick lookup
+        $byKey = [];
+        foreach ($flat as $displayName => $data) {
+            $byKey[$data['module']] = $data;
+            $byKey[$data['module']]['_display_name'] = $displayName;
+        }
+
+        $result = [];
+
+        // First pass: collect top-level modules
+        foreach ($flat as $displayName => $data) {
+            if (empty($data['parent_module'])) {
+                $result[$displayName] = $data;
+                $result[$displayName]['children'] = [];
+            }
+        }
+
+        // Second pass: attach children to parents
+        foreach ($flat as $displayName => $data) {
+            $parentKey = $data['parent_module'] ?? null;
+            if ($parentKey && isset($byKey[$parentKey])) {
+                $parentDisplayName = $byKey[$parentKey]['_display_name'];
+                if (isset($result[$parentDisplayName])) {
+                    $result[$parentDisplayName]['children'][$displayName] = $data;
+                }
+            }
+        }
+
+        // Sort children by order within each parent
+        foreach ($result as &$parent) {
+            if (!empty($parent['children'])) {
+                uasort($parent['children'], fn($a, $b) => ($a['order'] ?? 100) <=> ($b['order'] ?? 100));
+            }
         }
 
         return $result;

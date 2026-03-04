@@ -36,7 +36,60 @@
     {{-- Alpine.js is included with Livewire 3.x - no need to load separately --}}
 </head>
 <body class="bg-gradient-to-br from-gray-900 via-gray-800 to-black text-white">
-    
+    @php
+        $user = auth()->user();
+        $sidebarPerms = [
+            // Products
+            'products.read' => $user?->can('products.read'),
+            'products.create' => $user?->can('products.create'),
+            'categories.read' => $user?->can('categories.read'),
+            'import.read' => $user?->can('import.read'),
+            // Product Management
+            'parameters.read' => $user?->can('parameters.read'),
+            'compatibility.read' => $user?->can('compatibility.read'),
+            'suppliers.read' => $user?->can('suppliers.read'),
+            'vehicle_features.any_read' => $user?->canAny(['vehicle_features.browser.read', 'vehicle_features.library.read', 'vehicle_features.templates.read']),
+            // Shops
+            'shops.read' => $user?->can('shops.read'),
+            'shops.create' => $user?->can('shops.create'),
+            'shops.sync' => $user?->can('shops.sync'),
+            // Prices
+            'prices.read' => $user?->can('prices.read'),
+            'price_groups.read' => $user?->can('price_groups.read'),
+            // Deliveries, Orders, Claims
+            'deliveries.read' => $user?->can('deliveries.read'),
+            'orders.read' => $user?->can('orders.read'),
+            'claims.read' => $user?->can('claims.read'),
+            // Reports
+            'reports.read' => $user?->can('reports.read'),
+            // System
+            'dashboard.read' => $user?->can('dashboard.read'),
+            'users.read' => $user?->can('users.read'),
+            'users.roles' => $user?->can('users.roles'),
+            'system.config' => $user?->can('system.config'),
+            'system.manage' => $user?->can('system.manage'),
+            'sessions.read' => $user?->can('sessions.read'),
+            'audit.read' => $user?->can('audit.read'),
+            'backup.manage' => $user?->can('backup.manage'),
+            'maintenance.manage' => $user?->can('maintenance.manage'),
+            'media.read' => $user?->can('media.read'),
+            'media.manage' => $user?->can('media.manage'),
+            'bug-reports.read' => $user?->can('bug-reports.read'),
+            'integrations.read' => $user?->can('integrations.read'),
+            'scan.read' => $user?->can('scan.read'),
+            'visual-editor.read' => $user?->can('visual-editor.read'),
+        ];
+        $hasAnySystemPerm = ($sidebarPerms['users.read'] ?? false) || ($sidebarPerms['users.roles'] ?? false) || ($sidebarPerms['system.config'] ?? false) || ($sidebarPerms['system.manage'] ?? false) || ($sidebarPerms['sessions.read'] ?? false) || ($sidebarPerms['audit.read'] ?? false) || ($sidebarPerms['backup.manage'] ?? false) || ($sidebarPerms['maintenance.manage'] ?? false) || ($sidebarPerms['media.read'] ?? false) || ($sidebarPerms['media.manage'] ?? false) || ($sidebarPerms['bug-reports.read'] ?? false) || ($sidebarPerms['integrations.read'] ?? false) || ($sidebarPerms['scan.read'] ?? false) || ($sidebarPerms['visual-editor.read'] ?? false) || ($sidebarPerms['reports.read'] ?? false);
+        $hasAnyShopPerm = ($sidebarPerms['shops.read'] ?? false) || ($sidebarPerms['shops.create'] ?? false) || ($sidebarPerms['shops.sync'] ?? false);
+        $hasAnyProductPerm = ($sidebarPerms['products.read'] ?? false) || ($sidebarPerms['products.create'] ?? false) || ($sidebarPerms['categories.read'] ?? false) || ($sidebarPerms['import.read'] ?? false);
+        $hasAnyPricePerm = ($sidebarPerms['prices.read'] ?? false) || ($sidebarPerms['price_groups.read'] ?? false);
+        $hasAnyProductMgmtPerm = ($sidebarPerms['parameters.read'] ?? false) || ($sidebarPerms['compatibility.read'] ?? false) || ($sidebarPerms['suppliers.read'] ?? false) || ($sidebarPerms['vehicle_features.any_read'] ?? false);
+        $hasAnyDeliveryPerm = ($sidebarPerms['deliveries.read'] ?? false);
+        $hasAnyOrderPerm = ($sidebarPerms['orders.read'] ?? false);
+        $hasAnyClaimsPerm = ($sidebarPerms['claims.read'] ?? false);
+        $hasAnyReportsPerm = ($sidebarPerms['reports.read'] ?? false);
+    @endphp
+
     <!-- Animated Background Elements -->
     <div class="fixed inset-0 overflow-hidden pointer-events-none z-0">
         <div class="absolute -top-32 -right-32 w-64 h-64 rounded-full blur-3xl animate-pulse" style="background: radial-gradient(circle, rgba(224, 172, 126, 0.1), rgba(209, 151, 90, 0.05));"></div>
@@ -221,9 +274,10 @@
                         
                         <nav class="space-y-2">
                             <!-- Dashboard Link -->
-                            <a href="/admin" class="flex items-center px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-700 hover:text-white transition-colors duration-200 group relative {{ request()->is('admin') ? 'bg-gray-700 text-white' : '' }}"
+                            <a href="/admin" class="{{ !($sidebarPerms['dashboard.read'] ?? false) ? 'sidebar-link-no-access' : '' }} flex items-center px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-700 hover:text-white transition-colors duration-200 group relative {{ request()->is('admin') ? 'bg-gray-700 text-white' : '' }}"
                                :title="sidebarCollapsed ? 'Dashboard' : ''"
-                               :class="{ 'justify-center': sidebarCollapsed }">
+                               :class="{ 'justify-center': sidebarCollapsed }"
+                               @unless($sidebarPerms['dashboard.read'] ?? false) tabindex="-1" aria-disabled="true" @endunless>
                                 <svg class="w-5 h-5 group-hover:text-orange-400 flex-shrink-0"
                                      :class="{ 'mr-0': sidebarCollapsed, 'mr-3': !sidebarCollapsed }"
                                      fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -241,7 +295,8 @@
                                     </svg>
                                     Sklepy
                                 </div>
-                                <a href="/admin/shops" class="flex items-center px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-700 hover:text-white transition-colors duration-200 {{ request()->is('admin/shops') ? 'bg-gray-700 text-white' : '' }}"
+                                <a href="/admin/shops" class="{{ !($sidebarPerms['shops.read'] ?? false) ? 'sidebar-link-no-access' : '' }} flex items-center px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-700 hover:text-white transition-colors duration-200 {{ request()->is('admin/shops') ? 'bg-gray-700 text-white' : '' }}"
+                                   @unless($sidebarPerms['shops.read'] ?? false) tabindex="-1" aria-disabled="true" @endunless
                                    :title="sidebarCollapsed ? 'Lista sklepów' : ''"
                                    :class="{ 'justify-center': sidebarCollapsed }">
                                     <svg class="w-4 h-4 flex-shrink-0"
@@ -251,7 +306,8 @@
                                     </svg>
                                     <span x-show="!sidebarCollapsed" x-transition class="whitespace-nowrap">Lista sklepów</span>
                                 </a>
-                                <a href="/admin/shops/add" class="flex items-center px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-700 hover:text-white transition-colors duration-200 {{ request()->is('admin/shops/add') ? 'bg-gray-700 text-white' : '' }}"
+                                <a href="/admin/shops/add" class="{{ !($sidebarPerms['shops.create'] ?? false) ? 'sidebar-link-no-access' : '' }} flex items-center px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-700 hover:text-white transition-colors duration-200 {{ request()->is('admin/shops/add') ? 'bg-gray-700 text-white' : '' }}"
+                                   @unless($sidebarPerms['shops.create'] ?? false) tabindex="-1" aria-disabled="true" @endunless
                                    :title="sidebarCollapsed ? 'Dodaj sklep' : ''"
                                    :class="{ 'justify-center': sidebarCollapsed }">
                                     <svg class="w-4 h-4 flex-shrink-0"
@@ -261,7 +317,8 @@
                                     </svg>
                                     <span x-show="!sidebarCollapsed" x-transition class="whitespace-nowrap">Dodaj sklep</span>
                                 </a>
-                                <a href="/admin/shops/sync" class="flex items-center px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-700 hover:text-white transition-colors duration-200 {{ request()->is('admin/shops/sync') ? 'bg-gray-700 text-white' : '' }}"
+                                <a href="/admin/shops/sync" class="{{ !($sidebarPerms['shops.sync'] ?? false) ? 'sidebar-link-no-access' : '' }} flex items-center px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-700 hover:text-white transition-colors duration-200 {{ request()->is('admin/shops/sync') ? 'bg-gray-700 text-white' : '' }}"
+                                   @unless($sidebarPerms['shops.sync'] ?? false) tabindex="-1" aria-disabled="true" @endunless
                                    :title="sidebarCollapsed ? 'Synchronizacja' : ''"
                                    :class="{ 'justify-center': sidebarCollapsed }">
                                     <svg class="w-4 h-4 flex-shrink-0"
@@ -282,7 +339,8 @@
                                     </svg>
                                     Produkty
                                 </div>
-                                <a href="/admin/products" class="flex items-center px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-700 hover:text-white transition-colors duration-200 {{ request()->is('admin/products') && !request()->is('admin/products/*') ? 'bg-gray-700 text-white' : '' }}"
+                                <a href="/admin/products" class="{{ !($sidebarPerms['products.read'] ?? false) ? 'sidebar-link-no-access' : '' }} flex items-center px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-700 hover:text-white transition-colors duration-200 {{ request()->is('admin/products') && !request()->is('admin/products/*') ? 'bg-gray-700 text-white' : '' }}"
+                                   @unless($sidebarPerms['products.read'] ?? false) tabindex="-1" aria-disabled="true" @endunless
                                    :title="sidebarCollapsed ? 'Lista produktów' : ''"
                                    :class="{ 'justify-center': sidebarCollapsed }">
                                     <svg class="w-4 h-4 flex-shrink-0"
@@ -292,7 +350,8 @@
                                     </svg>
                                     <span x-show="!sidebarCollapsed" x-transition class="whitespace-nowrap">Lista produktów</span>
                                 </a>
-                                <a href="/admin/products/create" class="flex items-center px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-700 hover:text-white transition-colors duration-200 {{ request()->is('admin/products/create') ? 'bg-gray-700 text-white' : '' }}"
+                                <a href="/admin/products/create" class="{{ !($sidebarPerms['products.create'] ?? false) ? 'sidebar-link-no-access' : '' }} flex items-center px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-700 hover:text-white transition-colors duration-200 {{ request()->is('admin/products/create') ? 'bg-gray-700 text-white' : '' }}"
+                                   @unless($sidebarPerms['products.create'] ?? false) tabindex="-1" aria-disabled="true" @endunless
                                    :title="sidebarCollapsed ? 'Dodaj produkt' : ''"
                                    :class="{ 'justify-center': sidebarCollapsed }">
                                     <svg class="w-4 h-4 flex-shrink-0"
@@ -302,7 +361,8 @@
                                     </svg>
                                     <span x-show="!sidebarCollapsed" x-transition class="whitespace-nowrap">Dodaj produkt</span>
                                 </a>
-                                <a href="/admin/products/categories" class="flex items-center px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-700 hover:text-white transition-colors duration-200 {{ request()->is('admin/products/categories*') ? 'bg-gray-700 text-white' : '' }}"
+                                <a href="/admin/products/categories" class="{{ !($sidebarPerms['categories.read'] ?? false) ? 'sidebar-link-no-access' : '' }} flex items-center px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-700 hover:text-white transition-colors duration-200 {{ request()->is('admin/products/categories*') ? 'bg-gray-700 text-white' : '' }}"
+                                   @unless($sidebarPerms['categories.read'] ?? false) tabindex="-1" aria-disabled="true" @endunless
                                    :title="sidebarCollapsed ? 'Kategorie' : ''"
                                    :class="{ 'justify-center': sidebarCollapsed }">
                                     <svg class="w-4 h-4 flex-shrink-0"
@@ -312,7 +372,8 @@
                                     </svg>
                                     <span x-show="!sidebarCollapsed" x-transition class="whitespace-nowrap">Kategorie</span>
                                 </a>
-                                <a href="/admin/products/import" class="flex items-center px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-700 hover:text-white transition-colors duration-200 {{ request()->is('admin/products/import') ? 'bg-gray-700 text-white' : '' }}"
+                                <a href="/admin/products/import" class="{{ !($sidebarPerms['import.read'] ?? false) ? 'sidebar-link-no-access' : '' }} flex items-center px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-700 hover:text-white transition-colors duration-200 {{ request()->is('admin/products/import') ? 'bg-gray-700 text-white' : '' }}"
+                                   @unless($sidebarPerms['import.read'] ?? false) tabindex="-1" aria-disabled="true" @endunless
                                    :title="sidebarCollapsed ? 'Import z pliku' : ''"
                                    :class="{ 'justify-center': sidebarCollapsed }">
                                     <svg class="w-4 h-4 flex-shrink-0"
@@ -353,7 +414,8 @@
                                     </svg>
                                     Cennik
                                 </div>
-                                <a href="/admin/price-management/price-groups" class="flex items-center px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-700 hover:text-white transition-colors duration-200 {{ request()->is('admin/price-management/price-groups') ? 'bg-gray-700 text-white' : '' }}"
+                                <a href="/admin/price-management/price-groups" class="{{ !($sidebarPerms['price_groups.read'] ?? false) ? 'sidebar-link-no-access' : '' }} flex items-center px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-700 hover:text-white transition-colors duration-200 {{ request()->is('admin/price-management/price-groups') ? 'bg-gray-700 text-white' : '' }}"
+                                   @unless($sidebarPerms['price_groups.read'] ?? false) tabindex="-1" aria-disabled="true" @endunless
                                    :title="sidebarCollapsed ? 'Grupy cenowe' : ''"
                                    :class="{ 'justify-center': sidebarCollapsed }">
                                     <svg class="w-4 h-4 flex-shrink-0"
@@ -395,7 +457,8 @@
                                     </svg>
                                     Zarzadzanie produktami
                                 </div>
-                                <a href="/admin/product-parameters" class="flex items-center px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-700 hover:text-white transition-colors duration-200 {{ request()->is('admin/product-parameters*') ? 'bg-gray-700 text-white' : '' }}"
+                                <a href="/admin/product-parameters" class="{{ !($sidebarPerms['parameters.read'] ?? false) ? 'sidebar-link-no-access' : '' }} flex items-center px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-700 hover:text-white transition-colors duration-200 {{ request()->is('admin/product-parameters*') ? 'bg-gray-700 text-white' : '' }}"
+                                   @unless($sidebarPerms['parameters.read'] ?? false) tabindex="-1" aria-disabled="true" @endunless
                                    :title="sidebarCollapsed ? 'Parametry produktow' : ''"
                                    :class="{ 'justify-center': sidebarCollapsed }">
                                     <svg class="w-4 h-4 flex-shrink-0"
@@ -406,7 +469,8 @@
                                     </svg>
                                     <span x-show="!sidebarCollapsed" x-transition class="whitespace-nowrap">Parametry produktow</span>
                                 </a>
-                                <a href="/admin/features/vehicles" class="flex items-center px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-700 hover:text-white transition-colors duration-200 {{ request()->is('admin/features/vehicles') ? 'bg-gray-700 text-white' : '' }}"
+                                <a href="/admin/features/vehicles" class="{{ !($sidebarPerms['vehicle_features.any_read'] ?? false) ? 'sidebar-link-no-access' : '' }} flex items-center px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-700 hover:text-white transition-colors duration-200 {{ request()->is('admin/features/vehicles') ? 'bg-gray-700 text-white' : '' }}"
+                                   @unless($sidebarPerms['vehicle_features.any_read'] ?? false) tabindex="-1" aria-disabled="true" @endunless
                                    :title="sidebarCollapsed ? 'Cechy pojazdów' : ''"
                                    :class="{ 'justify-center': sidebarCollapsed }">
                                     <svg class="w-4 h-4 flex-shrink-0"
@@ -416,7 +480,8 @@
                                     </svg>
                                     <span x-show="!sidebarCollapsed" x-transition class="whitespace-nowrap">Cechy pojazdów</span>
                                 </a>
-                                <a href="/admin/compatibility" class="flex items-center px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-700 hover:text-white transition-colors duration-200 {{ request()->is('admin/compatibility') ? 'bg-gray-700 text-white' : '' }}"
+                                <a href="/admin/compatibility" class="{{ !($sidebarPerms['compatibility.read'] ?? false) ? 'sidebar-link-no-access' : '' }} flex items-center px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-700 hover:text-white transition-colors duration-200 {{ request()->is('admin/compatibility') ? 'bg-gray-700 text-white' : '' }}"
+                                   @unless($sidebarPerms['compatibility.read'] ?? false) tabindex="-1" aria-disabled="true" @endunless
                                    :title="sidebarCollapsed ? 'Dopasowania czesci' : ''"
                                    :class="{ 'justify-center': sidebarCollapsed }">
                                     <svg class="w-4 h-4 flex-shrink-0"
@@ -426,7 +491,8 @@
                                     </svg>
                                     <span x-show="!sidebarCollapsed" x-transition class="whitespace-nowrap">Dopasowania czesci</span>
                                 </a>
-                                <a href="/admin/suppliers" class="flex items-center px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-700 hover:text-white transition-colors duration-200 {{ request()->is('admin/suppliers*') ? 'bg-gray-700 text-white' : '' }}"
+                                <a href="/admin/suppliers" class="{{ !($sidebarPerms['suppliers.read'] ?? false) ? 'sidebar-link-no-access' : '' }} flex items-center px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-700 hover:text-white transition-colors duration-200 {{ request()->is('admin/suppliers*') ? 'bg-gray-700 text-white' : '' }}"
+                                   @unless($sidebarPerms['suppliers.read'] ?? false) tabindex="-1" aria-disabled="true" @endunless
                                    :title="sidebarCollapsed ? 'Zarzadzanie dostawcami' : ''"
                                    :class="{ 'justify-center': sidebarCollapsed }">
                                     <svg class="w-4 h-4 flex-shrink-0"
@@ -633,7 +699,8 @@
                                     System
                                 </div>
                                 <!-- Users -->
-                                <a href="/admin/users" class="flex items-center px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-700 hover:text-white transition-colors duration-200 {{ request()->is('admin/users*') ? 'bg-gray-700 text-white' : '' }}"
+                                <a href="/admin/users" class="{{ !($sidebarPerms['users.read'] ?? false) ? 'sidebar-link-no-access' : '' }} flex items-center px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-700 hover:text-white transition-colors duration-200 {{ request()->is('admin/users*') ? 'bg-gray-700 text-white' : '' }}"
+                                   @unless($sidebarPerms['users.read'] ?? false) tabindex="-1" aria-disabled="true" @endunless
                                    :title="sidebarCollapsed ? 'Uzytkownicy' : ''"
                                    :class="{ 'justify-center': sidebarCollapsed }">
                                     <svg class="w-4 h-4 flex-shrink-0"
@@ -644,7 +711,8 @@
                                     <span x-show="!sidebarCollapsed" x-transition class="whitespace-nowrap">Uzytkownicy</span>
                                 </a>
                                 <!-- Roles -->
-                                <a href="/admin/roles" class="flex items-center px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-700 hover:text-white transition-colors duration-200 {{ request()->is('admin/roles*') ? 'bg-gray-700 text-white' : '' }}"
+                                <a href="/admin/roles" class="{{ !($sidebarPerms['users.roles'] ?? false) ? 'sidebar-link-no-access' : '' }} flex items-center px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-700 hover:text-white transition-colors duration-200 {{ request()->is('admin/roles*') ? 'bg-gray-700 text-white' : '' }}"
+                                   @unless($sidebarPerms['users.roles'] ?? false) tabindex="-1" aria-disabled="true" @endunless
                                    :title="sidebarCollapsed ? 'Role' : ''"
                                    :class="{ 'justify-center': sidebarCollapsed }">
                                     <svg class="w-4 h-4 flex-shrink-0"
@@ -655,7 +723,8 @@
                                     <span x-show="!sidebarCollapsed" x-transition class="whitespace-nowrap">Role</span>
                                 </a>
                                 <!-- Permissions -->
-                                <a href="/admin/permissions" class="flex items-center px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-700 hover:text-white transition-colors duration-200 {{ request()->is('admin/permissions*') ? 'bg-gray-700 text-white' : '' }}"
+                                <a href="/admin/permissions" class="{{ !($sidebarPerms['users.roles'] ?? false) ? 'sidebar-link-no-access' : '' }} flex items-center px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-700 hover:text-white transition-colors duration-200 {{ request()->is('admin/permissions*') ? 'bg-gray-700 text-white' : '' }}"
+                                   @unless($sidebarPerms['users.roles'] ?? false) tabindex="-1" aria-disabled="true" @endunless
                                    :title="sidebarCollapsed ? 'Uprawnienia' : ''"
                                    :class="{ 'justify-center': sidebarCollapsed }">
                                     <svg class="w-4 h-4 flex-shrink-0"
@@ -666,7 +735,8 @@
                                     <span x-show="!sidebarCollapsed" x-transition class="whitespace-nowrap">Uprawnienia</span>
                                 </a>
                                 <!-- Sessions -->
-                                <a href="/admin/sessions" class="flex items-center px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-700 hover:text-white transition-colors duration-200 {{ request()->is('admin/sessions*') ? 'bg-gray-700 text-white' : '' }}"
+                                <a href="/admin/sessions" class="{{ !($sidebarPerms['system.config'] ?? false) ? 'sidebar-link-no-access' : '' }} flex items-center px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-700 hover:text-white transition-colors duration-200 {{ request()->is('admin/sessions*') ? 'bg-gray-700 text-white' : '' }}"
+                                   @unless($sidebarPerms['system.config'] ?? false) tabindex="-1" aria-disabled="true" @endunless
                                    :title="sidebarCollapsed ? 'Sesje' : ''"
                                    :class="{ 'justify-center': sidebarCollapsed }">
                                     <svg class="w-4 h-4 flex-shrink-0"
@@ -677,7 +747,8 @@
                                     <span x-show="!sidebarCollapsed" x-transition class="whitespace-nowrap">Sesje</span>
                                 </a>
                                 <!-- Security -->
-                                <a href="/admin/security" class="flex items-center px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-700 hover:text-white transition-colors duration-200 {{ request()->is('admin/security*') ? 'bg-gray-700 text-white' : '' }}"
+                                <a href="/admin/security" class="{{ !($sidebarPerms['system.manage'] ?? false) ? 'sidebar-link-no-access' : '' }} flex items-center px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-700 hover:text-white transition-colors duration-200 {{ request()->is('admin/security*') ? 'bg-gray-700 text-white' : '' }}"
+                                   @unless($sidebarPerms['system.manage'] ?? false) tabindex="-1" aria-disabled="true" @endunless
                                    :title="sidebarCollapsed ? 'Bezpieczenstwo' : ''"
                                    :class="{ 'justify-center': sidebarCollapsed }">
                                     <svg class="w-4 h-4 flex-shrink-0"
@@ -688,7 +759,8 @@
                                     <span x-show="!sidebarCollapsed" x-transition class="whitespace-nowrap">Bezpieczenstwo</span>
                                 </a>
                                 <!-- Audit Logs -->
-                                <a href="/admin/activity-log" class="flex items-center px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-700 hover:text-white transition-colors duration-200 {{ request()->is('admin/activity-log*') ? 'bg-gray-700 text-white' : '' }}"
+                                <a href="/admin/activity-log" class="{{ !($sidebarPerms['audit.read'] ?? false) ? 'sidebar-link-no-access' : '' }} flex items-center px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-700 hover:text-white transition-colors duration-200 {{ request()->is('admin/activity-log*') ? 'bg-gray-700 text-white' : '' }}"
+                                   @unless($sidebarPerms['audit.read'] ?? false) tabindex="-1" aria-disabled="true" @endunless
                                    :title="sidebarCollapsed ? 'Logi audytu' : ''"
                                    :class="{ 'justify-center': sidebarCollapsed }">
                                     <svg class="w-4 h-4 flex-shrink-0"
@@ -699,7 +771,8 @@
                                     <span x-show="!sidebarCollapsed" x-transition class="whitespace-nowrap">Logi audytu</span>
                                 </a>
                                 <!-- Settings -->
-                                <a href="/admin/system-settings" class="flex items-center px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-700 hover:text-white transition-colors duration-200 {{ request()->is('admin/system-settings*') ? 'bg-gray-700 text-white' : '' }}"
+                                <a href="/admin/system-settings" class="{{ !($sidebarPerms['system.manage'] ?? false) ? 'sidebar-link-no-access' : '' }} flex items-center px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-700 hover:text-white transition-colors duration-200 {{ request()->is('admin/system-settings*') ? 'bg-gray-700 text-white' : '' }}"
+                                   @unless($sidebarPerms['system.manage'] ?? false) tabindex="-1" aria-disabled="true" @endunless
                                    :title="sidebarCollapsed ? 'Ustawienia' : ''"
                                    :class="{ 'justify-center': sidebarCollapsed }">
                                     <svg class="w-4 h-4 flex-shrink-0"
@@ -711,7 +784,8 @@
                                     <span x-show="!sidebarCollapsed" x-transition class="whitespace-nowrap">Ustawienia</span>
                                 </a>
                                 <!-- Backup -->
-                                <a href="/admin/backup" class="flex items-center px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-700 hover:text-white transition-colors duration-200 {{ request()->is('admin/backup*') ? 'bg-gray-700 text-white' : '' }}"
+                                <a href="/admin/backup" class="{{ !($sidebarPerms['backup.manage'] ?? false) ? 'sidebar-link-no-access' : '' }} flex items-center px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-700 hover:text-white transition-colors duration-200 {{ request()->is('admin/backup*') ? 'bg-gray-700 text-white' : '' }}"
+                                   @unless($sidebarPerms['backup.manage'] ?? false) tabindex="-1" aria-disabled="true" @endunless
                                    :title="sidebarCollapsed ? 'Backup' : ''"
                                    :class="{ 'justify-center': sidebarCollapsed }">
                                     <svg class="w-4 h-4 flex-shrink-0"
@@ -722,7 +796,8 @@
                                     <span x-show="!sidebarCollapsed" x-transition class="whitespace-nowrap">Backup</span>
                                 </a>
                                 <!-- Maintenance -->
-                                <a href="/admin/maintenance" class="flex items-center px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-700 hover:text-white transition-colors duration-200 {{ request()->is('admin/maintenance*') ? 'bg-gray-700 text-white' : '' }}"
+                                <a href="/admin/maintenance" class="{{ !($sidebarPerms['maintenance.manage'] ?? false) ? 'sidebar-link-no-access' : '' }} flex items-center px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-700 hover:text-white transition-colors duration-200 {{ request()->is('admin/maintenance*') ? 'bg-gray-700 text-white' : '' }}"
+                                   @unless($sidebarPerms['maintenance.manage'] ?? false) tabindex="-1" aria-disabled="true" @endunless
                                    :title="sidebarCollapsed ? 'Konserwacja' : ''"
                                    :class="{ 'justify-center': sidebarCollapsed }">
                                     <svg class="w-4 h-4 flex-shrink-0"
@@ -733,7 +808,8 @@
                                     <span x-show="!sidebarCollapsed" x-transition class="whitespace-nowrap">Konserwacja</span>
                                 </a>
                                 <!-- Media -->
-                                <a href="/admin/media" class="flex items-center px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-700 hover:text-white transition-colors duration-200 {{ request()->is('admin/media') ? 'bg-gray-700 text-white' : '' }}"
+                                <a href="/admin/media" class="{{ !($sidebarPerms['media.manage'] ?? false) ? 'sidebar-link-no-access' : '' }} flex items-center px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-700 hover:text-white transition-colors duration-200 {{ request()->is('admin/media') ? 'bg-gray-700 text-white' : '' }}"
+                                   @unless($sidebarPerms['media.manage'] ?? false) tabindex="-1" aria-disabled="true" @endunless
                                    :title="sidebarCollapsed ? 'Media' : ''"
                                    :class="{ 'justify-center': sidebarCollapsed }">
                                     <svg class="w-4 h-4 flex-shrink-0"
@@ -744,9 +820,10 @@
                                     <span x-show="!sidebarCollapsed" x-transition class="whitespace-nowrap">Media</span>
                                 </a>
                                 <!-- Bug Reports -->
-                                <a href="/admin/bug-reports" class="flex items-center px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-700 hover:text-white transition-colors duration-200 {{ request()->is('admin/bug-reports*') ? 'bg-gray-700 text-white' : '' }}"
+                                <a href="/admin/bug-reports" class="{{ !($sidebarPerms['bug-reports.read'] ?? false) ? 'sidebar-link-no-access' : '' }} flex items-center px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-700 hover:text-white transition-colors duration-200 {{ request()->is('admin/bug-reports*') ? 'bg-gray-700 text-white' : '' }}"
                                    :title="sidebarCollapsed ? 'Zgloszenia' : ''"
-                                   :class="{ 'justify-center': sidebarCollapsed }">
+                                   :class="{ 'justify-center': sidebarCollapsed }"
+                                   @unless($sidebarPerms['bug-reports.read'] ?? false) tabindex="-1" aria-disabled="true" @endunless>
                                     <svg class="w-4 h-4 flex-shrink-0"
                                          :class="{ 'mr-0': sidebarCollapsed, 'mr-3': !sidebarCollapsed }"
                                          fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -755,7 +832,8 @@
                                     <span x-show="!sidebarCollapsed" x-transition class="whitespace-nowrap">Zgloszenia</span>
                                 </a>
                                 <!-- ERP Integrations -->
-                                <a href="/admin/integrations" class="flex items-center px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-700 hover:text-white transition-colors duration-200 {{ request()->is('admin/integrations*') ? 'bg-gray-700 text-white' : '' }}"
+                                <a href="/admin/integrations" class="{{ !($sidebarPerms['integrations.read'] ?? false) ? 'sidebar-link-no-access' : '' }} flex items-center px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-700 hover:text-white transition-colors duration-200 {{ request()->is('admin/integrations*') ? 'bg-gray-700 text-white' : '' }}"
+                                   @unless($sidebarPerms['integrations.read'] ?? false) tabindex="-1" aria-disabled="true" @endunless
                                    :title="sidebarCollapsed ? 'Integracje ERP' : ''"
                                    :class="{ 'justify-center': sidebarCollapsed }">
                                     <svg class="w-4 h-4 flex-shrink-0"
@@ -766,7 +844,8 @@
                                     <span x-show="!sidebarCollapsed" x-transition class="whitespace-nowrap">Integracje ERP</span>
                                 </a>
                                 <!-- Cross-Source Matrix - ETAP_10 -->
-                                <a href="/admin/scan-products" class="flex items-center px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-700 hover:text-white transition-colors duration-200 {{ request()->is('admin/scan-products*') ? 'bg-gray-700 text-white' : '' }}"
+                                <a href="/admin/scan-products" class="{{ !($sidebarPerms['scan.read'] ?? false) ? 'sidebar-link-no-access' : '' }} flex items-center px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-700 hover:text-white transition-colors duration-200 {{ request()->is('admin/scan-products*') ? 'bg-gray-700 text-white' : '' }}"
+                                   @unless($sidebarPerms['scan.read'] ?? false) tabindex="-1" aria-disabled="true" @endunless
                                    :title="sidebarCollapsed ? 'Macierz Produktow' : ''"
                                    :class="{ 'justify-center': sidebarCollapsed }">
                                     <svg class="w-4 h-4 flex-shrink-0"
@@ -777,7 +856,8 @@
                                     <span x-show="!sidebarCollapsed" x-transition class="whitespace-nowrap">Macierz Produktow</span>
                                 </a>
                                 <!-- Reports Dashboard -->
-                                <a href="/admin/reports" class="flex items-center px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-700 hover:text-white transition-colors duration-200 {{ request()->is('admin/reports*') ? 'bg-gray-700 text-white' : '' }}"
+                                <a href="/admin/reports" class="{{ !($sidebarPerms['reports.read'] ?? false) ? 'sidebar-link-no-access' : '' }} flex items-center px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-700 hover:text-white transition-colors duration-200 {{ request()->is('admin/reports*') ? 'bg-gray-700 text-white' : '' }}"
+                                   @unless($sidebarPerms['reports.read'] ?? false) tabindex="-1" aria-disabled="true" @endunless
                                    :title="sidebarCollapsed ? 'Raporty' : ''"
                                    :class="{ 'justify-center': sidebarCollapsed }">
                                     <svg class="w-4 h-4 flex-shrink-0"

@@ -26,6 +26,7 @@
         </div>
 
         {{-- Shop Management Buttons --}}
+        @if(!($isReadOnly ?? false))
         <div class="flex items-center space-x-2">
             <button type="button"
                     wire:click="openShopSelector"
@@ -36,6 +37,7 @@
                 Dodaj do sklepu
             </button>
         </div>
+        @endif
     </div>
 
     {{-- Exported Shops List --}}

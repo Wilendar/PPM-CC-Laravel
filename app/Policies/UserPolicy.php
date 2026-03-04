@@ -30,7 +30,7 @@ class UserPolicy extends BasePolicy
      */
     public function viewAny(User $user): bool
     {
-        $canView = $this->canAccessAdmin($user);
+        $canView = $this->checkPermission($user, 'users.read');
         $this->logAuthAttempt($user, 'viewAny', 'User', $canView);
         return $canView;
     }
@@ -40,10 +40,9 @@ class UserPolicy extends BasePolicy
      */
     public function view(User $user, User $model): bool
     {
-        // Admin może view wszystkich
-        // Wszyscy mogą view swój własny profil
-        $canView = $this->canAccessAdmin($user) || $this->canManageOwn($user, $model);
-        
+        // users.read permission OR own profile
+        $canView = $this->checkPermission($user, 'users.read') || $this->canManageOwn($user, $model);
+
         $this->logAuthAttempt($user, 'view', "User:{$model->id}", $canView);
         return $canView;
     }
@@ -53,7 +52,7 @@ class UserPolicy extends BasePolicy
      */
     public function create(User $user): bool
     {
-        $canCreate = $this->canAccessAdmin($user);
+        $canCreate = $this->checkPermission($user, 'users.create');
         $this->logAuthAttempt($user, 'create', 'User', $canCreate);
         return $canCreate;
     }
@@ -63,10 +62,9 @@ class UserPolicy extends BasePolicy
      */
     public function update(User $user, User $model): bool
     {
-        // Admin może update wszystkich
-        // Użytkownicy mogą update swój własny profil (ograniczone pola)
-        $canUpdate = $this->canAccessAdmin($user) || $this->canManageOwn($user, $model);
-        
+        // users.update permission OR own profile
+        $canUpdate = $this->checkPermission($user, 'users.update') || $this->canManageOwn($user, $model);
+
         $this->logAuthAttempt($user, 'update', "User:{$model->id}", $canUpdate);
         return $canUpdate;
     }
@@ -76,10 +74,9 @@ class UserPolicy extends BasePolicy
      */
     public function delete(User $user, User $model): bool
     {
-        // Tylko Admin może usuwać użytkowników
-        // Nie można usunąć samego siebie
-        $canDelete = $this->canAccessAdmin($user) && $user->id !== $model->id;
-        
+        // Cannot delete self
+        $canDelete = $this->checkPermission($user, 'users.delete') && $user->id !== $model->id;
+
         $this->logAuthAttempt($user, 'delete', "User:{$model->id}", $canDelete);
         return $canDelete;
     }
@@ -90,7 +87,7 @@ class UserPolicy extends BasePolicy
      */
     public function restore(User $user, User $model): bool
     {
-        $canRestore = $this->canAccessAdmin($user);
+        $canRestore = $this->checkPermission($user, 'users.update');
         $this->logAuthAttempt($user, 'restore', "User:{$model->id}", $canRestore);
         return $canRestore;
     }
@@ -101,9 +98,9 @@ class UserPolicy extends BasePolicy
      */
     public function forceDelete(User $user, User $model): bool
     {
-        // Permanent delete - tylko Admin i nie samego siebie
-        $canForceDelete = $this->canAccessAdmin($user) && $user->id !== $model->id;
-        
+        // Cannot force delete self
+        $canForceDelete = $this->checkPermission($user, 'users.delete') && $user->id !== $model->id;
+
         $this->logAuthAttempt($user, 'forceDelete', "User:{$model->id}", $canForceDelete);
         return $canForceDelete;
     }
@@ -113,10 +110,9 @@ class UserPolicy extends BasePolicy
      */
     public function assignRole(User $user, User $model): bool
     {
-        // Tylko Admin może przypisywać role
-        // Nie można zmieniać ról samemu sobie (security)
-        $canAssignRole = $this->canAccessAdmin($user) && $user->id !== $model->id;
-        
+        // Cannot change own roles (security)
+        $canAssignRole = $this->checkPermission($user, 'users.roles') && $user->id !== $model->id;
+
         $this->logAuthAttempt($user, 'assignRole', "User:{$model->id}", $canAssignRole);
         return $canAssignRole;
     }
@@ -126,10 +122,9 @@ class UserPolicy extends BasePolicy
      */
     public function removeRole(User $user, User $model): bool
     {
-        // Tylko Admin może usuwać role
-        // Nie można usuwać ról samemu sobie (security)
-        $canRemoveRole = $this->canAccessAdmin($user) && $user->id !== $model->id;
-        
+        // Cannot change own roles (security)
+        $canRemoveRole = $this->checkPermission($user, 'users.roles') && $user->id !== $model->id;
+
         $this->logAuthAttempt($user, 'removeRole', "User:{$model->id}", $canRemoveRole);
         return $canRemoveRole;
     }
@@ -140,17 +135,16 @@ class UserPolicy extends BasePolicy
      */
     public function updateProfile(User $user, User $model, array $fields = []): bool
     {
-        // Admin może edytować wszystkie pola wszystkich użytkowników
-        if ($this->canAccessAdmin($user)) {
+        // users.update permission grants full profile edit for all users
+        if ($this->checkPermission($user, 'users.update')) {
             return true;
         }
 
-        // Użytkownik może edytować swój własny profil
+        // User can edit own profile (restricted fields excluded)
         if ($this->canManageOwn($user, $model)) {
-            // Sprawdź czy nie próbuje edytować restricted fields
             $restrictedFields = ['is_active', 'email_verified_at'];
             $hasRestrictedFields = !empty(array_intersect($fields, $restrictedFields));
-            
+
             $canUpdate = !$hasRestrictedFields;
             $this->logAuthAttempt($user, 'updateProfile', "User:{$model->id}", $canUpdate);
             return $canUpdate;
@@ -165,10 +159,9 @@ class UserPolicy extends BasePolicy
      */
     public function impersonate(User $user, User $model): bool
     {
-        // Tylko Admin może impersonate
-        // Nie można impersonate samego siebie
-        $canImpersonate = $this->canAccessAdmin($user) && $user->id !== $model->id;
-        
+        // Cannot impersonate self
+        $canImpersonate = $this->checkPermission($user, 'users.update') && $user->id !== $model->id;
+
         $this->logAuthAttempt($user, 'impersonate', "User:{$model->id}", $canImpersonate);
         return $canImpersonate;
     }
@@ -178,10 +171,9 @@ class UserPolicy extends BasePolicy
      */
     public function viewAuditLogs(User $user, User $model): bool
     {
-        // Admin może view wszystkie audit logi
-        // Użytkownicy mogą view swoje własne audit logi
-        $canViewAuditLogs = $this->canAccessAdmin($user) || $this->canManageOwn($user, $model);
-        
+        // users.read permission OR own audit logs
+        $canViewAuditLogs = $this->checkPermission($user, 'users.read') || $this->canManageOwn($user, $model);
+
         $this->logAuthAttempt($user, 'viewAuditLogs', "User:{$model->id}", $canViewAuditLogs);
         return $canViewAuditLogs;
     }
@@ -191,7 +183,7 @@ class UserPolicy extends BasePolicy
      */
     public function exportUsers(User $user): bool
     {
-        $canExport = $this->canAccessAdmin($user);
+        $canExport = $this->checkPermission($user, 'users.read');
         $this->logAuthAttempt($user, 'exportUsers', 'User', $canExport);
         return $canExport;
     }
@@ -201,7 +193,7 @@ class UserPolicy extends BasePolicy
      */
     public function importUsers(User $user): bool
     {
-        $canImport = $this->canAccessAdmin($user);
+        $canImport = $this->checkPermission($user, 'users.create');
         $this->logAuthAttempt($user, 'importUsers', 'User', $canImport);
         return $canImport;
     }

@@ -13,6 +13,7 @@ use App\Http\Livewire\Products\Listing\Traits\ProductListPrestaShopImport;
 use App\Http\Livewire\Products\Listing\Traits\ProductListPreferences;
 use App\Http\Livewire\Products\Listing\Traits\ProductListPresets;
 use App\Http\Livewire\Products\Listing\Traits\ProductListQuickActions;
+use App\Http\Livewire\Concerns\AuthorizesWithSpatie;
 
 /**
  * ProductList Component - Main product listing interface
@@ -33,6 +34,7 @@ use App\Http\Livewire\Products\Listing\Traits\ProductListQuickActions;
 class ProductList extends Component
 {
     use WithPagination;
+    use AuthorizesWithSpatie;
     use ProductListFilters;
     use ProductListColumns;
     use ProductListBulkActions;
@@ -49,6 +51,11 @@ class ProductList extends Component
     |--------------------------------------------------------------------------
     */
 
+    protected function getPermissionModule(): string
+    {
+        return 'products';
+    }
+
     // Computed
     public bool $hasFilters = false;
 
@@ -60,6 +67,7 @@ class ProductList extends Component
 
     public function mount(): void
     {
+        $this->initializePermissions();
         $this->loadUserPreferences();
         $this->loadDefaultPresetOnMount();
         $this->updateHasFilters();

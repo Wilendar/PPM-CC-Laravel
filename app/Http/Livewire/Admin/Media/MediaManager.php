@@ -87,7 +87,7 @@ class MediaManager extends Component
 
     public function mount(): void
     {
-        $this->authorize('admin.media.manage');
+        $this->authorize('media.manage');
         $this->loadStats();
     }
 
@@ -268,6 +268,7 @@ class MediaManager extends Component
      */
     public function deleteOrphanedMedia(int $mediaId): void
     {
+        $this->authorize('media.manage');
         try {
             $media = Media::findOrFail($mediaId);
 
@@ -297,6 +298,7 @@ class MediaManager extends Component
      */
     public function bulkDeleteOrphaned(): void
     {
+        $this->authorize('media.manage');
         if (empty($this->selectedMediaIds)) {
             $this->showMessage('Nie wybrano zadnych zdjec', 'warning');
             return;
@@ -345,6 +347,7 @@ class MediaManager extends Component
      */
     public function syncPendingToShop(int $shopId): void
     {
+        $this->authorize('media.manage');
         $this->isLoading = true;
 
         try {
@@ -472,6 +475,7 @@ class MediaManager extends Component
      */
     public function syncProductMedia(int $productId): void
     {
+        $this->authorize('media.manage');
         try {
             $product = Product::with('media')->findOrFail($productId);
 
@@ -520,6 +524,7 @@ class MediaManager extends Component
      */
     public function bulkSyncProducts(): void
     {
+        $this->authorize('media.manage');
         if (empty($this->selectedProductIds)) {
             $this->showMessage('Nie wybrano żadnych produktów', 'warning');
             return;

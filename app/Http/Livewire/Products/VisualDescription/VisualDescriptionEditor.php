@@ -16,6 +16,7 @@ use App\Services\VisualEditor\BlockRegistry;
 use App\Services\VisualEditor\HtmlToBlocksParser;
 use App\Services\PrestaShop\PrestaShop8Client;
 use Illuminate\Contracts\View\View;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\Log;
 use Livewire\Component;
 
@@ -27,6 +28,7 @@ use Livewire\Component;
  */
 class VisualDescriptionEditor extends Component
 {
+    use AuthorizesRequests;
     use EditorBlockManagement;
     use EditorMediaPicker;
     use EditorUndoRedo;
@@ -88,6 +90,8 @@ class VisualDescriptionEditor extends Component
      */
     public function mount(mixed $product = null, mixed $shop = null): void
     {
+        $this->authorize('visual-editor.read');
+
         // Handle model binding or direct ID
         $this->productId = $product instanceof Product ? $product->id : (int) $product;
         $this->shopId = $shop instanceof PrestaShopShop ? $shop->id : (int) $shop;

@@ -1,7 +1,9 @@
 @php
     $buttonClasses = trim('btn-enterprise-primary w-full py-3 text-lg ' . ($classes ?? ''));
+    $canSave = isset($userPermissions) ? ($isEditMode ? ($userPermissions['update'] ?? false) : ($userPermissions['create'] ?? false)) : true;
 @endphp
 
+@if($canSave)
 {{-- ETAP_08.5: Check both PrestaShop AND ERP job status --}}
 <button type="button"
         @click="
@@ -40,3 +42,13 @@
         Zapisywanie...
     </span>
 </button>
+@else
+{{-- READ-ONLY: Disabled save button with lock icon --}}
+<button type="button"
+        disabled
+        class="btn-enterprise-secondary w-full py-3 text-lg opacity-50 cursor-not-allowed"
+        title="Brak uprawnien do zapisu">
+    <i class="fas fa-lock mr-3"></i>
+    Tryb podgladu
+</button>
+@endif

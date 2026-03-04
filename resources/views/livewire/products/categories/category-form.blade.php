@@ -11,6 +11,9 @@
                     @if($mode === 'create')
                         <i class="fas fa-plus-circle text-green-400 mr-2"></i>
                         Nowa kategoria
+                    @elseif($isReadOnly)
+                        <i class="fas fa-eye text-gray-400 mr-2"></i>
+                        Podgląd kategorii
                     @else
                         <i class="fas fa-edit text-mpp-orange mr-2"></i>
                         Edytuj kategorię
@@ -39,9 +42,10 @@
             <div class="flex gap-4">
                 <a href="{{ route('admin.products.categories.index') }}"
                    class="btn-enterprise-secondary">
-                    <i class="fas fa-times"></i>
-                    Anuluj
+                    <i class="fas fa-arrow-left"></i>
+                    Wróć do listy
                 </a>
+                @if(!$isReadOnly)
                 <button wire:click="save"
                         class="btn-enterprise-primary relative"
                         wire:loading.attr="disabled"
@@ -55,6 +59,13 @@
                         Zapisywanie...
                     </span>
                 </button>
+                @else
+                <button type="button" disabled
+                        class="btn-enterprise-secondary opacity-50 cursor-not-allowed">
+                    <i class="fas fa-lock"></i>
+                    Tryb podgladu
+                </button>
+                @endif
             </div>
         </div>
     </div>
@@ -74,11 +85,20 @@
         </div>
     @endif
 
+    {{-- Readonly Banner --}}
+    @if($isReadOnly)
+        <div class="readonly-banner mx-4 xl:mx-8 mb-4">
+            <svg class="readonly-banner__icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
+            <span class="readonly-banner__text">Tryb podgladu</span>
+            <span class="readonly-banner__subtext">Brak uprawnien do edycji kategorii</span>
+        </div>
+    @endif
+
     {{-- Main Form --}}
     <form wire:submit.prevent="save">
         <div class="category-form-main-container">
             {{-- Left Column - Form Content --}}
-            <div class="category-form-left-column">
+            <div class="category-form-left-column {{ $isReadOnly ? 'product-form-readonly' : '' }}">
                 <div class="enterprise-card p-8">
                     {{-- Enterprise Tab Navigation --}}
                     <div class="tabs-enterprise">
@@ -960,6 +980,7 @@
                         Szybkie akcje
                     </h4>
                     <div class="space-y-4">
+                        @if(!$isReadOnly)
                         {{-- Save Button --}}
                         <button wire:click="save"
                                 class="btn-enterprise-primary w-full py-3 text-lg"
@@ -981,13 +1002,19 @@
                             <i class="fas fa-times mr-2"></i>
                             Anuluj i wróć
                         </a>
+                        @else
+                        {{-- Readonly: Lock button + back link --}}
+                        <button type="button" disabled
+                                class="btn-enterprise-secondary w-full py-3 text-lg opacity-50 cursor-not-allowed">
+                            <i class="fas fa-lock mr-3"></i>
+                            Tryb podgladu
+                        </button>
 
-                        {{-- Preview Button (Edit Mode) --}}
-                        @if($mode === 'edit' && $category)
-                            <a href="#" class="btn-enterprise-secondary w-full py-3">
-                                <i class="fas fa-eye mr-2"></i>
-                                Podgląd kategorii
-                            </a>
+                        <a href="{{ route('admin.products.categories.index') }}"
+                           class="btn-enterprise-secondary w-full py-3">
+                            <i class="fas fa-arrow-left mr-2"></i>
+                            Wróć do listy
+                        </a>
                         @endif
                     </div>
                 </div>

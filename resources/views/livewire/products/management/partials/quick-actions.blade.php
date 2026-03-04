@@ -128,7 +128,7 @@
         {{-- ========================================== --}}
         <div class="space-y-4" x-show="!isJobRunning && !showCompletionStatus && !erpIsJobRunning && !erpShowCompletionStatus" x-cloak>
             {{-- ETAP_13.2: Aktualizuj sklepy (ALL shops export) --}}
-            @if($isEditMode && !empty($exportedShops))
+            @if($isEditMode && !empty($exportedShops) && ($userPermissions['sync'] ?? false))
                 <button
                     type="button"
                     wire:click="bulkUpdateShops"
@@ -140,7 +140,7 @@
             @endif
 
             {{-- ETAP_13.2: Wczytaj ze sklepow (ALL shops import) --}}
-            @if($isEditMode && !empty($exportedShops))
+            @if($isEditMode && !empty($exportedShops) && ($userPermissions['sync'] ?? false))
                 <button
                     type="button"
                     wire:click="bulkPullFromShops"

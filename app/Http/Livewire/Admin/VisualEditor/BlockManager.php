@@ -7,6 +7,7 @@ namespace App\Http\Livewire\Admin\VisualEditor;
 use App\Models\DescriptionBlock;
 use App\Models\ProductDescription;
 use Illuminate\Contracts\View\View;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Collection;
 use Livewire\Attributes\Computed;
 use Livewire\Component;
@@ -19,6 +20,8 @@ use Livewire\Component;
  */
 class BlockManager extends Component
 {
+    use AuthorizesRequests;
+
     // =====================
     // PUBLIC PROPERTIES
     // =====================
@@ -37,6 +40,15 @@ class BlockManager extends Component
 
     /** @var bool Show preview modal */
     public bool $showPreviewModal = false;
+
+    // =====================
+    // LIFECYCLE
+    // =====================
+
+    public function mount(): void
+    {
+        $this->authorize('visual-editor.read');
+    }
 
     // =====================
     // LISTENERS

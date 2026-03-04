@@ -78,6 +78,10 @@ class ProductImportPanel extends Component
      */
     public function togglePriceDisplay(): void
     {
+        if (!$this->canSeePrices()) {
+            return;
+        }
+
         $this->priceDisplayMode = $this->priceDisplayMode === 'net' ? 'gross' : 'net';
     }
 
@@ -100,6 +104,10 @@ class ProductImportPanel extends Component
      */
     public function mount(): void
     {
+        if (!auth()->user()?->can('import.read')) {
+            abort(403);
+        }
+
         $this->resetFilters();
     }
 
@@ -356,6 +364,11 @@ class ProductImportPanel extends Component
      */
     public function openImportModal(?int $editProductId = null): void
     {
+        if (!$this->canSeeBasicData()) {
+            $this->dispatch('flash-message', type: 'error', message: 'Brak uprawnien do edycji danych');
+            return;
+        }
+
         $this->activeModal = 'product-import';
         $this->dispatch('openImportModal', pendingProductId: $editProductId);
     }
@@ -365,6 +378,11 @@ class ProductImportPanel extends Component
      */
     public function openImportPricesModal(int $productId): void
     {
+        if (!$this->canSeePrices()) {
+            $this->dispatch('flash-message', type: 'error', message: 'Brak uprawnien do edycji cen');
+            return;
+        }
+
         $this->dispatch('openImportPricesModal', productId: $productId);
     }
 

@@ -64,7 +64,7 @@ class BackupManager extends Component
 
     public function mount()
     {
-        $this->authorize('admin.backup.manage');
+        $this->authorize('backup.manage');
         $this->loadSettings();
         $this->loadStats();
         $this->resetBackupConfiguration();
@@ -164,6 +164,7 @@ class BackupManager extends Component
      */
     public function createBackup()
     {
+        $this->authorize('backup.manage');
         try {
             $this->validate([
                 'newBackupType' => 'required|in:database,files,full',
@@ -228,6 +229,7 @@ class BackupManager extends Component
      */
     public function deleteBackup($backupId)
     {
+        $this->authorize('backup.manage');
         try {
             $backup = BackupJob::findOrFail($backupId);
             
@@ -275,6 +277,7 @@ class BackupManager extends Component
      */
     public function restoreBackup($backupId)
     {
+        $this->authorize('backup.manage');
         try {
             $backup = BackupJob::findOrFail($backupId);
             
@@ -306,6 +309,7 @@ class BackupManager extends Component
      */
     public function saveSettings()
     {
+        $this->authorize('backup.manage');
         try {
             $this->validate([
                 'settings.backup_frequency' => 'required|in:manual,daily,weekly,monthly',
@@ -332,6 +336,7 @@ class BackupManager extends Component
      */
     public function cleanupOldBackups()
     {
+        $this->authorize('backup.manage');
         try {
             $retentionDays = $this->settings['backup_retention_days'] ?? 30;
             $cutoffDate = Carbon::now()->subDays($retentionDays);
@@ -360,6 +365,7 @@ class BackupManager extends Component
      */
     public function runTestBackup()
     {
+        $this->authorize('backup.manage');
         try {
             $this->isLoading = true;
 

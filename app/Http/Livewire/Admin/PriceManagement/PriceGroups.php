@@ -93,7 +93,7 @@ class PriceGroups extends Component
      */
     public function mount(): void
     {
-        $this->authorize('prices.groups');
+        $this->authorize('price_groups.manage');
     }
 
     /**
@@ -162,8 +162,7 @@ class PriceGroups extends Component
      */
     public function create(): void
     {
-        // DEVELOPMENT: Auth disabled for testing
-        // $this->authorize('prices.groups');
+        $this->authorize('price_groups.manage');
         $this->resetForm();
         $this->editMode = false;
         $this->showForm = true;
@@ -177,8 +176,7 @@ class PriceGroups extends Component
      */
     public function edit($priceGroupId): void
     {
-        // DEVELOPMENT: Auth disabled for testing
-        // $this->authorize('prices.groups');
+        $this->authorize('price_groups.manage');
 
         $priceGroup = PriceGroup::findOrFail($priceGroupId);
 
@@ -203,8 +201,7 @@ class PriceGroups extends Component
      */
     public function save(): void
     {
-        // DEVELOPMENT: Auth disabled for testing
-        // $this->authorize('prices.groups');
+        $this->authorize('price_groups.manage');
 
         // Validate form data
         $validatedData = $this->validate([
@@ -290,8 +287,7 @@ class PriceGroups extends Component
      */
     public function confirmDelete($priceGroupId): void
     {
-        // DEVELOPMENT: Auth disabled for testing
-        // $this->authorize('prices.groups');
+        $this->authorize('price_groups.manage');
 
         $priceGroup = PriceGroup::findOrFail($priceGroupId);
 
@@ -309,8 +305,7 @@ class PriceGroups extends Component
      */
     public function delete(): void
     {
-        // DEVELOPMENT: Auth disabled for testing
-        // $this->authorize('prices.groups');
+        $this->authorize('price_groups.manage');
 
         try {
             $priceGroup = PriceGroup::findOrFail($this->selectedPriceGroupId);
@@ -354,8 +349,7 @@ class PriceGroups extends Component
      */
     public function executeBulkAction(): void
     {
-        // DEVELOPMENT: Auth disabled for testing
-        // $this->authorize('prices.groups');
+        $this->authorize('price_groups.manage');
 
         if (empty($this->selectedGroups) || empty($this->bulkAction)) {
             session()->flash('error', 'Wybierz grupy i akcję do wykonania.');

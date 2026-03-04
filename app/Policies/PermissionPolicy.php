@@ -18,7 +18,7 @@ class PermissionPolicy extends BasePolicy
      */
     public function viewAny(User $user): bool
     {
-        return $this->hasRoleOrHigher($user, 'Manager') && $this->isActiveUser($user);
+        return $this->checkPermission($user, 'users.roles');
     }
 
     /**
@@ -26,7 +26,7 @@ class PermissionPolicy extends BasePolicy
      */
     public function view(User $user, Permission $permission): bool
     {
-        return $this->hasRoleOrHigher($user, 'Manager') && $this->isActiveUser($user);
+        return $this->checkPermission($user, 'users.roles');
     }
 
     /**
@@ -35,33 +35,30 @@ class PermissionPolicy extends BasePolicy
      */
     public function manage(User $user): bool
     {
-        return $user->hasRole('Admin') && $this->isActiveUser($user);
+        return $this->checkPermission($user, 'users.roles');
     }
 
     /**
      * Determine whether the user can create permissions.
-     * Only Admin can create permissions.
      */
     public function create(User $user): bool
     {
-        return $user->hasRole('Admin') && $this->isActiveUser($user);
+        return $this->checkPermission($user, 'users.roles');
     }
 
     /**
      * Determine whether the user can update the permission.
-     * Only Admin can update permissions.
      */
     public function update(User $user, Permission $permission): bool
     {
-        return $user->hasRole('Admin') && $this->isActiveUser($user);
+        return $this->checkPermission($user, 'users.roles');
     }
 
     /**
      * Determine whether the user can delete the permission.
-     * Only Admin can delete permissions.
      */
     public function delete(User $user, Permission $permission): bool
     {
-        return $user->hasRole('Admin') && $this->isActiveUser($user);
+        return $this->checkPermission($user, 'users.roles');
     }
 }

@@ -149,7 +149,9 @@ class SmartMatchingPanel extends Component
 
     public function mount(): void
     {
-        $this->authorize('products.update');
+        if (!auth()->user()->canAny(['parameters.smart_matching.read', 'parameters.read'])) {
+            abort(403);
+        }
         $this->loadKeywordRules();
         $this->loadAvailableShops();
         $this->loadAvailableBrands();

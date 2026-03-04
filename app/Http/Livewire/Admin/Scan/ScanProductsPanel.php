@@ -96,7 +96,7 @@ class ScanProductsPanel extends Component
      */
     public function mount(): void
     {
-        $this->authorize('admin.scan.view');
+        $this->authorize('scan.read');
 
         // Load last active scan if any
         $activeScan = ProductScanSession::running()

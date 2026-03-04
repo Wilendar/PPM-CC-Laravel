@@ -33,6 +33,7 @@
                 Dane PPM
             </button>
 
+            @if(!($isReadOnly ?? false))
             {{-- ETAP_08.8: Check ERP Button (gdy ERP TAB wybrany i produkt nie powiazany) --}}
             @if($activeErpConnectionId !== null && ($this->erpExternalData['sync_status'] ?? '') === 'not_linked')
                 <button type="button"
@@ -69,6 +70,7 @@
                 </svg>
                 Zarzadzaj ERP
             </a>
+            @endif
         </div>
     </div>
 
@@ -147,7 +149,7 @@
                     </button>
 
                     {{-- ETAP_08.8: Sync/Pull buttons ONLY when product is linked to ERP --}}
-                    @if(!in_array($syncDisplay['status'], ['not_linked', 'not_found']))
+                    @if(!($isReadOnly ?? false) && !in_array($syncDisplay['status'], ['not_linked', 'not_found']))
                         {{-- Sync to ERP Button - height matches label (py-1.5 + border = need py-2) --}}
                         <button type="button"
                                 wire:click="syncToErp({{ $connection->id }})"

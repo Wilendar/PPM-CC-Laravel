@@ -121,7 +121,7 @@ class AddShop extends Component
 
     public function mount()
     {
-        $this->authorize('admin.shops.create');
+        $this->authorize('shops.create');
 
         // Initialize PPM Price Groups (from CLAUDE.md spec)
         $this->ppmPriceGroups = [

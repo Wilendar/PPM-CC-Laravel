@@ -101,7 +101,7 @@ class ShopCssEditor extends Component
      */
     public function mount(int $shopId): void
     {
-        $this->authorize('admin.shops.edit');
+        $this->authorize('shops.update');
         $this->shopId = $shopId;
         $this->shop = PrestaShopShop::find($shopId);
 

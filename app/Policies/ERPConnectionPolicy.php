@@ -13,31 +13,31 @@ class ERPConnectionPolicy extends BasePolicy
 {
     public function viewAny(User $user): bool
     {
-        return $this->hasPermission($user, 'admin.erp.view');
+        return $this->hasPermission($user, 'integrations.read');
     }
 
     public function view(User $user, $connection): bool
     {
-        return $this->hasPermission($user, 'admin.erp.view');
+        return $this->hasPermission($user, 'integrations.read');
     }
 
     public function create(User $user): bool
     {
-        return $this->hasPermission($user, 'admin.erp.manage');
+        return $this->hasPermission($user, 'integrations.config');
     }
 
     public function update(User $user, $connection): bool
     {
-        return $this->hasPermission($user, 'admin.erp.manage');
+        return $this->hasPermission($user, 'integrations.config');
     }
 
     public function delete(User $user, $connection): bool
     {
-        return $this->hasPermission($user, 'admin.erp.manage');
+        return $this->hasPermission($user, 'integrations.config');
     }
 
     public function sync(User $user): bool
     {
-        return $this->hasPermission($user, 'admin.erp.sync');
+        return $this->hasPermission($user, 'integrations.sync');
     }
 }

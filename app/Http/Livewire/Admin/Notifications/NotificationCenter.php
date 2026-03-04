@@ -33,7 +33,7 @@ class NotificationCenter extends Component
 
     public function mount()
     {
-        $this->authorize('admin.settings.manage');
+        $this->authorize('system.manage');
         $this->loadNotifications();
     }
 
@@ -131,6 +131,7 @@ class NotificationCenter extends Component
      */
     public function markAsRead($notificationId)
     {
+        $this->authorize('system.manage');
         $notificationService = app(NotificationService::class);
         
         if ($notificationService->markAsRead($notificationId)) {
@@ -144,6 +145,7 @@ class NotificationCenter extends Component
      */
     public function markAllAsRead()
     {
+        $this->authorize('system.manage');
         AdminNotification::where('is_read', false)
             ->update([
                 'is_read' => true,
@@ -159,8 +161,9 @@ class NotificationCenter extends Component
      */
     public function markTabAsRead()
     {
+        $this->authorize('system.manage');
         $notificationService = app(NotificationService::class);
-        
+
         switch ($this->activeTab) {
             case 'system':
                 $notificationService->markAllAsReadByType(AdminNotification::TYPE_SYSTEM);
@@ -184,6 +187,7 @@ class NotificationCenter extends Component
      */
     public function acknowledge($notificationId)
     {
+        $this->authorize('system.manage');
         $notificationService = app(NotificationService::class);
         
         if ($notificationService->acknowledge($notificationId, auth()->user())) {

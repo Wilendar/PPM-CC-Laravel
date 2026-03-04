@@ -138,7 +138,7 @@ class BulkEditCompatibilityModal extends Component
 
     public function mount(): void
     {
-        $this->authorize('products.update');
+        $this->authorize('compatibility.read');
         $this->searchResults = collect([]);
     }
 

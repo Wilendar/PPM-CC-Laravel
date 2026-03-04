@@ -24,11 +24,13 @@
     class="product-list-row cursor-pointer hover:bg-orange-500/5 hover:shadow-lg hover:shadow-orange-500/5 transition-all duration-200 ease-out {{ $rowStatusClass }}">
     {{-- Bulk Select --}}
     <td class="px-6 py-4" @click.stop>
+        @if(!($isReadOnly ?? false))
         <input type="checkbox"
                wire:key="select-{{ $product->id }}"
                value="{{ $product->id }}"
                wire:model.live="selectedProducts"
                class="rounded border-primary text-orange-500 shadow-sm focus:ring-orange-500 focus:ring-opacity-50 bg-input cursor-pointer">
+        @endif
     </td>
 
     {{-- ETAP_07d FAZA 7: Thumbnail --}}
@@ -203,6 +205,7 @@
 
     {{-- Status --}}
     <td class="px-6 py-4 whitespace-nowrap" @click.stop>
+        @if($this->userCan('update'))
         <button wire:click="toggleStatus({{ $product->id }})"
                 class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium transition-colors
                     {{ $product->is_active
@@ -211,6 +214,13 @@
             <span class="w-2 h-2 rounded-full mr-1 {{ $product->is_active ? 'bg-green-400' : 'bg-red-400' }}"></span>
             {{ $product->is_active ? 'Aktywny' : 'Nieaktywny' }}
         </button>
+        @else
+        <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium
+                    {{ $product->is_active ? 'bg-green-800/50 text-green-200' : 'bg-red-800/50 text-red-200' }}">
+            <span class="w-2 h-2 rounded-full mr-1 {{ $product->is_active ? 'bg-green-400' : 'bg-red-400' }}"></span>
+            {{ $product->is_active ? 'Aktywny' : 'Nieaktywny' }}
+        </span>
+        @endif
     </td>
 
     {{-- ETAP: Product Status Column (2026-02-04) - Replaces PrestaShop Sync Status --}}
@@ -248,6 +258,7 @@
             </a>
 
             {{-- Duplicate Product --}}
+            @if($this->userCan('create'))
             <button wire:click="duplicateProduct({{ $product->id }})"
                     class="text-muted hover:text-green-500 transition-colors duration-300"
                     title="Duplikuj produkt">
@@ -255,8 +266,10 @@
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>
                 </svg>
             </button>
+            @endif
 
             {{-- FAZA 1.5: Multi-Store Actions --}}
+            @if($this->userCan('update'))
             {{-- Sync/Refresh Product --}}
             <button wire:click="syncProduct({{ $product->id }})"
                     class="text-muted hover:text-purple-500 transition-colors duration-300"
@@ -274,8 +287,10 @@
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
                 </svg>
             </button>
+            @endif
 
             {{-- Delete Product --}}
+            @if($this->userCan('delete'))
             <button wire:click="confirmDelete({{ $product->id }})"
                     class="text-muted hover:text-red-500 transition-colors duration-300"
                     title="Usuń produkt">
@@ -283,6 +298,7 @@
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
                 </svg>
             </button>
+            @endif
         </div>
     </td>
 </tr>

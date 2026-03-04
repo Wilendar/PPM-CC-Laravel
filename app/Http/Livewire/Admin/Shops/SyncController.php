@@ -208,7 +208,7 @@ class SyncController extends Component
             'timestamp' => now()->toDateTimeString(),
         ]);
 
-        $this->authorize('admin.shops.sync');
+        $this->authorize('shops.sync');
 
         $this->loadActiveSyncJobs();
         $this->selectedSyncTypes = ['products']; // Default selection
@@ -535,6 +535,7 @@ class SyncController extends Component
      */
     public function retryFailedJob(string $uuid)
     {
+        $this->authorize('shops.sync');
         try {
             $queueService = $this->getQueueJobsService();
             $result = $queueService->retryFailedJob($uuid);
@@ -563,6 +564,7 @@ class SyncController extends Component
      */
     public function deleteFailedJob(string $uuid)
     {
+        $this->authorize('shops.sync');
         try {
             $queueService = $this->getQueueJobsService();
             $result = $queueService->deleteFailedJob($uuid);
@@ -717,6 +719,7 @@ class SyncController extends Component
      */
     public function executeJobsNow($shopId)
     {
+        $this->authorize('shops.sync');
         try {
             $selectedJobIds = array_keys(array_filter($this->selectedQueueJobs[$shopId] ?? []));
 
@@ -765,6 +768,7 @@ class SyncController extends Component
      */
     public function retryQueueJobs($shopId)
     {
+        $this->authorize('shops.sync');
         try {
             $selectedJobIds = array_keys(array_filter($this->selectedQueueJobs[$shopId] ?? []));
 
@@ -812,6 +816,7 @@ class SyncController extends Component
      */
     public function cancelQueueJobs($shopId)
     {
+        $this->authorize('shops.sync');
         try {
             $selectedJobIds = array_keys(array_filter($this->selectedQueueJobs[$shopId] ?? []));
 
@@ -891,6 +896,7 @@ class SyncController extends Component
      */
     public function syncSelectedShops()
     {
+        $this->authorize('shops.sync');
         $this->validate();
         
         if (empty($this->selectedShops)) {
@@ -948,6 +954,7 @@ class SyncController extends Component
      */
     public function syncNow($shopId)
     {
+        $this->authorize('shops.sync');
         try {
             $shop = PrestaShopShop::findOrFail($shopId);
 
@@ -1104,6 +1111,7 @@ class SyncController extends Component
      */
     public function syncSingleShop($shopId)
     {
+        $this->authorize('shops.sync');
         $this->syncNow($shopId);
     }
 
@@ -1118,6 +1126,7 @@ class SyncController extends Component
      */
     public function importFromShop(int $shopId): void
     {
+        $this->authorize('shops.sync');
         try {
             $shop = PrestaShopShop::findOrFail($shopId);
 

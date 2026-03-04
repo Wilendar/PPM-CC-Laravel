@@ -1238,3 +1238,101 @@
     border-color: #10b981; /* green for location */
     box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.25);
 }
+
+/* ============================================
+ * READ-ONLY MODE - Permission-based lockdown
+ * Applied when user lacks update/create perms
+ * ============================================ */
+
+.product-form-readonly input:not([type="hidden"]),
+.product-form-readonly select,
+.product-form-readonly textarea,
+.product-form-readonly [type="checkbox"],
+.product-form-readonly [type="radio"],
+.product-form-readonly .checkbox-enterprise {
+    pointer-events: none !important;
+    opacity: 0.6 !important;
+    cursor: not-allowed !important;
+}
+
+.product-form-readonly button:not(.tab-enterprise) {
+    pointer-events: none !important;
+    opacity: 0.45 !important;
+    cursor: not-allowed !important;
+}
+
+.product-form-readonly a.btn-enterprise-primary,
+.product-form-readonly a.btn-enterprise-secondary {
+    pointer-events: none !important;
+    opacity: 0.5 !important;
+}
+
+/* Block gallery upload zones, drag-drop areas, clickable divs */
+.product-form-readonly .media-upload-zone,
+.product-form-readonly .media-card,
+.product-form-readonly .compatibility-tile,
+.product-form-readonly [x-on\:drop] {
+    pointer-events: none !important;
+    opacity: 0.6 !important;
+    cursor: not-allowed !important;
+}
+
+/* Gallery tab full lockdown in readonly mode */
+.product-form-readonly .gallery-tab .media-gallery-item,
+.product-form-readonly .gallery-tab .media-gallery-item-checkbox,
+.product-form-readonly .gallery-tab .media-gallery-item-actions,
+.product-form-readonly .gallery-tab .media-gallery-controls,
+.product-form-readonly .gallery-tab .media-btn,
+.product-form-readonly .gallery-tab .media-gallery-item-overlay {
+    pointer-events: none !important;
+    cursor: not-allowed !important;
+}
+
+.product-form-readonly .gallery-tab .media-gallery-item-checkbox,
+.product-form-readonly .gallery-tab .media-gallery-item-actions,
+.product-form-readonly .gallery-tab .media-gallery-controls,
+.product-form-readonly .gallery-tab .media-upload-zone {
+    opacity: 0.4 !important;
+}
+
+/* Ensure tab navigation remains fully interactive in readonly mode */
+.product-form-readonly .tab-enterprise,
+.product-form-readonly .tabs-enterprise .tab-enterprise,
+.product-form-readonly .shop-tab-active,
+.product-form-readonly .shop-tab-inactive,
+.product-form-readonly .erp-tab-active,
+.product-form-readonly .erp-tab-inactive {
+    pointer-events: auto !important;
+    opacity: 1 !important;
+    cursor: pointer !important;
+}
+
+.readonly-banner {
+    display: flex;
+    align-items: center;
+    padding: 0.75rem 1rem;
+    background: rgba(245, 158, 11, 0.12);
+    border: 1px solid rgba(245, 158, 11, 0.3);
+    border-radius: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+.readonly-banner__icon {
+    width: 1.25rem;
+    height: 1.25rem;
+    color: #f59e0b;
+    margin-right: 0.75rem;
+    flex-shrink: 0;
+}
+
+.readonly-banner__text {
+    color: #fbbf24;
+    font-weight: 500;
+    font-size: 0.875rem;
+}
+
+.readonly-banner__subtext {
+    color: #d97706;
+    font-size: 0.75rem;
+    margin-left: 0.5rem;
+}

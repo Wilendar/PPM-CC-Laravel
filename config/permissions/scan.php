@@ -4,97 +4,69 @@
  * Product Scan System Permissions
  *
  * ETAP_10: Product Scan System - Permission configuration
- *
- * Defines permissions for the product scanning and linking system.
- * Used by Spatie Laravel Permission package.
- *
- * @package Config\Permissions
- * @version 1.0
- * @since ETAP_10 - Product Scan System
+ * v2.0: Migrated from nested module.name format to flat format.
  */
 
 return [
-    /*
-    |--------------------------------------------------------------------------
-    | Module Information
-    |--------------------------------------------------------------------------
-    */
-    'module' => [
-        'name' => 'scan',
-        'label' => 'Skanowanie Produktów',
-        'description' => 'System skanowania i powiązań produktów między PPM a ERP/PrestaShop',
-        'icon' => 'search',
-        'order' => 25,
-    ],
+    'module' => 'scan',
+    'name' => 'Skanowanie Produktow',
+    'description' => 'System skanowania i powiazan produktow miedzy PPM a ERP/PrestaShop',
+    'icon' => 'magnifying-glass',
+    'order' => 25,
+    'color' => 'cyan',
 
-    /*
-    |--------------------------------------------------------------------------
-    | Permissions
-    |--------------------------------------------------------------------------
-    */
     'permissions' => [
-        'admin.scan.view' => [
-            'label' => 'Przeglądanie skanów',
-            'description' => 'Dostęp do panelu skanowania i przeglądanie wyników',
-            'default_roles' => ['admin', 'manager'],
+        'read' => [
+            'name' => 'scan.read',
+            'label' => 'Przegladanie skanow',
+            'description' => 'Dostep do panelu skanowania i przegladanie wynikow',
+            'dangerous' => false,
         ],
-        'admin.scan.start' => [
-            'label' => 'Uruchamianie skanów',
-            'description' => 'Możliwość uruchamiania nowych skanów produktów',
-            'default_roles' => ['admin', 'manager'],
+        'start' => [
+            'name' => 'scan.start',
+            'label' => 'Uruchamianie skanow',
+            'description' => 'Mozliwosc uruchamiania nowych skanow produktow',
+            'dangerous' => false,
         ],
-        'admin.scan.link' => [
-            'label' => 'Łączenie produktów',
-            'description' => 'Możliwość tworzenia powiązań między produktami PPM a źródłami zewnętrznymi',
-            'default_roles' => ['admin', 'manager'],
+        'link' => [
+            'name' => 'scan.link',
+            'label' => 'Laczenie produktow',
+            'description' => 'Tworzenie powiazan miedzy produktami PPM a zrodlami zewnetrznymi',
+            'dangerous' => false,
         ],
-        'admin.scan.create' => [
-            'label' => 'Import produktów',
-            'description' => 'Możliwość importowania produktów ze źródeł zewnętrznych do PPM',
-            'default_roles' => ['admin'],
+        'create' => [
+            'name' => 'scan.create',
+            'label' => 'Import produktow',
+            'description' => 'Importowanie produktow ze zrodel zewnetrznych do PPM',
+            'dangerous' => false,
         ],
-        'admin.scan.bulk' => [
+        'bulk' => [
+            'name' => 'scan.bulk',
             'label' => 'Akcje masowe',
-            'description' => 'Możliwość wykonywania operacji masowych na wynikach skanów',
-            'default_roles' => ['admin'],
+            'description' => 'Wykonywanie operacji masowych na wynikach skanow',
+            'dangerous' => true,
         ],
-        'admin.scan.history' => [
-            'label' => 'Historia skanów',
-            'description' => 'Dostęp do historii poprzednich skanów',
-            'default_roles' => ['admin', 'manager'],
+        'history' => [
+            'name' => 'scan.history',
+            'label' => 'Historia skanow',
+            'description' => 'Dostep do historii poprzednich skanow',
+            'dangerous' => false,
         ],
-        'admin.scan.export' => [
-            'label' => 'Eksport wyników',
-            'description' => 'Możliwość eksportowania wyników skanów do CSV',
-            'default_roles' => ['admin', 'manager'],
+        'export' => [
+            'name' => 'scan.export',
+            'label' => 'Eksport wynikow',
+            'description' => 'Eksportowanie wynikow skanow do CSV',
+            'dangerous' => false,
         ],
     ],
 
-    /*
-    |--------------------------------------------------------------------------
-    | Role Defaults
-    |--------------------------------------------------------------------------
-    */
     'role_defaults' => [
-        'admin' => [
-            'admin.scan.view',
-            'admin.scan.start',
-            'admin.scan.link',
-            'admin.scan.create',
-            'admin.scan.bulk',
-            'admin.scan.history',
-            'admin.scan.export',
-        ],
-        'manager' => [
-            'admin.scan.view',
-            'admin.scan.start',
-            'admin.scan.link',
-            'admin.scan.history',
-            'admin.scan.export',
-        ],
-        'editor' => [
-            'admin.scan.view',
-            'admin.scan.history',
-        ],
+        'Admin' => ['read', 'start', 'link', 'create', 'bulk', 'history', 'export'],
+        'Manager' => ['read', 'start', 'link', 'history', 'export'],
+        'Edytor' => ['read', 'history'],
+        'Magazyn' => [],
+        'Handlowy' => [],
+        'Reklamacje' => [],
+        'User' => [],
     ],
 ];

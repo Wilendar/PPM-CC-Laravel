@@ -10,6 +10,7 @@ use App\Services\VisualEditor\Styleset\StylesetCompiler;
 use App\Services\VisualEditor\Styleset\StylesetFactory;
 use App\Services\VisualEditor\Styleset\StylesetValidator;
 use Illuminate\Contracts\View\View;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Component;
 
 /**
@@ -20,6 +21,8 @@ use Livewire\Component;
  */
 class StylesetEditor extends Component
 {
+    use AuthorizesRequests;
+
     // Selected shop and styleset
     public ?int $selectedShopId = null;
     public ?int $stylesetId = null;
@@ -52,6 +55,8 @@ class StylesetEditor extends Component
 
     public function mount(?int $shopId = null): void
     {
+        $this->authorize('visual-editor.read');
+
         if ($shopId) {
             $this->selectedShopId = $shopId;
             $this->loadShopStyleset($shopId);

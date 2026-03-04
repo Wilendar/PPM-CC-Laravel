@@ -66,7 +66,7 @@ class SecurityDashboard extends Component
 
     public function mount(): void
     {
-        $this->authorize('admin.settings.manage');
+        $this->authorize('system.manage');
         $this->recentAlerts = collect();
         $this->topAttackingIPs = collect();
         $this->lockedOutUsers = collect();
@@ -137,6 +137,7 @@ class SecurityDashboard extends Component
 
     public function acknowledgeAlert(int $alertId): void
     {
+        $this->authorize('system.manage');
         $alert = SecurityAlert::find($alertId);
 
         if ($alert) {
@@ -148,6 +149,7 @@ class SecurityDashboard extends Component
 
     public function resolveAlert(int $alertId): void
     {
+        $this->authorize('system.manage');
         $alert = SecurityAlert::find($alertId);
 
         if ($alert) {
@@ -159,6 +161,7 @@ class SecurityDashboard extends Component
 
     public function dismissAlert(int $alertId): void
     {
+        $this->authorize('system.manage');
         $this->acknowledgeAlert($alertId);
     }
 
@@ -168,6 +171,7 @@ class SecurityDashboard extends Component
 
     public function unlockUser(int $userId): void
     {
+        $this->authorize('system.manage');
         $user = User::find($userId);
 
         if ($user) {
@@ -181,6 +185,7 @@ class SecurityDashboard extends Component
 
     public function forcePasswordChange(int $userId): void
     {
+        $this->authorize('system.manage');
         $user = User::find($userId);
 
         if ($user) {
@@ -194,6 +199,7 @@ class SecurityDashboard extends Component
 
     public function terminateAllUserSessions(int $userId): void
     {
+        $this->authorize('system.manage');
         $user = User::find($userId);
 
         if ($user) {
@@ -219,6 +225,7 @@ class SecurityDashboard extends Component
 
     public function blockIp(): void
     {
+        $this->authorize('system.manage');
         $this->validate([
             'blockIpAddress' => 'required|ip',
             'blockIpReason' => 'nullable|string|max:500',
@@ -246,6 +253,7 @@ class SecurityDashboard extends Component
 
     public function unblockIp(int $id): void
     {
+        $this->authorize('system.manage');
         $blockedIp = BlockedIp::findOrFail($id);
         $oldValues = $blockedIp->toArray();
         $blockedIp->update(['is_active' => false]);
@@ -262,6 +270,7 @@ class SecurityDashboard extends Component
 
     public function acknowledgeAllAlerts(): void
     {
+        $this->authorize('system.manage');
         SecurityAlert::unacknowledged()
             ->notExpired()
             ->update([
@@ -276,6 +285,7 @@ class SecurityDashboard extends Component
 
     public function unlockAllUsers(): void
     {
+        $this->authorize('system.manage');
         User::whereNotNull('locked_until')
             ->where('locked_until', '>', now())
             ->update([

@@ -33,7 +33,7 @@ class ReportsDashboard extends Component
 
     public function mount()
     {
-        $this->authorize('system.reports');
+        $this->authorize('reports.read');
         $this->dateFrom = now()->subDays(7)->format('Y-m-d');
         $this->dateTo = now()->format('Y-m-d');
         $this->generateDate = now()->format('Y-m-d');
@@ -137,6 +137,7 @@ class ReportsDashboard extends Component
      */
     public function generateReport()
     {
+        $this->authorize('reports.read');
         $this->validate([
             'generateType' => 'required|in:usage_analytics,performance,business_intelligence,integration_performance',
             'generatePeriod' => 'required|in:daily,weekly,monthly,quarterly',
@@ -177,6 +178,7 @@ class ReportsDashboard extends Component
      */
     public function deleteReport($reportId)
     {
+        $this->authorize('reports.read');
         $report = SystemReport::find($reportId);
         
         if ($report) {
@@ -222,6 +224,7 @@ class ReportsDashboard extends Component
      */
     public function regenerateReport($reportId)
     {
+        $this->authorize('reports.read');
         $existingReport = SystemReport::find($reportId);
         
         if (!$existingReport) {

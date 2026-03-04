@@ -90,6 +90,15 @@ class VehicleFeatureManagement extends Component
     public function setTab(string $tab): void
     {
         if (in_array($tab, ['library', 'templates', 'browser'])) {
+            // Per-tab permission check
+            $permMap = [
+                'browser' => 'vehicle_features.browser.read',
+                'library' => 'vehicle_features.library.read',
+                'templates' => 'vehicle_features.templates.read',
+            ];
+            if (!auth()->user()->can($permMap[$tab] ?? 'vehicle_features.browser.read')) {
+                return;
+            }
             $this->activeTab = $tab;
         }
     }
@@ -369,9 +378,43 @@ class VehicleFeatureManagement extends Component
     /**
      * Mount component
      */
+    /**
+     * Check if user can access a specific tab
+     */
+    public function canAccessTab(string $tab): bool
+    {
+        $permMap = [
+            'browser' => 'vehicle_features.browser.read',
+            'library' => 'vehicle_features.library.read',
+            'templates' => 'vehicle_features.templates.read',
+        ];
+        return auth()->user()->can($permMap[$tab] ?? 'vehicle_features.browser.read');
+    }
+
+    /**
+     * Get first accessible tab for current user
+     */
+    public function getFirstAccessibleTab(): string
+    {
+        foreach (['browser', 'library', 'templates'] as $tab) {
+            if ($this->canAccessTab($tab)) {
+                return $tab;
+            }
+        }
+        return 'browser';
+    }
+
     public function mount(): void
     {
-        $this->authorize('products.update');
+        if (!auth()->user()->canAny([
+            'vehicle_features.browser.read',
+            'vehicle_features.library.read',
+            'vehicle_features.templates.read',
+        ])) {
+            abort(403);
+        }
+
+        $this->activeTab = $this->getFirstAccessibleTab();
         $this->loadPredefinedTemplates();
         $this->loadCustomTemplates();
         $this->loadFeatureLibrary();

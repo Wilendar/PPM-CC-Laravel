@@ -69,6 +69,9 @@ class StatusMonitoringConfig extends Component
      */
     public function mount(): void
     {
+        if (!auth()->user()->canAny(['parameters.status_monitoring.read', 'parameters.read'])) {
+            abort(403);
+        }
         $aggregator = app(ProductStatusAggregator::class);
         $config = $aggregator->getCurrentConfig();
 

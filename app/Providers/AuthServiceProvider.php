@@ -54,9 +54,9 @@ class AuthServiceProvider extends ServiceProvider
 
         // Explicit gates used przez komponenty Livewire
         $abilities = [
-            'admin.settings.manage',
-            'admin.erp.view', 'admin.erp.create', 'admin.erp.edit', 'admin.erp.delete',
-            'admin.shops.view', 'admin.shops.create', 'admin.shops.edit', 'admin.shops.delete',
+            'system.manage',
+            'integrations.read', 'integrations.config',
+            'shops.read', 'shops.create', 'shops.update', 'shops.delete',
         ];
 
         foreach ($abilities as $ability) {

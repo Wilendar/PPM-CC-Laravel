@@ -33,6 +33,7 @@ class AiScoringConfigPanel extends Component
 
     public function mount(): void
     {
+        $this->authorize('parameters.read');
         $this->loadConfig();
     }
 

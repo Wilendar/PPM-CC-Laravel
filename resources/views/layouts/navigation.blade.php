@@ -129,7 +129,7 @@
         @endcan
 
         {{-- Synchronization --}}
-        @can('integrations.sync')
+        @can('shops.sync')
         <a href="{{ route('admin.shops.sync') }}"
            class="group flex items-center px-2 py-2 text-sm font-medium rounded-md
                   {{ request()->routeIs('sync.*')
@@ -165,7 +165,7 @@
     {{-- Role-specific sections --}}
     
     {{-- Admin Only --}}
-    @role('Admin')
+    @can('users.read')
     <div class="space-y-1">
         <h3 class="px-2 text-xs font-semibold text-red-500 dark:text-red-400 uppercase tracking-wider">
             Administracja
@@ -272,7 +272,7 @@
     </div>
     
     <hr class="my-4 border-gray-200 dark:border-gray-700">
-    @endrole
+    @endcan
 
     {{-- Warehouseman Features --}}
     @hasrole('Warehouseman')

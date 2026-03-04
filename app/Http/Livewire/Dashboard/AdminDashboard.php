@@ -16,6 +16,7 @@ use App\Models\MaintenanceTask;
 use App\Models\AdminNotification;
 use App\Models\ApiUsageLog;
 use App\Models\IntegrationLog;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
@@ -40,6 +41,8 @@ use Carbon\Carbon;
  */
 class AdminDashboard extends Component
 {
+    use AuthorizesRequests;
+
     // Auto-refresh configuration
     public $refreshInterval = 60; // seconds
     public $autoRefresh = true;
@@ -47,6 +50,9 @@ class AdminDashboard extends Component
 
     // User role for role-based dashboard content
     public $userRole = 'Admin';
+
+    // Visible widgets per role
+    public $visibleWidgets = [];
 
     // Dashboard data
     public $dashboardStats = [];
@@ -81,34 +87,64 @@ class AdminDashboard extends Component
 
     public function mount()
     {
-        Log::info('AdminDashboard mount() called - loading with unified layout and role-based content');
+        $this->authorize('dashboard.read');
 
-        // TEMPORARY: Authorization disabled for development testing
-        /*
-        // Check admin authorization
-        if (!auth()->user() || !auth()->user()->hasRole('Admin')) {
-            abort(403, 'Unauthorized access to admin dashboard.');
-        }
-        */
+        Log::info('AdminDashboard mount() called - loading with unified layout and role-based content');
 
         // Detect user role for role-based dashboard content
         $this->userRole = $this->getUserRole();
+
+        // Determine visible widgets based on role
+        $this->visibleWidgets = $this->getVisibleWidgets();
 
         // Initialize dashboard data based on role
         $this->loadDashboardData();
     }
 
     /**
-     * Get current user role
+     * Get current user role (Spatie Permission compatible)
      */
     private function getUserRole(): string
     {
-        // TEMPORARY: Default to 'Admin' for development
-        // In production, use: auth()->user()->role
-        if (auth()->check() && auth()->user()->role) {
-            return auth()->user()->role;
+        $user = auth()->user();
+        if ($user) {
+            // Spatie getRoleNames() returns collection
+            if (method_exists($user, 'getRoleNames')) {
+                $roles = $user->getRoleNames();
+                if ($roles->isNotEmpty()) {
+                    return $roles->first();
+                }
+            }
+            // Fallback to role attribute
+            if ($user->role) {
+                return $user->role;
+            }
         }
-        return 'Admin'; // Development fallback
+        return 'User'; // Default - nie Admin!
+    }
+
+    /**
+     * Get visible widgets based on user role
+     */
+    private function getVisibleWidgets(): array
+    {
+        $role = $this->userRole;
+
+        $widgets = [
+            'welcome_card' => true,
+            'core_metrics' => true,
+            'products_overview' => in_array($role, ['Admin', 'Manager', 'Editor']),
+            'shops_status' => in_array($role, ['Admin', 'Manager']),
+            'sync_jobs' => in_array($role, ['Admin', 'Manager']),
+            'erp_health' => in_array($role, ['Admin', 'Manager']),
+            'system_health' => $role === 'Admin',
+            'user_activity' => $role === 'Admin',
+            'security_alerts' => $role === 'Admin',
+            'stock_overview' => in_array($role, ['Admin', 'Manager', 'Warehouseman']),
+            'recent_activity' => in_array($role, ['Admin', 'Manager']),
+        ];
+
+        return array_filter($widgets);
     }
 
     public function render()

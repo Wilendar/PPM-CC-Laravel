@@ -49,6 +49,12 @@ trait ImportPanelPublicationTrait
      */
     public function requestUnpublish(int $productId): void
     {
+        $user = auth()->user();
+        if (!$user || !$user->can('import.unpublish')) {
+            $this->dispatch('flash-message', type: 'error', message: 'Brak uprawnien do cofania publikacji');
+            return;
+        }
+
         $this->confirmUnpublishId = $productId;
     }
 
@@ -150,6 +156,11 @@ trait ImportPanelPublicationTrait
      */
     public function setPublicationTargets(int $productId, array $targets): void
     {
+        if (!$this->canSeePublication()) {
+            $this->dispatch('flash-message', type: 'error', message: 'Brak uprawnien do zarzadzania publikacja');
+            return;
+        }
+
         $product = PendingProduct::find($productId);
         if (!$product) {
             return;
@@ -181,6 +192,10 @@ trait ImportPanelPublicationTrait
      */
     public function toggleErpConnection(int $productId, int $connectionId): void
     {
+        if (!$this->canSeePublication()) {
+            return;
+        }
+
         // Check if this is the default ERP - cannot toggle off
         $connection = ERPConnection::find($connectionId);
         if (!$connection) {
@@ -216,6 +231,10 @@ trait ImportPanelPublicationTrait
      */
     public function togglePrestaShopShop(int $productId, int $shopId): void
     {
+        if (!$this->canSeePublication()) {
+            return;
+        }
+
         $product = PendingProduct::find($productId);
         if (!$product) {
             return;
@@ -243,6 +262,11 @@ trait ImportPanelPublicationTrait
      */
     public function cancelScheduledPublication(int $productId): void
     {
+        if (!$this->canSeeScheduleDate()) {
+            $this->dispatch('flash-message', type: 'error', message: 'Brak uprawnien');
+            return;
+        }
+
         $product = PendingProduct::find($productId);
         if (!$product) {
             return;
@@ -272,6 +296,11 @@ trait ImportPanelPublicationTrait
      */
     public function schedulePublication(int $productId, ?string $datetime): void
     {
+        if (!$this->canSeeScheduleDate()) {
+            $this->dispatch('flash-message', type: 'error', message: 'Brak uprawnien');
+            return;
+        }
+
         $product = PendingProduct::find($productId);
         if (!$product) {
             return;
@@ -348,6 +377,11 @@ trait ImportPanelPublicationTrait
      */
     public function publishWithTargets(int $productId): void
     {
+        if (!$this->canPublish()) {
+            $this->dispatch('flash-message', type: 'error', message: 'Brak uprawnien do publikacji');
+            return;
+        }
+
         $product = PendingProduct::find($productId);
         if (!$product) {
             $this->dispatch('flash-message', [

@@ -34,6 +34,11 @@ trait ImportPanelActions
      */
     public function openSKUPasteModal(): void
     {
+        if (!$this->canSeeBasicData()) {
+            $this->dispatch('flash-message', type: 'error', message: 'Brak uprawnien');
+            return;
+        }
+
         $this->openModal('sku-paste');
     }
 
@@ -42,6 +47,11 @@ trait ImportPanelActions
      */
     public function openCSVImportModal(): void
     {
+        if (!$this->canSeeBasicData()) {
+            $this->dispatch('flash-message', type: 'error', message: 'Brak uprawnien');
+            return;
+        }
+
         $this->openModal('csv-import');
     }
 
@@ -50,6 +60,11 @@ trait ImportPanelActions
      */
     public function startEditing(int $productId, string $field): void
     {
+        if (!$this->canSeeBasicData()) {
+            $this->dispatch('flash-message', type: 'error', message: 'Brak uprawnien');
+            return;
+        }
+
         $product = PendingProduct::find($productId);
         if (!$product) {
             return;
@@ -65,6 +80,11 @@ trait ImportPanelActions
      */
     public function saveInlineEdit(): void
     {
+        if (!$this->canSeeBasicData()) {
+            $this->dispatch('flash-message', type: 'error', message: 'Brak uprawnien');
+            return;
+        }
+
         if (!$this->editingProductId || !$this->editingField) {
             return;
         }
@@ -114,6 +134,11 @@ trait ImportPanelActions
      */
     public function updateProductType(int $productId, ?int $typeId): void
     {
+        if (!$this->canSeeBasicData()) {
+            $this->dispatch('flash-message', type: 'error', message: 'Brak uprawnien');
+            return;
+        }
+
         $product = PendingProduct::find($productId);
         if (!$product) {
             return;
@@ -133,6 +158,11 @@ trait ImportPanelActions
      */
     public function updateManufacturer(int $productId, ?int $manufacturerId): void
     {
+        if (!$this->canSeeBasicData()) {
+            $this->dispatch('flash-message', type: 'error', message: 'Brak uprawnien');
+            return;
+        }
+
         $product = PendingProduct::find($productId);
         if (!$product) {
             return;
@@ -152,6 +182,11 @@ trait ImportPanelActions
      */
     public function deletePendingProduct(int $productId): void
     {
+        if (!$this->canDuplicateDelete()) {
+            $this->dispatch('flash-message', type: 'error', message: 'Brak uprawnien do usuwania');
+            return;
+        }
+
         $product = PendingProduct::find($productId);
         if (!$product) {
             return;
@@ -186,6 +221,11 @@ trait ImportPanelActions
      */
     public function publishSingle(int $productId): void
     {
+        if (!$this->canPublish()) {
+            $this->dispatch('flash-message', type: 'error', message: 'Brak uprawnien do publikacji');
+            return;
+        }
+
         $pendingProduct = PendingProduct::find($productId);
         if (!$pendingProduct) {
             $this->dispatch('flash-message', [
@@ -222,6 +262,11 @@ trait ImportPanelActions
      */
     public function editProduct(int $productId): void
     {
+        if (!$this->canSeeBasicData()) {
+            $this->dispatch('flash-message', type: 'error', message: 'Brak uprawnien');
+            return;
+        }
+
         // TODO: Implement dedicated PendingProduct edit page or modal
         $this->dispatch('flash-message', [
             'type' => 'info',
@@ -234,6 +279,11 @@ trait ImportPanelActions
      */
     public function duplicateProduct(int $productId): void
     {
+        if (!$this->canDuplicateDelete()) {
+            $this->dispatch('flash-message', type: 'error', message: 'Brak uprawnien do duplikowania');
+            return;
+        }
+
         $product = PendingProduct::find($productId);
         if (!$product) {
             return;

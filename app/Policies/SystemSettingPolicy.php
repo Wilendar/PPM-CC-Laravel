@@ -14,16 +14,16 @@ class SystemSettingPolicy extends BasePolicy
 {
     public function viewAny(User $user): bool
     {
-        return $this->hasPermission($user, 'admin.settings.manage');
+        return $this->hasPermission($user, 'system.manage');
     }
 
     public function view(User $user, $setting): bool
     {
-        return $this->hasPermission($user, 'admin.settings.manage');
+        return $this->hasPermission($user, 'system.manage');
     }
 
     public function update(User $user, $setting): bool
     {
-        return $this->hasPermission($user, 'admin.settings.manage');
+        return $this->hasPermission($user, 'system.manage');
     }
 }

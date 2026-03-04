@@ -173,7 +173,7 @@ class ERPManager extends Component
      */
     public function mount()
     {
-        $this->authorize('admin.erp.view');
+        $this->authorize('integrations.read');
 
         // Load API key from environment (not hardcoded)
         $this->subiektConfig['rest_api_key'] = env('SUBIEKT_GT_API_KEY', '');
@@ -278,7 +278,7 @@ class ERPManager extends Component
      */
     public function startWizard()
     {
-        // DEVELOPMENT: $this->authorize('admin.erp.create');
+        $this->authorize('integrations.config');
 
         $this->resetWizard();
         $this->showAddConnection = true;
@@ -549,6 +549,8 @@ class ERPManager extends Component
      */
     public function completeWizard()
     {
+        $this->authorize('integrations.config');
+
         $this->validate();
 
         try {
@@ -681,7 +683,7 @@ class ERPManager extends Component
      */
     public function testConnection($connectionId)
     {
-        // DEVELOPMENT: $this->authorize('admin.erp.test');
+        $this->authorize('integrations.test');
 
         $connection = ERPConnection::findOrFail($connectionId);
         $this->testingConnection = true;
@@ -720,7 +722,7 @@ class ERPManager extends Component
      */
     public function syncERP($connectionId)
     {
-        // DEVELOPMENT: $this->authorize('admin.erp.sync');
+        $this->authorize('integrations.sync');
 
         $connection = ERPConnection::findOrFail($connectionId);
         $this->syncingERP = true;
@@ -779,7 +781,7 @@ class ERPManager extends Component
      */
     public function toggleConnectionStatus($connectionId)
     {
-        // DEVELOPMENT: $this->authorize('admin.erp.edit');
+        $this->authorize('integrations.config');
 
         $connection = ERPConnection::findOrFail($connectionId);
         $connection->is_active = !$connection->is_active;
@@ -794,7 +796,7 @@ class ERPManager extends Component
      */
     public function deleteConnection($connectionId)
     {
-        // DEVELOPMENT: $this->authorize('admin.erp.delete');
+        $this->authorize('integrations.config');
 
         $connection = ERPConnection::findOrFail($connectionId);
         $connectionName = $connection->instance_name;
@@ -843,6 +845,8 @@ class ERPManager extends Component
      */
     public function editConnection(int $connectionId): void
     {
+        $this->authorize('integrations.config');
+
         $connection = ERPConnection::findOrFail($connectionId);
 
         // Store editing connection ID
@@ -1151,6 +1155,8 @@ class ERPManager extends Component
      */
     public function createWarehouseFromErp(int $erpWarehouseId): void
     {
+        $this->authorize('integrations.config');
+
         $erpWarehouse = collect($this->availableErpWarehouses)
             ->firstWhere('id', $erpWarehouseId);
 

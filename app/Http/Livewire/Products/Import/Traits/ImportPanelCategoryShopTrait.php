@@ -61,6 +61,11 @@ trait ImportPanelCategoryShopTrait
      */
     public function openCategoryPicker(int $productId): void
     {
+        if (!$this->canSeeCategories()) {
+            $this->dispatch('flash-message', type: 'error', message: 'Brak uprawnien do zarzadzania kategoriami');
+            return;
+        }
+
         $product = PendingProduct::find($productId);
         if (!$product) {
             return;
@@ -211,6 +216,10 @@ trait ImportPanelCategoryShopTrait
      */
     public function toggleCategory(int $categoryId): void
     {
+        if (!$this->canSeeCategories()) {
+            return;
+        }
+
         if (in_array($categoryId, $this->selectedCategoryIds)) {
             $this->selectedCategoryIds = array_values(array_filter(
                 $this->selectedCategoryIds,
@@ -227,6 +236,11 @@ trait ImportPanelCategoryShopTrait
      */
     public function saveCategories(): void
     {
+        if (!$this->canSeeCategories()) {
+            $this->dispatch('flash-message', type: 'error', message: 'Brak uprawnien do zarzadzania kategoriami');
+            return;
+        }
+
         if (!$this->editingCategoryProductId) {
             return;
         }
@@ -300,6 +314,11 @@ trait ImportPanelCategoryShopTrait
      */
     public function openShopPicker(int $productId): void
     {
+        if (!$this->canSeePublication()) {
+            $this->dispatch('flash-message', type: 'error', message: 'Brak uprawnien');
+            return;
+        }
+
         $product = PendingProduct::find($productId);
         if (!$product) {
             return;
@@ -339,6 +358,11 @@ trait ImportPanelCategoryShopTrait
      */
     public function saveShops(): void
     {
+        if (!$this->canSeePublication()) {
+            $this->dispatch('flash-message', type: 'error', message: 'Brak uprawnien');
+            return;
+        }
+
         if (!$this->editingShopProductId) {
             return;
         }
@@ -438,6 +462,10 @@ trait ImportPanelCategoryShopTrait
      */
     public function setCategoryForLevel(int $productId, int $level, ?int $categoryId, ?int $parentId = null): void
     {
+        if (!$this->canSeeCategories()) {
+            return;
+        }
+
         $product = PendingProduct::find($productId);
         if (!$product) {
             return;
@@ -524,6 +552,10 @@ trait ImportPanelCategoryShopTrait
      */
     public function setShopsForProduct(int $productId, array $shopIds): void
     {
+        if (!$this->canSeePublication()) {
+            return;
+        }
+
         $product = PendingProduct::find($productId);
         if (!$product) {
             return;
@@ -583,6 +615,10 @@ trait ImportPanelCategoryShopTrait
      */
     public function createInlineCategory(int $productId, int $level, ?int $parentId, string $name): ?array
     {
+        if (!$this->canSeeCategories()) {
+            return null;
+        }
+
         $name = trim($name);
         if (empty($name)) {
             return null;

@@ -121,7 +121,7 @@ class ShopManager extends Component
      */
     public function mount()
     {
-        $this->authorize('admin.shops.view');
+        $this->authorize('shops.read');
     }
 
     /**
@@ -431,9 +431,8 @@ class ShopManager extends Component
      */
     public function startWizard()
     {
-        // DEVELOPMENT: authorize tymczasowo wyłączone dla testów
-        // $this->authorize('admin.shops.create');
-        
+        $this->authorize('shops.create');
+
         // Redirect to dedicated AddShop wizard page
         return redirect()->route('admin.shops.add');
     }
@@ -614,8 +613,7 @@ class ShopManager extends Component
      */
     public function testConnection($shopId)
     {
-        // DEVELOPMENT: authorize tymczasowo wyłączone dla testów
-        // $this->authorize('admin.shops.test');
+        $this->authorize('shops.update');
 
         $shop = PrestaShopShop::findOrFail($shopId);
         $this->testingConnection = true;
@@ -692,6 +690,7 @@ class ShopManager extends Component
      */
     public function detectVersionsForAllShops()
     {
+        $this->authorize('shops.update');
         $shops = PrestaShopShop::all();
         $updated = 0;
         $failed = 0;
@@ -742,8 +741,7 @@ class ShopManager extends Component
      */
     public function syncShop($shopId)
     {
-        // DEVELOPMENT: authorize tymczasowo wyłączone dla testów
-        // $this->authorize('admin.shops.sync');
+        $this->authorize('shops.update');
 
         $shop = PrestaShopShop::findOrFail($shopId);
         $this->syncingShop = true;
@@ -791,9 +789,8 @@ class ShopManager extends Component
      */
     public function toggleShopStatus($shopId)
     {
-        // DEVELOPMENT: authorize tymczasowo wyłączone dla testów
-        // $this->authorize('admin.shops.edit');
-        
+        $this->authorize('shops.update');
+
         $shop = PrestaShopShop::findOrFail($shopId);
         $shop->is_active = !$shop->is_active;
         $shop->save();
@@ -807,9 +804,8 @@ class ShopManager extends Component
      */
     public function confirmDeleteShop($shopId)
     {
-        // DEVELOPMENT: authorize tymczasowo wyłączone dla testów
-        // $this->authorize('admin.shops.delete');
-        
+        $this->authorize('shops.delete');
+
         $this->shopToDelete = PrestaShopShop::findOrFail($shopId);
         $this->showDeleteConfirm = true;
     }
@@ -828,9 +824,8 @@ class ShopManager extends Component
      */
     public function deleteShop()
     {
-        // DEVELOPMENT: authorize tymczasowo wyłączone dla testów
-        // $this->authorize('admin.shops.delete');
-        
+        $this->authorize('shops.delete');
+
         if (!$this->shopToDelete) {
             $this->addError('delete_error', 'Nie wybrano sklepu do usunięcia.');
             return;
@@ -882,9 +877,8 @@ class ShopManager extends Component
      */
     public function editShop($shopId)
     {
-        // DEVELOPMENT: authorize tymczasowo wyłączone dla testów  
-        // $this->authorize('admin.shops.edit');
-        
+        $this->authorize('shops.update');
+
         // For now, redirect to AddShop wizard with edit mode
         // TODO: Create dedicated EditShop component in future iteration
         return redirect()->route('admin.shops.add', ['edit' => $shopId]);

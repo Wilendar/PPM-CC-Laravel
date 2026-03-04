@@ -52,6 +52,7 @@
                 </span>
             </div>
             <div class="flex flex-wrap items-center gap-2">
+                @if($this->userCan('update'))
                 <button wire:click="bulkActivate"
                         class="px-3 py-1 text-sm btn-secondary rounded hover:bg-card-hover transition-all duration-300">
                     <svg class="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -66,7 +67,9 @@
                     </svg>
                     Deaktywuj
                 </button>
+                @endif
                 {{-- Category Operations Dropdown (ETAP_07a FAZA 2) --}}
+                @if($this->userCan('update'))
                 <div class="relative" x-data="{ open: false }">
                     <button @click="open = !open"
                             class="px-3 py-1 text-sm btn-secondary rounded hover:bg-card-hover transition-all duration-300 inline-flex items-center">
@@ -119,6 +122,8 @@
                         </div>
                     </div>
                 </div>
+                @endif
+                @if($this->userCan('export'))
                 <button wire:click="bulkExportCsv"
                         class="px-3 py-1 text-sm bg-green-600 hover:bg-green-700 text-white rounded transition-all duration-300">
                     <svg class="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -126,6 +131,8 @@
                     </svg>
                     Export CSV
                 </button>
+                @endif
+                @if($this->userCan('update'))
                 <button wire:click="openQuickSendModal"
                         class="px-3 py-1 text-sm bg-purple-600 hover:bg-purple-700 text-white rounded transition-all duration-300">
                     <svg class="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -133,6 +140,8 @@
                     </svg>
                     Wyślij na sklepy
                 </button>
+                @endif
+                @if($this->userCan('delete'))
                 <button wire:click="openBulkDeleteModal"
                         class="px-3 py-1 text-sm bg-red-600 hover:bg-red-700 text-white rounded transition-all duration-300">
                     <svg class="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -140,6 +149,7 @@
                     </svg>
                     Usuń
                 </button>
+                @endif
                 <button wire:click="resetSelection"
                         class="px-3 py-1 text-sm text-muted hover:text-primary transition-colors duration-300">
                     Anuluj

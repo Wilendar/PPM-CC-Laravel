@@ -6,18 +6,18 @@ use App\Models\User;
 
 /**
  * PPM Category Policy
- * 
+ *
  * Policy dla zarządzania kategoriami w systemie PPM.
  * Implementuje authorization logic dla 5-poziomowej struktury kategorii.
- * 
+ *
  * FAZA A: Spatie Setup + Middleware - Category Management Policy
- * 
+ *
  * Kategorie w PPM:
- * - 5 poziomów zagnieżdżenia (Kategoria → Kategoria4)  
+ * - 5 poziomów zagnieżdżenia (Kategoria -> Kategoria4)
  * - Multi-store support (różne kategorie per sklep)
  * - Mapowanie do Prestashop categories
  * - Hierarchical structure management
- * 
+ *
  * Permissions per Role:
  * - Admin: Wszystko
  * - Manager: CRUD + bulk operations + sync
@@ -31,8 +31,7 @@ class CategoryPolicy extends BasePolicy
      */
     public function viewAny(User $user): bool
     {
-        // Wszyscy zalogowani mogą browse categories
-        $canView = $this->isActiveUser($user);
+        $canView = $this->checkPermission($user, 'categories.read');
         $this->logAuthAttempt($user, 'viewAny', 'Category', $canView);
         return $canView;
     }
@@ -42,13 +41,12 @@ class CategoryPolicy extends BasePolicy
      */
     public function view(User $user, $category = null): bool
     {
-        // Wszyscy zalogowani mogą view categories
-        $canView = $this->isActiveUser($user);
-        
+        $canView = $this->checkPermission($user, 'categories.read');
+
         if ($category) {
             $this->logAuthAttempt($user, 'view', "Category:{$category->id}", $canView);
         }
-        
+
         return $canView;
     }
 
@@ -57,8 +55,7 @@ class CategoryPolicy extends BasePolicy
      */
     public function create(User $user): bool
     {
-        // Manager+ mogą tworzyć kategorie
-        $canCreate = $this->hasRoleOrHigher($user, 'Manager') && $this->isActiveUser($user);
+        $canCreate = $this->checkPermission($user, 'categories.create');
         $this->logAuthAttempt($user, 'create', 'Category', $canCreate);
         return $canCreate;
     }
@@ -68,13 +65,12 @@ class CategoryPolicy extends BasePolicy
      */
     public function update(User $user, $category = null): bool
     {
-        // Editor+ mogą edytować kategorie
-        $canUpdate = $this->hasRoleOrHigher($user, 'Editor') && $this->isActiveUser($user);
-        
+        $canUpdate = $this->checkPermission($user, 'categories.update');
+
         if ($category) {
             $this->logAuthAttempt($user, 'update', "Category:{$category->id}", $canUpdate);
         }
-        
+
         return $canUpdate;
     }
 
@@ -83,13 +79,12 @@ class CategoryPolicy extends BasePolicy
      */
     public function delete(User $user, $category = null): bool
     {
-        // Tylko Manager+ mogą usuwać kategorie
-        $canDelete = $this->hasRoleOrHigher($user, 'Manager') && $this->isActiveUser($user);
-        
+        $canDelete = $this->checkPermission($user, 'categories.delete');
+
         if ($category) {
             $this->logAuthAttempt($user, 'delete', "Category:{$category->id}", $canDelete);
         }
-        
+
         return $canDelete;
     }
 
@@ -98,12 +93,12 @@ class CategoryPolicy extends BasePolicy
      */
     public function restore(User $user, $category = null): bool
     {
-        $canRestore = $this->hasRoleOrHigher($user, 'Manager') && $this->isActiveUser($user);
-        
+        $canRestore = $this->checkPermission($user, 'categories.update');
+
         if ($category) {
             $this->logAuthAttempt($user, 'restore', "Category:{$category->id}", $canRestore);
         }
-        
+
         return $canRestore;
     }
 
@@ -112,13 +107,12 @@ class CategoryPolicy extends BasePolicy
      */
     public function forceDelete(User $user, $category = null): bool
     {
-        // Permanent delete - tylko Admin
-        $canForceDelete = $this->canAccessAdmin($user);
-        
+        $canForceDelete = $this->checkPermission($user, 'categories.delete');
+
         if ($category) {
             $this->logAuthAttempt($user, 'forceDelete', "Category:{$category->id}", $canForceDelete);
         }
-        
+
         return $canForceDelete;
     }
 
@@ -127,13 +121,12 @@ class CategoryPolicy extends BasePolicy
      */
     public function manageHierarchy(User $user, $category = null): bool
     {
-        // Manager+ mogą zarządzać hierarchią (parent/child relationships)
-        $canManageHierarchy = $this->hasRoleOrHigher($user, 'Manager') && $this->isActiveUser($user);
-        
+        $canManageHierarchy = $this->checkPermission($user, 'categories.tree');
+
         if ($category) {
             $this->logAuthAttempt($user, 'manageHierarchy', "Category:{$category->id}", $canManageHierarchy);
         }
-        
+
         return $canManageHierarchy;
     }
 
@@ -142,13 +135,12 @@ class CategoryPolicy extends BasePolicy
      */
     public function moveCategory(User $user, $category = null): bool
     {
-        // Manager+ mogą przenosić kategorie between levels
-        $canMove = $this->hasRoleOrHigher($user, 'Manager') && $this->isActiveUser($user);
-        
+        $canMove = $this->checkPermission($user, 'categories.tree');
+
         if ($category) {
             $this->logAuthAttempt($user, 'moveCategory', "Category:{$category->id}", $canMove);
         }
-        
+
         return $canMove;
     }
 
@@ -157,13 +149,12 @@ class CategoryPolicy extends BasePolicy
      */
     public function syncToPrestashop(User $user, $category = null): bool
     {
-        // Manager+ mogą sync categories do Prestashop
-        $canSync = $this->hasRoleOrHigher($user, 'Manager') && $this->isActiveUser($user);
-        
+        $canSync = $this->checkPermission($user, 'shops.sync');
+
         if ($category) {
             $this->logAuthAttempt($user, 'syncToPrestashop', "Category:{$category->id}", $canSync);
         }
-        
+
         return $canSync;
     }
 
@@ -172,13 +163,12 @@ class CategoryPolicy extends BasePolicy
      */
     public function manageMappings(User $user, $category = null): bool
     {
-        // Manager+ mogą zarządzać mapowaniem kategorii do sklepów
-        $canManageMappings = $this->hasRoleOrHigher($user, 'Manager') && $this->isActiveUser($user);
-        
+        $canManageMappings = $this->checkPermission($user, 'categories.tree');
+
         if ($category) {
             $this->logAuthAttempt($user, 'manageMappings', "Category:{$category->id}", $canManageMappings);
         }
-        
+
         return $canManageMappings;
     }
 
@@ -187,7 +177,7 @@ class CategoryPolicy extends BasePolicy
      */
     public function bulkOperations(User $user): bool
     {
-        $canBulk = $this->canBulkAction($user);
+        $canBulk = $this->checkPermission($user, 'categories.delete');
         $this->logAuthAttempt($user, 'bulkOperations', 'Category', $canBulk);
         return $canBulk;
     }
@@ -197,8 +187,7 @@ class CategoryPolicy extends BasePolicy
      */
     public function export(User $user): bool
     {
-        // Editor+ mogą eksportować kategorie
-        $canExport = $this->canExport($user);
+        $canExport = $this->checkPermission($user, 'categories.read');
         $this->logAuthAttempt($user, 'export', 'Category', $canExport);
         return $canExport;
     }
@@ -208,8 +197,7 @@ class CategoryPolicy extends BasePolicy
      */
     public function import(User $user): bool
     {
-        // Manager+ mogą importować kategorie
-        $canImport = $this->canImport($user);
+        $canImport = $this->checkPermission($user, 'categories.create');
         $this->logAuthAttempt($user, 'import', 'Category', $canImport);
         return $canImport;
     }
@@ -219,13 +207,12 @@ class CategoryPolicy extends BasePolicy
      */
     public function createSubcategory(User $user, $parentCategory = null): bool
     {
-        // Manager+ mogą tworzyć subcategories
-        $canCreateSub = $this->hasRoleOrHigher($user, 'Manager') && $this->isActiveUser($user);
-        
+        $canCreateSub = $this->checkPermission($user, 'categories.create');
+
         if ($parentCategory) {
             $this->logAuthAttempt($user, 'createSubcategory', "Category:{$parentCategory->id}", $canCreateSub);
         }
-        
+
         return $canCreateSub;
     }
 
@@ -234,13 +221,12 @@ class CategoryPolicy extends BasePolicy
      */
     public function manageSEO(User $user, $category = null): bool
     {
-        // Editor+ mogą zarządzać SEO categories (meta descriptions, URLs)
-        $canManageSEO = $this->hasRoleOrHigher($user, 'Editor') && $this->isActiveUser($user);
-        
+        $canManageSEO = $this->checkPermission($user, 'categories.update');
+
         if ($category) {
             $this->logAuthAttempt($user, 'manageSEO', "Category:{$category->id}", $canManageSEO);
         }
-        
+
         return $canManageSEO;
     }
 
@@ -249,13 +235,12 @@ class CategoryPolicy extends BasePolicy
      */
     public function manageVisibility(User $user, $category = null): bool
     {
-        // Manager+ mogą zarządzać visibility categories per shop
-        $canManageVisibility = $this->hasRoleOrHigher($user, 'Manager') && $this->isActiveUser($user);
-        
+        $canManageVisibility = $this->checkPermission($user, 'categories.update');
+
         if ($category) {
             $this->logAuthAttempt($user, 'manageVisibility', "Category:{$category->id}", $canManageVisibility);
         }
-        
+
         return $canManageVisibility;
     }
 
@@ -264,13 +249,12 @@ class CategoryPolicy extends BasePolicy
      */
     public function viewStatistics(User $user, $category = null): bool
     {
-        // Editor+ mogą view statistics categories
-        $canViewStats = $this->hasRoleOrHigher($user, 'Editor') && $this->isActiveUser($user);
-        
+        $canViewStats = $this->checkPermission($user, 'categories.read');
+
         if ($category) {
             $this->logAuthAttempt($user, 'viewStatistics', "Category:{$category->id}", $canViewStats);
         }
-        
+
         return $canViewStats;
     }
 
@@ -279,13 +263,12 @@ class CategoryPolicy extends BasePolicy
      */
     public function assignProducts(User $user, $category = null): bool
     {
-        // Editor+ mogą przypisywać produkty do kategorii
-        $canAssignProducts = $this->hasRoleOrHigher($user, 'Editor') && $this->isActiveUser($user);
-        
+        $canAssignProducts = $this->checkPermission($user, 'categories.update');
+
         if ($category) {
             $this->logAuthAttempt($user, 'assignProducts', "Category:{$category->id}", $canAssignProducts);
         }
-        
+
         return $canAssignProducts;
     }
 }

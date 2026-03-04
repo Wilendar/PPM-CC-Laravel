@@ -51,15 +51,16 @@
          }"
 
         <div class="py-1" role="menu">
-            {{-- Edit Category --}}
+            {{-- Edit Category (view always allowed - readonly mode handles lockdown) --}}
             <a href="/admin/products/categories/{{ $category->id }}/edit"
                class="flex items-center px-4 py-2 text-sm text-gray-300
                       hover:bg-gray-700 transition-colors"
                role="menuitem">
                 <i class="fas fa-edit mr-3 text-blue-500"></i>
-                Edytuj kategorię
+                {{ $this->userCan('update') ? 'Edytuj kategorię' : 'Podgląd kategorii' }}
             </a>
 
+            @if($this->userCan('create'))
             {{-- Add Subcategory --}}
             <a href="/admin/products/categories/create?parent_id={{ $category->id }}"
                class="w-full text-left flex items-center px-4 py-2 text-sm text-gray-300
@@ -68,7 +69,9 @@
                 <i class="fas fa-plus mr-3 text-green-500"></i>
                 Dodaj podkategorię
             </a>
+            @endif
 
+            @if($this->userCan('update'))
             {{-- Merge Category --}}
             <button wire:click="openCategoryMergeModal({{ $category->id }})"
                     class="w-full text-left flex items-center px-4 py-2 text-sm text-gray-300
@@ -96,7 +99,9 @@
                     Aktywuj
                 </button>
             @endif
+            @endif
 
+            @if($this->userCan('delete'))
             {{-- Separator --}}
             <div class="border-t border-gray-100 dark:border-gray-700 my-1"></div>
 
@@ -108,6 +113,7 @@
                 <i class="fas fa-trash mr-3"></i>
                 Usuń kategorię
             </button>
+            @endif
         </div>
     </div>
 </div>

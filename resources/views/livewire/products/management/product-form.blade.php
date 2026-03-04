@@ -124,8 +124,19 @@
     {{-- FIX 2025-12-08: Layout repair via global Livewire hooks in @push('scripts') --}}
     <div class="category-form-main-container">
         {{-- Left Column - Form Content (inside form) --}}
-        <form wire:submit.prevent="save" class="category-form-left-column" wire:key="left-column-{{ $product?->id ?? 'new' }}">
+        <form wire:submit.prevent="save" class="category-form-left-column {{ $isReadOnly ? 'product-form-readonly' : '' }}" wire:key="left-column-{{ $product?->id ?? 'new' }}">
             <div class="enterprise-card p-8 relative" wire:key="enterprise-card-{{ $product?->id ?? 'new' }}">
+
+                    {{-- READ-ONLY BANNER - Permission lockdown indicator --}}
+                    @if($isReadOnly)
+                        <div class="readonly-banner">
+                            <svg class="readonly-banner__icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                            </svg>
+                            <span class="readonly-banner__text">Tryb podgladu</span>
+                            <span class="readonly-banner__subtext">Brak uprawnien do edycji produktu</span>
+                        </div>
+                    @endif
                     {{-- Loading Overlay - Shop Data Fetch (FIX 2025-11-28 v2) --}}
                     {{-- Using Alpine.js + Livewire events for precise control --}}
                     {{-- Only shows when ACTUALLY calling PrestaShop API (not on cache hits) --}}
@@ -221,7 +232,7 @@
         </form> {{-- Close form (which is also left-column) --}}
 
         {{-- Right Column - Quick Actions & Info (OUTSIDE form to prevent morphing issues) --}}
-        <div class="category-form-right-column" wire:key="right-column-{{ $product?->id ?? 'new' }}">
+        <div class="category-form-right-column {{ $isReadOnly ? 'product-form-readonly' : '' }}" wire:key="right-column-{{ $product?->id ?? 'new' }}">
             {{-- Quick Actions Panel --}}
             @include('livewire.products.management.partials.quick-actions')
 

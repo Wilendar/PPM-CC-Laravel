@@ -52,11 +52,13 @@
                 @endif
 
                 {{-- Add Category Button --}}
+                @if($this->userCan('create'))
                 <button wire:click="createCategory()"
                         class="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 transition-colors">
                     <i class="fas fa-plus mr-1"></i>
                     Dodaj kategorię
                 </button>
+                @endif
             </div>
         </div>
     </div>
@@ -485,6 +487,7 @@
                     <button wire:click="saveCategory"
                             wire:loading.attr="disabled"
                             wire:target="saveCategory"
+                            @if(!$this->userCan($modalMode === 'create' ? 'create' : 'update')) disabled title="Brak uprawnien" @endif
                             class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50">
                         <span wire:loading.remove wire:target="saveCategory">
                             @if($modalMode === 'create')

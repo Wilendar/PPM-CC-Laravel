@@ -7,9 +7,11 @@
                 <tr>
                     {{-- Bulk Select --}}
                     <th class="w-12 px-6 py-3">
+                        @if(!($isReadOnly ?? false))
                         <input type="checkbox"
                                wire:model.live="selectAll"
                                class="rounded border-primary text-orange-500 shadow-sm focus:ring-orange-500 focus:ring-opacity-50 bg-input">
+                        @endif
                     </th>
 
                     {{-- ETAP_07d FAZA 7: Thumbnail Column --}}

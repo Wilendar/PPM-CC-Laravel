@@ -62,7 +62,7 @@ class AdminTheme extends Component
 
     public function mount(ThemeService $themeService)
     {
-        $this->authorize('admin.settings.manage');
+        $this->authorize('system.manage');
         $this->loadCurrentTheme($themeService);
         $this->loadAvailableThemes($themeService);
     }
@@ -121,6 +121,7 @@ class AdminTheme extends Component
      */
     public function updateColors()
     {
+        $this->authorize('system.manage');
         $this->validate([
             'primaryColor' => $this->rules['primaryColor'],
             'secondaryColor' => $this->rules['secondaryColor'],
@@ -149,6 +150,7 @@ class AdminTheme extends Component
      */
     public function updateLayout()
     {
+        $this->authorize('system.manage');
         $this->validate([
             'layoutDensity' => $this->rules['layoutDensity'],
             'sidebarPosition' => $this->rules['sidebarPosition'],
@@ -177,6 +179,7 @@ class AdminTheme extends Component
      */
     public function updateBranding()
     {
+        $this->authorize('system.manage');
         $this->validate([
             'companyName' => $this->rules['companyName'],
             'logoFile' => $this->rules['logoFile'],
@@ -212,9 +215,10 @@ class AdminTheme extends Component
      */
     public function updateCustomCss()
     {
+        $this->authorize('system.manage');
         try {
             $themeService = app(ThemeService::class);
-            
+
             $this->currentTheme = $themeService->updateTheme(auth()->user(), [
                 'custom_css' => $this->customCss,
             ]);
@@ -232,6 +236,7 @@ class AdminTheme extends Component
      */
     public function createNewTheme()
     {
+        $this->authorize('system.manage');
         $this->validate();
         
         try {
@@ -271,6 +276,7 @@ class AdminTheme extends Component
      */
     public function switchTheme($themeId)
     {
+        $this->authorize('system.manage');
         try {
             $theme = AdminThemeModel::findOrFail($themeId);
             $themeService = app(ThemeService::class);
@@ -291,10 +297,11 @@ class AdminTheme extends Component
      */
     public function deleteTheme($themeId)
     {
+        $this->authorize('system.manage');
         try {
             $theme = AdminThemeModel::findOrFail($themeId);
             $themeService = app(ThemeService::class);
-            
+
             $themeService->deleteTheme(auth()->user(), $theme);
             $this->loadAvailableThemes($themeService);
             
@@ -331,6 +338,7 @@ class AdminTheme extends Component
      */
     public function importTheme()
     {
+        $this->authorize('system.manage');
         $this->validate([
             'importFile' => $this->rules['importFile'],
         ]);
@@ -378,6 +386,7 @@ class AdminTheme extends Component
      */
     public function updateDashboardSettings()
     {
+        $this->authorize('system.manage');
         try {
             $themeService = app(ThemeService::class);
             $themeService->updateDashboardSettings(auth()->user(), $this->dashboardSettings);
@@ -403,6 +412,7 @@ class AdminTheme extends Component
      */
     public function resetToDefault()
     {
+        $this->authorize('system.manage');
         try {
             $themeService = app(ThemeService::class);
             $defaultTheme = $themeService->createDefaultTheme(auth()->user());

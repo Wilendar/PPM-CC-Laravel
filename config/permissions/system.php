@@ -3,13 +3,14 @@
 /**
  * System Permission Module
  *
- * Permissions for system administration and maintenance.
+ * Permissions for system administration.
+ * v2.0: Removed audit/reports (moved to dedicated modules), added system.manage.
  */
 
 return [
     'module' => 'system',
     'name' => 'System',
-    'description' => 'Administracja i konserwacja systemu',
+    'description' => 'Administracja systemu',
     'icon' => 'cog',
     'order' => 100,
     'color' => 'gray',
@@ -21,33 +22,21 @@ return [
             'description' => 'Konfiguracja systemu',
             'dangerous' => true,
         ],
-        'maintenance' => [
-            'name' => 'system.maintenance',
-            'label' => 'Konserwacja',
-            'description' => 'Konserwacja systemu',
+        'manage' => [
+            'name' => 'system.manage',
+            'label' => 'Zarzadzanie',
+            'description' => 'Pelne zarzadzanie ustawieniami systemu',
             'dangerous' => true,
-        ],
-        'reports' => [
-            'name' => 'reports.read',
-            'label' => 'Raporty',
-            'description' => 'Odczyt raportow',
-            'dangerous' => false,
-        ],
-        'audit' => [
-            'name' => 'audit.read',
-            'label' => 'Audyt',
-            'description' => 'Dostep do logów audytu',
-            'dangerous' => false,
         ],
     ],
 
     'role_defaults' => [
-        'Admin' => ['config', 'maintenance', 'reports', 'audit'],
-        'Manager' => ['reports'],
-        'Editor' => [],
-        'Warehouseman' => [],
-        'Salesperson' => [],
-        'Claims' => [],
+        'Admin' => ['config', 'manage'],
+        'Manager' => [],
+        'Edytor' => [],
+        'Magazyn' => [],
+        'Handlowy' => [],
+        'Reklamacje' => [],
         'User' => [],
     ],
 ];

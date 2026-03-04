@@ -6,6 +6,7 @@ use App\Models\AttributeType;
 use App\Models\PrestaShopShop;
 use App\Services\Product\AttributeManager;
 use App\Services\PrestaShop\PrestaShopAttributeSyncService;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Livewire\Component;
@@ -19,6 +20,8 @@ use Livewire\Attributes\Computed;
  */
 class AttributeSystemManager extends Component
 {
+    use AuthorizesRequests;
+
     // PROPERTIES
 
     /** @var bool Modal visibility */
@@ -76,6 +79,13 @@ class AttributeSystemManager extends Component
             $this->syncService = app(PrestaShopAttributeSyncService::class);
         }
         return $this->syncService;
+    }
+
+    // LIFECYCLE
+
+    public function mount(): void
+    {
+        $this->authorize('parameters.read');
     }
 
     // COMPUTED PROPERTIES

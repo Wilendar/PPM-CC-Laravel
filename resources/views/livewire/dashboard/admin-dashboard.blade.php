@@ -7,6 +7,33 @@
         <p class="text-gray-400 mt-2">Witaj w panelu administracyjnym PPM - {{ $userRole }}</p>
     </div>
 
+    {{-- Welcome Card - ALL ROLES --}}
+    @if(($visibleWidgets['welcome_card'] ?? false))
+    <div class="enterprise-card p-6 mb-6">
+        <div class="flex items-center justify-between">
+            <div>
+                <h2 class="text-xl font-bold text-white">Witaj, {{ auth()->user()->name ?? 'Użytkownik' }}</h2>
+                <p class="text-gray-400 mt-1">{{ auth()->user()->email ?? '' }} | Rola: {{ $userRole }}</p>
+                @if(auth()->user()->last_login_at ?? false)
+                    <p class="text-sm text-gray-500 mt-1">Ostatnie logowanie: {{ \Carbon\Carbon::parse(auth()->user()->last_login_at)->format('d.m.Y H:i') }}</p>
+                @endif
+            </div>
+            <div class="w-14 h-14 rounded-xl flex items-center justify-center" style="background: linear-gradient(135deg, rgba(224, 172, 126, 0.2), rgba(209, 151, 90, 0.1)); border: 1px solid rgba(224, 172, 126, 0.3);">
+                <i class="fas fa-user text-2xl" style="color: #e0ac7e;"></i>
+            </div>
+        </div>
+    </div>
+    @endif
+
+    {{-- Minimal dashboard fallback for basic roles --}}
+    @if(count($visibleWidgets) <= 2)
+    <div class="enterprise-card p-8 text-center">
+        <i class="fas fa-info-circle text-4xl mb-4" style="color: #e0ac7e;"></i>
+        <h3 class="text-lg font-bold text-white mb-2">Panel w budowie</h3>
+        <p class="text-gray-400">Dedykowane widgety dla Twojej roli ({{ $userRole }}) zostaną udostępnione wkrótce.</p>
+    </div>
+    @endif
+
     {{-- Role-Based Content --}}
 
     @if($userRole === 'Admin')
@@ -15,6 +42,7 @@
             ============================================ --}}
 
         {{-- System Health Status Bar --}}
+        @if(($visibleWidgets['system_health'] ?? false))
         <div class="mb-8 relative">
             <div class="backdrop-blur-xl rounded-2xl p-8 shadow-2xl relative overflow-hidden" style="background: linear-gradient(135deg, rgba(31, 41, 55, 0.8), rgba(17, 24, 39, 0.6), rgba(31, 41, 55, 0.8)); border: 1px solid rgba(224, 172, 126, 0.2);">
                 <div class="absolute inset-0 opacity-5">
@@ -66,8 +94,10 @@
                 </div>
             </div>
         </div>
+        @endif
 
         {{-- Core Metrics Grid - Colorful Gradient Cards --}}
+        @if(($visibleWidgets['core_metrics'] ?? false))
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 mb-8">
 
             {{-- Total Products --}}
@@ -223,6 +253,7 @@
             </div>
 
         </div>
+        @endif
 
         {{-- Admin Quick Actions --}}
         <div class="mb-8">
@@ -354,7 +385,7 @@
         </div>
 
         {{-- Sync Jobs Monitoring with MPP TRADE Colors --}}
-        @if(isset($syncJobsStatus['total_jobs']))
+        @if(($visibleWidgets['sync_jobs'] ?? false) && isset($syncJobsStatus['total_jobs']))
         <div class="mb-8 relative">
             <div class="backdrop-blur-xl rounded-2xl p-8 shadow-2xl relative overflow-hidden" style="background: linear-gradient(135deg, rgba(31, 41, 55, 0.8), rgba(17, 24, 39, 0.6), rgba(31, 41, 55, 0.8)); border: 1px solid rgba(59, 130, 246, 0.3);">
                 {{-- Header --}}

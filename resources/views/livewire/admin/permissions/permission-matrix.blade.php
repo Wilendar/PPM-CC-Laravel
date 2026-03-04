@@ -167,126 +167,229 @@
         </div>
     </div>
 
-    <!-- Permission matrix -->
-    <div class="bg-gray-800 rounded-lg shadow-sm border border-gray-700">
-        @foreach($permissionsByModule as $moduleName => $permissions)
-        <div class="border-b border-gray-700 last:border-b-0">
-            <!-- Module header -->
-            <div class="px-6 py-4 bg-gray-900/50">
-                <div class="flex items-center justify-between">
-                    <div class="flex items-center space-x-3">
-                        <button wire:click="toggleModuleExpansion('{{ $moduleName }}')" 
-                                class="p-1 rounded-full hover:bg-gray-700 transition-colors">
-                            <svg class="w-4 h-4 transform transition-transform {{ $expandedModules[$moduleName] ?? true ? 'rotate-90' : '' }}" 
+    <!-- Permission matrix (hierarchical) -->
+    <div class="space-y-4">
+        @php
+            $lockedPermissionIds = $this->getLockedPermissionIds();
+        @endphp
+
+        @foreach($groupedModules as $moduleName => $moduleData)
+            <div class="bg-gray-800 rounded-lg shadow-sm border border-gray-700"
+                 wire:key="module-group-{{ $moduleData['module'] }}">
+
+                {{-- Parent module header --}}
+                <div class="px-6 py-4 bg-gray-900/50 rounded-t-lg cursor-pointer hover:bg-gray-800/70 transition-colors"
+                     wire:click="toggleModuleExpansion('{{ $moduleName }}')">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center space-x-3">
+                            <svg class="w-5 h-5 text-gray-400 transition-transform duration-200 {{ ($expandedModules[$moduleName] ?? true) ? 'rotate-90' : '' }}"
                                  fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
                             </svg>
-                        </button>
-                        
-                        <h3 class="text-lg font-semibold text-white">
-                            {{ $moduleName }}
-                        </h3>
-                        
-                        <button wire:click="toggleModule('{{ $moduleName }}')" 
-                                class="px-3 py-1 text-xs bg-gray-700 hover:bg-gray-600 rounded-full transition-colors">
-                            {{ $moduleStats[$moduleName]['enabled'] ?? 0 === $moduleStats[$moduleName]['total'] ?? 0 ? 'Wyłącz wszystkie' : 'Włącz wszystkie' }}
-                        </button>
-                    </div>
-                    
-                    <div class="flex items-center space-x-4">
-                        <!-- Progress bar -->
-                        <div class="flex items-center space-x-2">
-                            <div class="w-24 h-2 bg-gray-600 rounded-full overflow-hidden">
-                                <div class="h-full bg-gradient-to-r from-green-400 to-green-600 transition-all duration-300"
-                                     style="width: {{ $moduleStats[$moduleName]['percentage'] ?? 0 }}%"></div>
-                            </div>
-                            <span class="text-sm font-medium text-gray-300">
-                                {{ $moduleStats[$moduleName]['enabled'] ?? 0 }}/{{ $moduleStats[$moduleName]['total'] ?? 0 }}
-                            </span>
+
+                            <div class="w-2.5 h-2.5 rounded-full bg-{{ $moduleData['color'] }}-400"></div>
+
+                            <h3 class="text-lg font-semibold text-white">
+                                {{ $moduleName }}
+                            </h3>
+
+                            @if(!empty($moduleData['children']))
+                                <span class="text-xs text-gray-400 bg-gray-700 px-2 py-0.5 rounded-full">
+                                    {{ count($moduleData['children']) }} {{ count($moduleData['children']) === 1 ? 'podmodul' : (count($moduleData['children']) < 5 ? 'podmoduly' : 'podmodulow') }}
+                                </span>
+                            @endif
+                        </div>
+
+                        <div class="flex items-center space-x-4">
+                            {{-- Aggregated progress --}}
+                            @if(isset($moduleStats[$moduleName . '_grouped']))
+                                <div class="flex items-center space-x-2">
+                                    <div class="w-24 h-2 bg-gray-600 rounded-full overflow-hidden">
+                                        <div class="h-full bg-gradient-to-r from-green-400 to-green-600 transition-all duration-300"
+                                             style="width: {{ $moduleStats[$moduleName . '_grouped']['percentage'] ?? 0 }}%"></div>
+                                    </div>
+                                    <span class="text-sm font-medium text-gray-300">
+                                        {{ $moduleStats[$moduleName . '_grouped']['enabled'] ?? 0 }}/{{ $moduleStats[$moduleName . '_grouped']['total'] ?? 0 }}
+                                    </span>
+                                </div>
+                            @endif
+
+                            <button wire:click.stop="toggleGroupedModule('{{ $moduleName }}')"
+                                    class="px-3 py-1 text-xs bg-gray-700 hover:bg-gray-600 rounded-full transition-colors text-gray-300">
+                                Toggle
+                            </button>
                         </div>
                     </div>
                 </div>
-            </div>
-            
-            <!-- Permissions list -->
-            @if($expandedModules[$moduleName] ?? true)
-            <div class="px-6 py-4">
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    @php
-                        $lockedPermissionIds = $this->getLockedPermissionIds();
-                    @endphp
-                    @foreach($permissions as $permission)
-                    @php
-                        $isLocked = in_array($permission->id, $lockedPermissionIds);
-                    @endphp
-                    <div class="flex items-center justify-between p-3 rounded-lg border {{ $isLocked ? 'border-red-800/50 bg-red-900/10' : 'border-gray-600 hover:bg-gray-700/50' }} transition-colors">
-                        <div class="flex items-center space-x-3">
-                            @if($bulkSelectMode && !$isLocked)
-                                <input type="checkbox"
-                                       wire:click="togglePermissionSelection({{ $permission->id }})"
-                                       :checked="$wire.selectedPermissions.includes({{ $permission->id }})"
-                                       class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
-                            @endif
 
-                            <div>
-                                <div class="font-medium text-sm {{ $isLocked ? 'text-red-300' : 'text-white' }} flex items-center">
-                                    @if($isLocked)
-                                    <svg class="w-4 h-4 mr-1.5 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
-                                    </svg>
+                @if($expandedModules[$moduleName] ?? true)
+                    {{-- Parent's own permissions --}}
+                    @if($moduleData['permissions'] && $moduleData['permissions']->count() > 0)
+                        <div class="px-6 py-4 border-b border-gray-700/50">
+                            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                                @foreach($moduleData['permissions'] as $permission)
+                                    @php $isLocked = in_array($permission->id, $lockedPermissionIds); @endphp
+                                    <div class="flex items-center justify-between p-3 rounded-lg border {{ $isLocked ? 'border-red-800/50 bg-red-900/10' : 'border-gray-600 hover:bg-gray-700/50' }} transition-colors"
+                                         wire:key="perm-{{ $permission->id }}">
+                                        <div class="flex items-center space-x-3">
+                                            @if($bulkSelectMode && !$isLocked)
+                                                <input type="checkbox"
+                                                       wire:click="togglePermissionSelection({{ $permission->id }})"
+                                                       :checked="$wire.selectedPermissions.includes({{ $permission->id }})"
+                                                       class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                                            @endif
+                                            <div>
+                                                <div class="font-medium text-sm {{ $isLocked ? 'text-red-300' : 'text-white' }} flex items-center">
+                                                    @if($isLocked)
+                                                        <svg class="w-4 h-4 mr-1.5 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
+                                                        </svg>
+                                                    @endif
+                                                    {{ $permission->label ?? str_replace('.', ' > ', $permission->name) }}
+                                                </div>
+                                                @if($permission->description)
+                                                    <div class="text-xs {{ $isLocked ? 'text-red-400/70' : 'text-gray-400' }} mt-1">{{ $permission->description }}</div>
+                                                @endif
+                                                @if($permission->dangerous ?? false)
+                                                    <span class="text-xs text-red-400 font-medium">Niebezpieczne</span>
+                                                @endif
+                                                @if($isLocked)
+                                                    <div class="text-xs text-red-400 mt-1 font-medium">Zablokowane dla roli systemowej</div>
+                                                @endif
+                                            </div>
+                                        </div>
+
+                                        <div class="flex items-center space-x-2">
+                                            <div class="flex items-center space-x-1">
+                                                @if($permissionMatrix[$permission->id] ?? false)
+                                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium {{ $isLocked ? 'bg-red-900/50 text-red-300' : 'bg-green-900/50 text-green-300' }}">
+                                                        {{ $isLocked ? 'Wymagane' : 'Wlaczone' }}
+                                                    </span>
+                                                @else
+                                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-700 text-gray-300">
+                                                        Wylaczone
+                                                    </span>
+                                                @endif
+                                            </div>
+
+                                            @if($isLocked)
+                                                <div class="w-11 h-6 bg-red-900/30 rounded-full flex items-center justify-center cursor-not-allowed" title="Uprawnienie zablokowane dla roli systemowej">
+                                                    <svg class="w-4 h-4 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
+                                                    </svg>
+                                                </div>
+                                            @else
+                                                <label class="relative inline-flex items-center cursor-pointer">
+                                                    <input type="checkbox"
+                                                           wire:click="togglePermission({{ $permission->id }})"
+                                                           {{ ($permissionMatrix[$permission->id] ?? false) ? 'checked' : '' }}
+                                                           class="sr-only peer">
+                                                    <div class="w-11 h-6 bg-gray-700 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-gray-400 after:border-gray-600 after:border after:rounded-full after:h-5 after:w-5 after:transition-all border-gray-600 peer-checked:bg-blue-600"></div>
+                                                </label>
+                                            @endif
+                                        </div>
+                                    </div>
+                                @endforeach
+                            </div>
+                        </div>
+                    @endif
+
+                    {{-- Children modules --}}
+                    @foreach($moduleData['children'] as $childName => $childData)
+                        <div class="ml-6 mr-4 mb-4 mt-2 border-l-2 border-{{ $childData['color'] }}-600/40"
+                             wire:key="child-module-{{ $childData['module'] }}">
+
+                            {{-- Child module header --}}
+                            <div class="pl-4 py-3 flex items-center justify-between">
+                                <div class="flex items-center space-x-2">
+                                    <div class="w-1.5 h-1.5 rounded-full bg-{{ $childData['color'] }}-400"></div>
+                                    <h4 class="text-sm font-semibold text-gray-200">{{ $childName }}</h4>
+                                    @if(isset($moduleStats[$childName]))
+                                        <span class="text-xs text-gray-500">
+                                            {{ $moduleStats[$childName]['enabled'] }}/{{ $moduleStats[$childName]['total'] }}
+                                        </span>
+                                        <div class="w-16 h-1.5 bg-gray-600 rounded-full overflow-hidden">
+                                            <div class="h-full bg-gradient-to-r from-green-400 to-green-600 transition-all duration-300"
+                                                 style="width: {{ $moduleStats[$childName]['percentage'] ?? 0 }}%"></div>
+                                        </div>
                                     @endif
-                                    {{ str_replace('.', ' › ', $permission->name) }}
                                 </div>
-                                @if($permission->description)
-                                <div class="text-xs {{ $isLocked ? 'text-red-400/70' : 'text-gray-400' }} mt-1">
-                                    {{ $permission->description }}
-                                </div>
-                                @endif
-                                @if($isLocked)
-                                <div class="text-xs text-red-400 mt-1 font-medium">
-                                    Zablokowane dla roli systemowej
-                                </div>
-                                @endif
-                            </div>
-                        </div>
-
-                        <div class="flex items-center space-x-2">
-                            <!-- Permission status indicator -->
-                            <div class="flex items-center space-x-1">
-                                @if($permissionMatrix[$permission->id] ?? false)
-                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium {{ $isLocked ? 'bg-red-900/50 text-red-300' : 'bg-green-900/50 text-green-300' }}">
-                                        {{ $isLocked ? 'Wymagane' : 'Włączone' }}
-                                    </span>
-                                @else
-                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-700 text-gray-300">
-                                        Wyłączone
-                                    </span>
-                                @endif
+                                <button wire:click="toggleModule('{{ $childName }}')"
+                                        class="px-2 py-0.5 text-xs bg-gray-700 hover:bg-gray-600 rounded-full transition-colors text-gray-400">
+                                    Toggle
+                                </button>
                             </div>
 
-                            <!-- Toggle switch -->
-                            @if($isLocked)
-                            <div class="w-11 h-6 bg-red-900/30 rounded-full flex items-center justify-center cursor-not-allowed" title="Uprawnienie zablokowane dla roli systemowej">
-                                <svg class="w-4 h-4 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
-                                </svg>
+                            {{-- Child permissions --}}
+                            <div class="pl-4 pb-3 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                                @foreach($childData['permissions'] as $permission)
+                                    @php $isLocked = in_array($permission->id, $lockedPermissionIds); @endphp
+                                    <div class="flex items-center justify-between p-3 rounded-lg border {{ $isLocked ? 'border-red-800/50 bg-red-900/10' : 'border-gray-600 hover:bg-gray-700/50' }} transition-colors"
+                                         wire:key="perm-{{ $permission->id }}">
+                                        <div class="flex items-center space-x-3">
+                                            @if($bulkSelectMode && !$isLocked)
+                                                <input type="checkbox"
+                                                       wire:click="togglePermissionSelection({{ $permission->id }})"
+                                                       :checked="$wire.selectedPermissions.includes({{ $permission->id }})"
+                                                       class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                                            @endif
+                                            <div>
+                                                <div class="font-medium text-sm {{ $isLocked ? 'text-red-300' : 'text-white' }} flex items-center">
+                                                    @if($isLocked)
+                                                        <svg class="w-4 h-4 mr-1.5 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
+                                                        </svg>
+                                                    @endif
+                                                    {{ $permission->label ?? str_replace('.', ' > ', $permission->name) }}
+                                                </div>
+                                                @if($permission->description)
+                                                    <div class="text-xs {{ $isLocked ? 'text-red-400/70' : 'text-gray-400' }} mt-1">{{ $permission->description }}</div>
+                                                @endif
+                                                @if($permission->dangerous ?? false)
+                                                    <span class="text-xs text-red-400 font-medium">Niebezpieczne</span>
+                                                @endif
+                                                @if($isLocked)
+                                                    <div class="text-xs text-red-400 mt-1 font-medium">Zablokowane dla roli systemowej</div>
+                                                @endif
+                                            </div>
+                                        </div>
+
+                                        <div class="flex items-center space-x-2">
+                                            <div class="flex items-center space-x-1">
+                                                @if($permissionMatrix[$permission->id] ?? false)
+                                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium {{ $isLocked ? 'bg-red-900/50 text-red-300' : 'bg-green-900/50 text-green-300' }}">
+                                                        {{ $isLocked ? 'Wymagane' : 'Wlaczone' }}
+                                                    </span>
+                                                @else
+                                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-700 text-gray-300">
+                                                        Wylaczone
+                                                    </span>
+                                                @endif
+                                            </div>
+
+                                            @if($isLocked)
+                                                <div class="w-11 h-6 bg-red-900/30 rounded-full flex items-center justify-center cursor-not-allowed" title="Uprawnienie zablokowane dla roli systemowej">
+                                                    <svg class="w-4 h-4 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
+                                                    </svg>
+                                                </div>
+                                            @else
+                                                <label class="relative inline-flex items-center cursor-pointer">
+                                                    <input type="checkbox"
+                                                           wire:click="togglePermission({{ $permission->id }})"
+                                                           {{ ($permissionMatrix[$permission->id] ?? false) ? 'checked' : '' }}
+                                                           class="sr-only peer">
+                                                    <div class="w-11 h-6 bg-gray-700 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-gray-400 after:border-gray-600 after:border after:rounded-full after:h-5 after:w-5 after:transition-all border-gray-600 peer-checked:bg-blue-600"></div>
+                                                </label>
+                                            @endif
+                                        </div>
+                                    </div>
+                                @endforeach
                             </div>
-                            @else
-                            <label class="relative inline-flex items-center cursor-pointer">
-                                <input type="checkbox"
-                                       wire:click="togglePermission({{ $permission->id }})"
-                                       :checked="{{ $permissionMatrix[$permission->id] ?? false ? 'true' : 'false' }}"
-                                       class="sr-only peer">
-                                <div class="w-11 h-6 bg-gray-700 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-gray-400 after:border-gray-600 after:border after:rounded-full after:h-5 after:w-5 after:transition-all border-gray-600 peer-checked:bg-blue-600"></div>
-                            </label>
-                            @endif
                         </div>
-                    </div>
                     @endforeach
-                </div>
+                @endif
             </div>
-            @endif
-        </div>
         @endforeach
     </div>
     @else

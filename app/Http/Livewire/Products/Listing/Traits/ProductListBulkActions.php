@@ -120,6 +120,8 @@ trait ProductListBulkActions
 
     public function bulkActivate(): void
     {
+        $this->authorizeAction('update');
+
         if (empty($this->selectedProducts)) {
             $this->dispatch('error', message: 'Nie zaznaczono żadnych produktów');
             return;
@@ -134,6 +136,8 @@ trait ProductListBulkActions
 
     public function bulkDeactivate(): void
     {
+        $this->authorizeAction('update');
+
         if (empty($this->selectedProducts)) {
             $this->dispatch('error', message: 'Nie zaznaczono żadnych produktów');
             return;
@@ -169,6 +173,8 @@ trait ProductListBulkActions
 
     public function confirmBulkDelete(): void
     {
+        $this->authorizeAction('delete');
+
         if (empty($this->selectedProducts)) {
             $this->dispatch('error', message: 'Nie zaznaczono żadnych produktów');
             $this->closeBulkDeleteModal();

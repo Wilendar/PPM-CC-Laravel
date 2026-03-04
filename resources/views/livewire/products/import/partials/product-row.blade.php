@@ -39,7 +39,7 @@
     </td>
 
     {{-- Miniaturka (klikniecie otwiera modal zdjec) --}}
-    <td class="px-3 py-2">
+    <td class="px-3 py-2 {{ !$this->canSeeImages() ? 'opacity-30 pointer-events-none' : '' }}">
         @php
             $images = $product->temp_media_paths['images'] ?? $product->temp_media_paths ?? [];
             $primaryIndex = $product->primary_media_index ?? 0;
@@ -71,7 +71,7 @@
     </td>
 
     {{-- SKU (edytowalny) --}}
-    <td class="px-3 py-2">
+    <td class="px-3 py-2 {{ !$this->canSeeBasicData() ? 'opacity-30 pointer-events-none' : '' }}">
         @if($isFrozen)
             <span class="text-gray-400 font-mono text-sm">{{ $product->sku ?? '-' }}</span>
         @elseif($editingProductId === $product->id && $editingField === 'sku')
@@ -91,8 +91,8 @@
     </td>
 
     {{-- Nazwa (edytowalna) --}}
-    <td class="px-3 py-2">
-        @if($isFrozen)
+    <td class="px-3 py-2 {{ !$this->canSeeBasicData() ? 'opacity-30 pointer-events-none' : '' }}">
+        @if($isFrozen || !$this->canSeeBasicData())
             <span class="text-gray-400 text-sm truncate max-w-xs block">{{ $product->name ?? '(brak nazwy)' }}</span>
         @elseif($editingProductId === $product->id && $editingField === 'name')
             <input type="text"
@@ -111,10 +111,10 @@
     </td>
 
     {{-- Typ produktu (dropdown) --}}
-    <td class="px-2 py-2">
+    <td class="px-2 py-2 {{ !$this->canSeeBasicData() ? 'opacity-30 pointer-events-none' : '' }}">
         <select wire:change="updateProductType({{ $product->id }}, $event.target.value)"
                 class="form-select-dark-sm w-full text-xs"
-                @disabled($isFrozen)>
+                @disabled($isFrozen || !$this->canSeeBasicData())>
             <option value="">-- typ --</option>
             @foreach($this->productTypes as $type)
                 <option value="{{ $type->id }}" @selected($product->product_type_id === $type->id)>
@@ -125,10 +125,10 @@
     </td>
 
     {{-- MARKA (manufacturer_id) - DROPDOWN Z MANUFACTURER MODEL --}}
-    <td class="px-2 py-2">
+    <td class="px-2 py-2 {{ !$this->canSeeBasicData() ? 'opacity-30 pointer-events-none' : '' }}">
         <select wire:change="updateManufacturer({{ $product->id }}, $event.target.value)"
                 class="form-select-dark-sm w-full text-xs {{ !$product->manufacturer_id ? 'text-amber-400' : '' }}"
-                @disabled($isFrozen)>
+                @disabled($isFrozen || !$this->canSeeBasicData())>
             <option value="">-- marka --</option>
             @foreach($this->manufacturers as $manufacturer)
                 <option value="{{ $manufacturer->id }}" @selected($product->manufacturer_id === $manufacturer->id)>
@@ -139,8 +139,8 @@
     </td>
 
     {{-- CENA (FAZA 9.4) - klik otwiera modal cen --}}
-    <td class="px-2 py-2">
-        <div class="import-price-cell {{ $isFrozen ? 'pointer-events-none opacity-60' : '' }}"
+    <td class="px-2 py-2 {{ !$this->canSeePrices() ? 'opacity-30 pointer-events-none' : '' }}">
+        <div class="import-price-cell {{ ($isFrozen || !$this->canSeePrices()) ? 'pointer-events-none opacity-60' : '' }}"
              @if(!$isFrozen) wire:click="openImportPricesModal({{ $product->id }})" @endif
              title="{{ $isFrozen ? 'Produkt opublikowany - edycja zablokowana' : 'Kliknij aby edytowac ceny' }}">
             @php
@@ -168,7 +168,7 @@
 
     {{-- KATEGORIE - inline dropdowny --}}
     {{-- L3 (Kategoria glowna) --}}
-    <td class="px-2 py-2 relative import-cell-category">
+    <td class="px-2 py-2 relative import-cell-category {{ !$this->canSeeCategories() ? 'opacity-30 pointer-events-none' : '' }}">
         @include('livewire.products.import.partials.inline-category-select', [
             'product' => $product,
             'level' => 3,
@@ -178,27 +178,27 @@
     </td>
 
     {{-- L4 (Podkategoria) - visible if L3 selected or has options --}}
-    <td class="px-2 py-2 relative import-cell-category">
+    <td class="px-2 py-2 relative import-cell-category {{ !$this->canSeeCategories() ? 'opacity-30 pointer-events-none' : '' }}">
         @include('livewire.products.import.partials.inline-category-select', [
             'product' => $product,
             'level' => 4,
-            'disabled' => $isFrozen || !$selectedL3,
+            'disabled' => $isFrozen || !$selectedL3 || !$this->canSeeCategories(),
             'parentCategoryId' => $selectedL3?->id
         ])
     </td>
 
     {{-- L5 (Szczegolowa) - visible if L4 selected or has options --}}
-    <td class="px-2 py-2 relative import-cell-category">
+    <td class="px-2 py-2 relative import-cell-category {{ !$this->canSeeCategories() ? 'opacity-30 pointer-events-none' : '' }}">
         @include('livewire.products.import.partials.inline-category-select', [
             'product' => $product,
             'level' => 5,
-            'disabled' => $isFrozen || !$selectedL4,
+            'disabled' => $isFrozen || !$selectedL4 || !$this->canSeeCategories(),
             'parentCategoryId' => $selectedL4?->id
         ])
     </td>
 
     {{-- L6-L8 - ukryte do czasu klikniecia "+" (dodaje kolumny krokowo) --}}
-    <td class="px-2 py-2 relative import-cell-category">
+    <td class="px-2 py-2 relative import-cell-category {{ !$this->canSeeCategories() ? 'opacity-30 pointer-events-none' : '' }}">
         @if($effectiveCategoryMaxLevel >= 6)
             @include('livewire.products.import.partials.inline-category-select', [
                 'product' => $product,
@@ -220,7 +220,7 @@
     </td>
 
     @if($effectiveCategoryMaxLevel >= 6)
-        <td class="px-2 py-2 relative import-cell-category">
+        <td class="px-2 py-2 relative import-cell-category {{ !$this->canSeeCategories() ? 'opacity-30 pointer-events-none' : '' }}">
             @if($effectiveCategoryMaxLevel >= 7)
                 @include('livewire.products.import.partials.inline-category-select', [
                     'product' => $product,
@@ -243,7 +243,7 @@
     @endif
 
     @if($effectiveCategoryMaxLevel >= 7)
-        <td class="px-2 py-2 relative import-cell-category">
+        <td class="px-2 py-2 relative import-cell-category {{ !$this->canSeeCategories() ? 'opacity-30 pointer-events-none' : '' }}">
             @if($effectiveCategoryMaxLevel >= 8)
                 @include('livewire.products.import.partials.inline-category-select', [
                     'product' => $product,
@@ -266,7 +266,7 @@
     @endif
 
     {{-- PUBLIKACJA - interaktywny dropdown ERPConnection + PrestaShop (FAZA 9.3 - zastepuje Sklepy) --}}
-    <td class="px-2 py-2 relative">
+    <td class="px-2 py-2 relative {{ !$this->canSeePublication() ? 'opacity-30 pointer-events-none' : '' }}">
         @php
             $pubTargets = $product->publication_targets ?? [];
             $erpConnectionIds = $pubTargets['erp_connections'] ?? [];
@@ -521,7 +521,7 @@
      </td>
 
     {{-- DATA PUBLIKACJI (FAZA 9.3) --}}
-    <td class="px-2 py-2 import-cell-schedule">
+    <td class="px-2 py-2 import-cell-schedule {{ !$this->canSeeScheduleDate() ? 'opacity-30 pointer-events-none' : '' }}">
         @if($pubStatus === 'published')
             <div class="import-published-date-cell">
                 <span class="import-published-date-badge">
@@ -538,12 +538,13 @@
                    value="{{ $product->scheduled_publish_at?->format('Y-m-d\\TH:i') }}"
                    wire:change="schedulePublication({{ $product->id }}, $event.target.value)"
                    class="import-schedule-input"
-                   title="Zaplanuj date publikacji">
+                   title="Zaplanuj date publikacji"
+                   @disabled(!$this->canSeeScheduleDate())>
         @endif
     </td>
 
     {{-- PUBLIKUJ button (FAZA 9.3) --}}
-    <td class="px-2 py-2 text-center import-cell-publish">
+    <td class="px-2 py-2 text-center import-cell-publish {{ !$this->canPublish() ? 'opacity-30 pointer-events-none' : '' }}">
         @php
             $canPublish = ($product->completion_percentage ?? 0) === 100;
             $hasSchedule = !empty($product->scheduled_publish_at);
@@ -664,14 +665,14 @@
         <div class="flex items-center justify-end gap-0.5 {{ $isFrozen ? 'import-row-frozen-actions' : '' }}">
             {{-- Warianty (FAZA 5.4) - zawsze widoczne, NIE wplywaja na progress --}}
             <button wire:click="$dispatch('openVariantModal', { productId: {{ $product->id }} })"
-                    @disabled($isFrozen)
-                    class="p-1 rounded transition-colors
+                    @disabled($isFrozen || !$this->canManageVariants())
+                    class="p-1 rounded transition-colors {{ !$this->canManageVariants() ? 'opacity-30 cursor-not-allowed' : '' }}
                            @if($hasVariants)
                                text-cyan-400 hover:text-cyan-300 hover:bg-cyan-900/30
                            @else
                                text-gray-400 hover:text-cyan-400 hover:bg-cyan-900/30
                            @endif"
-                    title="{{ $hasVariants ? 'Warianty ('.$variantCount.')' : 'Warianty' }}">
+                    title="{{ !$this->canManageVariants() ? 'Brak uprawnien' : ($hasVariants ? 'Warianty ('.$variantCount.')' : 'Warianty') }}">
                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                           d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
@@ -701,8 +702,8 @@
             {{-- Dopasowania (FAZA 5.6) - tylko dla typu "Czesc zamienna" --}}
             @if($showCompatibility)
             <button wire:click="$dispatch('openCompatibilityModal', { productId: {{ $product->id }} })"
-                    @disabled($isFrozen)
-                    class="p-1 rounded transition-colors
+                    @disabled($isFrozen || !$this->canManageCompatibility())
+                    class="p-1 rounded transition-colors {{ !$this->canManageCompatibility() ? 'opacity-30 cursor-not-allowed' : '' }}
                            @if($skipCompatibility)
                                text-red-400 hover:text-red-300 hover:bg-red-900/30
                            @elseif($hasCompatibility)
@@ -710,7 +711,7 @@
                            @else
                                text-gray-400 hover:text-teal-400 hover:bg-teal-900/30
                            @endif"
-                    title="{{ $skipCompatibility ? 'Brak dopasowan (oznaczono)' : ($hasCompatibility ? 'Dopasowania ('.$compatCount.')' : 'Dopasowania') }}">
+                    title="{{ !$this->canManageCompatibility() ? 'Brak uprawnien' : ($skipCompatibility ? 'Brak dopasowan (oznaczono)' : ($hasCompatibility ? 'Dopasowania ('.$compatCount.')' : 'Dopasowania')) }}">
                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                           d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2"/>
@@ -720,8 +721,8 @@
 
             {{-- Zdjecia (FAZA 5.7) - zawsze widoczne --}}
             <button wire:click="$dispatch('openImageModal', { productId: {{ $product->id }} })"
-                    @disabled($isFrozen)
-                    class="p-1 rounded transition-colors
+                    @disabled($isFrozen || !$this->canSeeImages())
+                    class="p-1 rounded transition-colors {{ !$this->canSeeImages() ? 'opacity-30 cursor-not-allowed' : '' }}
                            @if($skipImages)
                                text-red-400 hover:text-red-300 hover:bg-red-900/30
                            @elseif($hasImages)
@@ -729,7 +730,7 @@
                            @else
                                text-gray-400 hover:text-pink-400 hover:bg-pink-900/30
                            @endif"
-                    title="{{ $skipImages ? 'Bez zdjec (oznaczono)' : ($hasImages ? 'Zdjecia ('.$imageCount.')' : 'Zdjecia') }}">
+                    title="{{ !$this->canSeeImages() ? 'Brak uprawnien' : ($skipImages ? 'Bez zdjec (oznaczono)' : ($hasImages ? 'Zdjecia ('.$imageCount.')' : 'Zdjecia')) }}">
                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                           d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
@@ -738,8 +739,8 @@
 
             {{-- Opisy (FAZA 6.5.4) - NOWY modal opisow - PRZED kreska --}}
             <button wire:click="$dispatch('openDescriptionModal', { productId: {{ $product->id }} })"
-                    @disabled($isFrozen)
-                    class="p-1 rounded transition-colors
+                    @disabled($isFrozen || !$this->canManageDescriptions())
+                    class="p-1 rounded transition-colors {{ !$this->canManageDescriptions() ? 'opacity-30 cursor-not-allowed' : '' }}
                            @if($skipDescriptions)
                                text-red-400 hover:text-red-300 hover:bg-red-900/30
                            @elseif($hasDescriptions)
@@ -747,7 +748,7 @@
                            @else
                                text-gray-400 hover:text-indigo-400 hover:bg-indigo-900/30
                            @endif"
-                    title="{{ $skipDescriptions ? 'Publikuj bez opisow (oznaczono)' : ($hasDescriptions ? 'Opisy (krotki: '.$descShortLen.', dlugi: '.$descLongLen.')' : 'Opisy produktu') }}">
+                    title="{{ !$this->canManageDescriptions() ? 'Brak uprawnien' : ($skipDescriptions ? 'Publikuj bez opisow (oznaczono)' : ($hasDescriptions ? 'Opisy (krotki: '.$descShortLen.', dlugi: '.$descLongLen.')' : 'Opisy produktu')) }}">
                 {{-- Document text icon - for descriptions --}}
                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -759,9 +760,9 @@
 
             {{-- Edytuj (FAZA 9.2) --}}
             <button wire:click="openImportModal({{ $product->id }})"
-                    @disabled($isFrozen)
-                    class="p-1 text-gray-400 hover:text-white hover:bg-gray-700/50 rounded transition-colors"
-                    title="Edytuj podstawowe dane">
+                    @disabled($isFrozen || !$this->canSeeBasicData())
+                    class="p-1 text-gray-400 hover:text-white hover:bg-gray-700/50 rounded transition-colors {{ !$this->canSeeBasicData() ? 'opacity-30 cursor-not-allowed' : '' }}"
+                    title="{{ !$this->canSeeBasicData() ? 'Brak uprawnien' : 'Edytuj podstawowe dane' }}">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                           d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
@@ -770,9 +771,9 @@
 
             {{-- Duplikuj --}}
             <button wire:click="duplicateProduct({{ $product->id }})"
-                    @disabled($isFrozen)
-                    class="p-1 text-gray-400 hover:text-purple-400 hover:bg-purple-900/30 rounded transition-colors"
-                    title="Duplikuj">
+                    @disabled($isFrozen || !$this->canDuplicateDelete())
+                    class="p-1 text-gray-400 hover:text-purple-400 hover:bg-purple-900/30 rounded transition-colors {{ !$this->canDuplicateDelete() ? 'opacity-30 cursor-not-allowed' : '' }}"
+                    title="{{ !$this->canDuplicateDelete() ? 'Brak uprawnien' : 'Duplikuj' }}">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                           d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>
@@ -782,9 +783,9 @@
             {{-- Usun --}}
             <button wire:click="deletePendingProduct({{ $product->id }})"
                     wire:confirm="Czy na pewno usunac {{ $product->sku }}?"
-                    @disabled($isFrozen)
-                    class="p-1 text-gray-400 hover:text-red-400 hover:bg-red-900/30 rounded transition-colors"
-                    title="Usun">
+                    @disabled($isFrozen || !$this->canDuplicateDelete())
+                    class="p-1 text-gray-400 hover:text-red-400 hover:bg-red-900/30 rounded transition-colors {{ !$this->canDuplicateDelete() ? 'opacity-30 cursor-not-allowed' : '' }}"
+                    title="{{ !$this->canDuplicateDelete() ? 'Brak uprawnien' : 'Usun' }}">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                           d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>

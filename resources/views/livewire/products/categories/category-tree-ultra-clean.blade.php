@@ -55,17 +55,19 @@
                 @endif
 
                 {{-- NOTE: Creates a main category (level 2) - levels 0 and 1 are reserved for PrestaShop structure --}}
+                @if($this->userCan('create'))
                 <a href="/admin/products/categories/create?level=2"
                    class="category-add-btn"
                    title="Dodaje nową kategorię główną (poziom 2)">
                     <i class="fas fa-plus mr-2"></i>
                     Dodaj kategorię
                 </a>
+                @endif
             </div>
         </div>
     </div>
-    {{-- Bulk Actions Toolbar (visible tylko gdy selectedCategories > 0) --}}
-    @if(count($selectedCategories) > 0)
+    {{-- Bulk Actions Toolbar (visible tylko gdy selectedCategories > 0, hidden for read-only) --}}
+    @if(count($selectedCategories) > 0 && !$isReadOnly)
     <div class="category-bulk-bar"
          x-data="{ bulkMenuOpen: false }"
          x-transition:enter="transition ease-out duration-200"
@@ -160,6 +162,7 @@
                                 const cb = $el.querySelector('input[type=checkbox]');
                                 if (cb) cb.indeterminate = (selectedCount > 0 && selectedCount < totalCount);
                             })">
+                            @if(!$isReadOnly)
                             <input type="checkbox"
                                    wire:key="master-checkbox-{{ count($selectedCategories) === count($categories) && count($categories) > 0 ? '1' : '0' }}"
                                    wire:click="toggleSelectAll"
@@ -167,6 +170,7 @@
                                    class="category-checkbox"
                                    aria-label="Zaznacz/odznacz wszystkie kategorie"
                                    title="{{ count($selectedCategories) > 0 ? 'Odznacz wszystkie' : 'Zaznacz wszystkie widoczne kategorie' }}">
+                            @endif
                         </th>
 
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
@@ -207,6 +211,7 @@
 
                             {{-- Checkbox Column --}}
                             <td class="px-3 py-4 whitespace-nowrap w-12">
+                                @if(!$isReadOnly)
                                 <input type="checkbox"
                                        wire:key="checkbox-{{ $category->id }}-{{ in_array($category->id, $selectedCategories) ? '1' : '0' }}"
                                        wire:click="toggleSelection({{ $category->id }})"
@@ -214,12 +219,13 @@
                                        class="category-checkbox"
                                        aria-label="Zaznacz kategorię {{ $category->name }}"
                                        title="Zaznacz kategorię">
+                                @endif
                             </td>
 
                             <td class="px-6 py-4 whitespace-nowrap">
                                 <div class="flex items-center space-x-3">
-                                    {{-- Drag Handle (Tree Mode Only) --}}
-                                    @if($viewMode === 'tree')
+                                    {{-- Drag Handle (Tree Mode Only, hidden for read-only) --}}
+                                    @if($viewMode === 'tree' && !$isReadOnly)
                                         <div class="drag-handle cursor-move opacity-30 hover:opacity-60 transition-opacity p-1"
                                              title="Przeciągnij aby zmienić kolejność">
                                             <i class="fas fa-grip-vertical text-gray-400 text-xs"></i>
@@ -269,7 +275,7 @@
                                             {{ $category->name }}
 
                                             {{-- Inline Insert Trigger (+) - adds sibling category on same level --}}
-                                            @if($viewMode === 'tree' && ($category->level ?? 0) >= 2)
+                                            @if($viewMode === 'tree' && ($category->level ?? 0) >= 2 && $this->userCan('create'))
                                                 <button class="category-insert-trigger--inline"
                                                         @click="$dispatch('open-insert-line', { id: {{ $category->id }} })"
                                                         title="Dodaj kategorię na tym poziomie">
@@ -356,7 +362,7 @@
 
                                     {{-- Add child trigger (slides DOWN below badge, CENTERED) --}}
                                     {{-- Block level 1 creation (only Baza/level 0 can have level 1 children via other methods) --}}
-                                    @if($childLevel > 1)
+                                    @if($childLevel > 1 && $this->userCan('create'))
                                     <div class="category-add-child-popup"
                                          x-show="showTrigger && !isOpen"
                                          x-cloak
@@ -378,7 +384,7 @@
 
                                     {{-- Inline form popup (below trigger) --}}
                                     @endif
-                                    @if($childLevel > 1)
+                                    @if($childLevel > 1 && $this->userCan('create'))
                                     <div class="category-add-child-form"
                                          x-show="isOpen"
                                          x-cloak
@@ -467,7 +473,7 @@
                         </tr>
 
                         {{-- Insert-line <tr> between rows - form opens via dispatch from inline trigger --}}
-                        @if($viewMode === 'tree' && ($category->level ?? 0) >= 2)
+                        @if($viewMode === 'tree' && ($category->level ?? 0) >= 2 && $this->userCan('create'))
                             @php
                                 $insertLevel = $category->level ?? 0;
                                 $insertParentId = $category->parent_id;
@@ -538,10 +544,12 @@
                                     <i class="fas fa-folder-open text-4xl mb-4"></i>
                                     <h3 class="text-lg font-medium mb-2">Brak kategorii</h3>
                                     <p class="text-sm">Dodaj pierwszą kategorię aby rozpocząć organizację produktów.</p>
+                                    @if($this->userCan('create'))
                                     <a href="/admin/products/categories/create" class="category-add-btn mt-4">
                                         <i class="fas fa-plus mr-2"></i>
                                         Dodaj kategorię
                                     </a>
+                                    @endif
                                 </div>
                             </td>
                         </tr>

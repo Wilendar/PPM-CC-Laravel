@@ -9,6 +9,7 @@ use App\Models\Category;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use App\Http\Livewire\Concerns\AuthorizesWithSpatie;
 
 /**
  * CategoryTree Livewire Component - Interactive Category Management
@@ -34,6 +35,17 @@ use Illuminate\Support\Facades\Log;
 class CategoryTree extends Component
 {
     use WithPagination;
+    use AuthorizesWithSpatie;
+
+    protected function getPermissionModule(): string
+    {
+        return 'categories';
+    }
+
+    protected function getModuleActions(): array
+    {
+        return ['read', 'create', 'update', 'delete', 'tree'];
+    }
 
     // ==========================================
     // COMPONENT STATE PROPERTIES
@@ -256,6 +268,8 @@ class CategoryTree extends Component
      */
     public function mount(): void
     {
+        $this->initializePermissions();
+
         // Force tree view mode as default (override session preferences)
         $this->viewMode = 'tree';
 
@@ -587,6 +601,8 @@ class CategoryTree extends Component
      */
     public function saveInlineCategory(string $name, string $description, ?int $parentId = null): void
     {
+        $this->authorizeAction('create');
+
         $name = trim($name);
 
         if (empty($name)) {
@@ -678,6 +694,8 @@ class CategoryTree extends Component
      */
     public function saveCategory(): void
     {
+        $this->authorizeAction('update');
+
         $this->loadingStates['save'] = true;
 
         try {
@@ -770,6 +788,8 @@ class CategoryTree extends Component
      */
     public function deleteCategory(int $categoryId): void
     {
+        $this->authorizeAction('delete');
+
         $this->loadingStates['delete'] = true;
 
         try {
@@ -853,6 +873,8 @@ class CategoryTree extends Component
      */
     public function confirmForceDelete(): void
     {
+        $this->authorizeAction('delete');
+
         if (!$this->categoryToDelete) {
             return;
         }

@@ -45,15 +45,21 @@ return [
             'description' => 'Upload plikow',
             'dangerous' => false,
         ],
+        'manage' => [
+            'name' => 'media.manage',
+            'label' => 'Zarzadzanie',
+            'description' => 'Pelne zarzadzanie mediami w panelu admin',
+            'dangerous' => true,
+        ],
     ],
 
     'role_defaults' => [
-        'Admin' => ['create', 'read', 'update', 'delete', 'upload'],
-        'Manager' => ['create', 'read', 'update', 'delete', 'upload'],
-        'Editor' => ['create', 'read', 'update', 'delete', 'upload'],
-        'Warehouseman' => [],
-        'Salesperson' => [],
-        'Claims' => [],
+        'Admin' => ['create', 'read', 'update', 'delete', 'upload', 'manage'],
+        'Manager' => ['create', 'read', 'update', 'delete', 'upload', 'manage'],
+        'Edytor' => ['create', 'read', 'update', 'delete', 'upload'],
+        'Magazyn' => [],
+        'Handlowy' => [],
+        'Reklamacje' => [],
         'User' => ['read'],
     ],
 ];

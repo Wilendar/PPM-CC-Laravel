@@ -53,7 +53,7 @@ class CrossSourceMatrixPanel extends Component
      */
     public function mount(): void
     {
-        $this->authorize('admin.scan.view');
+        $this->authorize('scan.read');
         $this->loadSources();
         $this->detectActiveChunkedScan();
     }

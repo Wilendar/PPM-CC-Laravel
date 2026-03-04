@@ -116,15 +116,15 @@ return Application::configure(basePath: dirname(__DIR__))
         $exceptions->render(function (\Illuminate\Auth\Access\AuthorizationException $e, $request) {
             if ($request->expectsJson()) {
                 return response()->json([
-                    'error' => 'Unauthorized', 
+                    'error' => 'Unauthorized',
                     'message' => $e->getMessage() ?: 'You do not have permission to access this resource.'
                 ], 403);
             }
-            
-            return redirect()->route('dashboard')
-                ->withErrors(['access' => 'You do not have permission to access this resource.']);
+
+            return redirect('/admin')
+                ->with('error', 'Nie masz uprawnien do tego zasobu.');
         });
-        
+
         // Handle role/permission exceptions from Spatie
         $exceptions->render(function (\Spatie\Permission\Exceptions\UnauthorizedException $e, $request) {
             if ($request->expectsJson()) {
@@ -133,9 +133,9 @@ return Application::configure(basePath: dirname(__DIR__))
                     'message' => $e->getMessage()
                 ], 403);
             }
-            
-            return redirect()->route('dashboard')
-                ->withErrors(['access' => 'You do not have the required permissions.']);
+
+            return redirect('/admin')
+                ->with('error', 'Nie masz wymaganych uprawnien.');
         });
     })
     ->create();

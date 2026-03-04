@@ -9,6 +9,7 @@ use App\Models\PrestaShopShop;
 use App\Services\Product\AttributeManager;
 use App\Services\Product\AttributeUsageService;
 use App\Services\PrestaShop\PrestaShopAttributeSyncService;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Collection;
 use Livewire\Component;
 use Livewire\Attributes\Computed;
@@ -28,7 +29,7 @@ use Livewire\Attributes\Url;
  */
 class AttributeValueManager extends Component
 {
-    use AttributeValueBulkOperations;
+    use AttributeValueBulkOperations, AuthorizesRequests;
 
     public bool $showModal = false;
     public bool $showEditForm = false;
@@ -65,6 +66,7 @@ class AttributeValueManager extends Component
     #[On('open-attribute-value-manager')]
     public function open(int $typeId): void
     {
+        $this->authorize('parameters.read');
         $this->attributeTypeId = $typeId;
         $this->showModal = true;
         $this->resetFilters();

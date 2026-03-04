@@ -76,6 +76,18 @@ abstract class BasePolicy
     }
 
     /**
+     * Sprawdź czy użytkownik ma permission i jest aktywny (z obsługą brakującego permission).
+     */
+    protected function checkPermission(User $user, string $permission): bool
+    {
+        try {
+            return $user->hasPermissionTo($permission) && $this->isActiveUser($user);
+        } catch (\Spatie\Permission\Exceptions\PermissionDoesNotExist $e) {
+            return false;
+        }
+    }
+
+    /**
      * Sprawdź czy użytkownik może wykonać action na własnych danych.
      */
     protected function canManageOwn(User $user, $resource): bool

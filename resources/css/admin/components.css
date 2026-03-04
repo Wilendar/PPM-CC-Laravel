@@ -7130,6 +7130,54 @@ hex-color-picker {
 }
 
 /* ========================================
+   SIDEBAR NO-ACCESS LINKS (Permission denied)
+   Style dla linkow do sekcji bez uprawnien
+   ======================================== */
+
+/* No Access sidebar link - permission denied */
+/* NO parent opacity - dimming via color only, so badge stays fully visible */
+.sidebar-link-no-access {
+    cursor: not-allowed !important;
+    pointer-events: none;
+    position: relative;
+}
+
+/* No Access link text/icon color - same brightness as .sidebar-link-disabled */
+.sidebar-link-no-access > span,
+.sidebar-link-no-access > svg {
+    color: rgba(156, 163, 175, 0.5) !important;
+    opacity: 0.6;
+}
+
+/* No Access link hover - no visual effect */
+.sidebar-link-no-access:hover {
+    background: transparent !important;
+}
+
+/* "Brak Dostepu" badge - FULL VISIBILITY (no parent opacity to dim it) */
+.sidebar-link-no-access::after {
+    content: '\f023  Brak Dostepu';
+    font-family: 'Font Awesome 6 Free', sans-serif;
+    font-weight: 900;
+    position: absolute;
+    right: 0.5rem;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 0.55rem;
+    letter-spacing: 0.03em;
+    color: rgba(239, 68, 68, 0.95);
+    background: rgba(239, 68, 68, 0.15);
+    padding: 0.1rem 0.35rem;
+    border-radius: 0.2rem;
+    border: 1px solid rgba(239, 68, 68, 0.4);
+}
+
+/* Hide no-access badge in collapsed sidebar */
+.sidebar-collapsed .sidebar-link-no-access::after {
+    display: none;
+}
+
+/* ========================================
    VEHICLE FEATURE MANAGEMENT MODALS
    Fix for transparent modal background
    ======================================== */

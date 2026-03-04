@@ -35,6 +35,7 @@ use App\Jobs\PrestaShop\SyncProductToPrestaShop;
 use App\Jobs\PrestaShop\BulkSyncProducts; // ETAP_13 - Bulk sync operations
 use App\Jobs\PrestaShop\BulkPullProducts; // ETAP_13 - Bulk pull operations
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use App\Http\Livewire\Concerns\AuthorizesWithSpatie;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -56,6 +57,7 @@ use Illuminate\Support\Str;
 class ProductForm extends Component
 {
     use AuthorizesRequests;
+    use AuthorizesWithSpatie;
     use ProductFormValidation;
     use ProductFormUpdates;
     use ProductFormComputed;
@@ -67,6 +69,23 @@ class ProductForm extends Component
     use VariantModalsTrait;
     use ProductFormCompatibility;
     use ProductFormVisualDescription;
+
+    protected function getPermissionModule(): string
+    {
+        return 'products';
+    }
+
+    protected function getExtraPermissions(): array
+    {
+        return [
+            'variants' => 'products.variants',
+            'prices' => 'prices.update',
+            'stock' => 'stock.update',
+            'media' => 'media.update',
+            'sync' => 'shops.sync',
+            'categories_update' => 'categories.update',
+        ];
+    }
 
     /*
     |--------------------------------------------------------------------------
@@ -367,6 +386,8 @@ class ProductForm extends Component
      */
     public function mount(?Product $product = null): void
     {
+        $this->initializePermissions();
+
         try {
             Log::info('ProductForm mount() called', ['product_id' => $product?->id]);
 
@@ -1761,9 +1782,9 @@ class ProductForm extends Component
     public function canUnlockStockColumn(string $column): bool
     {
         return match ($column) {
-            'quantity' => auth()->user()?->can('products.stock.unlock_quantity') ?? false,
-            'reserved' => auth()->user()?->can('products.stock.unlock_reserved') ?? false,
-            'minimum' => auth()->user()?->can('products.stock.unlock_minimum') ?? false,
+            'quantity' => auth()->user()?->can('stock.unlock_quantity') ?? false,
+            'reserved' => auth()->user()?->can('stock.unlock_reserved') ?? false,
+            'minimum' => auth()->user()?->can('stock.unlock_minimum') ?? false,
             default => false,
         };
     }
@@ -6018,6 +6039,7 @@ class ProductForm extends Component
      */
     public function save(): void
     {
+        $this->authorizeAction($this->isEditMode ? 'update' : 'create');
         // Use existing pending-changes flow (handles default/shop + job dispatch)
         $this->saveAndClose();
     }

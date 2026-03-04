@@ -3,15 +3,17 @@
 /**
  * Prices Permission Module
  *
- * Permissions for price management including price groups and cost prices.
+ * Permissions for price management in ProductForm context.
+ * Price Groups management moved to separate price_groups module.
  */
 
 return [
     'module' => 'prices',
+    'parent_module' => 'products',
     'name' => 'Ceny',
-    'description' => 'Zarzadzanie cenami i grupami cenowymi',
+    'description' => 'Zarzadzanie cenami produktow (odczyt/edycja w ProductForm)',
     'icon' => 'currency-dollar',
-    'order' => 40,
+    'order' => 11,
     'color' => 'green',
 
     'permissions' => [
@@ -27,12 +29,6 @@ return [
             'description' => 'Edycja cen',
             'dangerous' => false,
         ],
-        'groups' => [
-            'name' => 'prices.groups',
-            'label' => 'Grupy cenowe',
-            'description' => 'Zarzadzanie grupami cenowymi',
-            'dangerous' => false,
-        ],
         'cost' => [
             'name' => 'prices.cost',
             'label' => 'Ceny zakupu',
@@ -42,12 +38,12 @@ return [
     ],
 
     'role_defaults' => [
-        'Admin' => ['read', 'update', 'groups', 'cost'],
-        'Manager' => ['read', 'update', 'groups', 'cost'],
-        'Editor' => [],
-        'Warehouseman' => [],
-        'Salesperson' => ['read'],
-        'Claims' => [],
+        'Admin' => ['read', 'update', 'cost'],
+        'Manager' => ['read', 'update', 'cost'],
+        'Edytor' => [],
+        'Magazyn' => [],
+        'Handlowy' => ['read'],
+        'Reklamacje' => [],
         'User' => [],
     ],
 ];

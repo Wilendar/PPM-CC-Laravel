@@ -106,7 +106,7 @@ class ProductTypeManager extends Component
 
     public function mount(): void
     {
-        $this->authorize('products.update');
+        $this->authorize('parameters.read');
         // Initialize sort_order for new types
         $this->sort_order = (ProductType::max('sort_order') ?? 0) + 10;
     }

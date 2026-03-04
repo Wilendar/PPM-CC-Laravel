@@ -50,10 +50,10 @@ return [
     'role_defaults' => [
         'Admin' => ['read', 'create', 'update', 'delete', 'roles'],
         'Manager' => [],
-        'Editor' => [],
-        'Warehouseman' => [],
-        'Salesperson' => [],
-        'Claims' => [],
+        'Edytor' => [],
+        'Magazyn' => [],
+        'Handlowy' => [],
+        'Reklamacje' => [],
         'User' => [],
     ],
 ];

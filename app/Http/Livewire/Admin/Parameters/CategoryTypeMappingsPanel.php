@@ -82,6 +82,9 @@ class CategoryTypeMappingsPanel extends Component
 
     public function mount(): void
     {
+        if (!auth()->user()->canAny(['parameters.category_mappings.read', 'parameters.read'])) {
+            abort(403);
+        }
         $this->loadShops();
         $this->loadProductTypes();
     }
