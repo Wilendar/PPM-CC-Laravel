@@ -71,6 +71,11 @@ class User extends Authenticatable implements MustVerifyEmail
         'oauth_last_used_at',
         'oauth_linked_providers',
         'microsoft_only',
+        'is_active',
+        'is_approved',
+        'approved_at',
+        'approved_by',
+        'approval_note',
     ];
 
     /**
@@ -103,6 +108,8 @@ class User extends Authenticatable implements MustVerifyEmail
         'oauth_locked_until' => 'datetime',
         'oauth_linked_providers' => 'array',
         'microsoft_only' => 'boolean',
+        'is_approved' => 'boolean',
+        'approved_at' => 'datetime',
     ];
 
     // Removed dates array - no soft deletes for now
