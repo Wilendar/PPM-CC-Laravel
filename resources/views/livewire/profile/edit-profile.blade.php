@@ -16,7 +16,7 @@
                 wire:click="$set('activeTab', 'personal')"
                 class="py-2 px-1 border-b-2 font-medium text-sm 
                        @if($activeTab === 'personal') 
-                           border-blue-500 text-blue-600 dark:border-blue-400 dark:text-blue-400
+                           border-[#e0ac7e] text-[#e0ac7e]
                        @else 
                            border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300
                        @endif
@@ -32,7 +32,7 @@
                 wire:click="$set('activeTab', 'preferences')"
                 class="py-2 px-1 border-b-2 font-medium text-sm
                        @if($activeTab === 'preferences') 
-                           border-blue-500 text-blue-600 dark:border-blue-400 dark:text-blue-400
+                           border-[#e0ac7e] text-[#e0ac7e]
                        @else 
                            border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300
                        @endif
@@ -49,7 +49,7 @@
                 wire:click="$set('activeTab', 'notifications')"
                 class="py-2 px-1 border-b-2 font-medium text-sm
                        @if($activeTab === 'notifications') 
-                           border-blue-500 text-blue-600 dark:border-blue-400 dark:text-blue-400
+                           border-[#e0ac7e] text-[#e0ac7e]
                        @else 
                            border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300
                        @endif
@@ -65,7 +65,7 @@
                 wire:click="$set('activeTab', 'security')"
                 class="py-2 px-1 border-b-2 font-medium text-sm
                        @if($activeTab === 'security') 
-                           border-blue-500 text-blue-600 dark:border-blue-400 dark:text-blue-400
+                           border-[#e0ac7e] text-[#e0ac7e]
                        @else 
                            border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300
                        @endif
@@ -118,10 +118,8 @@
                                                   file:mr-4 file:py-2 file:px-4
                                                   file:rounded-md file:border-0
                                                   file:text-sm file:font-semibold
-                                                  file:bg-blue-50 file:text-blue-700
-                                                  hover:file:bg-blue-100
-                                                  dark:file:bg-blue-900 dark:file:text-blue-300
-                                                  dark:hover:file:bg-blue-800">
+                                                  file:bg-gray-700 file:text-[#e0ac7e]
+                                                  hover:file:bg-gray-600">
                                 </div>
                                 @error('avatar')
                                     <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
@@ -161,7 +159,7 @@
                             <input wire:model.lazy="first_name" 
                                    type="text" 
                                    id="first_name" 
-                                   class="mt-1 block w-full border-gray-600 dark:bg-gray-700 dark:text-white rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                                   class="mt-1 block w-full border-gray-600 dark:bg-gray-700 dark:text-white rounded-md shadow-sm focus:ring-[#e0ac7e] focus:border-[#e0ac7e] sm:text-sm">
                             @error('first_name')
                                 <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
                             @enderror
@@ -175,7 +173,7 @@
                             <input wire:model.lazy="last_name" 
                                    type="text" 
                                    id="last_name" 
-                                   class="mt-1 block w-full border-gray-600 dark:bg-gray-700 dark:text-white rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                                   class="mt-1 block w-full border-gray-600 dark:bg-gray-700 dark:text-white rounded-md shadow-sm focus:ring-[#e0ac7e] focus:border-[#e0ac7e] sm:text-sm">
                             @error('last_name')
                                 <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
                             @enderror
@@ -186,10 +184,14 @@
                             <label for="email" class="block text-sm font-medium text-gray-300">
                                 Adres email *
                             </label>
-                            <input wire:model.lazy="email" 
-                                   type="email" 
-                                   id="email" 
-                                   class="mt-1 block w-full border-gray-600 dark:bg-gray-700 dark:text-white rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                            <input wire:model.lazy="email"
+                                   type="email"
+                                   id="email"
+                                   @if(!$canEditEmail) disabled @endif
+                                   class="mt-1 block w-full border-gray-600 dark:bg-gray-700 dark:text-white rounded-md shadow-sm focus:ring-[#e0ac7e] focus:border-[#e0ac7e] sm:text-sm @if(!$canEditEmail) opacity-60 cursor-not-allowed @endif">
+                            @if(!$canEditEmail)
+                                <p class="mt-1 text-xs text-amber-400">Zmiana email wymaga uprawnien administratora</p>
+                            @endif
                             @error('email')
                                 <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
                             @enderror
@@ -203,7 +205,7 @@
                             <input wire:model.lazy="company" 
                                    type="text" 
                                    id="company" 
-                                   class="mt-1 block w-full border-gray-600 dark:bg-gray-700 dark:text-white rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                                   class="mt-1 block w-full border-gray-600 dark:bg-gray-700 dark:text-white rounded-md shadow-sm focus:ring-[#e0ac7e] focus:border-[#e0ac7e] sm:text-sm">
                             @error('company')
                                 <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
                             @enderror
@@ -217,7 +219,7 @@
                             <input wire:model.lazy="position" 
                                    type="text" 
                                    id="position" 
-                                   class="mt-1 block w-full border-gray-600 dark:bg-gray-700 dark:text-white rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                                   class="mt-1 block w-full border-gray-600 dark:bg-gray-700 dark:text-white rounded-md shadow-sm focus:ring-[#e0ac7e] focus:border-[#e0ac7e] sm:text-sm">
                             @error('position')
                                 <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
                             @enderror
@@ -231,7 +233,7 @@
                             <input wire:model.lazy="phone" 
                                    type="tel" 
                                    id="phone" 
-                                   class="mt-1 block w-full border-gray-600 dark:bg-gray-700 dark:text-white rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                                   class="mt-1 block w-full border-gray-600 dark:bg-gray-700 dark:text-white rounded-md shadow-sm focus:ring-[#e0ac7e] focus:border-[#e0ac7e] sm:text-sm">
                             @error('phone')
                                 <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
                             @enderror
@@ -257,7 +259,7 @@
                             </label>
                             <select wire:model="theme" 
                                     id="theme" 
-                                    class="mt-1 block w-full border-gray-600 dark:bg-gray-700 dark:text-white rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                                    class="mt-1 block w-full border-gray-600 dark:bg-gray-700 dark:text-white rounded-md shadow-sm focus:ring-[#e0ac7e] focus:border-[#e0ac7e] sm:text-sm">
                                 <option value="light">Jasny</option>
                                 <option value="dark">Ciemny</option>
                                 <option value="auto">Automatyczny</option>
@@ -271,7 +273,7 @@
                             </label>
                             <select wire:model="language" 
                                     id="language" 
-                                    class="mt-1 block w-full border-gray-600 dark:bg-gray-700 dark:text-white rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                                    class="mt-1 block w-full border-gray-600 dark:bg-gray-700 dark:text-white rounded-md shadow-sm focus:ring-[#e0ac7e] focus:border-[#e0ac7e] sm:text-sm">
                                 <option value="pl">Polski</option>
                                 <option value="en">English</option>
                             </select>
@@ -284,7 +286,7 @@
                             </label>
                             <select wire:model="date_format" 
                                     id="date_format" 
-                                    class="mt-1 block w-full border-gray-600 dark:bg-gray-700 dark:text-white rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                                    class="mt-1 block w-full border-gray-600 dark:bg-gray-700 dark:text-white rounded-md shadow-sm focus:ring-[#e0ac7e] focus:border-[#e0ac7e] sm:text-sm">
                                 <option value="d.m.Y">31.12.2023</option>
                                 <option value="Y-m-d">2023-12-31</option>
                                 <option value="m/d/Y">12/31/2023</option>
@@ -298,7 +300,7 @@
                             </label>
                             <select wire:model="timezone" 
                                     id="timezone" 
-                                    class="mt-1 block w-full border-gray-600 dark:bg-gray-700 dark:text-white rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                                    class="mt-1 block w-full border-gray-600 dark:bg-gray-700 dark:text-white rounded-md shadow-sm focus:ring-[#e0ac7e] focus:border-[#e0ac7e] sm:text-sm">
                                 <option value="Europe/Warsaw">Europa/Warszawa (CET/CEST)</option>
                                 <option value="UTC">UTC</option>
                                 <option value="Europe/London">Europa/Londyn (GMT/BST)</option>
@@ -327,8 +329,8 @@
                             </div>
                             <button type="button" 
                                     wire:click="$toggle('email_notifications')"
-                                    class="relative inline-flex flex-shrink-0 h-6 w-11 border-2 border-transparent rounded-full cursor-pointer transition-colors ease-in-out duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 
-                                           @if($email_notifications) bg-blue-600 @else bg-gray-200 dark:bg-gray-600 @endif">
+                                    class="relative inline-flex flex-shrink-0 h-6 w-11 border-2 border-transparent rounded-full cursor-pointer transition-colors ease-in-out duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#e0ac7e] 
+                                           @if($email_notifications) bg-[#e0ac7e] @else bg-gray-200 dark:bg-gray-600 @endif">
                                 <span class="sr-only">Toggle email notifications</span>
                                 <span class="pointer-events-none inline-block h-5 w-5 rounded-full bg-gray-800 shadow transform ring-0 transition ease-in-out duration-200 
                                              @if($email_notifications) translate-x-5 @else translate-x-0 @endif"></span>
@@ -343,8 +345,8 @@
                             </div>
                             <button type="button" 
                                     wire:click="$toggle('browser_notifications')"
-                                    class="relative inline-flex flex-shrink-0 h-6 w-11 border-2 border-transparent rounded-full cursor-pointer transition-colors ease-in-out duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 
-                                           @if($browser_notifications) bg-blue-600 @else bg-gray-200 dark:bg-gray-600 @endif">
+                                    class="relative inline-flex flex-shrink-0 h-6 w-11 border-2 border-transparent rounded-full cursor-pointer transition-colors ease-in-out duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#e0ac7e] 
+                                           @if($browser_notifications) bg-[#e0ac7e] @else bg-gray-200 dark:bg-gray-600 @endif">
                                 <span class="sr-only">Toggle browser notifications</span>
                                 <span class="pointer-events-none inline-block h-5 w-5 rounded-full bg-gray-800 shadow transform ring-0 transition ease-in-out duration-200 
                                              @if($browser_notifications) translate-x-5 @else translate-x-0 @endif"></span>
@@ -359,8 +361,8 @@
                             </div>
                             <button type="button" 
                                     wire:click="$toggle('mobile_notifications')"
-                                    class="relative inline-flex flex-shrink-0 h-6 w-11 border-2 border-transparent rounded-full cursor-pointer transition-colors ease-in-out duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 
-                                           @if($mobile_notifications) bg-blue-600 @else bg-gray-200 dark:bg-gray-600 @endif">
+                                    class="relative inline-flex flex-shrink-0 h-6 w-11 border-2 border-transparent rounded-full cursor-pointer transition-colors ease-in-out duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#e0ac7e] 
+                                           @if($mobile_notifications) bg-[#e0ac7e] @else bg-gray-200 dark:bg-gray-600 @endif">
                                 <span class="sr-only">Toggle mobile notifications</span>
                                 <span class="pointer-events-none inline-block h-5 w-5 rounded-full bg-gray-800 shadow transform ring-0 transition ease-in-out duration-200 
                                              @if($mobile_notifications) translate-x-5 @else translate-x-0 @endif"></span>
@@ -375,8 +377,8 @@
                             </div>
                             <button type="button" 
                                     wire:click="$toggle('marketing_emails')"
-                                    class="relative inline-flex flex-shrink-0 h-6 w-11 border-2 border-transparent rounded-full cursor-pointer transition-colors ease-in-out duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 
-                                           @if($marketing_emails) bg-blue-600 @else bg-gray-200 dark:bg-gray-600 @endif">
+                                    class="relative inline-flex flex-shrink-0 h-6 w-11 border-2 border-transparent rounded-full cursor-pointer transition-colors ease-in-out duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#e0ac7e] 
+                                           @if($marketing_emails) bg-[#e0ac7e] @else bg-gray-200 dark:bg-gray-600 @endif">
                                 <span class="sr-only">Toggle marketing emails</span>
                                 <span class="pointer-events-none inline-block h-5 w-5 rounded-full bg-gray-800 shadow transform ring-0 transition ease-in-out duration-200 
                                              @if($marketing_emails) translate-x-5 @else translate-x-0 @endif"></span>
@@ -404,7 +406,7 @@
                             </div>
                             <button type="button" 
                                     wire:click="togglePasswordSection"
-                                    class="px-4 py-2 border border-gray-600 rounded-md text-sm font-medium text-gray-300 bg-gray-700 hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                                    class="px-4 py-2 border border-gray-600 rounded-md text-sm font-medium text-gray-300 bg-gray-700 hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#e0ac7e]">
                                 @if($showPasswordSection)
                                     Anuluj zmianę hasła
                                 @else
@@ -423,7 +425,7 @@
                                     <input wire:model.lazy="current_password" 
                                            type="password" 
                                            id="current_password" 
-                                           class="mt-1 block w-full border-gray-600 dark:bg-gray-600 dark:text-white rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                                           class="mt-1 block w-full border-gray-600 dark:bg-gray-600 dark:text-white rounded-md shadow-sm focus:ring-[#e0ac7e] focus:border-[#e0ac7e] sm:text-sm">
                                     @error('current_password')
                                         <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
                                     @enderror
@@ -437,7 +439,7 @@
                                     <input wire:model.lazy="password" 
                                            type="password" 
                                            id="password" 
-                                           class="mt-1 block w-full border-gray-600 dark:bg-gray-600 dark:text-white rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                                           class="mt-1 block w-full border-gray-600 dark:bg-gray-600 dark:text-white rounded-md shadow-sm focus:ring-[#e0ac7e] focus:border-[#e0ac7e] sm:text-sm">
                                     @error('password')
                                         <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
                                     @enderror
@@ -446,7 +448,7 @@
                                     @if(strlen($password) > 0)
                                         <div class="mt-2 flex items-center space-x-2">
                                             <div class="flex-1 bg-gray-200 rounded-full h-2">
-                                                <div class="bg-blue-600 h-2 rounded-full transition-all duration-300" 
+                                                <div class="bg-[#e0ac7e] h-2 rounded-full transition-all duration-300" 
                                                      style="width: {{ ($passwordStrength / 5) * 100 }}%"></div>
                                             </div>
                                             <span class="text-xs px-2 py-1 rounded {{ $passwordStrengthColor }}">
@@ -464,7 +466,7 @@
                                     <input wire:model.lazy="password_confirmation" 
                                            type="password" 
                                            id="password_confirmation" 
-                                           class="mt-1 block w-full border-gray-600 dark:bg-gray-600 dark:text-white rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                                           class="mt-1 block w-full border-gray-600 dark:bg-gray-600 dark:text-white rounded-md shadow-sm focus:ring-[#e0ac7e] focus:border-[#e0ac7e] sm:text-sm">
                                 </div>
                             </div>
                         @endif
@@ -505,7 +507,7 @@
                            @if($loading) 
                                bg-gray-400 cursor-not-allowed 
                            @else 
-                               bg-blue-600 hover:bg-blue-700 focus:ring-2 focus:ring-offset-2 focus:ring-blue-500
+                               bg-[#e0ac7e] hover:bg-[#d1975a] focus:ring-2 focus:ring-offset-2 focus:ring-[#e0ac7e]
                            @endif 
                            focus:outline-none transition duration-150 ease-in-out">
                 @if($loading)

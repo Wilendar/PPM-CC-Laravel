@@ -127,9 +127,8 @@ Route::middleware(['auth'])->group(function () {
         return view('profile.show');
     })->name('profile.show');
 
-    Route::get('/profile/edit', function () {
-        return view('profile.edit');
-    })->name('profile.edit');
+    Route::get('/profile/edit', \App\Http\Livewire\Profile\EditProfile::class)
+        ->name('profile.edit');
 
     Route::patch('/profile', function (\Illuminate\Http\Request $request) {
         $user = auth()->user();
@@ -144,7 +143,11 @@ Route::middleware(['auth'])->group(function () {
         ]);
 
         $user->name = $validated['name'];
-        $user->email = $validated['email'];
+
+        // Only Admin can change email
+        if ($user->hasRole('Admin') && isset($validated['email'])) {
+            $user->email = $validated['email'];
+        }
 
         if (!empty($validated['password'])) {
             $user->password = bcrypt($validated['password']);
@@ -183,32 +186,17 @@ Route::middleware(['auth'])->group(function () {
         return redirect('/')->with('success', 'Konto zostalo usuniete.');
     })->name('profile.destroy');
 
-    // Additional profile routes
-    // Active Sessions Management - ETAP_04 FAZA A (User Management - planned)
-    Route::get('/profile/sessions', function () {
-        return view('placeholder-page', [
-            'title' => 'Aktywne Sesje',
-            'message' => 'Panel zarządzania aktywnymi sesjami użytkownika z możliwością wylogowania z innych urządzeń będzie dostępny wkrótce.',
-            'etap' => 'ETAP_04 FAZA A - User Management (zaplanowane)'
-        ]);
-    })->name('profile.sessions');
+    // Active Sessions Management
+    Route::get('/profile/sessions', \App\Http\Livewire\Profile\UserSessions::class)
+        ->name('profile.sessions');
 
-    // Activity History - ETAP_04 FAZA A (User Management - planned)
-    Route::get('/profile/activity', function () {
-        return view('placeholder-page', [
-            'title' => 'Historia Aktywności',
-            'message' => 'Timeline aktywności użytkownika (login/logout, zmiany produktów, akcje admin) będzie dostępny wkrótce.',
-            'etap' => 'ETAP_04 FAZA A - User Management (zaplanowane)'
-        ]);
-    })->name('profile.activity');
+    // Activity History
+    Route::get('/profile/activity', \App\Http\Livewire\Profile\ActivityHistory::class)
+        ->name('profile.activity');
 
-    Route::get('/profile/notifications', function () {
-        return view('placeholder-page', [
-            'title' => 'Ustawienia Powiadomień',
-            'message' => 'Panel ustawień powiadomień będzie dostępny w przyszłej wersji.',
-            'etap' => null
-        ]);
-    })->name('profile.notifications');
+    // Notification Preferences
+    Route::get('/profile/notifications', \App\Http\Livewire\Profile\NotificationPreferences::class)
+        ->name('profile.notifications');
 
     // Bug Reports - User's personal reports history
     Route::get('/profile/bug-reports', \App\Http\Livewire\BugReports\UserBugReports::class)

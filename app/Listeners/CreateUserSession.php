@@ -3,6 +3,7 @@
 namespace App\Listeners;
 
 use Illuminate\Auth\Events\Login;
+use App\Models\AuditLog;
 use App\Services\User\SessionManagementService;
 use App\Models\UserSession;
 
@@ -42,5 +43,8 @@ class CreateUserSession
             $event->user,
             request()
         );
+
+        // Log login to audit trail
+        AuditLog::logLogin($event->user->id);
     }
 }

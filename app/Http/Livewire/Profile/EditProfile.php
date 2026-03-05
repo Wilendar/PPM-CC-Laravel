@@ -15,11 +15,14 @@ class EditProfile extends Component
 
     // Personal Information
     public $first_name;
-    public $last_name; 
+    public $last_name;
     public $email;
     public $company;
     public $position;
     public $phone;
+
+    // Email editing permission
+    public bool $canEditEmail = false;
 
     // Avatar
     public $avatar;
@@ -52,7 +55,9 @@ class EditProfile extends Component
         $rules = [
             'first_name' => 'required|string|max:255',
             'last_name' => 'required|string|max:255',
-            'email' => 'required|email|unique:users,email,' . Auth::id(),
+            'email' => $this->canEditEmail
+                ? 'required|email|unique:users,email,' . Auth::id()
+                : 'required|email',
             'company' => 'nullable|string|max:255',
             'position' => 'nullable|string|max:255',
             'phone' => 'nullable|string|max:20',
@@ -86,7 +91,10 @@ class EditProfile extends Component
     public function mount()
     {
         $user = Auth::user();
-        
+
+        // Check email edit permission
+        $this->canEditEmail = $user->hasRole('Admin');
+
         // Load user data
         $this->first_name = $user->first_name;
         $this->last_name = $user->last_name;
@@ -97,7 +105,7 @@ class EditProfile extends Component
         $this->current_avatar = $user->avatar;
 
         // Load preferences (with defaults if not set)
-        $preferences = $user->preferences ?? [];
+        $preferences = $user->ui_preferences ?? [];
         $this->theme = $preferences['theme'] ?? 'light';
         $this->language = $preferences['language'] ?? 'pl';
         $this->date_format = $preferences['date_format'] ?? 'd.m.Y';
@@ -190,13 +198,17 @@ class EditProfile extends Component
             $userData = [
                 'first_name' => $this->first_name,
                 'last_name' => $this->last_name,
-                'email' => $this->email,
                 'company' => $this->company,
                 'position' => $this->position,
                 'phone' => $this->phone,
                 'avatar' => $avatarPath,
                 'marketing_accepted' => $this->marketing_emails
             ];
+
+            // Only allow email change for Admin role
+            if ($this->canEditEmail) {
+                $userData['email'] = $this->email;
+            }
 
             // Handle password change
             if ($this->showPasswordSection && !empty($this->current_password) && !empty($this->password)) {
@@ -230,7 +242,7 @@ class EditProfile extends Component
                 'mobile' => $this->mobile_notifications
             ];
 
-            $userData['preferences'] = $preferences;
+            $userData['ui_preferences'] = $preferences;
             $userData['notification_settings'] = $notificationSettings;
 
             // Update user
@@ -332,8 +344,9 @@ class EditProfile extends Component
     public function render()
     {
         return view('livewire.profile.edit-profile')
-            ->layout('layouts.app', [
-                'title' => 'Profil użytkownika - PPM'
+            ->layout('layouts.admin', [
+                'title' => 'Edytuj profil - Admin PPM',
+                'breadcrumb' => 'Edytuj profil'
             ]);
     }
 }
