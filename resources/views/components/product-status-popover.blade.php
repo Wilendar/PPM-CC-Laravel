@@ -17,6 +17,10 @@
 @php
     use App\DTOs\ProductStatusDTO;
 
+    // SECURITY: Filter out price/stock issues from display if user lacks permissions
+    $canReadPrices = auth()->user()?->hasPermissionTo('prices.read') ?? false;
+    $canReadStock = auth()->user()?->hasPermissionTo('stock.read') ?? false;
+
     $hasIssues = $status->hasAnyIssues();
     $severity = $status->getSeverity();
     $issueLabels = ProductStatusDTO::getIssueLabels();
@@ -122,10 +126,19 @@
                 <div class="p-3 space-y-3 max-h-64 overflow-y-auto">
                     {{-- Global Issues --}}
                     @if($status->hasGlobalIssues())
+                        @php
+                            // SECURITY: Filter global issues based on permissions
+                            $visibleIssues = collect($status->getActiveGlobalIssues())->filter(function ($issue) use ($canReadPrices, $canReadStock) {
+                                if ($issue === ProductStatusDTO::ISSUE_ZERO_PRICE && !$canReadPrices) return false;
+                                if ($issue === ProductStatusDTO::ISSUE_LOW_STOCK && !$canReadStock) return false;
+                                return true;
+                            })->values();
+                        @endphp
+                        @if($visibleIssues->isNotEmpty())
                         <div>
                             <h5 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1.5">Problemy ogólne</h5>
                             <ul class="space-y-1">
-                                @foreach($status->getActiveGlobalIssues() as $issue)
+                                @foreach($visibleIssues as $issue)
                                     @php
                                         $color = $issueColors[$issue] ?? 'gray';
                                         $colorClass = $colorMap[$color] ?? $colorMap['gray'];
@@ -137,6 +150,7 @@
                                 @endforeach
                             </ul>
                         </div>
+                        @endif
                     @endif
 
                     {{-- Shop Issues --}}

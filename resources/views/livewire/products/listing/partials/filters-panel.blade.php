@@ -3,7 +3,8 @@
         {{-- Category Filter - Tree Dropdown --}}
         @include('livewire.products.listing.partials.category-tree-dropdown')
 
-        {{-- Status Filter --}}
+        {{-- Status Filter - SECURITY: only with products.status --}}
+        @if($this->userCan('status_read'))
         <div>
             <label class="block text-sm font-medium text-gray-300 mb-2">Status</label>
             <select wire:model.live="statusFilter"
@@ -13,8 +14,10 @@
                 <option value="inactive">Nieaktywne</option>
             </select>
         </div>
+        @endif
 
-        {{-- Stock Filter (basic) --}}
+        {{-- Stock Filter (basic) - SECURITY: only with stock.read --}}
+        @if($this->userCan('stock_read'))
         <div>
             <label class="block text-sm font-medium text-gray-300 mb-2">Stan magazynowy</label>
             <select wire:model.live="stockFilter"
@@ -25,6 +28,7 @@
                 <option value="out_of_stock">Brak na stanie</option>
             </select>
         </div>
+        @endif
 
         {{-- Product Type Filter --}}
         <div>
@@ -40,7 +44,8 @@
 
         {{-- ETAP_05 - Advanced Filters (1.1.1.2.4-1.1.1.2.8) --}}
 
-        {{-- 1.1.1.2.4: Price Group Filter --}}
+        {{-- 1.1.1.2.4: Price Group Filter - SECURITY: only with prices.read --}}
+        @if($this->userCan('prices_read'))
         <div>
             <label class="block text-sm font-medium text-gray-300 mb-2">Grupa cenowa</label>
             <select wire:model.live="priceGroupFilter"
@@ -65,8 +70,10 @@
                        class="form-input w-full rounded-lg text-sm focus:border-orange-500 focus:ring-orange-500 focus:ring-opacity-50">
             </div>
         </div>
+        @endif
 
-        {{-- Warehouse Filter --}}
+        {{-- Warehouse Filter - SECURITY: only with stock.read --}}
+        @if($this->userCan('stock_read'))
         <div>
             <label class="block text-sm font-medium text-gray-300 mb-2">Magazyn</label>
             <select wire:model.live="stockWarehouseFilter"
@@ -91,6 +98,7 @@
                        class="form-input w-full rounded-lg text-sm focus:border-orange-500 focus:ring-orange-500 focus:ring-opacity-50">
             </div>
         </div>
+        @endif
 
         {{-- 1.1.1.2.5: Date Range Filters --}}
         <div>
@@ -117,7 +125,8 @@
                    class="form-input w-full rounded-lg shadow-sm focus:border-orange-500 focus:ring-orange-500 focus:ring-opacity-50">
         </div>
 
-        {{-- 1.1.1.2.7: Integration Status Filter --}}
+        {{-- 1.1.1.2.7: Integration Status Filter - SECURITY: only with products.compliance --}}
+        @if($this->userCan('compliance_read'))
         <div>
             <label class="block text-sm font-medium text-gray-300 mb-2">Status integracji</label>
             <select wire:model.live="integrationFilter"
@@ -128,6 +137,7 @@
                 @endforeach
             </select>
         </div>
+        @endif
 
         {{-- 1.1.1.2.8: Media Status Filter --}}
         <div>

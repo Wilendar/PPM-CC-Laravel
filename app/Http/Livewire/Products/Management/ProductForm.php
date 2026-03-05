@@ -80,10 +80,15 @@ class ProductForm extends Component
         return [
             'variants' => 'products.variants',
             'prices' => 'prices.update',
+            'prices_read' => 'prices.read',
+            'prices_cost' => 'prices.cost',
             'stock' => 'stock.update',
+            'stock_read' => 'stock.read',
             'media' => 'media.update',
             'sync' => 'shops.sync',
             'categories_update' => 'categories.update',
+            'status_read' => 'products.status',
+            'compliance_read' => 'products.compliance',
         ];
     }
 

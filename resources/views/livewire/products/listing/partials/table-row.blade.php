@@ -119,107 +119,121 @@
     </td>
 
     {{-- Cena --}}
-    <td class="px-4 py-4 whitespace-nowrap text-sm" @click.stop
-        x-data="{ show: false, tipStyle: '' }"
-        @mouseenter="show = true; $nextTick(() => { const r = $refs.priceVal.getBoundingClientRect(); const vh = window.innerHeight; const flip = r.bottom + 200 > vh; tipStyle = flip ? 'bottom:' + (vh - r.top + 2) + 'px;top:auto;left:' + Math.max(8, r.left) + 'px' : 'top:' + (r.bottom + 2) + 'px;left:' + Math.max(8, r.left) + 'px'; })"
-        @mouseleave="show = false">
-        @php
-            $defaultPrice = $this->getDefaultPriceForProduct($product);
-            $allPrices = $this->getAllPricesForProduct($product);
-        @endphp
-        <span x-ref="priceVal" class="text-orange-400 font-medium">
-            {{ $this->formatPrice($defaultPrice) }}
-        </span>
-        @if(count($allPrices) > 1)
-            <span class="text-xs text-gray-500 ml-1">({{ count($allPrices) }})</span>
-        @endif
+    <td class="px-4 py-4 whitespace-nowrap text-sm" @click.stop>
+        @if($this->userCan('prices_read'))
+        <div x-data="{ show: false, tipStyle: '' }"
+            @mouseenter="show = true; $nextTick(() => { const r = $refs.priceVal.getBoundingClientRect(); const vh = window.innerHeight; const flip = r.bottom + 200 > vh; tipStyle = flip ? 'bottom:' + (vh - r.top + 2) + 'px;top:auto;left:' + Math.max(8, r.left) + 'px' : 'top:' + (r.bottom + 2) + 'px;left:' + Math.max(8, r.left) + 'px'; })"
+            @mouseleave="show = false">
+            @php
+                $defaultPrice = $this->getDefaultPriceForProduct($product);
+                $allPrices = $this->getAllPricesForProduct($product);
+            @endphp
+            <span x-ref="priceVal" class="text-orange-400 font-medium">
+                {{ $this->formatPrice($defaultPrice) }}
+            </span>
+            @if(count($allPrices) > 1)
+                <span class="text-xs text-gray-500 ml-1">({{ count($allPrices) }})</span>
+            @endif
 
-        @if(count($allPrices) > 0)
-            <template x-teleport="body">
-                <div x-show="show" x-transition x-cloak class="price-tooltip" :style="tipStyle">
-                    <div class="text-xs font-semibold text-gray-300 mb-1 pb-1 border-b border-gray-600">
-                        Grupy cenowe ({{ $priceDisplayMode }})
-                    </div>
-                    @foreach($allPrices as $priceData)
-                        <div class="flex justify-between text-xs py-0.5">
-                            <span class="mr-3 {{ ($priceData['is_default'] ?? false) ? 'text-orange-400 font-medium' : 'text-gray-400' }}">{{ $priceData['group'] }}{{ ($priceData['is_default'] ?? false) ? ' *' : '' }}</span>
-                            <span class="{{ ($priceData['is_default'] ?? false) ? 'text-orange-300' : 'text-white' }} font-medium">
-                                {{ number_format($priceDisplayMode === 'netto' ? $priceData['netto'] : $priceData['brutto'], 2, ',', ' ') }} zl
-                            </span>
+            @if(count($allPrices) > 0)
+                <template x-teleport="body">
+                    <div x-show="show" x-transition x-cloak class="price-tooltip" :style="tipStyle">
+                        <div class="text-xs font-semibold text-gray-300 mb-1 pb-1 border-b border-gray-600">
+                            Grupy cenowe ({{ $priceDisplayMode }})
                         </div>
-                    @endforeach
-                </div>
-            </template>
+                        @foreach($allPrices as $priceData)
+                            <div class="flex justify-between text-xs py-0.5">
+                                <span class="mr-3 {{ ($priceData['is_default'] ?? false) ? 'text-orange-400 font-medium' : 'text-gray-400' }}">{{ $priceData['group'] }}{{ ($priceData['is_default'] ?? false) ? ' *' : '' }}</span>
+                                <span class="{{ ($priceData['is_default'] ?? false) ? 'text-orange-300' : 'text-white' }} font-medium">
+                                    {{ number_format($priceDisplayMode === 'netto' ? $priceData['netto'] : $priceData['brutto'], 2, ',', ' ') }} zl
+                                </span>
+                            </div>
+                        @endforeach
+                    </div>
+                </template>
+            @endif
+        </div>
+        @else
+            <span class="censored-value censored-value--price" title="Brak uprawnien do odczytu cen">**,** zl</span>
         @endif
     </td>
 
     {{-- Stan --}}
-    <td class="px-4 py-4 whitespace-nowrap text-sm" @click.stop
-        x-data="{ show: false, tipStyle: '' }"
-        @mouseenter="show = true; $nextTick(() => { const r = $refs.stockVal.getBoundingClientRect(); const vh = window.innerHeight; const flip = r.bottom + 350 > vh; tipStyle = flip ? 'bottom:' + (vh - r.top + 2) + 'px;top:auto;left:' + Math.max(8, r.left - 100) + 'px' : 'top:' + (r.bottom + 2) + 'px;left:' + Math.max(8, r.left - 100) + 'px'; })"
-        @mouseleave="show = false">
-        @php
-            $defaultStock = $this->getDefaultStockForProduct($product);
-            $allStock = $this->getAllStockForProduct($product);
-            $stockClass = $this->getStockIndicatorClass($defaultStock);
-        @endphp
-        <span x-ref="stockVal" class="{{ $stockClass }}">
-            {{ $defaultStock !== null ? $defaultStock . ' szt.' : '-' }}
-        </span>
-        @if(count($allStock) > 1)
-            <span class="text-xs text-gray-500 ml-1">({{ count($allStock) }})</span>
-        @endif
+    <td class="px-4 py-4 whitespace-nowrap text-sm" @click.stop>
+        @if($this->userCan('stock_read'))
+        <div x-data="{ show: false, tipStyle: '' }"
+            @mouseenter="show = true; $nextTick(() => { const r = $refs.stockVal.getBoundingClientRect(); const vh = window.innerHeight; const flip = r.bottom + 350 > vh; tipStyle = flip ? 'bottom:' + (vh - r.top + 2) + 'px;top:auto;left:' + Math.max(8, r.left - 100) + 'px' : 'top:' + (r.bottom + 2) + 'px;left:' + Math.max(8, r.left - 100) + 'px'; })"
+            @mouseleave="show = false">
+            @php
+                $defaultStock = $this->getDefaultStockForProduct($product);
+                $allStock = $this->getAllStockForProduct($product);
+                $stockClass = $this->getStockIndicatorClass($defaultStock);
+            @endphp
+            <span x-ref="stockVal" class="{{ $stockClass }}">
+                {{ $defaultStock !== null ? $defaultStock . ' szt.' : '-' }}
+            </span>
+            @if(count($allStock) > 1)
+                <span class="text-xs text-gray-500 ml-1">({{ count($allStock) }})</span>
+            @endif
 
-        @if(count($allStock) > 0)
-            <template x-teleport="body">
-                <div x-show="show" x-transition x-cloak class="stock-tooltip" :style="tipStyle">
-                    <div class="text-xs font-semibold text-gray-300 mb-2 pb-1 border-b border-gray-600">
-                        Stany magazynowe
-                    </div>
-                    <table class="stock-tooltip__table">
-                        <thead>
-                            <tr class="text-xs text-gray-500">
-                                <th class="text-left pr-3 pb-1 font-medium">Magazyn</th>
-                                <th class="text-right pr-2 pb-1 font-medium">Stan</th>
-                                <th class="text-right pr-2 pb-1 font-medium">Rez.</th>
-                                <th class="text-right pr-2 pb-1 font-medium">Dost.</th>
-                                <th class="text-right pb-1 font-medium">Limit</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @foreach($allStock as $stockData)
-                                <tr class="text-xs {{ $stockData['is_out'] ? 'stock-tooltip__row--out' : ($stockData['is_low'] ? 'stock-tooltip__row--low' : '') }}">
-                                    <td class="pr-3 py-0.5 {{ $stockData['is_default'] ?? false ? 'text-orange-400 font-medium' : 'text-gray-400' }}">{{ $stockData['warehouse'] }}{{ ($stockData['is_default'] ?? false) ? ' *' : '' }}</td>
-                                    <td class="text-right pr-2 py-0.5 text-white">{{ $stockData['quantity'] }}</td>
-                                    <td class="text-right pr-2 py-0.5 text-gray-400">{{ $stockData['reserved'] }}</td>
-                                    <td class="text-right pr-2 py-0.5 font-medium {{ $stockData['is_out'] ? 'text-red-400' : ($stockData['is_low'] ? 'text-yellow-400' : 'text-green-400') }}">{{ $stockData['available'] }}</td>
-                                    <td class="text-right py-0.5 text-gray-500">{{ $stockData['minimum_stock'] > 0 ? $stockData['minimum_stock'] : '-' }}</td>
+            @if(count($allStock) > 0)
+                <template x-teleport="body">
+                    <div x-show="show" x-transition x-cloak class="stock-tooltip" :style="tipStyle">
+                        <div class="text-xs font-semibold text-gray-300 mb-2 pb-1 border-b border-gray-600">
+                            Stany magazynowe
+                        </div>
+                        <table class="stock-tooltip__table">
+                            <thead>
+                                <tr class="text-xs text-gray-500">
+                                    <th class="text-left pr-3 pb-1 font-medium">Magazyn</th>
+                                    <th class="text-right pr-2 pb-1 font-medium">Stan</th>
+                                    <th class="text-right pr-2 pb-1 font-medium">Rez.</th>
+                                    <th class="text-right pr-2 pb-1 font-medium">Dost.</th>
+                                    <th class="text-right pb-1 font-medium">Limit</th>
                                 </tr>
-                            @endforeach
-                        </tbody>
-                    </table>
-                </div>
-            </template>
+                            </thead>
+                            <tbody>
+                                @foreach($allStock as $stockData)
+                                    <tr class="text-xs {{ $stockData['is_out'] ? 'stock-tooltip__row--out' : ($stockData['is_low'] ? 'stock-tooltip__row--low' : '') }}">
+                                        <td class="pr-3 py-0.5 {{ $stockData['is_default'] ?? false ? 'text-orange-400 font-medium' : 'text-gray-400' }}">{{ $stockData['warehouse'] }}{{ ($stockData['is_default'] ?? false) ? ' *' : '' }}</td>
+                                        <td class="text-right pr-2 py-0.5 text-white">{{ $stockData['quantity'] }}</td>
+                                        <td class="text-right pr-2 py-0.5 text-gray-400">{{ $stockData['reserved'] }}</td>
+                                        <td class="text-right pr-2 py-0.5 font-medium {{ $stockData['is_out'] ? 'text-red-400' : ($stockData['is_low'] ? 'text-yellow-400' : 'text-green-400') }}">{{ $stockData['available'] }}</td>
+                                        <td class="text-right py-0.5 text-gray-500">{{ $stockData['minimum_stock'] > 0 ? $stockData['minimum_stock'] : '-' }}</td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                </template>
+            @endif
+        </div>
+        @else
+            <span class="censored-value censored-value--stock" title="Brak uprawnien do odczytu stanow">** szt.</span>
         @endif
     </td>
 
     {{-- Status --}}
     <td class="px-6 py-4 whitespace-nowrap" @click.stop>
-        @if($this->userCan('update'))
-        <button wire:click="toggleStatus({{ $product->id }})"
-                class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium transition-colors
-                    {{ $product->is_active
-                        ? 'bg-green-800 text-green-200 hover:bg-green-700'
-                        : 'bg-red-800 text-red-200 hover:bg-red-700' }}">
-            <span class="w-2 h-2 rounded-full mr-1 {{ $product->is_active ? 'bg-green-400' : 'bg-red-400' }}"></span>
-            {{ $product->is_active ? 'Aktywny' : 'Nieaktywny' }}
-        </button>
+        @if($this->userCan('status_read'))
+            @if($this->userCan('update'))
+            <button wire:click="toggleStatus({{ $product->id }})"
+                    class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium transition-colors
+                        {{ $product->is_active
+                            ? 'bg-green-800 text-green-200 hover:bg-green-700'
+                            : 'bg-red-800 text-red-200 hover:bg-red-700' }}">
+                <span class="w-2 h-2 rounded-full mr-1 {{ $product->is_active ? 'bg-green-400' : 'bg-red-400' }}"></span>
+                {{ $product->is_active ? 'Aktywny' : 'Nieaktywny' }}
+            </button>
+            @else
+            <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium
+                        {{ $product->is_active ? 'bg-green-800/50 text-green-200' : 'bg-red-800/50 text-red-200' }}">
+                <span class="w-2 h-2 rounded-full mr-1 {{ $product->is_active ? 'bg-green-400' : 'bg-red-400' }}"></span>
+                {{ $product->is_active ? 'Aktywny' : 'Nieaktywny' }}
+            </span>
+            @endif
         @else
-        <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium
-                    {{ $product->is_active ? 'bg-green-800/50 text-green-200' : 'bg-red-800/50 text-red-200' }}">
-            <span class="w-2 h-2 rounded-full mr-1 {{ $product->is_active ? 'bg-green-400' : 'bg-red-400' }}"></span>
-            {{ $product->is_active ? 'Aktywny' : 'Nieaktywny' }}
-        </span>
+            <span class="censored-value" title="Brak uprawnien do odczytu statusu">***</span>
         @endif
     </td>
 

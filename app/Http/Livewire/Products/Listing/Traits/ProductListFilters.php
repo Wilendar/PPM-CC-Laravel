@@ -230,16 +230,22 @@ trait ProductListFilters
             });
         }
 
-        if ($this->statusFilter !== 'all') {
+        // SECURITY: Only apply status filter if user has status_read permission
+        if ($this->statusFilter !== 'all' && $this->userCan('status_read')) {
             $query->where('is_active', $this->statusFilter === 'active');
+        } elseif ($this->statusFilter !== 'all') {
+            $this->statusFilter = 'all';
         }
 
         if ($this->productTypeFilter !== 'all') {
             $query->byType($this->productTypeFilter);
         }
 
-        if ($this->stockFilter !== 'all') {
+        // SECURITY: Only apply basic stock filter if user has stock_read permission
+        if ($this->stockFilter !== 'all' && $this->userCan('stock_read')) {
             $query = $this->applyStockFilter($query);
+        } elseif ($this->stockFilter !== 'all') {
+            $this->stockFilter = 'all';
         }
 
         $query = $this->applyAdvancedFilters($query);
@@ -260,7 +266,16 @@ trait ProductListFilters
     {
         $direction = strtolower($this->sortDirection) === 'desc' ? 'desc' : 'asc';
 
-        switch ($this->sortBy) {
+        // SECURITY: Reset sort to default if user lacks permission for price/stock columns
+        $effectiveSortBy = $this->sortBy;
+        if ($effectiveSortBy === 'price' && !$this->userCan('prices_read')) {
+            $effectiveSortBy = 'updated_at';
+        }
+        if ($effectiveSortBy === 'stock' && !$this->userCan('stock_read')) {
+            $effectiveSortBy = 'updated_at';
+        }
+
+        switch ($effectiveSortBy) {
             case 'price':
                 $priceColumn = $this->priceDisplayMode === 'netto' ? 'price_net' : 'price_gross';
 
@@ -288,11 +303,11 @@ trait ProductListFilters
                 break;
 
             default:
-                $query->orderBy($this->sortBy, $direction);
+                $query->orderBy($effectiveSortBy, $direction);
                 break;
         }
 
-        if ($this->sortBy !== 'id') {
+        if ($effectiveSortBy !== 'id') {
             $query->orderBy('products.id', 'desc');
         }
 
@@ -322,36 +337,50 @@ trait ProductListFilters
 
     private function applyAdvancedFilters(Builder $query): Builder
     {
-        // Price Group + Range Filter
-        if ($this->priceGroupFilter) {
-            $query->whereHas('prices', function ($q) {
-                $q->where('price_group_id', $this->priceGroupFilter);
-                if ($this->priceMin > 0) {
-                    $q->where('price_net', '>=', $this->priceMin);
-                }
-                if ($this->priceMax < 10000) {
-                    $q->where('price_net', '<=', $this->priceMax);
-                }
-            });
-        } elseif ($this->priceMin > 0 || $this->priceMax < 10000) {
-            $query->whereHas('prices', function ($q) {
-                $q->whereBetween('price_net', [$this->priceMin, $this->priceMax]);
-            });
+        // Price Group + Range Filter - SECURITY: only apply if user has prices_read permission
+        if ($this->userCan('prices_read')) {
+            if ($this->priceGroupFilter) {
+                $query->whereHas('prices', function ($q) {
+                    $q->where('price_group_id', $this->priceGroupFilter);
+                    if ($this->priceMin > 0) {
+                        $q->where('price_net', '>=', $this->priceMin);
+                    }
+                    if ($this->priceMax < 10000) {
+                        $q->where('price_net', '<=', $this->priceMax);
+                    }
+                });
+            } elseif ($this->priceMin > 0 || $this->priceMax < 10000) {
+                $query->whereHas('prices', function ($q) {
+                    $q->whereBetween('price_net', [$this->priceMin, $this->priceMax]);
+                });
+            }
+        } else {
+            // Reset price filters to prevent Livewire wire:call bypass
+            $this->priceMin = 0;
+            $this->priceMax = 10000;
+            $this->priceGroupFilter = '';
         }
 
-        // Stock Range + Warehouse Filter
-        if ($this->stockMin !== null || $this->stockMax !== null || $this->stockWarehouseFilter) {
-            $query->whereHas('stock', function ($q) {
-                if ($this->stockWarehouseFilter) {
-                    $q->where('warehouse_id', $this->stockWarehouseFilter);
-                }
-                if ($this->stockMin !== null) {
-                    $q->where('quantity', '>=', $this->stockMin);
-                }
-                if ($this->stockMax !== null) {
-                    $q->where('quantity', '<=', $this->stockMax);
-                }
-            });
+        // Stock Range + Warehouse Filter - SECURITY: only apply if user has stock_read permission
+        if ($this->userCan('stock_read')) {
+            if ($this->stockMin !== null || $this->stockMax !== null || $this->stockWarehouseFilter) {
+                $query->whereHas('stock', function ($q) {
+                    if ($this->stockWarehouseFilter) {
+                        $q->where('warehouse_id', $this->stockWarehouseFilter);
+                    }
+                    if ($this->stockMin !== null) {
+                        $q->where('quantity', '>=', $this->stockMin);
+                    }
+                    if ($this->stockMax !== null) {
+                        $q->where('quantity', '<=', $this->stockMax);
+                    }
+                });
+            }
+        } else {
+            // Reset stock filters to prevent Livewire wire:call bypass
+            $this->stockMin = null;
+            $this->stockMax = null;
+            $this->stockWarehouseFilter = '';
         }
 
         if (!empty($this->dateFrom)) {
@@ -361,16 +390,23 @@ trait ProductListFilters
             $query->whereDate($this->dateType, '<=', $this->dateTo);
         }
 
-        if ($this->integrationFilter !== 'all') {
+        // SECURITY: Only apply integration filter if user has compliance_read permission
+        if ($this->integrationFilter !== 'all' && $this->userCan('compliance_read')) {
             $query = $this->applyIntegrationFilter($query);
+        } elseif ($this->integrationFilter !== 'all') {
+            $this->integrationFilter = 'all';
         }
 
         if ($this->mediaFilter !== 'all') {
             $query = $this->applyMediaFilter($query);
         }
 
-        if (!empty($this->dataStatusFilter) || !empty($this->issueTypeFilters)) {
+        // SECURITY: Only apply compliance filters if user has compliance_read permission
+        if ($this->userCan('compliance_read') && (!empty($this->dataStatusFilter) || !empty($this->issueTypeFilters))) {
             $query = $this->applyDataStatusFilter($query);
+        } elseif (!$this->userCan('compliance_read')) {
+            $this->dataStatusFilter = null;
+            $this->issueTypeFilters = [];
         }
 
         return $query;
@@ -379,7 +415,16 @@ trait ProductListFilters
     private function applyDataStatusFilter(Builder $query): Builder
     {
         if (!empty($this->issueTypeFilters)) {
-            foreach ($this->issueTypeFilters as $issueType) {
+            // SECURITY: Remove price/stock issue types if user lacks permissions
+            $effectiveFilters = $this->issueTypeFilters;
+            if (!$this->userCan('prices_read')) {
+                $effectiveFilters = array_values(array_filter($effectiveFilters, fn($f) => $f !== 'zero_price'));
+            }
+            if (!$this->userCan('stock_read')) {
+                $effectiveFilters = array_values(array_filter($effectiveFilters, fn($f) => $f !== 'low_stock'));
+            }
+
+            foreach ($effectiveFilters as $issueType) {
                 switch ($issueType) {
                     case 'zero_price':
                         $query->whereHas('prices', function ($q) {
@@ -411,25 +456,32 @@ trait ProductListFilters
 
         if ($this->dataStatusFilter === 'issues') {
             $query->where(function ($q) {
-                $q->whereHas('prices', function ($pq) {
-                    $pq->whereHas('priceGroup', fn($pg) => $pg->where('is_active', true))
-                       ->where('price_net', '<=', 0);
-                })
-                ->orWhereHas('stock', function ($sq) {
-                    $sq->whereHas('warehouse', fn($wq) => $wq->where('is_default', true))
-                       ->whereColumn('quantity', '<', 'minimum_stock')
-                       ->where('minimum_stock', '>', 0);
-                })
-                ->orWhereDoesntHave('media', fn($mq) => $mq->where('is_active', true))
-                ->orWhereDoesntHave('shopData');
+                // SECURITY: Only include price/stock issue checks if user has permission
+                if ($this->userCan('prices_read')) {
+                    $q->whereHas('prices', function ($pq) {
+                        $pq->whereHas('priceGroup', fn($pg) => $pg->where('is_active', true))
+                           ->where('price_net', '<=', 0);
+                    });
+                }
+                if ($this->userCan('stock_read')) {
+                    $q->orWhereHas('stock', function ($sq) {
+                        $sq->whereHas('warehouse', fn($wq) => $wq->where('is_default', true))
+                           ->whereColumn('quantity', '<', 'minimum_stock')
+                           ->where('minimum_stock', '>', 0);
+                    });
+                }
+                $q->orWhereDoesntHave('media', fn($mq) => $mq->where('is_active', true))
+                  ->orWhereDoesntHave('shopData');
             });
         } elseif ($this->dataStatusFilter === 'ok') {
-            $query->whereDoesntHave('prices', function ($pq) {
-                $pq->whereHas('priceGroup', fn($pg) => $pg->where('is_active', true))
-                   ->where('price_net', '<=', 0);
-            })
-            ->whereHas('media', fn($mq) => $mq->where('is_active', true))
-            ->whereHas('shopData');
+            if ($this->userCan('prices_read')) {
+                $query->whereDoesntHave('prices', function ($pq) {
+                    $pq->whereHas('priceGroup', fn($pg) => $pg->where('is_active', true))
+                       ->where('price_net', '<=', 0);
+                });
+            }
+            $query->whereHas('media', fn($mq) => $mq->where('is_active', true))
+                  ->whereHas('shopData');
         }
 
         return $query;

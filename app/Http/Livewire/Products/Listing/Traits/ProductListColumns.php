@@ -45,6 +45,14 @@ trait ProductListColumns
 
     public function setSortColumn(string $column): void
     {
+        // SECURITY: Block sorting by price/stock without permissions
+        if ($column === 'price' && !$this->userCan('prices_read')) {
+            return;
+        }
+        if ($column === 'stock' && !$this->userCan('stock_read')) {
+            return;
+        }
+
         if ($this->sortBy === $column) {
             $this->sortDirection = $this->sortDirection === 'asc' ? 'desc' : 'asc';
         } else {
@@ -121,7 +129,24 @@ trait ProductListColumns
         }
 
         $products = $paginator->getCollection();
-        return app(ProductStatusAggregator::class)->aggregateForProducts($products);
+        $statuses = app(ProductStatusAggregator::class)->aggregateForProducts($products);
+
+        // SECURITY: Filter sensitive issues based on permissions
+        $canReadPrices = $this->userCan('prices_read');
+        $canReadStock = $this->userCan('stock_read');
+
+        if (!$canReadPrices || !$canReadStock) {
+            foreach ($statuses as $productId => $status) {
+                if (!$canReadPrices) {
+                    $status->clearGlobalIssue(ProductStatusDTO::ISSUE_ZERO_PRICE);
+                }
+                if (!$canReadStock) {
+                    $status->clearGlobalIssue(ProductStatusDTO::ISSUE_LOW_STOCK);
+                }
+            }
+        }
+
+        return $statuses;
     }
 
     public function getProductStatus(int $productId): ?ProductStatusDTO
@@ -229,6 +254,10 @@ trait ProductListColumns
      */
     public function getDefaultPriceForProduct(\App\Models\Product $product): ?float
     {
+        if (!$this->userCan('prices_read')) {
+            return null;
+        }
+
         if (!$product->relationLoaded('prices')) {
             return null;
         }
@@ -255,6 +284,10 @@ trait ProductListColumns
      */
     public function getAllPricesForProduct(\App\Models\Product $product): array
     {
+        if (!$this->userCan('prices_read')) {
+            return [];
+        }
+
         if (!$product->relationLoaded('prices')) {
             return [];
         }
@@ -278,6 +311,10 @@ trait ProductListColumns
      */
     public function getDefaultStockForProduct(\App\Models\Product $product): ?int
     {
+        if (!$this->userCan('stock_read')) {
+            return null;
+        }
+
         if (!$product->relationLoaded('stock')) {
             return null;
         }
@@ -299,6 +336,10 @@ trait ProductListColumns
      */
     public function getAllStockForProduct(\App\Models\Product $product): array
     {
+        if (!$this->userCan('stock_read')) {
+            return [];
+        }
+
         // Get all active warehouses (cached via computed)
         $warehouses = $this->allActiveWarehouses;
 

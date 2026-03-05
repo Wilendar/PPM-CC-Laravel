@@ -56,6 +56,17 @@ class ProductList extends Component
         return 'products';
     }
 
+    protected function getExtraPermissions(): array
+    {
+        return [
+            'prices_read' => 'prices.read',
+            'stock_read' => 'stock.read',
+            'prices_cost' => 'prices.cost',
+            'status_read' => 'products.status',
+            'compliance_read' => 'products.compliance',
+        ];
+    }
+
     // Computed
     public bool $hasFilters = false;
 

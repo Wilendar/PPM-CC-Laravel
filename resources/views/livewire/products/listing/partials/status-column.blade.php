@@ -21,7 +21,9 @@
 
 <td class="px-3 py-2" @click.stop>
     <div class="flex flex-wrap items-center gap-1 max-w-[200px]">
-        @if($status)
+        @if(!$this->userCan('compliance_read'))
+            <span class="censored-value" title="Brak uprawnien do odczytu zgodnosci">***</span>
+        @elseif($status)
             {{-- GRACE PERIOD: Awaiting validation state --}}
             @if($status->isAwaitingValidation)
                 <span class="inline-flex items-center gap-1 px-2 py-1 rounded text-xs bg-yellow-900/30 text-yellow-400 border border-yellow-700/50"
@@ -61,12 +63,12 @@
                 {{-- Main popover trigger with full details --}}
                 <x-product-status-popover :status="$status" :product="$product" />
 
-                {{-- Global issues as icons (if any) --}}
-                @if($status->globalIssues[ProductStatusDTO::ISSUE_ZERO_PRICE] ?? false)
+                {{-- Global issues as icons (if any) - SECURITY: only show price/stock issues with permissions --}}
+                @if($this->userCan('prices_read') && ($status->globalIssues[ProductStatusDTO::ISSUE_ZERO_PRICE] ?? false))
                     <x-product-status-icon type="zero_price" />
                 @endif
 
-                @if($status->globalIssues[ProductStatusDTO::ISSUE_LOW_STOCK] ?? false)
+                @if($this->userCan('stock_read') && ($status->globalIssues[ProductStatusDTO::ISSUE_LOW_STOCK] ?? false))
                     <x-product-status-icon type="low_stock" />
                 @endif
 

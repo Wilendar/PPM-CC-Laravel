@@ -126,6 +126,16 @@ class ProductStatusDTO
     }
 
     /**
+     * Clear a global issue (for permission-based filtering)
+     */
+    public function clearGlobalIssue(string $issueKey): void
+    {
+        if (array_key_exists($issueKey, $this->globalIssues)) {
+            $this->globalIssues[$issueKey] = false;
+        }
+    }
+
+    /**
      * Set a global issue
      */
     public function setGlobalIssue(string $issue, bool $hasIssue = true): self

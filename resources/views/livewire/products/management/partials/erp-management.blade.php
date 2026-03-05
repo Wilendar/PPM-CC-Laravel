@@ -6,7 +6,18 @@
     $productErpStatus = $this->getProductErpSyncStatus();
 @endphp
 
-@if($erpConnections->isNotEmpty())
+@if(!$this->userCan('compliance_read'))
+    @if($erpConnections->isNotEmpty())
+    <div class="mt-3 bg-gray-800 rounded-lg p-3">
+        <div class="flex items-center space-x-2 text-gray-500">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+            </svg>
+            <span class="text-sm">Integracje ERP — <span class="censored-value">brak uprawnień</span></span>
+        </div>
+    </div>
+    @endif
+@elseif($erpConnections->isNotEmpty())
 {{-- KRYTYCZNE: wire:poll MUSI być ZAWSZE w DOM (Livewire 3.x Golden Rule) --}}
 {{-- Dodajemy wire:poll do głównego wrappera, nie do warunkowego include --}}
 <div class="mt-3 bg-gray-800 rounded-lg p-3 relative"

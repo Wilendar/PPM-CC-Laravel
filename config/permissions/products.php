@@ -57,15 +57,27 @@ return [
             'description' => 'Zarzadzanie wariantami produktow',
             'dangerous' => false,
         ],
+        'status' => [
+            'name' => 'products.status',
+            'label' => 'Kolumna Status',
+            'description' => 'Odczyt statusu aktywnosci produktow (Aktywny/Nieaktywny) na liscie',
+            'dangerous' => false,
+        ],
+        'compliance' => [
+            'name' => 'products.compliance',
+            'label' => 'Kolumna Zgodnosc',
+            'description' => 'Odczyt zgodnosci danych produktow (ikony problemow, integracje) na liscie',
+            'dangerous' => false,
+        ],
     ],
 
     'role_defaults' => [
-        'Admin' => ['create', 'read', 'update', 'delete', 'export', 'import', 'variants'],
-        'Manager' => ['create', 'read', 'update', 'delete', 'export', 'import', 'variants'],
-        'Edytor' => ['read', 'update', 'export'],
-        'Magazyn' => ['read'],
-        'Handlowy' => ['read'],
-        'Reklamacje' => ['read'],
+        'Admin' => ['create', 'read', 'update', 'delete', 'export', 'import', 'variants', 'status', 'compliance'],
+        'Manager' => ['create', 'read', 'update', 'delete', 'export', 'import', 'variants', 'status', 'compliance'],
+        'Edytor' => ['read', 'update', 'export', 'status', 'compliance'],
+        'Magazyn' => ['read', 'status'],
+        'Handlowy' => ['read', 'status'],
+        'Reklamacje' => ['read', 'status'],
         'User' => ['read'],
     ],
 ];

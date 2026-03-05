@@ -10,6 +10,7 @@
     @see Plan_Projektu/synthetic-mixing-thunder.md
 --}}
 
+@if($this->userCan('compliance_read'))
 <div class="bg-gray-800/50 rounded-lg p-4 border border-gray-700">
     <h4 class="text-sm font-medium text-white mb-3 flex items-center gap-2">
         <svg class="w-4 h-4 text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -63,7 +64,8 @@
     <div>
         <label class="block text-xs text-gray-400 mb-2">Typ problemu (multi-select)</label>
         <div class="flex flex-wrap gap-2">
-            {{-- Zero price --}}
+            {{-- Zero price - SECURITY: only with prices.read --}}
+            @if($this->userCan('prices_read'))
             <label class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md cursor-pointer transition-colors
                 {{ in_array('zero_price', $issueTypeFilters)
                     ? 'bg-red-500/20 text-red-400 border border-red-500/50'
@@ -77,8 +79,10 @@
                 </svg>
                 <span class="text-xs">Cena 0</span>
             </label>
+            @endif
 
-            {{-- Low stock --}}
+            {{-- Low stock - SECURITY: only with stock.read --}}
+            @if($this->userCan('stock_read'))
             <label class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md cursor-pointer transition-colors
                 {{ in_array('low_stock', $issueTypeFilters)
                     ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/50'
@@ -92,6 +96,7 @@
                 </svg>
                 <span class="text-xs">Niski stan</span>
             </label>
+            @endif
 
             {{-- No images --}}
             <label class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md cursor-pointer transition-colors
@@ -154,3 +159,4 @@
         </div>
     @endif
 </div>
+@endif {{-- compliance_read --}}
