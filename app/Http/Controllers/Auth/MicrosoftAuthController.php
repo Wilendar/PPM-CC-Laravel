@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
+use App\Models\LoginAttempt;
 use App\Models\User;
 use App\Models\AuditLog;
 use Illuminate\Http\Request;
@@ -88,7 +89,20 @@ class MicrosoftAuthController extends Controller
                     'error_description' => $request->get('error_description'),
                     'ip' => $request->ip()
                 ]);
-                
+
+                LoginAttempt::recordFailure(
+                    'unknown@microsoft-oauth',
+                    $request->ip(),
+                    LoginAttempt::FAILURE_OAUTH_ERROR,
+                    null,
+                    [
+                        'oauth_provider' => 'microsoft',
+                        'user_agent' => $request->userAgent(),
+                        'device_type' => $this->detectDeviceType($request->userAgent()),
+                        'browser' => $this->detectBrowser($request->userAgent()),
+                    ]
+                );
+
                 return redirect()
                     ->route('login')
                     ->withErrors(['oauth' => 'Autoryzacja Microsoft została anulowana lub nie powiodła się.']);
@@ -105,7 +119,20 @@ class MicrosoftAuthController extends Controller
                     'domain' => $this->extractDomain($microsoftUser->getEmail()),
                     'ip' => $request->ip()
                 ]);
-                
+
+                LoginAttempt::recordFailure(
+                    $microsoftUser->getEmail(),
+                    $request->ip(),
+                    'domain_rejected',
+                    null,
+                    [
+                        'oauth_provider' => 'microsoft',
+                        'user_agent' => $request->userAgent(),
+                        'device_type' => $this->detectDeviceType($request->userAgent()),
+                        'browser' => $this->detectBrowser($request->userAgent()),
+                    ]
+                );
+
                 return redirect()
                     ->route('login')
                     ->withErrors(['oauth' => 'Twoja domena email nie jest autoryzowana do logowania.']);
@@ -122,7 +149,20 @@ class MicrosoftAuthController extends Controller
                     'locked_until' => $user->oauth_locked_until,
                     'ip' => $request->ip()
                 ]);
-                
+
+                LoginAttempt::recordFailure(
+                    $user->email,
+                    $request->ip(),
+                    LoginAttempt::FAILURE_USER_LOCKED,
+                    $user->id,
+                    [
+                        'oauth_provider' => 'microsoft',
+                        'user_agent' => $request->userAgent(),
+                        'device_type' => $this->detectDeviceType($request->userAgent()),
+                        'browser' => $this->detectBrowser($request->userAgent()),
+                    ]
+                );
+
                 return redirect()
                     ->route('login')
                     ->withErrors(['oauth' => 'Konto jest tymczasowo zablokowane. Spróbuj ponownie później.']);
@@ -146,9 +186,36 @@ class MicrosoftAuthController extends Controller
             // Authenticate user
             Auth::login($user, config('services.oauth.remember_oauth_sessions', true));
 
+            // Record successful OAuth login attempt
+            LoginAttempt::recordSuccess(
+                $user->email,
+                $request->ip(),
+                $user->id,
+                [
+                    'oauth_provider' => 'microsoft',
+                    'user_agent' => $request->userAgent(),
+                    'device_type' => $this->detectDeviceType($request->userAgent()),
+                    'browser' => $this->detectBrowser($request->userAgent()),
+                ]
+            );
+
             // Check if user is active
             if (!$user->is_active) {
                 Auth::logout();
+
+                LoginAttempt::recordFailure(
+                    $user->email,
+                    $request->ip(),
+                    LoginAttempt::FAILURE_USER_INACTIVE,
+                    $user->id,
+                    [
+                        'oauth_provider' => 'microsoft',
+                        'user_agent' => $request->userAgent(),
+                        'device_type' => $this->detectDeviceType($request->userAgent()),
+                        'browser' => $this->detectBrowser($request->userAgent()),
+                    ]
+                );
+
                 return redirect()->route('login')
                     ->withErrors(['oauth' => 'Konto jest nieaktywne. Skontaktuj sie z administratorem.']);
             }
@@ -177,7 +244,20 @@ class MicrosoftAuthController extends Controller
                 'provider' => 'microsoft',
                 'ip' => $request->ip()
             ]);
-            
+
+            LoginAttempt::recordFailure(
+                'unknown@microsoft-oauth',
+                $request->ip(),
+                LoginAttempt::FAILURE_OAUTH_ERROR,
+                null,
+                [
+                    'oauth_provider' => 'microsoft',
+                    'user_agent' => $request->userAgent(),
+                    'device_type' => $this->detectDeviceType($request->userAgent()),
+                    'browser' => $this->detectBrowser($request->userAgent()),
+                ]
+            );
+
             return redirect()
                 ->route('login')
                 ->withErrors(['oauth' => 'Sesja OAuth wygasła. Spróbuj zalogować się ponownie.']);
@@ -187,7 +267,20 @@ class MicrosoftAuthController extends Controller
                 'provider' => 'microsoft',
                 'ip' => $request->ip()
             ]);
-            
+
+            LoginAttempt::recordFailure(
+                'unknown@microsoft-oauth',
+                $request->ip(),
+                LoginAttempt::FAILURE_OAUTH_ERROR,
+                null,
+                [
+                    'oauth_provider' => 'microsoft',
+                    'user_agent' => $request->userAgent(),
+                    'device_type' => $this->detectDeviceType($request->userAgent()),
+                    'browser' => $this->detectBrowser($request->userAgent()),
+                ]
+            );
+
             return redirect()
                 ->route('login')
                 ->withErrors(['oauth' => 'Wystąpił błąd podczas logowania Microsoft. Spróbuj ponownie.']);
@@ -419,9 +512,12 @@ class MicrosoftAuthController extends Controller
             $updates['oauth_refresh_token'] = encrypt($microsoftUser->refreshToken);
         }
         
-        // Sync avatar if enabled
+        // Sync avatar if enabled (skip base64 data URIs - too large for varchar column)
         if (config('services.oauth.sync_avatars', true) && $microsoftUser->getAvatar()) {
-            $updates['oauth_avatar_url'] = $microsoftUser->getAvatar();
+            $avatar = $microsoftUser->getAvatar();
+            if (!str_starts_with($avatar, 'data:')) {
+                $updates['oauth_avatar_url'] = $avatar;
+            }
         }
         
         $user->update($updates);
@@ -585,6 +681,56 @@ class MicrosoftAuthController extends Controller
                 'error' => $e->getMessage()
             ]);
         }
+    }
+
+    /**
+     * Detect device type from User-Agent string.
+     */
+    protected function detectDeviceType(?string $userAgent): string
+    {
+        if (!$userAgent) {
+            return 'desktop';
+        }
+
+        $ua = strtolower($userAgent);
+
+        if (str_contains($ua, 'mobile') || str_contains($ua, 'android')) {
+            return 'mobile';
+        }
+
+        if (str_contains($ua, 'tablet') || str_contains($ua, 'ipad')) {
+            return 'tablet';
+        }
+
+        return 'desktop';
+    }
+
+    /**
+     * Detect browser name from User-Agent string.
+     */
+    protected function detectBrowser(?string $userAgent): ?string
+    {
+        if (!$userAgent) {
+            return null;
+        }
+
+        if (str_contains($userAgent, 'Edg/')) {
+            return 'Edge';
+        }
+
+        if (str_contains($userAgent, 'Chrome/')) {
+            return 'Chrome';
+        }
+
+        if (str_contains($userAgent, 'Firefox/')) {
+            return 'Firefox';
+        }
+
+        if (str_contains($userAgent, 'Safari/') && !str_contains($userAgent, 'Chrome/')) {
+            return 'Safari';
+        }
+
+        return null;
     }
 
     /**
