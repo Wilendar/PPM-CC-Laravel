@@ -123,11 +123,19 @@
                         
                         <!-- Logo -->
                         <div class="flex-shrink-0 ml-2 lg:ml-0">
+                            @php
+                                $logoPath = \App\Models\SystemSetting::get('company_logo');
+                                $companyLogo = $logoPath && \Illuminate\Support\Facades\Storage::disk('public')->exists($logoPath) ? \Illuminate\Support\Facades\Storage::url($logoPath) : null;
+                            @endphp
+                            @if($companyLogo)
+                                <img src="{{ $companyLogo }}" alt="Logo" class="h-10 w-auto max-w-[120px] object-contain rounded-lg">
+                            @else
                             <div class="relative w-10 h-10 rounded-xl flex items-center justify-center shadow-lg transform transition-transform duration-300 hover:scale-105" style="background: linear-gradient(45deg, #e0ac7e, #d1975a);">
                                 <svg class="w-6 h-6 text-white relative z-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
                                 </svg>
                             </div>
+                            @endif
                         </div>
                         <div class="ml-2 sm:ml-4 min-w-0 flex-1 lg:flex-initial">
                             <h1 class="text-base sm:text-lg font-bold tracking-tight truncate" style="color: #e0ac7e;">

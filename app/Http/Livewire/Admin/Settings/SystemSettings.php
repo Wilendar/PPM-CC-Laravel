@@ -109,7 +109,10 @@ class SystemSettings extends Component
         foreach ($categorySettings as $key => $setting) {
             $type = $setting['type'] ?? 'string';
 
-            if ($type === 'password') {
+            // File inputs obsługiwane przez uploadFiles, nie tempValues
+            if ($type === 'file') {
+                continue;
+            } elseif ($type === 'password') {
                 $this->tempValues[$key] = '';
             } elseif ($type === 'select') {
                 $this->tempValues[$key] = (string) $setting['value'];
@@ -165,8 +168,8 @@ class SystemSettings extends Component
                 'label' => 'Logo firmy',
                 'type' => 'file',
                 'value' => $this->settingsService->getFileUrl('company_logo'),
-                'description' => 'Logo firmy (zalecane 200x80px, PNG/JPG)',
-                'accept' => 'image/*',
+                'description' => 'Logo firmy (zalecane 200x80px, PNG/JPG/SVG)',
+                'accept' => 'image/*,.svg',
             ],
             'timezone' => [
                 'label' => 'Strefa czasowa',
@@ -677,6 +680,9 @@ class SystemSettings extends Component
             }
 
             switch ($config['type']) {
+                case 'file':
+                    continue 2; // Pliki walidowane osobno przy uploadzie
+
                 case 'integer':
                     $rule[] = 'integer';
                     if (isset($config['min'])) $rule[] = 'min:' . $config['min'];
