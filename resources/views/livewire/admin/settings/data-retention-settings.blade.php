@@ -199,7 +199,130 @@
         </div>
     </div>
 
-    {{-- Section 3: Archive Files --}}
+    {{-- Section 3: Media Management --}}
+    <div class="mb-8">
+        <h3 class="text-lg font-semibold text-white mb-4">
+            <i class="fas fa-images mr-2" style="color: var(--mpp-primary)"></i>
+            Zarzadzanie mediami
+        </h3>
+
+        <div class="bg-gray-800/50 rounded-lg border border-gray-700 p-5 space-y-5">
+            {{-- Media stats --}}
+            <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
+                <div class="bg-gray-700/50 rounded-lg p-3 text-center">
+                    <p class="text-2xl font-bold text-white">{{ number_format($mediaStats['total'] ?? 0) }}</p>
+                    <p class="text-xs text-gray-400">Total media</p>
+                </div>
+                <div class="bg-gray-700/50 rounded-lg p-3 text-center">
+                    <p class="text-2xl font-bold text-yellow-400">{{ number_format($mediaStats['trashed'] ?? 0) }}</p>
+                    <p class="text-xs text-gray-400">Soft-deleted</p>
+                </div>
+                <div class="bg-gray-700/50 rounded-lg p-3 text-center">
+                    <p class="text-2xl font-bold text-red-400">{{ number_format(($mediaStats['orphaned_products'] ?? 0) + ($mediaStats['orphaned_variants'] ?? 0)) }}</p>
+                    <p class="text-xs text-gray-400">Orphaned</p>
+                </div>
+                <div class="bg-gray-700/50 rounded-lg p-3 text-center">
+                    <p class="text-2xl font-bold text-gray-300">{{ $mediaStats['total_size_mb'] ?? 0 }} MB</p>
+                    <p class="text-xs text-gray-400">Rozmiar total</p>
+                </div>
+                <div class="bg-gray-700/50 rounded-lg p-3 text-center">
+                    <p class="text-2xl font-bold text-yellow-300">{{ $mediaStats['trashed_size_mb'] ?? 0 }} MB</p>
+                    <p class="text-xs text-gray-400">Rozmiar trashed</p>
+                </div>
+                <div class="bg-gray-700/50 rounded-lg p-3 text-center">
+                    <p class="text-2xl font-bold text-gray-400">
+                        {{ ($mediaStats['orphaned_products'] ?? 0) }} / {{ ($mediaStats['orphaned_variants'] ?? 0) }}
+                    </p>
+                    <p class="text-xs text-gray-400">Orphans: prod / var</p>
+                </div>
+            </div>
+
+            {{-- Media purge days --}}
+            <div class="flex items-center justify-between border-t border-gray-700 pt-4"
+                 x-data="{ purgeDays: {{ $this->retentionService->getMediaPurgeDays() }}, editing: false }">
+                <div>
+                    <span class="text-gray-200">Purge soft-deleted media</span>
+                    <p class="text-xs text-gray-500">Po ilu dniach trwale usunac soft-deleted media z pliku i DB</p>
+                </div>
+                <div class="flex items-center gap-3">
+                    <template x-if="!editing">
+                        <button @click="editing = true"
+                                class="text-gray-300 hover:text-white px-3 py-1 rounded bg-gray-700 hover:bg-gray-600 transition-colors text-sm">
+                            <span x-text="purgeDays"></span> dni
+                        </button>
+                    </template>
+                    <template x-if="editing">
+                        <div class="flex items-center gap-2">
+                            <input type="number" x-model.number="purgeDays" min="7" max="365"
+                                   class="w-24 form-input-enterprise text-center text-sm py-1"
+                                   @keydown.enter="$wire.saveMediaPurgeDays(purgeDays); editing = false"
+                                   @keydown.escape="editing = false">
+                            <button @click="$wire.saveMediaPurgeDays(purgeDays); editing = false"
+                                    class="text-emerald-400 hover:text-emerald-300">
+                                <i class="fas fa-check"></i>
+                            </button>
+                            <button @click="editing = false" class="text-gray-400 hover:text-gray-300">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                    </template>
+                </div>
+            </div>
+
+            {{-- Media orphan days --}}
+            <div class="flex items-center justify-between border-t border-gray-700 pt-4"
+                 x-data="{ orphanDays: {{ $this->retentionService->getMediaOrphanDays() }}, editing: false }">
+                <div>
+                    <span class="text-gray-200">Orphan cleanup</span>
+                    <p class="text-xs text-gray-500">Po ilu dniach usunac media bez powiazanego produktu</p>
+                </div>
+                <div class="flex items-center gap-3">
+                    <template x-if="!editing">
+                        <button @click="editing = true"
+                                class="text-gray-300 hover:text-white px-3 py-1 rounded bg-gray-700 hover:bg-gray-600 transition-colors text-sm">
+                            <span x-text="orphanDays"></span> dni
+                        </button>
+                    </template>
+                    <template x-if="editing">
+                        <div class="flex items-center gap-2">
+                            <input type="number" x-model.number="orphanDays" min="30" max="365"
+                                   class="w-24 form-input-enterprise text-center text-sm py-1"
+                                   @keydown.enter="$wire.saveMediaOrphanDays(orphanDays); editing = false"
+                                   @keydown.escape="editing = false">
+                            <button @click="$wire.saveMediaOrphanDays(orphanDays); editing = false"
+                                    class="text-emerald-400 hover:text-emerald-300">
+                                <i class="fas fa-check"></i>
+                            </button>
+                            <button @click="editing = false" class="text-gray-400 hover:text-gray-300">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                    </template>
+                </div>
+            </div>
+
+            {{-- Actions --}}
+            <div class="flex gap-3 border-t border-gray-700 pt-4">
+                <button wire:click="cleanupMedia"
+                        wire:loading.attr="disabled"
+                        wire:confirm="Na pewno wyczysc media (purge + orphans)?"
+                        class="btn-enterprise-primary btn-enterprise-sm">
+                    <i class="fas fa-broom mr-2" wire:loading.remove wire:target="cleanupMedia"></i>
+                    <i class="fas fa-spinner fa-spin mr-2" wire:loading wire:target="cleanupMedia"></i>
+                    Wyczysc media teraz
+                </button>
+                <button wire:click="auditMediaFiles"
+                        wire:loading.attr="disabled"
+                        class="btn-enterprise-secondary btn-enterprise-sm">
+                    <i class="fas fa-search mr-2" wire:loading.remove wire:target="auditMediaFiles"></i>
+                    <i class="fas fa-spinner fa-spin mr-2" wire:loading wire:target="auditMediaFiles"></i>
+                    Audyt plikow
+                </button>
+            </div>
+        </div>
+    </div>
+
+    {{-- Section 4: Archive Files --}}
     <div>
         <div class="flex items-center justify-between mb-4">
             <h3 class="text-lg font-semibold text-white">

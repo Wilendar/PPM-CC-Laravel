@@ -2,11 +2,15 @@
 
 namespace App\Http\Livewire\Admin\Settings;
 
+use App\Models\Media;
+use App\Models\Product;
+use App\Models\ProductVariant;
 use App\Models\SystemSetting;
 use App\Services\ArchiveService;
 use App\Services\RetentionConfigService;
 use Livewire\Component;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -18,6 +22,7 @@ class DataRetentionSettings extends Component
     public array $tableStats = [];
     public array $archives = [];
     public array $archiveStats = [];
+    public array $mediaStats = [];
     public string $message = '';
     public string $messageType = '';
     public bool $isLoading = false;
@@ -50,6 +55,7 @@ class DataRetentionSettings extends Component
         $this->tableStats = $this->getTableStats();
         $this->archives = $this->archiveService->listArchives()->take(20)->toArray();
         $this->archiveStats = $this->archiveService->getArchiveStats();
+        $this->mediaStats = $this->getMediaStats();
 
         $this->isLoading = false;
     }
@@ -257,6 +263,107 @@ class DataRetentionSettings extends Component
         $deleted = $this->archiveService->cleanupOldArchives();
         $this->showMessage("Usunieto {$deleted} starych archiwow.", 'success');
         $this->loadData();
+    }
+
+    /**
+     * Get media statistics
+     */
+    public function getMediaStats(): array
+    {
+        try {
+            return [
+                'total' => Media::count(),
+                'trashed' => Media::onlyTrashed()->count(),
+                'orphaned_products' => Media::where('mediable_type', 'App\\Models\\Product')
+                    ->whereNotIn('mediable_id', Product::withTrashed()->select('id'))->count(),
+                'orphaned_variants' => Media::where('mediable_type', 'App\\Models\\ProductVariant')
+                    ->whereNotIn('mediable_id', ProductVariant::select('id'))->count(),
+                'total_size_mb' => round((float) Media::sum('file_size') / 1024 / 1024, 2),
+                'trashed_size_mb' => round((float) Media::onlyTrashed()->sum('file_size') / 1024 / 1024, 2),
+            ];
+        } catch (\Exception $e) {
+            return [
+                'total' => 0, 'trashed' => 0, 'orphaned_products' => 0,
+                'orphaned_variants' => 0, 'total_size_mb' => 0, 'trashed_size_mb' => 0,
+            ];
+        }
+    }
+
+    /**
+     * Run media cleanup command
+     */
+    public function cleanupMedia()
+    {
+        $this->authorize('system.manage');
+
+        try {
+            $purgeDays = $this->retentionService->getMediaPurgeDays();
+            $orphanDays = $this->retentionService->getMediaOrphanDays();
+
+            Artisan::call("media:cleanup --purge-days={$purgeDays} --orphan-days={$orphanDays}");
+            $output = trim(Artisan::output());
+            $this->showMessage("Media cleanup zakonczone. {$output}", 'success');
+
+            Log::info('Manual media cleanup triggered from UI');
+        } catch (\Exception $e) {
+            $this->showMessage("Blad media cleanup: {$e->getMessage()}", 'error');
+        }
+
+        $this->loadData();
+    }
+
+    /**
+     * Run media file audit
+     */
+    public function auditMediaFiles()
+    {
+        $this->authorize('system.manage');
+
+        try {
+            Artisan::call('media:audit-files --dry-run');
+            $output = trim(Artisan::output());
+            $this->showMessage("Audyt plikow zakonczone. {$output}", 'success');
+
+            Log::info('Manual media audit triggered from UI');
+        } catch (\Exception $e) {
+            $this->showMessage("Blad audytu: {$e->getMessage()}", 'error');
+        }
+
+        $this->loadData();
+    }
+
+    /**
+     * Save media purge days
+     */
+    public function saveMediaPurgeDays(int $days)
+    {
+        $this->authorize('system.manage');
+
+        if ($days < 7 || $days > 365) {
+            $this->showMessage('Purge soft-deleted musi byc miedzy 7 a 365 dni.', 'error');
+            return;
+        }
+
+        SystemSetting::set('retention.media_trashed.days', $days, 'data_retention', 'integer', 'Media soft-delete purge period');
+        $this->showMessage("Media purge: {$days} dni.", 'success');
+        Log::info('Media purge days updated', ['days' => $days]);
+    }
+
+    /**
+     * Save media orphan days
+     */
+    public function saveMediaOrphanDays(int $days)
+    {
+        $this->authorize('system.manage');
+
+        if ($days < 30 || $days > 365) {
+            $this->showMessage('Orphan cleanup musi byc miedzy 30 a 365 dni.', 'error');
+            return;
+        }
+
+        SystemSetting::set('retention.media.days', $days, 'data_retention', 'integer', 'Media orphan cleanup period');
+        $this->showMessage("Media orphan cleanup: {$days} dni.", 'success');
+        Log::info('Media orphan days updated', ['days' => $days]);
     }
 
     protected function getTableStats(): array

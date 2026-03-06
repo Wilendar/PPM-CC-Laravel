@@ -395,6 +395,26 @@ Schedule::command('archives:cleanup')
     ->runInBackground();
 
 // ==========================================
+// MEDIA CLEANUP TASKS
+// ==========================================
+
+// Media cleanup - purge soft-deleted + orphan cleanup
+Schedule::command('media:cleanup')
+    ->daily()
+    ->at('04:45')
+    ->name('media-cleanup')
+    ->withoutOverlapping()
+    ->runInBackground();
+
+// Media file audit - weekly dry-run report (monitoring only)
+Schedule::command('media:audit-files --dry-run')
+    ->weekly()
+    ->at('05:30')
+    ->name('media-audit-files')
+    ->withoutOverlapping()
+    ->runInBackground();
+
+// ==========================================
 // FUTURE TASKS (PLACEHOLDER)
 // ==========================================
 

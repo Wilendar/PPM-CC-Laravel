@@ -68,6 +68,32 @@ class RetentionConfigService
     }
 
     /**
+     * Get media soft-delete purge days
+     */
+    public function getMediaPurgeDays(): int
+    {
+        $dbValue = SystemSetting::get('retention.media_trashed.days');
+        if ($dbValue !== null) {
+            return (int) $dbValue;
+        }
+
+        return config('database-cleanup.tables.media_trashed.retention_days', 30);
+    }
+
+    /**
+     * Get media orphan cleanup days
+     */
+    public function getMediaOrphanDays(): int
+    {
+        $dbValue = SystemSetting::get('retention.media.days');
+        if ($dbValue !== null) {
+            return (int) $dbValue;
+        }
+
+        return config('database-cleanup.tables.media.retention_days', 90);
+    }
+
+    /**
      * Get full retention config for all tables
      */
     public function getAllRetentionConfig(): array

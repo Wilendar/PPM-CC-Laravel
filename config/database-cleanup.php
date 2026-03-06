@@ -140,6 +140,23 @@ return [
             'chunk_size' => 500,
             'enabled' => true,
         ],
+
+        // Media - orphaned media cleanup (mediable deleted)
+        'media' => [
+            'retention_days' => 90,        // Orphan cleanup after 90 days
+            'date_column' => 'created_at',
+            'chunk_size' => 500,
+            'enabled' => true,
+            'command' => 'media:cleanup --orphan-days=90 --purge-days=30',
+        ],
+
+        // Media trashed - soft-deleted media purge
+        'media_trashed' => [
+            'retention_days' => 30,        // Purge soft-deleted after 30 days
+            'date_column' => 'deleted_at',
+            'chunk_size' => 500,
+            'enabled' => true,
+        ],
     ],
 
     /*
@@ -164,6 +181,7 @@ return [
         'audit_logs' => ['warning' => 100, 'critical' => 500],
         'product_scan_results' => ['warning' => 100, 'critical' => 500],
         'product_scan_sessions' => ['warning' => 20, 'critical' => 100],
+        'media' => ['warning' => 200, 'critical' => 1000],
     ],
 
     /*
