@@ -98,9 +98,11 @@
     </div>
     
     <!-- DEV MODE HEADER -->
+    @if(\App\Models\SystemSetting::get('dev_auth_bypass', false))
     <div class="bg-orange-600 text-white text-center p-2 text-sm font-bold relative z-10">
         🚧 DEVELOPMENT MODE - Authentication Disabled 🚧
     </div>
+    @endif
     
     {{-- Flash Messages Component --}}
     <x-flash-messages />

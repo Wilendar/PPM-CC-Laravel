@@ -76,12 +76,25 @@
                 @endforeach
 
                 @if($activeCategory === 'email')
-                <button type="button"
-                        wire:click="testEmailConnection"
-                        class="btn-enterprise-success btn-enterprise-sm mt-4">
-                    <i class="fas fa-envelope-open mr-2"></i>
-                    Test polaczenia
-                </button>
+                <div class="mt-4 space-y-2">
+                    <label class="block text-xs text-gray-400">Wyslij test na:</label>
+                    <input type="email"
+                           wire:model.defer="testEmailAddress"
+                           placeholder="email@example.com"
+                           required
+                           class="form-input-enterprise w-full text-sm">
+                    @error('testEmailAddress')
+                        <span class="text-red-400 text-xs mt-1">{{ $message }}</span>
+                    @enderror
+                    <button type="button"
+                            wire:click="testEmailConnection"
+                            wire:loading.attr="disabled"
+                            class="btn-enterprise-success btn-enterprise-sm w-full">
+                        <i class="fas fa-envelope-open mr-2" wire:loading.remove wire:target="testEmailConnection"></i>
+                        <i class="fas fa-spinner fa-spin mr-2" wire:loading wire:target="testEmailConnection"></i>
+                        Wyslij test
+                    </button>
+                </div>
                 @endif
             </nav>
 
@@ -125,7 +138,6 @@
                             @case('integer')
                                 <input type="number"
                                        wire:model.lazy="tempValues.{{ $key }}"
-                                       value="{{ $setting['value'] }}"
                                        class="form-input-enterprise w-full"
                                        @if(isset($setting['min'])) min="{{ $setting['min'] }}" @endif
                                        @if(isset($setting['max'])) max="{{ $setting['max'] }}" @endif>
@@ -135,7 +147,6 @@
                                 <label class="flex items-center">
                                     <input type="checkbox"
                                            wire:model.lazy="tempValues.{{ $key }}"
-                                           {{ $setting['value'] ? 'checked' : '' }}
                                            class="checkbox-enterprise">
                                     <span class="ml-2 text-sm text-gray-300">Wlaczone</span>
                                 </label>
@@ -145,7 +156,7 @@
                                 <select wire:model.lazy="tempValues.{{ $key }}"
                                         class="form-input-enterprise w-full">
                                     @foreach($setting['options'] as $value => $label)
-                                    <option value="{{ $value }}" {{ $setting['value'] == $value ? 'selected' : '' }}>
+                                    <option value="{{ $value }}">
                                         {{ $label }}
                                     </option>
                                     @endforeach

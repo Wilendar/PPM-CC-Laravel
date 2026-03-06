@@ -39,6 +39,7 @@ class SystemSettings extends Component
     public $isLoading = false;
     public $message = '';
     public $messageType = '';
+    public string $testEmailAddress = '';
 
     /**
      * Lista kategorii
@@ -59,6 +60,7 @@ class SystemSettings extends Component
     public function mount()
     {
         $this->authorize('system.manage');
+        $this->testEmailAddress = \Illuminate\Support\Facades\Auth::user()->email ?? '';
         $this->loadSettings();
     }
 
@@ -78,6 +80,7 @@ class SystemSettings extends Component
         if (array_key_exists($category, $this->categories)) {
             $this->activeCategory = $category;
             $this->resetMessages();
+            $this->initTempValues();
         }
     }
 
@@ -93,6 +96,27 @@ class SystemSettings extends Component
         }
 
         $this->isLoading = false;
+        $this->initTempValues();
+    }
+
+    /**
+     * Inicjalizuj tempValues z aktualnych wartości ustawień
+     */
+    private function initTempValues(): void
+    {
+        $this->tempValues = [];
+        $categorySettings = $this->settings[$this->activeCategory] ?? [];
+        foreach ($categorySettings as $key => $setting) {
+            $type = $setting['type'] ?? 'string';
+
+            if ($type === 'password') {
+                $this->tempValues[$key] = '';
+            } elseif ($type === 'select') {
+                $this->tempValues[$key] = (string) $setting['value'];
+            } else {
+                $this->tempValues[$key] = $setting['value'];
+            }
+        }
     }
 
     /**
@@ -115,6 +139,8 @@ class SystemSettings extends Component
                 return $this->getBackupSettings();
             case 'ui':
                 return $this->getUISettings();
+            case 'maintenance':
+                return $this->getMaintenanceSettings();
             case 'data_retention':
                 return []; // Handled by sub-component
             default:
@@ -330,9 +356,9 @@ class SystemSettings extends Component
                 'type' => 'select',
                 'value' => $this->settingsService->get('smtp_encryption', 'tls'),
                 'options' => [
-                    'tls' => 'TLS (port 587)',
-                    'ssl' => 'SSL (port 465)',
-                    '' => 'Brak szyfrowania',
+                    'tls' => 'STARTTLS (port 587) - Office365, Gmail',
+                    'ssl' => 'SSL/TLS (port 465)',
+                    '' => 'Brak szyfrowania (port 25)',
                 ],
             ],
             'from_email' => [
@@ -470,6 +496,52 @@ class SystemSettings extends Component
     }
 
     /**
+     * Ustawienia konserwacji
+     */
+    private function getMaintenanceSettings()
+    {
+        return [
+            'maintenance_mode' => [
+                'label' => 'Tryb konserwacji',
+                'type' => 'boolean',
+                'value' => $this->settingsService->get('maintenance_mode', false),
+                'description' => 'Wlacz tryb konserwacji - uzytkownicy zobacza komunikat serwisowy',
+            ],
+            'maintenance_message' => [
+                'label' => 'Komunikat konserwacji',
+                'type' => 'string',
+                'value' => $this->settingsService->get('maintenance_message', 'System jest w trakcie konserwacji. Prosimy o cierpliwosc.'),
+                'description' => 'Wiadomosc wyswietlana uzytkownikom podczas konserwacji',
+            ],
+            'maintenance_allowed_ips' => [
+                'label' => 'Dozwolone adresy IP',
+                'type' => 'string',
+                'value' => $this->settingsService->get('maintenance_allowed_ips', ''),
+                'description' => 'Lista IP oddzielonych przecinkami, ktore maja dostep podczas konserwacji',
+            ],
+            'auto_cleanup_frequency' => [
+                'label' => 'Czestotliwosc automatycznego czyszczenia',
+                'type' => 'select',
+                'value' => $this->settingsService->get('auto_cleanup_frequency', 'weekly'),
+                'options' => [
+                    'daily' => 'Codziennie',
+                    'weekly' => 'Co tydzien',
+                    'monthly' => 'Co miesiac',
+                    'disabled' => 'Wylaczone',
+                ],
+            ],
+            'log_retention_days' => [
+                'label' => 'Przechowywanie logow (dni)',
+                'type' => 'integer',
+                'value' => $this->settingsService->get('log_retention_days', 90),
+                'description' => 'Liczba dni przechowywania logow systemowych',
+                'min' => 7,
+                'max' => 365,
+            ],
+        ];
+    }
+
+    /**
      * Zapisz ustawienia
      */
     public function saveSettings()
@@ -491,9 +563,9 @@ class SystemSettings extends Component
 
             // Zapisz ustawienia
             foreach ($this->tempValues as $key => $value) {
-                if ($value !== null && $value !== '') {
+                if ($value !== null) {
                     // Specjalna obsługa hasła SMTP
-                    if ($key === 'smtp_password' && $value === '********') {
+                    if ($key === 'smtp_password' && ($value === '********' || $value === '')) {
                         continue; // Nie zmieniaj hasła jeśli nie wprowadzono nowego
                     }
                     
@@ -519,8 +591,7 @@ class SystemSettings extends Component
             }
 
             $this->showMessage('Ustawienia zostały zapisane pomyślnie', 'success');
-            $this->loadSettings(); // Odśwież dane
-            $this->tempValues = []; // Wyczyść tymczasowe wartości
+            $this->loadSettings(); // Odśwież dane (initTempValues() wywoływane wewnątrz)
             $this->uploadFiles = [];
 
         } catch (\Exception $e) {
@@ -552,26 +623,27 @@ class SystemSettings extends Component
     {
         $this->authorize('system.manage');
         try {
-            $fromEmail = config('mail.from.address');
-            $fromName = config('mail.from.name', 'PPM');
+            $this->validate([
+                'testEmailAddress' => 'required|email',
+            ], [
+                'testEmailAddress.required' => 'Wpisz adres email odbiorcy.',
+                'testEmailAddress.email' => 'Podaj poprawny adres email.',
+            ]);
 
-            if (empty($fromEmail)) {
-                $this->showMessage('Brak skonfigurowanego adresu nadawcy (from_email).', 'error');
-                return;
-            }
+            $recipient = $this->testEmailAddress;
 
             \Illuminate\Support\Facades\Mail::raw(
                 "To jest testowa wiadomosc z PPM.\n\nJesli ja widzisz, konfiguracja SMTP dziala poprawnie.\n\nData: " . now()->format('Y-m-d H:i:s'),
-                function ($message) use ($fromEmail, $fromName) {
-                    $message->to($fromEmail)
+                function ($message) use ($recipient) {
+                    $message->to($recipient)
                             ->subject('PPM - Test polaczenia email');
                 }
             );
 
-            $this->showMessage("Testowy email wyslany na {$fromEmail}. Sprawdz skrzynke.", 'success');
+            $this->showMessage("Testowy email wyslany na {$recipient}. Sprawdz skrzynke.", 'success');
 
             \Log::info('Test email sent', [
-                'to' => $fromEmail,
+                'to' => $recipient,
                 'smtp_host' => config('mail.mailers.smtp.host'),
                 'smtp_port' => config('mail.mailers.smtp.port'),
             ]);
