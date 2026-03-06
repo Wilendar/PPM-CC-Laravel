@@ -108,14 +108,11 @@ class SystemSetting extends Model
             'oauth_secrets',
             'backup_encryption_key',
             'database_passwords',
-            'erp_credentials'
+            'erp_credentials',
+            'webhook_secret',
         ];
 
-        return in_array($this->key, $encryptedKeys) || 
-               str_contains($this->key, 'password') ||
-               str_contains($this->key, 'secret') ||
-               str_contains($this->key, 'key') ||
-               str_contains($this->key, 'token');
+        return in_array($this->key, $encryptedKeys);
     }
 
     /**
@@ -256,6 +253,7 @@ class SystemSetting extends Model
             'email' => 'Konfiguracja poczty',
             'backup' => 'System kopii zapasowych',
             'maintenance' => 'Konserwacja systemu',
+            'data_retention' => 'Retencja danych',
             'ui' => 'Interfejs użytkownika',
         ];
     }

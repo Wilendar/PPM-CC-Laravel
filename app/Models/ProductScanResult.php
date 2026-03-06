@@ -387,6 +387,8 @@ class ProductScanResult extends Model
                 'resolved_by' => $userId,
             ]);
 
+            $this->stripResolvedData();
+
             Log::info('ProductScanResult linked to product', [
                 'result_id' => $this->id,
                 'product_id' => $productId,
@@ -448,6 +450,8 @@ class ProductScanResult extends Model
                 'resolved_by' => $userId,
             ]);
 
+            $this->stripResolvedData();
+
             Log::info('ProductScanResult created as PendingProduct', [
                 'result_id' => $this->id,
                 'pending_product_id' => $pendingProduct->id,
@@ -493,6 +497,8 @@ class ProductScanResult extends Model
             'resolved_by' => $userId,
         ]);
 
+        $this->stripResolvedData();
+
         Log::info('ProductScanResult marked as ignored', [
             'result_id' => $this->id,
             'sku' => $this->sku,
@@ -500,6 +506,53 @@ class ProductScanResult extends Model
         ]);
 
         return $this;
+    }
+
+    /**
+     * Strip heavy data from resolved scan results to save space.
+     * MUST be called AFTER resolution logic completes (source_data may be needed during resolution).
+     */
+    public function stripResolvedData(): void
+    {
+        if (!$this->isResolved()) {
+            return;
+        }
+
+        // Already stripped
+        if ($this->source_data === null && $this->ppm_data === null) {
+            return;
+        }
+
+        // Generate compact diff summary (only field names, not values)
+        $diffSummary = [];
+        $sourceData = $this->source_data ?? [];
+        $ppmData = $this->ppm_data ?? [];
+
+        $changedFields = [];
+        foreach ($sourceData as $key => $value) {
+            if (!array_key_exists($key, $ppmData) || $ppmData[$key] !== $value) {
+                $changedFields[] = $key;
+            }
+        }
+        foreach ($ppmData as $key => $value) {
+            if (!array_key_exists($key, $sourceData)) {
+                $changedFields[] = $key;
+            }
+        }
+
+        $diffSummary = [
+            '_summary' => true,
+            '_stripped_at' => now()->toIso8601String(),
+            '_resolution' => $this->resolution_status,
+            'changed_fields' => array_unique($changedFields),
+            'changed_count' => count(array_unique($changedFields)),
+        ];
+
+        $this->update([
+            'source_data' => null,
+            'ppm_data' => null,
+            'diff_data' => $diffSummary,
+        ]);
     }
 
     // ==========================================

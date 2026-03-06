@@ -54,7 +54,8 @@ Schedule::command('logs:archive --keep-days=30')
 
 // Automatic sync_jobs cleanup - retention policy from config/sync.php
 // 2025-11-12: BUG #9 FIX #6 - Configurable retention policy + optional auto-cleanup
-if (config('sync.cleanup.auto_cleanup_enabled', false)) {
+// 2026-03-07: Now reads enabled state from RetentionConfigService (UI toggle in system-settings)
+if (app(\App\Services\RetentionConfigService::class)->isSyncCleanupEnabled()) {
     Schedule::command('sync:cleanup')
         ->daily()
         ->at('02:00')
@@ -364,6 +365,34 @@ Schedule::command('import:publish-scheduled')
     ->withoutOverlapping()
     ->runInBackground()
     ->name('import-publish-scheduled');
+
+// Audit logs cleanup - keep 90 days of data
+Schedule::command('audit:cleanup --days=90')
+    ->daily()
+    ->at('04:30')
+    ->name('audit-logs-cleanup')
+    ->withoutOverlapping()
+    ->runInBackground();
+
+// ==========================================
+// SCAN & ARCHIVE CLEANUP TASKS
+// ==========================================
+
+// Scan results cleanup - strip resolved data + delete old results
+Schedule::command('scan:cleanup --days=30')
+    ->daily()
+    ->at('04:15')
+    ->name('scan-results-cleanup')
+    ->withoutOverlapping()
+    ->runInBackground();
+
+// Archive files cleanup - remove old .json.gz files
+Schedule::command('archives:cleanup')
+    ->weekly()
+    ->at('05:00')
+    ->name('archives-cleanup')
+    ->withoutOverlapping()
+    ->runInBackground();
 
 // ==========================================
 // FUTURE TASKS (PLACEHOLDER)

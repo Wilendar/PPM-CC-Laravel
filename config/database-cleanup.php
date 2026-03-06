@@ -114,6 +114,32 @@ return [
             'enabled' => true,
             'command' => 'category-preview:cleanup',
         ],
+
+        // Audit logs - security audit trail, medium retention
+        'audit_logs' => [
+            'retention_days' => 90,
+            'date_column' => 'created_at',
+            'chunk_size' => 5000,
+            'enabled' => true,
+            'command' => 'audit:cleanup --days=90',
+        ],
+
+        // Product scan results - scan data, short retention
+        'product_scan_results' => [
+            'retention_days' => 30,
+            'date_column' => 'created_at',
+            'chunk_size' => 1000,
+            'enabled' => true,
+            'command' => 'scan:cleanup --days=30',
+        ],
+
+        // Product scan sessions - scan sessions, short retention
+        'product_scan_sessions' => [
+            'retention_days' => 30,
+            'date_column' => 'created_at',
+            'chunk_size' => 500,
+            'enabled' => true,
+        ],
     ],
 
     /*
@@ -134,6 +160,9 @@ return [
         'job_progress' => ['warning' => 20, 'critical' => 100],
         'failed_jobs' => ['warning' => 10, 'critical' => 50],
         'notifications' => ['warning' => 50, 'critical' => 200],
+        'audit_logs' => ['warning' => 100, 'critical' => 500],
+        'product_scan_results' => ['warning' => 100, 'critical' => 500],
+        'product_scan_sessions' => ['warning' => 20, 'critical' => 100],
     ],
 
     /*
@@ -147,5 +176,20 @@ return [
         'time' => '06:00',               // Time for daily schedule
         'send_alert_on_warning' => true,
         'send_alert_on_critical' => true,
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Archive Settings
+    |--------------------------------------------------------------------------
+    |
+    | Configuration for data archiving before deletion.
+    |
+    */
+    'archive' => [
+        'enabled' => true,
+        'base_path' => 'archives',
+        'format' => 'json.gz',
+        'archive_retention_days' => 180,
     ],
 ];

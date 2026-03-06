@@ -53,12 +53,12 @@ class SystemSettings extends Component
     public function boot(SettingsService $settingsService)
     {
         $this->settingsService = $settingsService;
+        $this->categories = SystemSetting::getCategories();
     }
 
     public function mount()
     {
         $this->authorize('system.manage');
-        $this->categories = SystemSetting::getCategories();
         $this->loadSettings();
     }
 
@@ -115,6 +115,8 @@ class SystemSettings extends Component
                 return $this->getBackupSettings();
             case 'ui':
                 return $this->getUISettings();
+            case 'data_retention':
+                return []; // Handled by sub-component
             default:
                 return [];
         }
@@ -323,6 +325,16 @@ class SystemSettings extends Component
                 'value' => $this->settingsService->get('smtp_password') ? '********' : '',
                 'description' => 'Pozostaw puste jeśli nie chcesz zmieniać',
             ],
+            'smtp_encryption' => [
+                'label' => 'Szyfrowanie',
+                'type' => 'select',
+                'value' => $this->settingsService->get('smtp_encryption', 'tls'),
+                'options' => [
+                    'tls' => 'TLS (port 587)',
+                    'ssl' => 'SSL (port 465)',
+                    '' => 'Brak szyfrowania',
+                ],
+            ],
             'from_email' => [
                 'label' => 'Adres nadawcy',
                 'type' => 'email',
@@ -467,13 +479,14 @@ class SystemSettings extends Component
             $this->isLoading = true;
             
             $categorySettings = $this->settings[$this->activeCategory] ?? [];
-            $rules = $this->buildValidationRules($categorySettings);
-            
-            // Walidacja
-            $validator = Validator::make($this->tempValues, $rules);
-            if ($validator->fails()) {
-                $this->showMessage('Błędy walidacji: ' . $validator->errors()->first(), 'error');
-                return;
+
+            if (!empty($this->tempValues)) {
+                $rules = $this->buildValidationRules($categorySettings);
+                $validator = Validator::make($this->tempValues, $rules);
+                if ($validator->fails()) {
+                    $this->showMessage('Błędy walidacji: ' . $validator->errors()->first(), 'error');
+                    return;
+                }
             }
 
             // Zapisz ustawienia
@@ -485,9 +498,10 @@ class SystemSettings extends Component
                     }
                     
                     $settingConfig = $categorySettings[$key] ?? [];
-                    $type = $settingConfig['type'] ?? 'string';
-                    
-                    $this->settingsService->set($key, $value, $this->activeCategory, $type);
+                    $formType = $settingConfig['type'] ?? 'string';
+                    $dbType = $this->mapFormTypeToDbType($formType);
+
+                    $this->settingsService->set($key, $value, $this->activeCategory, $dbType);
                 }
             }
 
@@ -496,6 +510,12 @@ class SystemSettings extends Component
                 if ($file) {
                     $this->settingsService->handleFileUpload($key, $file);
                 }
+            }
+
+            // Po zapisaniu ustawień email - wyczyść cache aby nowe wartości
+            // zostały użyte przez applyDatabaseMailConfig() przy następnym requeście
+            if ($this->activeCategory === 'email') {
+                $this->settingsService->clearCategoryCache('email');
             }
 
             $this->showMessage('Ustawienia zostały zapisane pomyślnie', 'success');
@@ -526,20 +546,43 @@ class SystemSettings extends Component
     }
 
     /**
-     * Test połączenia email
+     * Test połączenia email - wysyła testową wiadomość na adres nadawcy.
      */
     public function testEmailConnection()
     {
         $this->authorize('system.manage');
         try {
-            // Wysyłanie testowego emaila
-            $settings = $this->settingsService->getEmailSettings();
-            
-            // Tutaj można dodać logikę testowania SMTP
-            $this->showMessage('Test połączenia email - funkcja w development', 'info');
-            
+            $fromEmail = config('mail.from.address');
+            $fromName = config('mail.from.name', 'PPM');
+
+            if (empty($fromEmail)) {
+                $this->showMessage('Brak skonfigurowanego adresu nadawcy (from_email).', 'error');
+                return;
+            }
+
+            \Illuminate\Support\Facades\Mail::raw(
+                "To jest testowa wiadomosc z PPM.\n\nJesli ja widzisz, konfiguracja SMTP dziala poprawnie.\n\nData: " . now()->format('Y-m-d H:i:s'),
+                function ($message) use ($fromEmail, $fromName) {
+                    $message->to($fromEmail)
+                            ->subject('PPM - Test polaczenia email');
+                }
+            );
+
+            $this->showMessage("Testowy email wyslany na {$fromEmail}. Sprawdz skrzynke.", 'success');
+
+            \Log::info('Test email sent', [
+                'to' => $fromEmail,
+                'smtp_host' => config('mail.mailers.smtp.host'),
+                'smtp_port' => config('mail.mailers.smtp.port'),
+            ]);
+
         } catch (\Exception $e) {
-            $this->showMessage('Błąd połączenia: ' . $e->getMessage(), 'error');
+            $this->showMessage('Blad wysylki: ' . $e->getMessage(), 'error');
+
+            \Log::error('Test email failed', [
+                'error' => $e->getMessage(),
+                'smtp_host' => config('mail.mailers.smtp.host'),
+            ]);
         }
     }
 
@@ -551,36 +594,40 @@ class SystemSettings extends Component
         $rules = [];
         
         foreach ($settings as $key => $config) {
+            if (!array_key_exists($key, $this->tempValues)) {
+                continue;
+            }
+
             $rule = [];
-            
+
             if ($config['required'] ?? false) {
                 $rule[] = 'required';
             }
-            
+
             switch ($config['type']) {
                 case 'integer':
                     $rule[] = 'integer';
                     if (isset($config['min'])) $rule[] = 'min:' . $config['min'];
                     if (isset($config['max'])) $rule[] = 'max:' . $config['max'];
                     break;
-                    
+
                 case 'email':
                     $rule[] = 'email';
                     break;
-                    
+
                 case 'boolean':
                     $rule[] = 'boolean';
                     break;
-                    
+
                 case 'string':
                 default:
                     $rule[] = 'string';
                     if (isset($config['max'])) $rule[] = 'max:' . $config['max'];
                     break;
             }
-            
+
             if (!empty($rule)) {
-                $rules["tempValues.{$key}"] = $rule;
+                $rules[$key] = $rule;
             }
         }
         
@@ -614,5 +661,40 @@ class SystemSettings extends Component
     public function updatedTempValues($value, $key)
     {
         $this->resetMessages();
+    }
+
+    /**
+     * Mapuj typ formularza na typ DB (enum: string, integer, boolean, json, email, url, file)
+     */
+    private function mapFormTypeToDbType(string $formType): string
+    {
+        return match($formType) {
+            'integer' => 'integer',
+            'boolean' => 'boolean',
+            'email' => 'email',
+            'file' => 'file',
+            'json' => 'json',
+            'url' => 'url',
+            default => 'string', // select, password, string -> string
+        };
+    }
+
+    /**
+     * Ikona dla kategorii ustawień
+     */
+    public function getCategoryIcon($category): string
+    {
+        return match($category) {
+            'general' => 'fas fa-cogs',
+            'security' => 'fas fa-shield-alt',
+            'product' => 'fas fa-box',
+            'email' => 'fas fa-envelope',
+            'integration' => 'fas fa-plug',
+            'backup' => 'fas fa-database',
+            'maintenance' => 'fas fa-wrench',
+            'data_retention' => 'fas fa-clock',
+            'ui' => 'fas fa-palette',
+            default => 'fas fa-cog'
+        };
     }
 }

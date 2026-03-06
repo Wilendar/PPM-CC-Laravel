@@ -135,7 +135,8 @@ class CleanupLogTables extends Command
      */
     private function cleanupTable(string $tableName, array $config, bool $dryRun): array
     {
-        $retentionDays = $config['retention_days'] ?? 30;
+        $retentionService = app(\App\Services\RetentionConfigService::class);
+        $retentionDays = $retentionService->getRetentionDays($tableName, $config['retention_days'] ?? 30);
         $dateColumn = $config['date_column'] ?? 'created_at';
         $chunkSize = $config['chunk_size'] ?? 1000;
 

@@ -103,6 +103,7 @@ class PriceHistory extends Model
         'metadata',
         'created_by',
         'created_at',
+        'format_version',
     ];
 
     /**
@@ -121,6 +122,7 @@ class PriceHistory extends Model
             'affected_products_count' => 'integer',
             'created_by' => 'integer',
             'created_at' => 'datetime',
+            'format_version' => 'integer',
         ];
     }
 
@@ -420,6 +422,15 @@ class PriceHistory extends Model
                     $changedFields[] = $key;
                 }
             }
+
+            // Deduplikacja: brak zmian = nie zapisuj
+            if (empty($changedFields)) {
+                return new PriceHistory();
+            }
+
+            // Filtruj do TYLKO zmienionych pol (format v2)
+            $oldValues = array_intersect_key($oldValues, array_flip($changedFields));
+            $newValues = array_intersect_key($newValues, array_flip($changedFields));
         }
 
         return static::create([
@@ -429,6 +440,7 @@ class PriceHistory extends Model
             'old_values' => $oldValues,
             'new_values' => $newValues,
             'changed_fields' => $changedFields,
+            'format_version' => 2,
             'change_reason' => $options['reason'] ?? null,
             'batch_id' => $options['batch_id'] ?? null,
             'adjustment_percentage' => $options['adjustment_percentage'] ?? null,

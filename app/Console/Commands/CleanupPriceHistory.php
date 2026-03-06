@@ -39,7 +39,10 @@ class CleanupPriceHistory extends Command
      */
     public function handle(): int
     {
-        $retentionDays = (int) $this->option('days');
+        $retentionService = app(\App\Services\RetentionConfigService::class);
+        $retentionDays = $this->option('days')
+            ? (int) $this->option('days')
+            : $retentionService->getRetentionDays('price_history', 90);
         $chunkSize = (int) $this->option('chunk');
         $dryRun = $this->option('dry-run');
 
