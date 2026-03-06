@@ -1,0 +1,321 @@
+name: Deploy to Production
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      skip_migrations:
+        description: 'Skip database migrations'
+        required: false
+        default: 'false'
+        type: boolean
+      skip_backup:
+        description: 'Skip database backup'
+        required: false
+        default: 'false'
+        type: boolean
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+env:
+  REMOTE_PATH: domains/ppm.mpptrade.pl/public_html
+  PRODUCTION_URL: https://ppm.mpptrade.pl
+
+jobs:
+  # Gate: run CI tests before deploying
+  test:
+    name: Pre-deploy Tests
+    uses: ./.github/workflows/ci.yml
+
+  deploy:
+    name: Deploy to Hostido Production
+    runs-on: ubuntu-latest
+    needs: test
+    environment: production
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup PHP 8.3
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: mbstring, xml, ctype, iconv, intl, pdo_mysql, gd, zip, bcmath
+          coverage: none
+          tools: composer:v2
+
+      - name: Get Composer cache directory
+        id: composer-cache
+        run: echo "dir=$(composer config cache-files-dir)" >> $GITHUB_OUTPUT
+
+      - name: Cache Composer dependencies
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.composer-cache.outputs.dir }}
+          key: ${{ runner.os }}-composer-${{ hashFiles('**/composer.lock') }}
+          restore-keys: ${{ runner.os }}-composer-
+
+      - name: Install Composer dependencies (production)
+        run: composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader
+
+      - name: Setup Node.js 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+
+      - name: Install npm dependencies
+        run: npm ci
+
+      - name: Build frontend assets
+        run: npm run build
+
+      - name: Verify Vite build output
+        run: |
+          test -f public/build/.vite/manifest.json || { echo "FAIL: manifest.json missing!"; exit 1; }
+          CSS_COUNT=$(ls public/build/assets/*.css 2>/dev/null | wc -l)
+          JS_COUNT=$(ls public/build/assets/*.js 2>/dev/null | wc -l)
+          echo "Build output: ${CSS_COUNT} CSS files, ${JS_COUNT} JS files"
+          [ "$CSS_COUNT" -gt 0 ] || { echo "FAIL: No CSS files!"; exit 1; }
+          [ "$JS_COUNT" -gt 0 ] || { echo "FAIL: No JS files!"; exit 1; }
+
+      # -----------------------------------------------
+      # SSH Setup
+      # -----------------------------------------------
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.HOSTIDO_SSH_KEY }}" > ~/.ssh/hostido_key
+          chmod 600 ~/.ssh/hostido_key
+          ssh-keyscan -p ${{ secrets.HOSTIDO_PORT }} ${{ secrets.HOSTIDO_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
+          cat >> ~/.ssh/config <<EOF
+          Host hostido
+            HostName ${{ secrets.HOSTIDO_HOST }}
+            User ${{ secrets.HOSTIDO_USER }}
+            Port ${{ secrets.HOSTIDO_PORT }}
+            IdentityFile ~/.ssh/hostido_key
+            StrictHostKeyChecking accept-new
+            ServerAliveInterval 60
+            ServerAliveCountMax 3
+          EOF
+          chmod 600 ~/.ssh/config
+
+      - name: Test SSH connection
+        run: ssh hostido "echo 'SSH connection OK' && php -v | head -1"
+
+      # -----------------------------------------------
+      # Pre-deploy: Backup
+      # -----------------------------------------------
+      - name: Backup database on server
+        if: ${{ github.event.inputs.skip_backup != 'true' }}
+        run: |
+          BACKUP_NAME="backup_$(date +%Y%m%d_%H%M%S).sql.gz"
+          echo "Creating backup: ${BACKUP_NAME}"
+          ssh hostido "mkdir -p ~/backups && mysqldump --single-transaction --quick --lock-tables=false -u ${{ secrets.DB_USER }} -p'${{ secrets.DB_PASSWORD }}' ${{ secrets.DB_NAME }} | gzip > ~/backups/${BACKUP_NAME}"
+          echo "Backup created: ${BACKUP_NAME}"
+          echo "BACKUP_NAME=${BACKUP_NAME}" >> $GITHUB_ENV
+
+      # -----------------------------------------------
+      # Deploy: rsync files
+      # -----------------------------------------------
+      - name: Deploy files via rsync
+        run: |
+          rsync -azP --delete \
+            --include='app/***' \
+            --include='bootstrap/***' \
+            --include='config/***' \
+            --include='database/***' \
+            --include='resources/views/***' \
+            --include='routes/***' \
+            --include='public/build/***' \
+            --include='public/index.php' \
+            --include='public/.htaccess' \
+            --include='public/favicon.ico' \
+            --include='public/robots.txt' \
+            --include='composer.json' \
+            --include='composer.lock' \
+            --include='artisan' \
+            --exclude='.env' \
+            --exclude='vendor/***' \
+            --exclude='node_modules/***' \
+            --exclude='storage/logs/***' \
+            --exclude='storage/framework/cache/***' \
+            --exclude='storage/framework/sessions/***' \
+            --exclude='storage/framework/views/***' \
+            --exclude='.git/***' \
+            --exclude='_TOOLS/***' \
+            --exclude='_DOCS/***' \
+            --exclude='_ISSUES_FIXES/***' \
+            --exclude='_AGENT_REPORTS/***' \
+            --exclude='.claude/***' \
+            --exclude='.Release_docs/***' \
+            --exclude='Plan_Projektu/***' \
+            --exclude='tests/***' \
+            --exclude='*.md' \
+            --exclude='.github/***' \
+            --exclude='.phpunit.cache/***' \
+            --exclude='phpunit.xml' \
+            --exclude='phpstan.neon*' \
+            --exclude='.php-cs-fixer*' \
+            --exclude='vite.config.js' \
+            --exclude='tailwind.config.js' \
+            --exclude='postcss.config.js' \
+            --exclude='package.json' \
+            --exclude='package-lock.json' \
+            -e "ssh -i ~/.ssh/hostido_key -p ${{ secrets.HOSTIDO_PORT }}" \
+            ./ ${{ secrets.HOSTIDO_USER }}@${{ secrets.HOSTIDO_HOST }}:${{ env.REMOTE_PATH }}/
+
+      - name: Deploy Vite manifest to root location
+        run: |
+          echo "Copying .vite/manifest.json -> build/manifest.json (Laravel requirement)"
+          ssh hostido "cp ${{ env.REMOTE_PATH }}/public/build/.vite/manifest.json ${{ env.REMOTE_PATH }}/public/build/manifest.json 2>/dev/null || true"
+
+      # -----------------------------------------------
+      # Post-deploy: Server-side operations
+      # -----------------------------------------------
+      - name: Install Composer dependencies on server
+        run: |
+          ssh hostido "cd ${{ env.REMOTE_PATH }} && composer install --no-dev --no-interaction --optimize-autoloader 2>&1"
+
+      - name: Run database migrations
+        if: ${{ github.event.inputs.skip_migrations != 'true' }}
+        run: |
+          ssh hostido "cd ${{ env.REMOTE_PATH }} && php artisan migrate --force --no-interaction 2>&1"
+
+      - name: Optimize application caches
+        run: |
+          ssh hostido "cd ${{ env.REMOTE_PATH }} && \
+            php artisan config:cache && \
+            php artisan route:cache && \
+            php artisan view:cache && \
+            php artisan event:cache && \
+            php artisan optimize 2>&1"
+
+      # -----------------------------------------------
+      # Health check
+      # -----------------------------------------------
+      - name: Health check - HTTP response
+        run: |
+          echo "Waiting 5 seconds for application warmup..."
+          sleep 5
+          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 30 "${{ env.PRODUCTION_URL }}")
+          echo "HTTP Status: ${HTTP_STATUS}"
+          if [ "$HTTP_STATUS" -ge 200 ] && [ "$HTTP_STATUS" -lt 400 ]; then
+            echo "Health check PASSED (HTTP ${HTTP_STATUS})"
+          else
+            echo "Health check FAILED (HTTP ${HTTP_STATUS})"
+            exit 1
+          fi
+
+      - name: Health check - verify CSS assets (HTTP 200)
+        run: |
+          MANIFEST="${{ env.REMOTE_PATH }}/public/build/.vite/manifest.json"
+          echo "Checking critical assets from manifest..."
+
+          # Extract CSS filenames from manifest on server
+          CSS_FILES=$(ssh hostido "cd ${{ env.REMOTE_PATH }} && php -r \"\\\$m = json_decode(file_get_contents('public/build/.vite/manifest.json'), true); foreach(\\\$m as \\\$entry) { if(isset(\\\$entry['file']) && str_ends_with(\\\$entry['file'], '.css')) echo \\\$entry['file'] . PHP_EOL; }\"")
+
+          ALL_OK=true
+          while IFS= read -r css_file; do
+            [ -z "$css_file" ] && continue
+            URL="${{ env.PRODUCTION_URL }}/public/build/${css_file}"
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 "$URL")
+            if [ "$STATUS" = "200" ]; then
+              echo "OK: ${css_file} (HTTP ${STATUS})"
+            else
+              echo "FAIL: ${css_file} (HTTP ${STATUS})"
+              ALL_OK=false
+            fi
+          done <<< "$CSS_FILES"
+
+          if [ "$ALL_OK" = false ]; then
+            echo ""
+            echo "WARNING: Some CSS assets returned non-200 status!"
+            echo "This may indicate incomplete asset deployment."
+            exit 1
+          fi
+
+          echo ""
+          echo "All CSS assets verified successfully."
+
+      - name: Verify Laravel artisan on server
+        run: |
+          ssh hostido "cd ${{ env.REMOTE_PATH }} && php artisan --version && php artisan env"
+
+      # -----------------------------------------------
+      # Cleanup
+      # -----------------------------------------------
+      - name: Cleanup old backups (keep last 5)
+        if: ${{ github.event.inputs.skip_backup != 'true' }}
+        run: |
+          ssh hostido "cd ~/backups && ls -t *.sql.gz 2>/dev/null | tail -n +6 | xargs -r rm -- && echo 'Old backups cleaned' || echo 'No old backups to clean'"
+
+      - name: Cleanup SSH key
+        if: always()
+        run: rm -f ~/.ssh/hostido_key
+
+      # -----------------------------------------------
+      # Summary
+      # -----------------------------------------------
+      - name: Deployment summary
+        if: success()
+        run: |
+          echo "============================================"
+          echo "  DEPLOYMENT SUCCESSFUL"
+          echo "============================================"
+          echo "  Branch:     ${{ github.ref_name }}"
+          echo "  Commit:     ${{ github.sha }}"
+          echo "  Author:     ${{ github.actor }}"
+          echo "  URL:        ${{ env.PRODUCTION_URL }}"
+          echo "  Backup:     ${BACKUP_NAME:-skipped}"
+          echo "  Migrations: ${{ github.event.inputs.skip_migrations == 'true' && 'skipped' || 'executed' }}"
+          echo "  Time:       $(date '+%Y-%m-%d %H:%M:%S UTC')"
+          echo "============================================"
+
+  # -----------------------------------------------
+  # Rollback job (manual trigger only)
+  # -----------------------------------------------
+  rollback:
+    name: Rollback (manual)
+    runs-on: ubuntu-latest
+    if: ${{ failure() && needs.deploy.result == 'failure' }}
+    needs: deploy
+
+    steps:
+      - name: Setup SSH for rollback
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.HOSTIDO_SSH_KEY }}" > ~/.ssh/hostido_key
+          chmod 600 ~/.ssh/hostido_key
+          ssh-keyscan -p ${{ secrets.HOSTIDO_PORT }} ${{ secrets.HOSTIDO_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
+          cat >> ~/.ssh/config <<EOF
+          Host hostido
+            HostName ${{ secrets.HOSTIDO_HOST }}
+            User ${{ secrets.HOSTIDO_USER }}
+            Port ${{ secrets.HOSTIDO_PORT }}
+            IdentityFile ~/.ssh/hostido_key
+            StrictHostKeyChecking accept-new
+          EOF
+          chmod 600 ~/.ssh/config
+
+      - name: Clear caches (safe rollback step)
+        run: |
+          echo "Clearing caches to restore stable state..."
+          ssh hostido "cd ${{ env.REMOTE_PATH }} && \
+            php artisan config:clear && \
+            php artisan route:clear && \
+            php artisan view:clear && \
+            php artisan cache:clear && \
+            php artisan optimize:clear 2>&1" || true
+          echo ""
+          echo "Caches cleared. If application is broken, restore from latest backup:"
+          echo "  ssh hostido 'ls -lht ~/backups/ | head -5'"
+          echo "  ssh hostido 'gunzip < ~/backups/BACKUP_FILE.sql.gz | mysql -u USER -pPASS DB_NAME'"
+
+      - name: Cleanup SSH key
+        if: always()
+        run: rm -f ~/.ssh/hostido_key
