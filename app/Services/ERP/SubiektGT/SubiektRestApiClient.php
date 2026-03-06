@@ -970,52 +970,26 @@ class SubiektRestApiClient
         }
 
         $results = [];
-        $baseUrl = $this->baseUrl;
-        $apiKey = $this->apiKey;
-        $timeout = $this->timeout;
-        $verifySsl = $this->verifySsl;
+        $skuList = array_values(array_unique($skus));
+        $chunks = array_chunk($skuList, 50);
 
-        // Re-index SKUs to ensure numeric keys 0, 1, 2...
-        $skuList = array_values($skus);
-
-        Log::info('SubiektRestApiClient::batchFetchPricesBySku - Starting parallel fetch', [
+        Log::info('SubiektRestApiClient::batchFetchPricesBySku - Starting chunked batch fetch', [
             'sku_count' => count($skuList),
+            'chunk_count' => count($chunks),
         ]);
 
         $startTime = microtime(true);
 
-        // Use Laravel HTTP::pool() for parallel requests
-        // Pool returns responses indexed 0, 1, 2... matching the order of requests
-        $responses = Http::pool(function ($pool) use ($skuList, $baseUrl, $apiKey, $timeout, $verifySsl) {
-            foreach ($skuList as $sku) {
-                $encodedSku = rawurlencode($sku);
-                $pool->as($sku)
-                    ->withHeaders(['X-API-Key' => $apiKey])
-                    ->withOptions(['verify' => $verifySsl])
-                    ->timeout($timeout)
-                    ->get("{$baseUrl}/api/prices/sku/{$encodedSku}");
-            }
-        });
-
-        // Process responses - keyed by SKU using ->as($sku)
-        foreach ($skuList as $sku) {
+        foreach ($chunks as $chunkIndex => $chunk) {
             try {
-                $response = $responses[$sku] ?? null;
+                $response = $this->request('POST', 'api/prices/batch', [
+                    'skus' => $chunk,
+                ]);
 
-                // Http::pool() returns ConnectionException instead of Response on connection failure
-                if ($response instanceof \Illuminate\Http\Client\ConnectionException) {
-                    Log::debug('batchFetchPricesBySku: Connection failed', [
-                        'sku' => $sku,
-                        'error' => $response->getMessage(),
-                    ]);
-                    continue;
-                }
+                if ($response['success'] ?? false) {
+                    $batchData = $response['data'] ?? [];
 
-                if ($response && $response->successful()) {
-                    $data = $response->json();
-                    if ($data['success'] ?? false) {
-                        $rawPrices = $data['data'] ?? [];
-
+                    foreach ($batchData as $sku => $rawPrices) {
                         // Transform API format to expected format for updateProductPricesFromErp
                         // API returns: [{"priceLevel":1,"priceNet":222.00,"priceGross":273.06}, ...]
                         // Expected:    [1 => ['net' => 222.00, 'gross' => 273.06], ...]
@@ -1031,17 +1005,24 @@ class SubiektRestApiClient
                         }
                         $results[$sku] = $transformedPrices;
                     }
-                } else {
-                    Log::debug('batchFetchPricesBySku: No response or failed', [
-                        'sku' => $sku,
-                        'status' => $response ? $response->status() : 'null',
+
+                    Log::debug('batchFetchPricesBySku: Chunk processed', [
+                        'chunk' => $chunkIndex + 1,
+                        'requested' => count($chunk),
+                        'fetched' => count($batchData),
                     ]);
                 }
             } catch (\Exception $e) {
-                Log::debug('batchFetchPricesBySku: Failed for SKU', [
-                    'sku' => $sku,
+                Log::warning('batchFetchPricesBySku: Chunk failed', [
+                    'chunk' => $chunkIndex + 1,
+                    'sku_count' => count($chunk),
                     'error' => $e->getMessage(),
                 ]);
+            }
+
+            // Delay between chunks to avoid overloading IIS
+            if ($chunkIndex < count($chunks) - 1) {
+                usleep(200000); // 200ms
             }
         }
 
@@ -1068,51 +1049,26 @@ class SubiektRestApiClient
         }
 
         $results = [];
-        $baseUrl = $this->baseUrl;
-        $apiKey = $this->apiKey;
-        $timeout = $this->timeout;
-        $verifySsl = $this->verifySsl;
+        $skuList = array_values(array_unique($skus));
+        $chunks = array_chunk($skuList, 50);
 
-        // Re-index SKUs to ensure numeric keys
-        $skuList = array_values($skus);
-
-        Log::info('SubiektRestApiClient::batchFetchStockBySku - Starting parallel fetch', [
+        Log::info('SubiektRestApiClient::batchFetchStockBySku - Starting chunked batch fetch', [
             'sku_count' => count($skuList),
+            'chunk_count' => count($chunks),
         ]);
 
         $startTime = microtime(true);
 
-        // Use Laravel HTTP::pool() for parallel requests
-        $responses = Http::pool(function ($pool) use ($skuList, $baseUrl, $apiKey, $timeout, $verifySsl) {
-            foreach ($skuList as $sku) {
-                $encodedSku = rawurlencode($sku);
-                $pool->as($sku)
-                    ->withHeaders(['X-API-Key' => $apiKey])
-                    ->withOptions(['verify' => $verifySsl])
-                    ->timeout($timeout)
-                    ->get("{$baseUrl}/api/stock/sku/{$encodedSku}");
-            }
-        });
-
-        // Process responses - keyed by SKU using ->as($sku)
-        foreach ($skuList as $sku) {
+        foreach ($chunks as $chunkIndex => $chunk) {
             try {
-                $response = $responses[$sku] ?? null;
+                $response = $this->request('POST', 'api/stock/batch', [
+                    'skus' => $chunk,
+                ]);
 
-                // Http::pool() returns ConnectionException instead of Response on connection failure
-                if ($response instanceof \Illuminate\Http\Client\ConnectionException) {
-                    Log::debug('batchFetchStockBySku: Connection failed', [
-                        'sku' => $sku,
-                        'error' => $response->getMessage(),
-                    ]);
-                    continue;
-                }
+                if ($response['success'] ?? false) {
+                    $batchData = $response['data'] ?? [];
 
-                if ($response && $response->successful()) {
-                    $data = $response->json();
-                    if ($data['success'] ?? false) {
-                        $rawStock = $data['data'] ?? [];
-
+                    foreach ($batchData as $sku => $rawStock) {
                         // Transform API format to expected format for updateProductStockFromErp
                         // API returns: [{"warehouseId":1,"quantity":5.00}, ...]
                         // Expected:    [1 => ['quantity' => 5], ...]
@@ -1130,17 +1086,24 @@ class SubiektRestApiClient
                         }
                         $results[$sku] = $transformedStock;
                     }
-                } else {
-                    Log::debug('batchFetchStockBySku: No response or failed', [
-                        'sku' => $sku,
-                        'status' => $response ? $response->status() : 'null',
+
+                    Log::debug('batchFetchStockBySku: Chunk processed', [
+                        'chunk' => $chunkIndex + 1,
+                        'requested' => count($chunk),
+                        'fetched' => count($batchData),
                     ]);
                 }
             } catch (\Exception $e) {
-                Log::debug('batchFetchStockBySku: Failed for SKU', [
-                    'sku' => $sku,
+                Log::warning('batchFetchStockBySku: Chunk failed', [
+                    'chunk' => $chunkIndex + 1,
+                    'sku_count' => count($chunk),
                     'error' => $e->getMessage(),
                 ]);
+            }
+
+            // Delay between chunks to avoid overloading IIS
+            if ($chunkIndex < count($chunks) - 1) {
+                usleep(200000); // 200ms
             }
         }
 
