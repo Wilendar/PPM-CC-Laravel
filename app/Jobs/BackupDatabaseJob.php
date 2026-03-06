@@ -54,7 +54,24 @@ class BackupDatabaseJob implements ShouldQueue
 
             if ($success) {
                 Log::info("Backup job completed successfully: {$this->backupJob->id}");
-                
+
+                // Notify admins about completed backup
+                $adminRecipients = \App\Models\User::role('Admin')
+                    ->where('is_active', true)
+                    ->get();
+                $backupSize = $this->backupJob->file_size ?? 'N/A';
+                $duration = $this->backupJob->started_at
+                    ? now()->diffInSeconds($this->backupJob->started_at)
+                    : 0;
+                \Illuminate\Support\Facades\Notification::send(
+                    $adminRecipients,
+                    new \App\Notifications\BackupCompletedNotification(
+                        $this->backupJob->name ?? 'backup',
+                        is_numeric($backupSize) ? number_format($backupSize / 1048576, 2) . ' MB' : (string) $backupSize,
+                        (float) $duration
+                    )
+                );
+
                 // Emit event dla Livewire
                 event('backup.completed', [
                     'backup_id' => $this->backupJob->id,

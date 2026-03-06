@@ -23,6 +23,7 @@ use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Facades\Config;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -60,6 +61,7 @@ class AppServiceProvider extends ServiceProvider
         $this->registerProductStatusCacheObservers();
         $this->registerOAuthRateLimiters();
         $this->registerSocialiteProviders();
+        $this->applyDatabaseMailConfig();
     }
 
     /**
@@ -100,6 +102,55 @@ class AppServiceProvider extends ServiceProvider
         Event::listen(function (\SocialiteProviders\Manager\SocialiteWasCalled $event) {
             $event->extendSocialite('microsoft', \SocialiteProviders\Microsoft\Provider::class);
         });
+    }
+
+    /**
+     * Override Laravel mail config with DB settings from System Settings panel.
+     * Falls back to .env values if no DB settings are configured.
+     */
+    private function applyDatabaseMailConfig(): void
+    {
+        try {
+            $smtpHost = \App\Models\SystemSetting::get('smtp_host');
+
+            if (empty($smtpHost)) {
+                return;
+            }
+
+            // Switch driver from log/array to smtp when DB settings exist
+            Config::set('mail.default', 'smtp');
+            Config::set('mail.mailers.smtp.host', $smtpHost);
+
+            $port = \App\Models\SystemSetting::get('smtp_port');
+            if ($port) {
+                Config::set('mail.mailers.smtp.port', (int) $port);
+            }
+
+            $username = \App\Models\SystemSetting::get('smtp_username');
+            if ($username) {
+                Config::set('mail.mailers.smtp.username', $username);
+            }
+
+            $password = \App\Models\SystemSetting::get('smtp_password');
+            if ($password) {
+                Config::set('mail.mailers.smtp.password', $password);
+            }
+
+            $encryption = \App\Models\SystemSetting::get('smtp_encryption', 'tls');
+            Config::set('mail.mailers.smtp.encryption', $encryption);
+
+            $fromEmail = \App\Models\SystemSetting::get('from_email');
+            if ($fromEmail) {
+                Config::set('mail.from.address', $fromEmail);
+            }
+
+            $fromName = \App\Models\SystemSetting::get('from_name');
+            if ($fromName) {
+                Config::set('mail.from.name', $fromName);
+            }
+        } catch (\Exception $e) {
+            // DB not available (e.g. during migrations) - use .env defaults
+        }
     }
 
     /**

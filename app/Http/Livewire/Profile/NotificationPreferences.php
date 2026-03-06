@@ -36,14 +36,34 @@ class NotificationPreferences extends Component
      * Merged with defaults on mount().
      */
     public array $prefs = [
+        // Produkty
         'email_product_changes' => true,
-        'email_sync_status' => true,
-        'email_security_alerts' => true,
-        'email_system_updates' => false,
         'browser_product_changes' => false,
+        // Import
+        'email_import_ready' => true,
+        'browser_import_ready' => true,
+        'email_import_scheduled' => true,
+        'browser_import_scheduled' => false,
+        'email_import_published' => true,
+        'browser_import_published' => true,
+        // Synchronizacja
+        'email_sync_status' => true,
         'browser_sync_status' => true,
+        'email_sync_failed' => true,
+        'browser_sync_failed' => true,
+        // Bezpieczenstwo
+        'email_security_alerts' => true,
         'browser_security_alerts' => true,
+        'email_login_new_ip' => true,
+        'browser_login_new_ip' => true,
+        // System
+        'email_system_updates' => false,
         'browser_system_updates' => false,
+        'email_backup_completed' => false,
+        'browser_backup_completed' => true,
+        // Nowy uzytkownik
+        'email_new_user_pending' => true,
+        'browser_new_user_pending' => true,
     ];
 
     /**
@@ -51,14 +71,34 @@ class NotificationPreferences extends Component
      * no saved preferences or when new preference keys are added.
      */
     protected array $defaultPrefs = [
+        // Produkty
         'email_product_changes' => true,
-        'email_sync_status' => true,
-        'email_security_alerts' => true,
-        'email_system_updates' => false,
         'browser_product_changes' => false,
+        // Import
+        'email_import_ready' => true,
+        'browser_import_ready' => true,
+        'email_import_scheduled' => true,
+        'browser_import_scheduled' => false,
+        'email_import_published' => true,
+        'browser_import_published' => true,
+        // Synchronizacja
+        'email_sync_status' => true,
         'browser_sync_status' => true,
+        'email_sync_failed' => true,
+        'browser_sync_failed' => true,
+        // Bezpieczenstwo
+        'email_security_alerts' => true,
         'browser_security_alerts' => true,
+        'email_login_new_ip' => true,
+        'browser_login_new_ip' => true,
+        // System
+        'email_system_updates' => false,
         'browser_system_updates' => false,
+        'email_backup_completed' => false,
+        'browser_backup_completed' => true,
+        // Nowy uzytkownik
+        'email_new_user_pending' => true,
+        'browser_new_user_pending' => true,
     ];
 
     // ==========================================
@@ -76,8 +116,57 @@ class NotificationPreferences extends Component
     }
 
     // ==========================================
+    // AUTO-SAVE ON PROPERTY CHANGE
+    // ==========================================
+
+    /**
+     * Automatically persist preferences when any pref toggle changes.
+     * Triggered by @entangle().live binding from Alpine toggle switches.
+     */
+    public function updated($property, $value): void
+    {
+        if (str_starts_with($property, 'prefs.')) {
+            $sanitized = array_map(fn($v) => (bool) $v, $this->prefs);
+
+            Auth::user()->update(['notification_settings' => $sanitized]);
+
+            $this->prefs = $sanitized;
+
+            $this->dispatch('preferences-saved');
+
+            \Log::info('Notification preferences auto-saved', [
+                'user_id' => Auth::id(),
+                'changed_key' => $property,
+            ]);
+        }
+    }
+
+    // ==========================================
     // COMPUTED PROPERTIES
     // ==========================================
+
+    /**
+     * Visible notification categories filtered by user permissions.
+     * Admin sees all; other users see only categories they have permission for.
+     *
+     * @return array<int, array>
+     */
+    #[Computed]
+    public function visibleCategories(): array
+    {
+        $user = Auth::user();
+        $allCategories = $this->getCategoryDefinitions();
+
+        return array_filter($allCategories, function ($cat) use ($user) {
+            if ($cat['permission'] === null) {
+                return true;
+            }
+            if ($user->hasRole('Admin')) {
+                return true;
+            }
+            return $user->can($cat['permission']);
+        });
+    }
 
     /**
      * Paginated notifications for the current user.
@@ -229,6 +318,137 @@ class NotificationPreferences extends Component
     // ==========================================
     // HELPERS
     // ==========================================
+
+    /**
+     * Full list of notification category definitions.
+     * Each entry maps to email_<key> and browser_<key> preference keys.
+     *
+     * @return array<int, array{key: string, label: string, description: string, icon: string, icon_color: string, permission: string|null, group: string|null}>
+     */
+    protected function getCategoryDefinitions(): array
+    {
+        return [
+            [
+                'key' => 'product_changes',
+                'label' => 'Produkty',
+                'description' => 'Zmiany w produktach, aktualizacje danych',
+                'icon' => 'product',
+                'icon_color' => 'emerald',
+                'permission' => 'products.read',
+                'group' => null,
+            ],
+            [
+                'key' => 'import_ready',
+                'label' => 'Import: Gotowy do publikacji',
+                'description' => 'Produkt ma SKU i nazwe - gotowy do opublikowania',
+                'icon' => 'import',
+                'icon_color' => 'purple',
+                'permission' => 'import.read',
+                'group' => 'Import',
+            ],
+            [
+                'key' => 'import_scheduled',
+                'label' => 'Import: Data publikacji',
+                'description' => 'Data publikacji produktu zostala ustawiona',
+                'icon' => 'import',
+                'icon_color' => 'purple',
+                'permission' => 'import.read',
+                'group' => 'Import',
+            ],
+            [
+                'key' => 'import_published',
+                'label' => 'Import: Opublikowany',
+                'description' => 'Produkt zostal pomyslnie opublikowany',
+                'icon' => 'import',
+                'icon_color' => 'purple',
+                'permission' => 'import.read',
+                'group' => 'Import',
+            ],
+            [
+                'key' => 'sync_status',
+                'label' => 'Synchronizacja',
+                'description' => 'Status synchronizacji PrestaShop i ERP',
+                'icon' => 'sync',
+                'icon_color' => 'blue',
+                'permission' => 'shops.sync',
+                'group' => null,
+            ],
+            [
+                'key' => 'sync_failed',
+                'label' => 'Sync: Blad synchronizacji',
+                'description' => 'Nieudana synchronizacja - wymaga uwagi',
+                'icon' => 'sync',
+                'icon_color' => 'red',
+                'permission' => 'shops.sync',
+                'group' => null,
+            ],
+            [
+                'key' => 'security_alerts',
+                'label' => 'Bezpieczenstwo',
+                'description' => 'Logowania, podejrzana aktywnosc, alerty',
+                'icon' => 'security',
+                'icon_color' => 'red',
+                'permission' => null,
+                'group' => null,
+            ],
+            [
+                'key' => 'login_new_ip',
+                'label' => 'Login z nowego IP',
+                'description' => 'Powiadomienie o logowaniu z nieznanego adresu IP',
+                'icon' => 'security',
+                'icon_color' => 'amber',
+                'permission' => null,
+                'group' => null,
+            ],
+            [
+                'key' => 'system_updates',
+                'label' => 'System',
+                'description' => 'Aktualizacje systemu, konserwacja',
+                'icon' => 'system',
+                'icon_color' => 'gray',
+                'permission' => 'system.config',
+                'group' => null,
+            ],
+            [
+                'key' => 'backup_completed',
+                'label' => 'Backup ukonczony',
+                'description' => 'Backup bazy danych ukonczony pomyslnie',
+                'icon' => 'system',
+                'icon_color' => 'gray',
+                'permission' => 'system.config',
+                'group' => null,
+            ],
+            [
+                'key' => 'new_user_pending',
+                'label' => 'Nowy uzytkownik',
+                'description' => 'Nowy uzytkownik oczekuje na zatwierdzenie',
+                'icon' => 'security',
+                'icon_color' => 'blue',
+                'permission' => 'system.config',
+                'group' => null,
+            ],
+        ];
+    }
+
+    /**
+     * Resolve full Tailwind classes for category icon background and text color.
+     * Uses static map to avoid Tailwind purge issues with dynamic class names.
+     *
+     * @return array{bg: string, text: string}
+     */
+    public function getCategoryIconClasses(string $color): array
+    {
+        $map = [
+            'emerald' => ['bg' => 'bg-emerald-500/20', 'text' => 'text-emerald-400'],
+            'purple'  => ['bg' => 'bg-purple-500/20',  'text' => 'text-purple-400'],
+            'blue'    => ['bg' => 'bg-blue-500/20',    'text' => 'text-blue-400'],
+            'red'     => ['bg' => 'bg-red-500/20',     'text' => 'text-red-400'],
+            'amber'   => ['bg' => 'bg-amber-500/20',   'text' => 'text-amber-400'],
+            'gray'    => ['bg' => 'bg-gray-500/20',    'text' => 'text-gray-400'],
+        ];
+
+        return $map[$color] ?? $map['gray'];
+    }
 
     /**
      * Resolve a human-readable title from notification data or type.

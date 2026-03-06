@@ -1,5 +1,15 @@
 {{-- resources/views/livewire/products/management/tabs/prices-tab.blade.php --}}
 <div class="tab-content active space-y-6">
+    @if(!$this->userCan('prices_read'))
+    {{-- Permission denied placeholder --}}
+    <div class="permission-denied-placeholder">
+        <svg class="permission-denied-placeholder__icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H3.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
+        </svg>
+        <h3 class="permission-denied-placeholder__title">Brak uprawnien do odczytu cen</h3>
+        <p class="permission-denied-placeholder__text">Skontaktuj sie z administratorem, aby uzyskac uprawnienie <code>prices.read</code>.</p>
+    </div>
+    @else
     <div class="flex items-center justify-between mb-6">
         <div class="flex items-center gap-3">
             <h3 class="text-lg font-medium text-white">
@@ -133,9 +143,11 @@
                                            {{ $pricesUnlocked ? '' : 'readonly' }}>
                                 </td>
 
-                                {{-- Margin (readonly for now) --}}
+                                                {{-- Margin (readonly for now) - censored without prices.cost --}}
                                 <td class="px-4 py-3 text-right">
-                                    @if(isset($prices[$groupId]['margin']) && $prices[$groupId]['margin'] !== null)
+                                    @if(!$this->userCan('prices_cost'))
+                                        <span class="censored-value" title="Brak uprawnien do odczytu marzy">**,** %</span>
+                                    @elseif(isset($prices[$groupId]['margin']) && $prices[$groupId]['margin'] !== null)
                                         <span class="text-green-400 font-mono">{{ number_format($prices[$groupId]['margin'], 2, ',', ' ') }}%</span>
                                     @else
                                         <span class="text-gray-600 text-xs">—</span>
@@ -162,4 +174,5 @@
             </div>
         </div>
     </div>
+    @endif
 </div>

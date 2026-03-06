@@ -1001,6 +1001,16 @@ class SubiektRestApiClient
         foreach ($skuList as $sku) {
             try {
                 $response = $responses[$sku] ?? null;
+
+                // Http::pool() returns ConnectionException instead of Response on connection failure
+                if ($response instanceof \Illuminate\Http\Client\ConnectionException) {
+                    Log::debug('batchFetchPricesBySku: Connection failed', [
+                        'sku' => $sku,
+                        'error' => $response->getMessage(),
+                    ]);
+                    continue;
+                }
+
                 if ($response && $response->successful()) {
                     $data = $response->json();
                     if ($data['success'] ?? false) {
@@ -1088,6 +1098,16 @@ class SubiektRestApiClient
         foreach ($skuList as $sku) {
             try {
                 $response = $responses[$sku] ?? null;
+
+                // Http::pool() returns ConnectionException instead of Response on connection failure
+                if ($response instanceof \Illuminate\Http\Client\ConnectionException) {
+                    Log::debug('batchFetchStockBySku: Connection failed', [
+                        'sku' => $sku,
+                        'error' => $response->getMessage(),
+                    ]);
+                    continue;
+                }
+
                 if ($response && $response->successful()) {
                     $data = $response->json();
                     if ($data['success'] ?? false) {

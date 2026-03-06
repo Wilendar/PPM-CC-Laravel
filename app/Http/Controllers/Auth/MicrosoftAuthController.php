@@ -236,8 +236,8 @@ class MicrosoftAuthController extends Controller
                 return redirect()->route('approval.pending');
             }
 
-            // Redirect to intended page or dashboard
-            return redirect()->intended(route('dashboard'));
+            // Redirect to intended page or admin dashboard
+            return redirect()->intended('/admin');
 
         } catch (InvalidStateException $e) {
             $this->logError('oauth.callback.invalid_state', $e, [
@@ -478,11 +478,11 @@ class MicrosoftAuthController extends Controller
             ]);
 
             // Powiadom adminow o nowym userze oczekujacym na zatwierdzenie
-            $admins = User::role('Admin')->where('is_active', true)->get();
-            foreach ($admins as $admin) {
-                \Illuminate\Support\Facades\Mail::to($admin->email)
-                    ->queue(new \App\Mail\NewUserPendingApprovalMail($user));
-            }
+            $admins = \App\Models\User::role('Admin')->where('is_active', true)->get();
+            \Illuminate\Support\Facades\Notification::send(
+                $admins,
+                new \App\Notifications\NewUserPendingNotification($user)
+            );
 
             return $user;
         }

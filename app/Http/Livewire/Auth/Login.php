@@ -7,8 +7,6 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Validation\ValidationException;
 use Illuminate\Support\Str;
-use Carbon\Carbon;
-
 class Login extends Component
 {
     // Form properties
@@ -133,40 +131,8 @@ class Login extends Component
 
     private function redirectBasedOnRole()
     {
-        $user = Auth::user();
-        
-        // Admin redirect
-        if ($user->hasRole('Admin')) {
-            return redirect()->route('admin.dashboard');
-        }
-        
-        // Manager redirect  
-        if ($user->hasRole('Manager')) {
-            return redirect()->route('manager.dashboard');
-        }
-        
-        // Editor redirect
-        if ($user->hasRole('Editor')) {
-            return redirect()->route('products.index');
-        }
-        
-        // Warehouseman redirect
-        if ($user->hasRole('Warehouseman')) {
-            return redirect()->route('warehouse.dashboard');
-        }
-        
-        // Salesperson redirect
-        if ($user->hasRole('Salesperson')) {
-            return redirect()->route('sales.dashboard');
-        }
-        
-        // Claims redirect
-        if ($user->hasRole('Claims')) {
-            return redirect()->route('claims.dashboard');
-        }
-        
-        // Default User redirect
-        return redirect()->route('dashboard');
+        // All approved users go to /admin dashboard
+        return redirect()->intended('/admin');
     }
 
     private function logLoginAttempt($success)

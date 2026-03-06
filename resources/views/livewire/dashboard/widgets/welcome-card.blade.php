@@ -19,6 +19,28 @@
         <span class="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-semibold bg-amber-500/15 text-amber-400 border border-amber-500/20 whitespace-nowrap">
             {{ $userRole }}
         </span>
+
+        {{-- Real-time clock (Alpine.js) --}}
+        <div class="welcome-clock"
+             x-data="{
+                 time: '', day: '', date: '',
+                 tick() {
+                     const now = new Date();
+                     this.time = now.toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' });
+                     const days = ['Niedziela','Poniedzialek','Wtorek','Sroda','Czwartek','Piatek','Sobota'];
+                     this.day = days[now.getDay()];
+                     const dd = String(now.getDate()).padStart(2, '0');
+                     const mm = String(now.getMonth() + 1).padStart(2, '0');
+                     this.date = dd + '.' + mm + '.' + now.getFullYear();
+                 }
+             }"
+             x-init="tick(); setInterval(() => tick(), 1000)">
+            <span class="welcome-clock__time" x-text="time"></span>
+            <div class="welcome-clock__daydate">
+                <span class="welcome-clock__day" x-text="day"></span>
+                <span class="welcome-clock__date" x-text="date"></span>
+            </div>
+        </div>
     </div>
 
     {{-- Session info row --}}

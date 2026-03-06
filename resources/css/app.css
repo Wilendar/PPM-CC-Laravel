@@ -4,6 +4,7 @@
 @import 'products/product-list-search.css';
 @import 'products/product-list-columns.css';
 @import 'admin/cross-source-matrix.css';
+@import 'dashboard/dashboard.css';
 
 /* Import Tailwind CSS */
 @tailwind base;
@@ -197,6 +198,30 @@ button:focus {
 }
 
 /* Print Styles */
+/* Approval Pending Page */
+.approval-logo {
+    margin-bottom: -5rem;
+}
+.approval-card {
+    background: #0f2b46;
+    border: 1px solid rgba(222, 170, 124, 0.4);
+    border-radius: 0.75rem;
+    overflow: hidden;
+}
+
+.approval-card__divider {
+    border-color: rgba(222, 170, 124, 0.25);
+}
+
+.approval-card__icon {
+    background: rgba(222, 170, 124, 0.15);
+    color: #deaa7c;
+}
+
+.approval-card__title {
+    color: #deaa7c;
+}
+
 @media print {
     .no-print {
         display: none !important;

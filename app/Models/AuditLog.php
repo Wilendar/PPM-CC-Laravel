@@ -100,6 +100,10 @@ class AuditLog extends Model
     public const EVENT_BULK_DELETE = 'bulk_delete';
     public const EVENT_BULK_UPDATE = 'bulk_update';
     public const EVENT_BULK_EXPORT = 'bulk_export';
+    public const EVENT_IMPORTED = 'imported';
+    public const EVENT_EXPORTED = 'exported';
+    public const EVENT_SYNCED = 'synced';
+    public const EVENT_MATCHED = 'matched';
 
     // ==========================================
     // ACCESSORS FOR COMPONENT COMPATIBILITY
@@ -427,6 +431,10 @@ class AuditLog extends Model
             'bulk_delete' => 'Masowe usunięcie',
             'bulk_update' => 'Masowa aktualizacja',
             'bulk_export' => 'Masowy eksport',
+            'imported' => 'Zaimportowano',
+            'exported' => 'Wyeksportowano',
+            'synced' => 'Zsynchronizowano',
+            'matched' => 'Dopasowano',
             default => ucfirst(str_replace('_', ' ', $this->event))
         };
     }

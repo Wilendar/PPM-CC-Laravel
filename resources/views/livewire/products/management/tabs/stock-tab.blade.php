@@ -8,6 +8,16 @@
      x-on:show-stock-unlock-modal.window="showUnlockModal = true"
      x-on:close-stock-unlock-modal.window="showUnlockModal = false; pendingColumn = null">
 
+    @if(!$this->userCan('stock_read'))
+    {{-- Permission denied placeholder --}}
+    <div class="permission-denied-placeholder">
+        <svg class="permission-denied-placeholder__icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+        </svg>
+        <h3 class="permission-denied-placeholder__title">Brak uprawnien do odczytu stanow magazynowych</h3>
+        <p class="permission-denied-placeholder__text">Skontaktuj sie z administratorem, aby uzyskac uprawnienie <code>stock.read</code>.</p>
+    </div>
+    @else
     {{-- Header Section --}}
     <div class="flex items-center justify-between mb-6">
         <div class="flex items-center gap-3">
@@ -431,4 +441,5 @@
             </div>
         </div>
     </div>
+    @endif
 </div>

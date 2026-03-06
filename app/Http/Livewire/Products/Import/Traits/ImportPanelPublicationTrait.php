@@ -323,6 +323,20 @@ trait ImportPanelPublicationTrait
 
         $product->save();
 
+        // Notify users about scheduled publication
+        if ($datetime) {
+            $recipients = \App\Models\User::permission('import.read')
+                ->where('is_active', true)
+                ->get();
+            \Illuminate\Support\Facades\Notification::send(
+                $recipients,
+                new \App\Notifications\ImportProductScheduledNotification(
+                    $product,
+                    $product->scheduled_publish_at->format('d.m.Y H:i')
+                )
+            );
+        }
+
         Log::debug('ImportPanelPublicationTrait: schedule updated', [
             'product_id' => $productId,
             'scheduled_at' => $datetime,

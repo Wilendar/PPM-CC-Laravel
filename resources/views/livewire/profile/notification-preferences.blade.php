@@ -66,12 +66,11 @@
             <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 {{-- Unread filter toggle --}}
                 <label class="inline-flex items-center cursor-pointer select-none">
-                    <div class="relative" x-data="{ checked: @entangle('showUnreadOnly') }">
+                    <div class="relative" x-data="{ checked: @entangle('showUnreadOnly').live }">
                         <input type="checkbox"
-                               wire:model.live="showUnreadOnly"
-                               class="sr-only"
-                               x-ref="toggle">
-                        <div @click="checked = !checked; $refs.toggle.click()"
+                               x-model="checked"
+                               class="sr-only">
+                        <div @click="checked = !checked"
                              :class="checked ? 'bg-[#e0ac7e]' : 'bg-gray-600'"
                              class="w-10 h-5 rounded-full transition-colors duration-200 cursor-pointer">
                         </div>
@@ -261,7 +260,17 @@
     {{-- TAB: SETTINGS --}}
     {{-- ============================================ --}}
     @if($activeTab === 'settings')
-        <div class="space-y-6">
+        <div class="space-y-6"
+             x-data="{
+                 browserPermission: typeof Notification !== 'undefined' ? Notification.permission : 'unsupported',
+                 get browserEnabled() { return this.browserPermission === 'granted'; },
+                 requestPermission() {
+                     if (typeof Notification === 'undefined') return;
+                     Notification.requestPermission().then(permission => {
+                         this.browserPermission = permission;
+                     });
+                 }
+             }">
 
             {{-- Preferences Grid --}}
             <div class="bg-gray-800/50 rounded-xl border border-gray-700 overflow-hidden">
@@ -287,152 +296,103 @@
                                     </div>
                                 </th>
                                 <th class="px-6 py-4 text-center text-sm font-medium text-gray-300">
-                                    <div class="flex items-center justify-center gap-2">
+                                    <div class="flex items-center justify-center gap-2"
+                                         :class="{ 'opacity-40': !browserEnabled }">
                                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                                   d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
                                         </svg>
                                         Przegladarka
+                                        <template x-if="!browserEnabled">
+                                            <svg class="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                      d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                                            </svg>
+                                        </template>
                                     </div>
                                 </th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-gray-700/50">
-                            {{-- Row: Produkty --}}
-                            <tr class="hover:bg-gray-700/30 transition-colors duration-150">
-                                <td class="px-6 py-5">
-                                    <div class="flex items-center gap-3">
-                                        <div class="w-8 h-8 rounded-lg bg-emerald-500/20 flex items-center justify-center flex-shrink-0">
-                                            <svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                                      d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
-                                            </svg>
-                                        </div>
-                                        <div>
-                                            <p class="text-sm font-medium text-white">Produkty</p>
-                                            <p class="text-xs text-gray-500">Zmiany w produktach, aktualizacje danych</p>
-                                        </div>
-                                    </div>
-                                </td>
-                                <td class="px-6 py-5 text-center">
-                                    @include('livewire.profile.partials._toggle-switch', [
-                                        'model' => 'prefs.email_product_changes',
-                                        'id' => 'email_product_changes',
-                                    ])
-                                </td>
-                                <td class="px-6 py-5 text-center">
-                                    @include('livewire.profile.partials._toggle-switch', [
-                                        'model' => 'prefs.browser_product_changes',
-                                        'id' => 'browser_product_changes',
-                                    ])
-                                </td>
-                            </tr>
+                            @php $lastGroup = null; @endphp
+                            @foreach($this->visibleCategories as $category)
+                                {{-- Group header for sub-categories (e.g. Import) --}}
+                                @if($category['group'] && $category['group'] !== $lastGroup)
+                                    <tr class="bg-gray-800/30">
+                                        <td colspan="3" class="px-6 py-2">
+                                            <span class="text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                                                {{ $category['group'] }}
+                                            </span>
+                                        </td>
+                                    </tr>
+                                    @php $lastGroup = $category['group']; @endphp
+                                @elseif(!$category['group'])
+                                    @php $lastGroup = null; @endphp
+                                @endif
 
-                            {{-- Row: Synchronizacja --}}
-                            <tr class="hover:bg-gray-700/30 transition-colors duration-150">
-                                <td class="px-6 py-5">
-                                    <div class="flex items-center gap-3">
-                                        <div class="w-8 h-8 rounded-lg bg-blue-500/20 flex items-center justify-center flex-shrink-0">
-                                            <svg class="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                                      d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
-                                            </svg>
-                                        </div>
-                                        <div>
-                                            <p class="text-sm font-medium text-white">Synchronizacja</p>
-                                            <p class="text-xs text-gray-500">Status synchronizacji PrestaShop i ERP</p>
-                                        </div>
-                                    </div>
-                                </td>
-                                <td class="px-6 py-5 text-center">
-                                    @include('livewire.profile.partials._toggle-switch', [
-                                        'model' => 'prefs.email_sync_status',
-                                        'id' => 'email_sync_status',
-                                    ])
-                                </td>
-                                <td class="px-6 py-5 text-center">
-                                    @include('livewire.profile.partials._toggle-switch', [
-                                        'model' => 'prefs.browser_sync_status',
-                                        'id' => 'browser_sync_status',
-                                    ])
-                                </td>
-                            </tr>
+                                @php $iconClasses = $this->getCategoryIconClasses($category['icon_color']); @endphp
 
-                            {{-- Row: Bezpieczenstwo --}}
-                            <tr class="hover:bg-gray-700/30 transition-colors duration-150">
-                                <td class="px-6 py-5">
-                                    <div class="flex items-center gap-3">
-                                        <div class="w-8 h-8 rounded-lg bg-red-500/20 flex items-center justify-center flex-shrink-0">
-                                            <svg class="w-4 h-4 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                                      d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
-                                            </svg>
+                                <tr wire:key="pref-row-{{ $category['key'] }}" class="hover:bg-gray-700/30 transition-colors duration-150">
+                                    <td class="px-6 py-5">
+                                        <div class="flex items-center gap-3">
+                                            <div class="w-8 h-8 rounded-lg {{ $iconClasses['bg'] }} flex items-center justify-center flex-shrink-0">
+                                                @switch($category['icon'])
+                                                    @case('product')
+                                                        <svg class="w-4 h-4 {{ $iconClasses['text'] }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
+                                                        </svg>
+                                                        @break
+                                                    @case('import')
+                                                        <svg class="w-4 h-4 {{ $iconClasses['text'] }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
+                                                        </svg>
+                                                        @break
+                                                    @case('sync')
+                                                        <svg class="w-4 h-4 {{ $iconClasses['text'] }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                                                        </svg>
+                                                        @break
+                                                    @case('security')
+                                                        <svg class="w-4 h-4 {{ $iconClasses['text'] }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
+                                                        </svg>
+                                                        @break
+                                                    @default
+                                                        <svg class="w-4 h-4 {{ $iconClasses['text'] }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+                                                        </svg>
+                                                @endswitch
+                                            </div>
+                                            <div>
+                                                <p class="text-sm font-medium text-white">{{ $category['label'] }}</p>
+                                                <p class="text-xs text-gray-500">{{ $category['description'] }}</p>
+                                            </div>
                                         </div>
-                                        <div>
-                                            <p class="text-sm font-medium text-white">Bezpieczenstwo</p>
-                                            <p class="text-xs text-gray-500">Logowania, podejrzana aktywnosc, alerty</p>
+                                    </td>
+                                    <td class="px-6 py-5 text-center">
+                                        @include('livewire.profile.partials._toggle-switch', [
+                                            'model' => 'prefs.email_' . $category['key'],
+                                            'id' => 'email_' . $category['key'],
+                                        ])
+                                    </td>
+                                    <td class="px-6 py-5 text-center">
+                                        <div :class="{ 'opacity-40 pointer-events-none': !browserEnabled }"
+                                             :title="!browserEnabled ? 'Wlacz powiadomienia przegladarki ponizej' : ''">
+                                            @include('livewire.profile.partials._toggle-switch', [
+                                                'model' => 'prefs.browser_' . $category['key'],
+                                                'id' => 'browser_' . $category['key'],
+                                            ])
                                         </div>
-                                    </div>
-                                </td>
-                                <td class="px-6 py-5 text-center">
-                                    @include('livewire.profile.partials._toggle-switch', [
-                                        'model' => 'prefs.email_security_alerts',
-                                        'id' => 'email_security_alerts',
-                                    ])
-                                </td>
-                                <td class="px-6 py-5 text-center">
-                                    @include('livewire.profile.partials._toggle-switch', [
-                                        'model' => 'prefs.browser_security_alerts',
-                                        'id' => 'browser_security_alerts',
-                                    ])
-                                </td>
-                            </tr>
-
-                            {{-- Row: System --}}
-                            <tr class="hover:bg-gray-700/30 transition-colors duration-150">
-                                <td class="px-6 py-5">
-                                    <div class="flex items-center gap-3">
-                                        <div class="w-8 h-8 rounded-lg bg-gray-500/20 flex items-center justify-center flex-shrink-0">
-                                            <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                                      d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
-                                            </svg>
-                                        </div>
-                                        <div>
-                                            <p class="text-sm font-medium text-white">System</p>
-                                            <p class="text-xs text-gray-500">Aktualizacje systemu, konserwacja, backup</p>
-                                        </div>
-                                    </div>
-                                </td>
-                                <td class="px-6 py-5 text-center">
-                                    @include('livewire.profile.partials._toggle-switch', [
-                                        'model' => 'prefs.email_system_updates',
-                                        'id' => 'email_system_updates',
-                                    ])
-                                </td>
-                                <td class="px-6 py-5 text-center">
-                                    @include('livewire.profile.partials._toggle-switch', [
-                                        'model' => 'prefs.browser_system_updates',
-                                        'id' => 'browser_system_updates',
-                                    ])
-                                </td>
-                            </tr>
+                                    </td>
+                                </tr>
+                            @endforeach
                         </tbody>
                     </table>
                 </div>
             </div>
 
-            {{-- Browser Permission Section --}}
-            <div class="bg-gray-800/50 rounded-xl border border-gray-700 p-6"
-                 x-data="{
-                     browserPermission: typeof Notification !== 'undefined' ? Notification.permission : 'unsupported',
-                     requestPermission() {
-                         if (typeof Notification === 'undefined') return;
-                         Notification.requestPermission().then(permission => {
-                             this.browserPermission = permission;
-                         });
-                     }
-                 }">
+            {{-- Browser Permission Section (uses browserPermission from parent x-data) --}}
+            <div class="bg-gray-800/50 rounded-xl border border-gray-700 p-6">
                 <div class="flex items-start gap-4">
                     <div class="w-10 h-10 rounded-lg bg-[#e0ac7e]/20 flex items-center justify-center flex-shrink-0">
                         <svg class="w-5 h-5 text-[#e0ac7e]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -496,30 +456,22 @@
                 </div>
             </div>
 
-            {{-- Save Button --}}
-            <div class="flex justify-end">
-                <button wire:click="savePreferences"
-                        wire:loading.attr="disabled"
-                        wire:target="savePreferences"
-                        class="inline-flex items-center px-6 py-3 rounded-lg text-sm font-semibold
-                               bg-[#e0ac7e] text-gray-900 hover:bg-[#d1975a]
-                               disabled:opacity-50 disabled:cursor-not-allowed
-                               transition-colors duration-200">
-                    <span wire:loading.remove wire:target="savePreferences">
-                        <svg class="w-4 h-4 mr-2 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                  d="M5 13l4 4L19 7"/>
-                        </svg>
-                        Zapisz preferencje
-                    </span>
-                    <span wire:loading wire:target="savePreferences">
-                        <svg class="w-4 h-4 mr-2 inline animate-spin" fill="none" viewBox="0 0 24 24">
-                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
-                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
-                        </svg>
-                        Zapisywanie...
-                    </span>
-                </button>
+            {{-- Auto-save toast (replaces manual Save button) --}}
+            <div x-data="{ show: false }"
+                 x-on:preferences-saved.window="show = true; setTimeout(() => show = false, 2000)"
+                 x-show="show"
+                 x-transition:enter="transition ease-out duration-300"
+                 x-transition:enter-start="opacity-0 translate-y-2"
+                 x-transition:enter-end="opacity-100 translate-y-0"
+                 x-transition:leave="transition ease-in duration-200"
+                 x-transition:leave-start="opacity-100 translate-y-0"
+                 x-transition:leave-end="opacity-0 translate-y-2"
+                 class="fixed bottom-6 right-6 z-50 inline-flex items-center gap-2 px-4 py-3 rounded-lg bg-emerald-500/90 text-white text-sm font-medium shadow-lg backdrop-blur-sm"
+                 style="display: none;">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                </svg>
+                Zapisano automatycznie
             </div>
         </div>
     @endif

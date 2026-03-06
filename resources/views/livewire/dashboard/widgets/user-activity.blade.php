@@ -10,58 +10,24 @@
         </div>
     </div>
 
-    {{-- Session time today --}}
-    <div class="health-indicator mb-4">
-        <div class="health-dot health-dot--healthy"></div>
-        <span class="text-sm text-gray-300">
-            Zalogowany dzis:
-            <span class="font-semibold text-white">
-                @php
-                    $hours = floor($todaySessionHours);
-                    $minutes = round(($todaySessionHours - $hours) * 60);
-                @endphp
-                {{ $hours }}h {{ $minutes }}m
-            </span>
-        </span>
-    </div>
-
     {{-- Activity feed --}}
     <div class="max-h-64 overflow-y-auto">
         @forelse ($activities as $activity)
             <div wire:key="activity-{{ $activity->id }}" class="activity-item">
-                @if($usingSessionFallback)
-                    {{-- Session fallback display --}}
-                    <div class="activity-item__icon {{ $this->getSessionIconClass($activity) }}">
-                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                  d="{{ $activity->getDeviceIconPath() }}" />
-                        </svg>
-                    </div>
-                    <div class="flex-1 min-w-0">
-                        <p class="text-sm text-gray-200 truncate">
-                            {{ $this->getSessionDescription($activity) }}
-                        </p>
-                        <p class="activity-item__time">
-                            {{ $activity->created_at->diffForHumans() }}
-                        </p>
-                    </div>
-                @else
-                    {{-- AuditLog display --}}
-                    <div class="activity-item__icon {{ $this->getEventIconClass($activity->event) }}">
-                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                  d="{{ $this->getEventIconPath($activity->event) }}" />
-                        </svg>
-                    </div>
-                    <div class="flex-1 min-w-0">
-                        <p class="text-sm text-gray-200 truncate">
-                            {{ $this->getActivityDescription($activity) }}
-                        </p>
-                        <p class="activity-item__time">
-                            {{ $activity->created_at->diffForHumans() }}
-                        </p>
-                    </div>
-                @endif
+                <div class="activity-item__icon {{ $this->getEventIconClass($activity->event) }}">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                              d="{{ $this->getEventIconPath($activity->event) }}" />
+                    </svg>
+                </div>
+                <div class="flex-1 min-w-0">
+                    <p class="text-sm text-gray-200 truncate">
+                        {{ $this->getActivityDescription($activity) }}
+                    </p>
+                    <p class="activity-item__time">
+                        {{ $activity->created_at->diffForHumans() }}
+                    </p>
+                </div>
             </div>
         @empty
             <div class="text-center py-6">

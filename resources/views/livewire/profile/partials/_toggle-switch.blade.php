@@ -3,15 +3,18 @@
     Variables:
         $model - wire:model binding path (e.g. 'prefs.email_product_changes')
         $id    - unique HTML id for the toggle
+
+    Uses single @entangle().live binding (Livewire 3.x + Alpine.js).
+    NO wire:model.live on input (would double-toggle with entangle).
+    NO $refs.cb.click() on div (would triple-toggle).
 --}}
 <label for="{{ $id }}" class="inline-flex items-center cursor-pointer">
-    <div class="relative" x-data="{ on: @entangle($model) }">
+    <div class="relative" x-data="{ on: @entangle($model).live }">
         <input type="checkbox"
                id="{{ $id }}"
-               wire:model.live="{{ $model }}"
-               class="sr-only"
-               x-ref="cb">
-        <div @click="on = !on; $refs.cb.click()"
+               x-model="on"
+               class="sr-only">
+        <div @click="on = !on"
              :class="on ? 'bg-[#e0ac7e]' : 'bg-gray-600'"
              class="w-11 h-6 rounded-full transition-colors duration-200 cursor-pointer">
         </div>

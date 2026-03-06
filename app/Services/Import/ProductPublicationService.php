@@ -145,6 +145,18 @@ class ProductPublicationService
                     'sku' => $product->sku,
                 ]);
 
+                // Notify users about published product
+                $importRecipients = \App\Models\User::permission('import.read')
+                    ->where('is_active', true)
+                    ->get();
+                \Illuminate\Support\Facades\Notification::send(
+                    $importRecipients,
+                    new \App\Notifications\ImportProductPublishedNotification(
+                        $pendingProduct,
+                        $product->id
+                    )
+                );
+
                 return [
                     'success' => true,
                     'product' => $product,

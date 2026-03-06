@@ -73,6 +73,22 @@ class SessionManagementService
         // Check for suspicious activity
         $this->checkForSuspiciousActivity($user, $session);
 
+        // Check if this IP is new for this user
+        $knownIps = UserSession::forUser($user->id)
+            ->where('id', '!=', $session->id)
+            ->distinct()
+            ->pluck('ip_address');
+
+        if (!$knownIps->contains($session->ip_address)) {
+            $user->notify(new \App\Notifications\LoginFromNewIpNotification(
+                $session->ip_address,
+                $browser,
+                $os,
+                $geoData['city'] ?? null,
+                $geoData['country'] ?? null
+            ));
+        }
+
         return $session;
     }
 

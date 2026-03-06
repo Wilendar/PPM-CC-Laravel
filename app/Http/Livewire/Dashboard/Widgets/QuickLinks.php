@@ -11,7 +11,7 @@ class QuickLinks extends Component
 
     public function mount(): void
     {
-        $this->links = $this->buildLinks();
+        $this->links = array_values(array_filter($this->buildLinks(), fn($link) => $link['allowed']));
     }
 
     /**

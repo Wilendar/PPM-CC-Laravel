@@ -42,6 +42,18 @@ class WelcomeCard extends Component
         if ($lastLogin) {
             $this->lastLoginAt = $lastLogin->attempted_at->diffForHumans();
             $this->lastLoginIp = $lastLogin->ip_address;
+            return;
+        }
+
+        // Fallback: use most recent ended UserSession
+        $lastSession = UserSession::forUser($userId)
+            ->where('is_active', false)
+            ->latest('created_at')
+            ->first();
+
+        if ($lastSession) {
+            $this->lastLoginAt = $lastSession->created_at->diffForHumans();
+            $this->lastLoginIp = $lastSession->ip_address;
         }
     }
 
@@ -49,9 +61,37 @@ class WelcomeCard extends Component
     {
         $sessions = UserSession::forUser($userId)
             ->whereDate('created_at', today())
+            ->orderBy('created_at')
             ->get();
 
-        $this->sessionDuration = $sessions->sum(fn ($session) => $session->getDurationMinutes());
+        if ($sessions->isEmpty()) {
+            $this->sessionDuration = 0;
+            return;
+        }
+
+        // Merge overlapping intervals to avoid double-counting
+        $intervals = $sessions->map(fn ($s) => [
+            'start' => $s->created_at->timestamp,
+            'end' => ($s->ended_at ?? now())->timestamp,
+        ])->sortBy('start')->values()->toArray();
+
+        $merged = [$intervals[0]];
+
+        for ($i = 1; $i < count($intervals); $i++) {
+            $last = &$merged[count($merged) - 1];
+            if ($intervals[$i]['start'] <= $last['end']) {
+                $last['end'] = max($last['end'], $intervals[$i]['end']);
+            } else {
+                $merged[] = $intervals[$i];
+            }
+        }
+
+        $totalSeconds = array_sum(array_map(
+            fn ($iv) => $iv['end'] - $iv['start'],
+            $merged
+        ));
+
+        $this->sessionDuration = (int) round($totalSeconds / 60);
     }
 
     protected function getGreeting(): string

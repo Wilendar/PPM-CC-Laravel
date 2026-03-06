@@ -249,6 +249,21 @@ class PendingProduct extends Model
             // Recalculate completion on every save
             $product->recalculateCompletion();
         });
+
+        // Notify users when product becomes ready for publish
+        static::saved(function (PendingProduct $product) {
+            if ($product->is_ready_for_publish
+                && $product->wasChanged('is_ready_for_publish')
+                && !$product->isPublished()) {
+                $recipients = \App\Models\User::permission('import.read')
+                    ->where('is_active', true)
+                    ->get();
+                \Illuminate\Support\Facades\Notification::send(
+                    $recipients,
+                    new \App\Notifications\ImportProductReadyNotification($product)
+                );
+            }
+        });
     }
 
     /*

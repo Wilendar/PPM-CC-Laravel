@@ -147,8 +147,8 @@ class GoogleAuthController extends Controller
             $user->updateLastLogin();
             $user->updateOAuthActivity();
 
-            // Redirect to intended page or dashboard
-            return redirect()->intended(route('dashboard'));
+            // Redirect to intended page or admin dashboard
+            return redirect()->intended('/admin');
 
         } catch (InvalidStateException $e) {
             $this->logError('oauth.callback.invalid_state', $e, [
@@ -426,7 +426,14 @@ class GoogleAuthController extends Controller
                 'domain' => $user->oauth_domain,
                 'ip' => $request->ip()
             ]);
-            
+
+            // Powiadom adminow o nowym userze oczekujacym na zatwierdzenie
+            $admins = \App\Models\User::role('Admin')->where('is_active', true)->get();
+            \Illuminate\Support\Facades\Notification::send(
+                $admins,
+                new \App\Notifications\NewUserPendingNotification($user)
+            );
+
             return $user;
         }
 

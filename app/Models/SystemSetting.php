@@ -59,14 +59,17 @@ class SystemSetting extends Model
         // Automatyczne szyfrowanie sensitive values
         static::creating(function ($setting) {
             if ($setting->shouldEncrypt()) {
-                $setting->value = encrypt($setting->value);
+                $rawValue = $setting->attributes['value'];
+                $setting->attributes['value'] = encrypt($rawValue);
                 $setting->is_encrypted = true;
             }
         });
 
         static::updating(function ($setting) {
             if ($setting->isDirty('value') && $setting->shouldEncrypt()) {
-                $setting->value = encrypt($setting->value);
+                // Read raw attribute to bypass accessor (which would try to decrypt plain text)
+                $rawValue = $setting->attributes['value'];
+                $setting->attributes['value'] = encrypt($rawValue);
                 $setting->is_encrypted = true;
             }
         });

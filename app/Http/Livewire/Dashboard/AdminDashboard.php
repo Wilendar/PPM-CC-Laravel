@@ -46,7 +46,7 @@ class AdminDashboard extends Component
             ['component' => 'dashboard.widgets.my-bug-reports', 'span' => 2],
             ['component' => 'dashboard.widgets.products-attention', 'span' => 2],
             ['component' => 'dashboard.widgets.user-activity', 'span' => 2],
-            ['component' => 'dashboard.widgets.login-history', 'span' => 2],
+            ['component' => 'dashboard.widgets.login-history', 'span' => 4],
         ];
 
         // Admin-only widgets
