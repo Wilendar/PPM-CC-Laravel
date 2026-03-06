@@ -106,8 +106,8 @@ return [
             'enabled' => true,
         ],
 
-        // Category previews - temporary data, very short retention
-        'category_previews' => [
+        // Category preview - temporary data, very short retention
+        'category_preview' => [
             'retention_days' => 1,       // Keep 1 day
             'date_column' => 'created_at',
             'chunk_size' => 1000,
@@ -160,6 +160,7 @@ return [
         'job_progress' => ['warning' => 20, 'critical' => 100],
         'failed_jobs' => ['warning' => 10, 'critical' => 50],
         'notifications' => ['warning' => 50, 'critical' => 200],
+        'category_preview' => ['warning' => 10, 'critical' => 50],
         'audit_logs' => ['warning' => 100, 'critical' => 500],
         'product_scan_results' => ['warning' => 100, 'critical' => 500],
         'product_scan_sessions' => ['warning' => 20, 'critical' => 100],

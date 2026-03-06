@@ -93,6 +93,11 @@ class DataRetentionSettings extends Component
             return;
         }
 
+        if (!\Schema::hasTable($table)) {
+            $this->showMessage("Tabela {$table} nie istnieje w bazie.", 'error');
+            return;
+        }
+
         $command = $config['command'] ?? null;
 
         if ($command) {
@@ -140,12 +145,24 @@ class DataRetentionSettings extends Component
             }
 
             try {
+                if (!\Schema::hasTable($table)) {
+                    continue;
+                }
+
+                $dateColumn = $config['date_column'] ?? 'created_at';
+                $chunkSize = $config['chunk_size'] ?? 1000;
                 $cutoff = now()->subDays($config['retention_days']);
+
                 $result = $this->archiveService->archive($table, $cutoff, [
-                    'date_column' => $config['date_column'] ?? 'created_at',
-                    'chunk_size' => $config['chunk_size'] ?? 1000,
+                    'date_column' => $dateColumn,
+                    'chunk_size' => $chunkSize,
                 ]);
                 $totalArchived += $result['archived'];
+
+                // Delete archived records from DB
+                if ($result['archived'] > 0) {
+                    DB::table($table)->where($dateColumn, '<', $cutoff)->delete();
+                }
             } catch (\Exception $e) {
                 $errors[] = "{$table}: {$e->getMessage()}";
             }
