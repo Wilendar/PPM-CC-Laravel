@@ -219,7 +219,7 @@ trait ProductListBulkActions
 
         try {
             $products = Product::whereIn('id', $this->selectedProducts)
-                ->with(['categories', 'priceGroups'])
+                ->with(['categories', 'validPrices.priceGroup', 'activeStock'])
                 ->orderBy('sku')
                 ->get();
 
@@ -228,11 +228,10 @@ trait ProductListBulkActions
             foreach ($products as $product) {
                 $primaryCategory = $product->categories
                     ->where('pivot.is_primary', true)
-                    ->where('pivot.shop_id', null)
                     ->first();
 
-                $retailPrice = $product->priceGroups->where('code', 'detaliczna')->first();
-                $dealerPrice = $product->priceGroups->where('code', 'dealer_standard')->first();
+                $retailPrice = $product->validPrices->first(fn($p) => $p->priceGroup?->code === 'detaliczna');
+                $dealerPrice = $product->validPrices->first(fn($p) => $p->priceGroup?->code === 'dealer_standard');
 
                 $csv .= sprintf(
                     "%s;%s;%s;%s;%d;%s;%s;%s;%s\n",
@@ -240,9 +239,9 @@ trait ProductListBulkActions
                     $this->escapeCsv($product->name),
                     $this->escapeCsv($primaryCategory?->name ?? '-'),
                     $product->is_active ? 'Aktywny' : 'Nieaktywny',
-                    $product->stock_quantity ?? 0,
-                    $retailPrice ? number_format($retailPrice->pivot->price, 2, ',', '') : '-',
-                    $dealerPrice ? number_format($dealerPrice->pivot->price, 2, ',', '') : '-',
+                    $product->total_stock ?? 0,
+                    $retailPrice ? number_format((float) $retailPrice->price_net, 2, ',', '') : '-',
+                    $dealerPrice ? number_format((float) $dealerPrice->price_net, 2, ',', '') : '-',
                     $product->created_at->format('Y-m-d H:i'),
                     $product->updated_at->format('Y-m-d H:i')
                 );

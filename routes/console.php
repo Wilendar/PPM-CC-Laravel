@@ -82,6 +82,14 @@ Schedule::command('telescope:prune --hours=48')
     ->withoutOverlapping()
     ->runInBackground();
 
+// Feed files cleanup - remove generated feed files older than 7 days
+Schedule::command('feeds:cleanup')
+    ->daily()
+    ->at('03:15')
+    ->name('feeds-cleanup')
+    ->withoutOverlapping()
+    ->runInBackground();
+
 // Price history cleanup - keep 90 days of audit trail
 // CRITICAL: Bez tego price_history rosnie do dziesiatek GB!
 // JSON columns (old_values, new_values) moga miec setki KB per rekord
@@ -369,6 +377,18 @@ Schedule::command('import:publish-scheduled')
     ->withoutOverlapping()
     ->runInBackground()
     ->name('import-publish-scheduled');
+
+// ==========================================
+// EXPORT FEEDS: SCHEDULED GENERATION
+// ==========================================
+// ETAP_07f: Auto-generate export feeds based on profile schedule (1h/6h/12h/24h)
+// Checks every 15 minutes which profiles are due and dispatches GenerateFeedJob
+
+Schedule::command('feeds:generate-scheduled')
+    ->everyFifteenMinutes()
+    ->withoutOverlapping()
+    ->runInBackground()
+    ->name('feeds-generate-scheduled');
 
 // Audit logs cleanup - keep 90 days of data
 Schedule::command('audit:cleanup --days=90')

@@ -44,6 +44,7 @@
             'products.create' => $user?->can('products.create'),
             'categories.read' => $user?->can('categories.read'),
             'import.read' => $user?->can('import.read'),
+            'export.read' => $user?->can('export.read'),
             // Product Management
             'parameters.read' => $user?->can('parameters.read'),
             'compatibility.read' => $user?->can('compatibility.read'),
@@ -81,7 +82,7 @@
         ];
         $hasAnySystemPerm = ($sidebarPerms['users.read'] ?? false) || ($sidebarPerms['users.roles'] ?? false) || ($sidebarPerms['system.config'] ?? false) || ($sidebarPerms['system.manage'] ?? false) || ($sidebarPerms['sessions.read'] ?? false) || ($sidebarPerms['audit.read'] ?? false) || ($sidebarPerms['backup.manage'] ?? false) || ($sidebarPerms['maintenance.manage'] ?? false) || ($sidebarPerms['media.read'] ?? false) || ($sidebarPerms['media.manage'] ?? false) || ($sidebarPerms['bug-reports.read'] ?? false) || ($sidebarPerms['integrations.read'] ?? false) || ($sidebarPerms['scan.read'] ?? false) || ($sidebarPerms['visual-editor.read'] ?? false) || ($sidebarPerms['reports.read'] ?? false);
         $hasAnyShopPerm = ($sidebarPerms['shops.read'] ?? false) || ($sidebarPerms['shops.create'] ?? false) || ($sidebarPerms['shops.sync'] ?? false);
-        $hasAnyProductPerm = ($sidebarPerms['products.read'] ?? false) || ($sidebarPerms['products.create'] ?? false) || ($sidebarPerms['categories.read'] ?? false) || ($sidebarPerms['import.read'] ?? false);
+        $hasAnyProductPerm = ($sidebarPerms['products.read'] ?? false) || ($sidebarPerms['products.create'] ?? false) || ($sidebarPerms['categories.read'] ?? false) || ($sidebarPerms['import.read'] ?? false) || ($sidebarPerms['export.read'] ?? false);
         $hasAnyPricePerm = ($sidebarPerms['prices.read'] ?? false) || ($sidebarPerms['price_groups.read'] ?? false);
         $hasAnyProductMgmtPerm = ($sidebarPerms['parameters.read'] ?? false) || ($sidebarPerms['compatibility.read'] ?? false) || ($sidebarPerms['suppliers.read'] ?? false) || ($sidebarPerms['vehicle_features.any_read'] ?? false);
         $hasAnyDeliveryPerm = ($sidebarPerms['deliveries.read'] ?? false);
@@ -149,21 +150,6 @@
 
                     <!-- Header Right Side -->
                     <div class="flex items-center space-x-2 sm:space-x-4 ml-2">
-                        <!-- Quick Search -->
-                        <div class="hidden lg:block relative">
-                            <input type="text"
-                                   placeholder="Szybkie wyszukiwanie..."
-                                   class="w-48 xl:w-64 px-4 py-2 pl-10 text-sm text-white placeholder-gray-400 rounded-lg transition-all duration-200 focus:outline-none focus:ring-2"
-                                   style="background: rgba(31, 41, 55, 0.8); border: 1px solid rgba(75, 85, 99, 0.5);"
-                                   onfocus="this.style.borderColor='#e0ac7e'; this.style.boxShadow='0 0 0 3px rgba(224, 172, 126, 0.1)'"
-                                   onblur="this.style.borderColor='rgba(75, 85, 99, 0.5)'; this.style.boxShadow='none'">
-                            <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-                                <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
-                                </svg>
-                            </div>
-                        </div>
-                        
                         <!-- User Menu -->
                         <div class="relative" x-data="{ open: false }">
                             <button @click="open = !open" class="flex items-center space-x-2 text-sm rounded-lg p-2 hover:bg-gray-700 transition-colors duration-200">
@@ -389,6 +375,17 @@
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10"></path>
                                     </svg>
                                     <span x-show="!sidebarCollapsed" x-transition class="whitespace-nowrap">Import z pliku</span>
+                                </a>
+                                <a href="/admin/export" class="{{ !($sidebarPerms['export.read'] ?? false) ? 'sidebar-link-no-access' : '' }} flex items-center px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-700 hover:text-white transition-colors duration-200 {{ request()->is('admin/export*') ? 'bg-gray-700 text-white' : '' }}"
+                                   @unless($sidebarPerms['export.read'] ?? false) tabindex="-1" aria-disabled="true" @endunless
+                                   :title="sidebarCollapsed ? 'Eksport & Feedy' : ''"
+                                   :class="{ 'justify-center': sidebarCollapsed }">
+                                    <svg class="w-4 h-4 flex-shrink-0"
+                                         :class="{ 'mr-0': sidebarCollapsed, 'mr-3': !sidebarCollapsed }"
+                                         xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5m-13.5-9L12 3m0 0 4.5 4.5M12 3v13.5" />
+                                    </svg>
+                                    <span x-show="!sidebarCollapsed" x-transition class="whitespace-nowrap">Eksport & Feedy</span>
                                 </a>
                                 <a href="/admin/products/import-history" class="sidebar-link-disabled flex items-center px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-700 hover:text-white transition-colors duration-200"
                                    title="W przygotowaniu"

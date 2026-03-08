@@ -33,9 +33,19 @@ Route::get('/thumbnail/variant/{variantImageId}', [ThumbnailController::class, '
     ->where('variantImageId', '[0-9]+')
     ->middleware('throttle:60,1');
 
+// Public Feed Access (token-based, no auth)
+Route::prefix('feed')->group(function () {
+    Route::get('/{token}', [\App\Http\Controllers\FeedController::class, 'show'])
+        ->name('feed.show')
+        ->middleware('throttle:60,1');
+    Route::get('/{token}/download', [\App\Http\Controllers\FeedController::class, 'download'])
+        ->name('feed.download')
+        ->middleware('throttle:30,1');
+});
+
 Route::get('/', function () {
     if (Auth::check()) {
-        return redirect()->route('dashboard');
+        return redirect('/admin');
     }
     return view('welcome');
 })->name('home');
@@ -117,9 +127,9 @@ Route::prefix('auth/microsoft')->name('auth.microsoft.')->group(function () {
 
 Route::middleware(['auth'])->group(function () {
     
-    // Dashboard - wszyscy zalogowani użytkownicy
+    // Dashboard - redirect do admin panel
     Route::get('/dashboard', function () {
-        return view('dashboard');
+        return redirect('/admin');
     })->name('dashboard');
     
     // Profile management
@@ -355,6 +365,15 @@ Route::prefix('admin')->name('admin.')->middleware($adminMiddleware)->group(func
         ->name('exports.download')->middleware('permission:products.export');
     Route::delete('/exports/{file}', [\App\Http\Controllers\Admin\ExportDownloadController::class, 'delete'])
         ->name('exports.delete')->middleware('permission:products.export');
+
+    // ==========================================
+    // EXPORT PROFILES - Feed & Export Management
+    // ==========================================
+    Route::prefix('export')->name('export.')->group(function () {
+        Route::get('/', \App\Http\Livewire\Admin\Export\ExportManager::class)->name('index');
+        Route::get('/create', \App\Http\Livewire\Admin\Export\ExportProfileForm::class)->name('create');
+        Route::get('/{profile}/edit', \App\Http\Livewire\Admin\Export\ExportProfileForm::class)->name('edit');
+    });
 
     // ERP Integration Management - działający komponent
     Route::get('/integrations', \App\Http\Livewire\Admin\ERP\ERPManager::class)->name('integrations')->middleware('permission:integrations.read');
