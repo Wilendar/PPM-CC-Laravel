@@ -1037,29 +1037,77 @@
 
 /* Main Content - Two Column Layout */
 .compat-main-content {
-    display: grid;
-    grid-template-columns: minmax(350px, 25%) 1fr;
-    gap: 0;
+    display: flex;
     min-height: calc(100vh - 200px);
 }
 
 @media (max-width: 1279px) {
     .compat-main-content {
-        grid-template-columns: 1fr;
+        flex-direction: column;
     }
 }
 
 /* Parts Column (Left) */
 .compat-parts-column {
     background: var(--color-bg-secondary, #1f2937);
-    border-right: 1px solid var(--color-border-primary, #374151);
+    border-right: none;
     display: flex;
     flex-direction: column;
     max-height: calc(100vh - 200px);
     overflow: hidden;
-    resize: horizontal;
-    min-width: 300px;
+    width: 350px;
+    min-width: 280px;
     max-width: 50%;
+    flex-shrink: 0;
+}
+
+@media (max-width: 1279px) {
+    .compat-parts-column {
+        width: 100%;
+        max-width: 100%;
+        max-height: 40vh;
+    }
+}
+
+/* Column Resize Handle */
+.compat-resize-handle {
+    width: 6px;
+    cursor: col-resize;
+    background: var(--color-border-primary, #374151);
+    position: relative;
+    flex-shrink: 0;
+    transition: background 0.15s ease;
+    z-index: 2;
+}
+
+.compat-resize-handle:hover,
+.compat-resize-handle.is-dragging {
+    background: var(--mpp-primary, #e0ac7e);
+}
+
+.compat-resize-handle::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 2px;
+    height: 40px;
+    border-radius: 1px;
+    background: var(--color-text-muted, #6b7280);
+    transition: background 0.15s ease, height 0.15s ease;
+}
+
+.compat-resize-handle:hover::after,
+.compat-resize-handle.is-dragging::after {
+    background: var(--mpp-primary, #e0ac7e);
+    height: 60px;
+}
+
+@media (max-width: 1279px) {
+    .compat-resize-handle {
+        display: none;
+    }
 }
 
 .compat-parts-header {
@@ -1300,6 +1348,8 @@
     flex-direction: column;
     position: relative;
     overflow: hidden;
+    flex: 1;
+    min-width: 0;
 }
 
 .compat-vehicles-header {
@@ -2219,9 +2269,18 @@
     border-top: 1px solid var(--color-border-primary, #374151);
 }
 
-/* Category filter - wider for long names */
-.compat-filter-category .compat-filter-select {
-    min-width: 200px;
+/* Category filter - wider for tree dropdown */
+.compat-filter-category {
+    position: relative;
+    min-width: 220px;
+}
+
+.compat-filter-category .category-tree-dropdown-wrapper {
+    position: relative;
+}
+
+.compat-filter-category .category-tree-dropdown__panel {
+    min-width: 280px;
 }
 
 /* Active filters badge */

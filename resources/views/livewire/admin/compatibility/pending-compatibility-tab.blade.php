@@ -34,9 +34,32 @@
     ])
 
     {{-- Two-Column Layout --}}
-    <div class="compat-main-content">
+    <div class="compat-main-content"
+         x-data="{
+             isDragging: false,
+             startX: 0,
+             startWidth: 0,
+             onMouseDown(e) {
+                 this.isDragging = true;
+                 this.startX = e.clientX;
+                 this.startWidth = this.$refs.partsCol.offsetWidth;
+                 e.preventDefault();
+             },
+             onMouseMove(e) {
+                 if (!this.isDragging) return;
+                 const diff = e.clientX - this.startX;
+                 const newWidth = Math.max(280, Math.min(this.startWidth + diff, window.innerWidth * 0.5));
+                 this.$refs.partsCol.style.width = newWidth + 'px';
+             },
+             onMouseUp() {
+                 this.isDragging = false;
+             }
+         }"
+         @mousemove.window="onMouseMove($event)"
+         @mouseup.window="onMouseUp()"
+    >
         {{-- LEFT: Pending Parts List --}}
-        <div class="compat-parts-column">
+        <div class="compat-parts-column" x-ref="partsCol">
             <div class="compat-parts-header">
                 <h3>
                     <i class="fas fa-clock"></i>
@@ -88,6 +111,12 @@
                 {{ $pendingParts->links() }}
             </div>
         </div>
+
+        {{-- Resize Handle --}}
+        <div class="compat-resize-handle"
+             :class="{ 'is-dragging': isDragging }"
+             @mousedown="onMouseDown($event)"
+        ></div>
 
         {{-- RIGHT: Vehicle Tiles --}}
         <div class="compat-vehicles-column">
