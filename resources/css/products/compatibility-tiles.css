@@ -2502,6 +2502,11 @@
     color: var(--ppm-primary, #e0ac7e);
 }
 
+/* Elevated position when floating-action-bar is also visible */
+.compat-bulk-bar--elevated {
+    bottom: 84px; /* 20px (floating bar bottom) + 56px (floating bar height) + 8px gap */
+}
+
 .compat-bulk-btn--secondary {
     color: var(--color-text-muted, #6b7280);
 }

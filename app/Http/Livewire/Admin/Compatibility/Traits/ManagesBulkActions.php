@@ -33,37 +33,24 @@ trait ManagesBulkActions
     public bool $selectAllOnPage = false;
 
     /**
-     * Toggle individual part selection
+     * Hook: wire:model.live on selectAllOnPage - sync with selectedPartIds
+     * Uses string IDs to match wire:model.live HTML value attributes
      */
-    public function togglePartSelection(int $partId): void
+    public function updatedSelectAllOnPage(): void
     {
-        if (in_array($partId, $this->selectedPartIds)) {
-            $this->selectedPartIds = array_values(array_diff($this->selectedPartIds, [$partId]));
-        } else {
-            $this->selectedPartIds[] = $partId;
-        }
-    }
-
-    /**
-     * Toggle select all parts on current page
-     */
-    public function toggleSelectAll(): void
-    {
-        $this->selectAllOnPage = !$this->selectAllOnPage;
-
         $pageIds = $this->parts->pluck('id')->toArray();
 
         if ($this->selectAllOnPage) {
-            // Add all current page IDs (avoid duplicates)
             foreach ($pageIds as $id) {
-                if (!in_array($id, $this->selectedPartIds)) {
-                    $this->selectedPartIds[] = $id;
+                $strId = (string) $id;
+                if (!in_array($strId, $this->selectedPartIds)) {
+                    $this->selectedPartIds[] = $strId;
                 }
             }
         } else {
-            // Remove all current page IDs from selection
+            $pageStrIds = array_map('strval', $pageIds);
             $this->selectedPartIds = array_values(
-                array_diff($this->selectedPartIds, $pageIds)
+                array_filter($this->selectedPartIds, fn($v) => !in_array((string) $v, $pageStrIds))
             );
         }
     }
@@ -243,17 +230,16 @@ trait ManagesBulkActions
                 $rows[] = [
                     'sku' => $product->sku,
                     'name' => $product->name,
-                    'vehicle' => '',
+                    'brand' => $product->manufacturer ?? '',
                     'type' => '',
+                    'vehicle_sku' => '',
+                    'vehicle_name' => '',
+                    'vehicle_brand' => '',
                 ];
                 continue;
             }
 
             foreach ($product->vehicleCompatibility as $compat) {
-                $vehicleName = $compat->vehicleProduct
-                    ? trim(($compat->vehicleProduct->manufacturer ?? '') . ' ' . ($compat->vehicleProduct->name ?? ''))
-                    : 'N/A';
-
                 $typeLabel = match ($compat->compatibilityAttribute?->code) {
                     'original' => 'Oryginal',
                     'replacement' => 'Zamiennik',
@@ -263,21 +249,27 @@ trait ManagesBulkActions
                 $rows[] = [
                     'sku' => $product->sku,
                     'name' => $product->name,
-                    'vehicle' => $vehicleName,
+                    'brand' => $product->manufacturer ?? '',
                     'type' => $typeLabel,
+                    'vehicle_sku' => $compat->vehicleProduct->sku ?? '',
+                    'vehicle_name' => $compat->vehicleProduct->name ?? '',
+                    'vehicle_brand' => $compat->vehicleProduct->manufacturer ?? '',
                 ];
             }
         }
 
         // Build CSV string on backend (JS listener expects 'content' key)
         $csvLines = [];
-        $csvLines[] = implode(';', ['SKU', 'Nazwa', 'Pojazd', 'Typ']);
+        $csvLines[] = implode(';', ['SKU', 'Nazwa', 'Marka', 'Typ', 'Pojazd SKU', 'Pojazd Nazwa', 'Pojazd Marka']);
         foreach ($rows as $row) {
             $csvLines[] = implode(';', [
                 '"' . str_replace('"', '""', $row['sku']) . '"',
                 '"' . str_replace('"', '""', $row['name']) . '"',
-                '"' . str_replace('"', '""', $row['vehicle']) . '"',
+                '"' . str_replace('"', '""', $row['brand']) . '"',
                 '"' . str_replace('"', '""', $row['type']) . '"',
+                '"' . str_replace('"', '""', $row['vehicle_sku']) . '"',
+                '"' . str_replace('"', '""', $row['vehicle_name']) . '"',
+                '"' . str_replace('"', '""', $row['vehicle_brand']) . '"',
             ]);
         }
         $csvContent = implode("\n", $csvLines);

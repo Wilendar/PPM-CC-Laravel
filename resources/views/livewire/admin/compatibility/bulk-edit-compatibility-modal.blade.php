@@ -24,14 +24,14 @@
 <div
     x-data="{ open: @entangle('open') }"
     @open-bulk-modal.window="
-        $wire.openModal($event.detail.direction, $event.detail.selectedIds);
+        let d = $event.detail[0] || $event.detail;
+        $wire.openModal(d.direction, d.selectedIds);
         open = true;
     "
-    class="bulk-edit-modal"
 >
     @if($open)
     <div
-        class="modal-overlay fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center"
+        class="bulk-edit-modal"
         @click.self="$wire.close(); open = false;"
     >
         <div class="modal-container enterprise-card bg-gray-800 rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto p-6">

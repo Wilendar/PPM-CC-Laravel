@@ -5,7 +5,7 @@
     Required: ManagesBulkActions trait on the component
 --}}
 @if($this->getSelectedCount() > 0)
-    <div class="compat-bulk-bar" x-data="{ showCopyModal: false }">
+    <div class="compat-bulk-bar {{ $editingProductId ? 'compat-bulk-bar--elevated' : '' }}" x-data="{ showCopyModal: false }">
         <div class="compat-bulk-bar__info">
             <span class="compat-bulk-bar__count">
                 <i class="fas fa-check-square"></i>

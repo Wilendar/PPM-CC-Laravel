@@ -90,8 +90,7 @@
                     <label class="compat-checkbox-label" title="Zaznacz wszystkie na stronie">
                         <input
                             type="checkbox"
-                            wire:click="toggleSelectAll"
-                            {{ $selectAllOnPage ? 'checked' : '' }}
+                            wire:model.live="selectAllOnPage"
                             class="compat-checkbox"
                         />
                         <span>Zaznacz</span>
@@ -106,10 +105,13 @@
                         class="compat-part-item {{ $editingProductId === $part->id ? 'compat-part-item--active' : '' }} {{ $this->productHasUnsavedChanges($part->id) ? 'compat-part-item--unsaved' : '' }}"
                         wire:click="editPart({{ $part->id }})"
                     >
-                        <div class="compat-part-checkbox" wire:click.stop="togglePartSelection({{ $part->id }})">
+                        <div class="compat-part-checkbox" @click.stop>
                             <input
                                 type="checkbox"
-                                {{ $this->isPartSelected($part->id) ? 'checked' : '' }}
+                                wire:model.live="selectedPartIds"
+                                value="{{ $part->id }}"
+                                wire:key="select-part-{{ $part->id }}"
+                                class="compat-checkbox"
                             />
                         </div>
 
