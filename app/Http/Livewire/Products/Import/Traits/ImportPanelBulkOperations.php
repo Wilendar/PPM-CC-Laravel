@@ -42,6 +42,23 @@ trait ImportPanelBulkOperations
     }
 
     /**
+     * Toggle select all on current page (checkbox-patterns Wzorzec B)
+     *
+     * If any selected -> deselect all (clear), else -> select all on page.
+     */
+    public function toggleSelectAllOnPage(): void
+    {
+        if (count($this->selectedIds) > 0) {
+            $this->selectedIds = [];
+            $this->selectAll = false;
+        } else {
+            $pageIds = $this->pendingProducts->pluck('id')->toArray();
+            $this->selectedIds = $pageIds;
+            $this->selectAll = true;
+        }
+    }
+
+    /**
      * Select all products (across all pages)
      */
     public function selectAllProducts(): void

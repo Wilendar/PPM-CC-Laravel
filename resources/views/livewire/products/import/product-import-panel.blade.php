@@ -225,8 +225,8 @@
                         {{-- LEFT STICKY: Checkbox --}}
                         <th class="px-3 import-table-sticky-left import-sticky-col-0">
                             <input type="checkbox"
-                                   wire:model.live="selectAll"
-                                   wire:click="selectAllOnPage"
+                                   wire:click="toggleSelectAllOnPage"
+                                   @checked($selectAll)
                                    class="form-checkbox-dark">
                         </th>
                         {{-- LEFT STICKY: Obraz --}}

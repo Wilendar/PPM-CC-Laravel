@@ -75,7 +75,7 @@
     {{-- ================================================================
          COLUMN PICKER
          ================================================================ --}}
-    <div class="flex items-center gap-2 mb-4 flex-wrap">
+    <div class="flex items-center gap-2 mb-4 flex-wrap relative z-30">
         <span class="text-xs font-medium text-gray-400 uppercase tracking-wider mr-1">Kolumny:</span>
 
         {{-- Fixed columns (SKU, Nazwa) - not removable --}}
@@ -109,7 +109,7 @@
         @endforeach
 
         {{-- Add column button + dropdown --}}
-        <div class="relative">
+        <div class="relative" x-ref="columnPickerAnchor">
             <button x-on:click="showColumnPicker = !showColumnPicker"
                     class="px-2.5 py-1 bg-green-700 hover:bg-green-600 rounded-md text-xs text-white font-medium transition-colors flex items-center gap-1">
                 <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -118,17 +118,27 @@
                 Dodaj kolumne
             </button>
 
-            {{-- Dropdown with available columns --}}
+            {{-- Dropdown with available columns (fixed to escape overflow:auto parent) --}}
             <div x-show="showColumnPicker"
                  x-cloak
                  x-on:click.away="showColumnPicker = false"
+                 x-init="$watch('showColumnPicker', (val) => {
+                     if (val) {
+                         $nextTick(() => {
+                             const anchor = $refs.columnPickerAnchor;
+                             const rect = anchor.getBoundingClientRect();
+                             $el.style.top = (rect.bottom + 4) + 'px';
+                             $el.style.left = rect.left + 'px';
+                         });
+                     }
+                 })"
                  x-transition:enter="transition ease-out duration-100"
                  x-transition:enter-start="opacity-0 scale-95"
                  x-transition:enter-end="opacity-100 scale-100"
                  x-transition:leave="transition ease-in duration-75"
                  x-transition:leave-start="opacity-100 scale-100"
                  x-transition:leave-end="opacity-0 scale-95"
-                 class="absolute z-20 mt-1 left-0 bg-gray-700 rounded-lg shadow-xl border border-gray-600 min-w-[220px] max-h-64 overflow-y-auto">
+                 class="fixed z-[200] bg-gray-700 rounded-lg shadow-xl border border-gray-600 min-w-[220px] max-h-80 overflow-y-auto">
 
                 {{-- Separator: Base columns --}}
                 @php

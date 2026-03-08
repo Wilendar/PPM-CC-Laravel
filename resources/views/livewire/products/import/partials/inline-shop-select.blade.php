@@ -72,19 +72,12 @@
 
         {{-- Shop options --}}
         @foreach($shops as $shop)
-            <label class="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-gray-700/50 transition-colors">
+            <label class="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-gray-700/50 transition-colors"
+                   wire:key="inline-shop-{{ $product->id }}-{{ $shop->id }}">
                 <input type="checkbox"
-                       value="{{ $shop->id }}"
-                       :checked="selectedIds.includes({{ $shop->id }})"
-                       @change="
-                           if ($event.target.checked) {
-                               selectedIds.push({{ $shop->id }});
-                           } else {
-                               selectedIds = selectedIds.filter(id => id !== {{ $shop->id }});
-                           }
-                           shopCount = selectedIds.length;
-                           $wire.setShopsForProduct(productId, selectedIds);
-                       "
+                       x-model="selectedIds"
+                       :value="{{ $shop->id }}"
+                       @change="shopCount = selectedIds.length; $wire.setShopsForProduct(productId, selectedIds);"
                        class="form-checkbox-dark w-3.5 h-3.5">
                 <span class="text-xs text-gray-300 truncate">{{ $shop->name }}</span>
             </label>

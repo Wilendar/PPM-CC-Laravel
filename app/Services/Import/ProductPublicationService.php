@@ -21,6 +21,8 @@ use App\Models\ProductVariant;
 use App\Models\ShopVariant;
 use App\Models\VariantAttribute;
 use App\Models\VariantImage;
+use App\Models\ProductStock;
+use App\Models\Warehouse;
 
 /**
  * ProductPublicationService
@@ -86,6 +88,9 @@ class ProductPublicationService
 
                 // 2. Create price entries from price_data
                 $this->createPriceEntries($product, $pendingProduct);
+
+                // 2a. Create stock entry (minimum_stock, location)
+                $this->createStockEntry($product, $pendingProduct);
 
                 // FIX #9: Auto-detect variant master from variant_data
                 // PendingProduct may have variant_data with variants array even if
@@ -371,6 +376,53 @@ class ProductPublicationService
         Log::debug('ProductPublicationService: Price entries created', [
             'product_id' => $product->id,
             'groups_count' => count($groups),
+        ]);
+    }
+
+    /**
+     * Create ProductStock entry from PendingProduct minimum_stock/location
+     *
+     * Only creates if at least one field has a value.
+     * Uses default warehouse (is_default=true).
+     */
+    protected function createStockEntry(Product $product, PendingProduct $pendingProduct): void
+    {
+        $minimumStock = $pendingProduct->minimum_stock;
+        $location = $pendingProduct->location;
+
+        if ($minimumStock === null && empty($location)) {
+            return;
+        }
+
+        $defaultWarehouse = Warehouse::where('is_default', true)->first();
+        if (!$defaultWarehouse) {
+            Log::warning('ProductPublicationService: No default warehouse found, skipping stock entry', [
+                'product_id' => $product->id,
+            ]);
+            return;
+        }
+
+        $data = [];
+        if ($minimumStock !== null) {
+            $data['minimum_stock'] = $minimumStock;
+        }
+        if (!empty($location)) {
+            $data['location'] = $location;
+        }
+
+        ProductStock::updateOrCreate(
+            [
+                'product_id' => $product->id,
+                'warehouse_id' => $defaultWarehouse->id,
+            ],
+            $data
+        );
+
+        Log::debug('ProductPublicationService: Stock entry created', [
+            'product_id' => $product->id,
+            'warehouse_id' => $defaultWarehouse->id,
+            'minimum_stock' => $minimumStock,
+            'location' => $location,
         ]);
     }
 

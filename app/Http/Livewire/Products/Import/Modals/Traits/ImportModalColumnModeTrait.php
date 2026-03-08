@@ -49,6 +49,8 @@ trait ImportModalColumnModeTrait
         'material'        => ['label' => 'Material', 'type' => 'input'],
         'defect_symbol'   => ['label' => 'Symbol z wada', 'type' => 'input'],
         'application'     => ['label' => 'Zastosowanie', 'type' => 'input'],
+        'minimum_stock'   => ['label' => 'Stan minimalny', 'type' => 'input'],
+        'location'        => ['label' => 'Lokalizacja', 'type' => 'input'],
     ];
 
     /**
@@ -570,6 +572,8 @@ trait ImportModalColumnModeTrait
                     'material' => trim($row['material'] ?? '') ?: null,
                     'defect_symbol' => trim($row['defect_symbol'] ?? '') ?: null,
                     'application' => trim($row['application'] ?? '') ?: null,
+                    'minimum_stock' => !empty($row['minimum_stock']) ? (int) $row['minimum_stock'] : null,
+                    'location' => trim($row['location'] ?? '') ?: null,
                     'price_data' => !empty($priceData) ? $priceData : null,
                     'imported_by' => $userId,
                     'imported_at' => now(),
@@ -656,6 +660,8 @@ trait ImportModalColumnModeTrait
             'material' => $product->material,
             'defect_symbol' => $product->defect_symbol,
             'application' => $product->application,
+            'minimum_stock' => $product->minimum_stock,
+            'location' => $product->location,
         ];
 
         foreach ($fieldMapping as $key => $value) {
@@ -717,6 +723,8 @@ trait ImportModalColumnModeTrait
             'material' => trim($row['material'] ?? '') ?: $product->material,
             'defect_symbol' => trim($row['defect_symbol'] ?? '') ?: $product->defect_symbol,
             'application' => trim($row['application'] ?? '') ?: $product->application,
+            'minimum_stock' => !empty($row['minimum_stock']) ? (int) $row['minimum_stock'] : $product->minimum_stock,
+            'location' => trim($row['location'] ?? '') ?: $product->location,
             'price_data' => !empty($priceData) ? $priceData : $product->price_data,
         ]);
 

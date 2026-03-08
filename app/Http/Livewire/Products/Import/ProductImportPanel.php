@@ -83,6 +83,7 @@ class ProductImportPanel extends Component
         }
 
         $this->priceDisplayMode = $this->priceDisplayMode === 'net' ? 'gross' : 'net';
+        $this->savePreferences();
     }
 
     /**
@@ -109,6 +110,34 @@ class ProductImportPanel extends Component
         }
 
         $this->resetFilters();
+
+        // Load saved preferences from session (persist across navigation)
+        $prefs = session('import_panel_preferences', []);
+        if (!request()->has('sortField') && isset($prefs['sortField'])) {
+            $this->sortField = $prefs['sortField'];
+        }
+        if (!request()->has('sortDirection') && isset($prefs['sortDirection'])) {
+            $this->sortDirection = $prefs['sortDirection'];
+        }
+        if (!request()->has('perPage') && isset($prefs['perPage'])) {
+            $this->perPage = $prefs['perPage'];
+        }
+        if (!request()->has('priceDisplayMode') && isset($prefs['priceDisplayMode'])) {
+            $this->priceDisplayMode = $prefs['priceDisplayMode'];
+        }
+    }
+
+    /**
+     * Save user preferences to session for persistence across navigation
+     */
+    private function savePreferences(): void
+    {
+        session(['import_panel_preferences' => [
+            'sortField' => $this->sortField,
+            'sortDirection' => $this->sortDirection,
+            'perPage' => $this->perPage,
+            'priceDisplayMode' => $this->priceDisplayMode,
+        ]]);
     }
 
     /**
@@ -129,6 +158,12 @@ class ProductImportPanel extends Component
         $this->resetPage();
     }
 
+    public function updatedPerPage(): void
+    {
+        $this->resetPage();
+        $this->savePreferences();
+    }
+
     /**
      * Toggle sort direction or change sort field
      */
@@ -141,6 +176,7 @@ class ProductImportPanel extends Component
             $this->sortDirection = 'asc';
         }
         $this->resetPage();
+        $this->savePreferences();
     }
 
     /**
