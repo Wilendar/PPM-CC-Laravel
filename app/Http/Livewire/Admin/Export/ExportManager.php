@@ -56,6 +56,7 @@ class ExportManager extends Component
     public string $logFilterAction = '';
     public string $logFilterDateFrom = '';
     public string $logFilterDateTo = '';
+    public string $logFilterBotType = ''; // 'bots', 'humans', '' (all)
 
     /*
     |--------------------------------------------------------------------------
@@ -101,6 +102,11 @@ class ExportManager extends Component
     }
 
     public function updatingLogFilterDateTo(): void
+    {
+        $this->resetPage(pageName: 'logsPage');
+    }
+
+    public function updatingLogFilterBotType(): void
     {
         $this->resetPage(pageName: 'logsPage');
     }
@@ -165,6 +171,11 @@ class ExportManager extends Component
         if ($this->logFilterDateTo) {
             $query->whereDate('created_at', '<=', $this->logFilterDateTo);
         }
+        if ($this->logFilterBotType === 'bots') {
+            $query->bots();
+        } elseif ($this->logFilterBotType === 'humans') {
+            $query->humans();
+        }
 
         return $query->paginate(15, ['*'], 'logsPage');
     }
@@ -174,11 +185,39 @@ class ExportManager extends Component
      */
     public function getStatsProperty(): array
     {
+        $totalSize = ExportProfile::whereNotNull('file_size')->sum('file_size');
+
         return [
             'total' => ExportProfile::count(),
             'active' => ExportProfile::active()->count(),
+            'public' => ExportProfile::active()->where('is_public', true)->count(),
+            'total_products' => number_format(ExportProfile::whereNotNull('product_count')->max('product_count') ?? 0),
+            'total_size' => $this->formatFileSize((int) $totalSize),
             'downloads' => ExportProfileLog::where('action', 'downloaded')->count(),
         ];
+    }
+
+    /**
+     * Get aggregated feed stats per profile for mini-stats display.
+     */
+    public function getFeedStatsProperty(): array
+    {
+        return ExportProfileLog::selectRaw("
+            export_profile_id,
+            COUNT(*) as total_requests,
+            COUNT(DISTINCT ip_address) as unique_ips,
+            SUM(CASE WHEN is_bot = 1 THEN 1 ELSE 0 END) as bot_requests,
+            SUM(CASE WHEN is_bot = 0 THEN 1 ELSE 0 END) as human_requests,
+            AVG(response_time_ms) as avg_response_ms,
+            SUM(CASE WHEN served_from = 'cache' THEN 1 ELSE 0 END) as cache_hits,
+            SUM(CASE WHEN served_from IS NOT NULL AND served_from != 'cache' THEN 1 ELSE 0 END) as cache_misses,
+            MAX(created_at) as last_access
+        ")
+        ->whereIn('action', ['accessed', 'downloaded'])
+        ->groupBy('export_profile_id')
+        ->get()
+        ->keyBy('export_profile_id')
+        ->toArray();
     }
 
     /*
@@ -408,6 +447,7 @@ class ExportManager extends Component
         $this->logFilterAction = '';
         $this->logFilterDateFrom = '';
         $this->logFilterDateTo = '';
+        $this->logFilterBotType = '';
         $this->resetPage(pageName: 'logsPage');
     }
 
@@ -468,6 +508,36 @@ class ExportManager extends Component
     }
 
     /**
+     * Format response time for display (ms or seconds).
+     */
+    public function formatResponseTime(?int $ms): string
+    {
+        if ($ms === null) {
+            return '-';
+        }
+
+        if ($ms >= 1000) {
+            return round($ms / 1000, 1) . 's';
+        }
+
+        return $ms . 'ms';
+    }
+
+    /**
+     * Extract domain from referer URL.
+     */
+    public function formatReferer(?string $referer): string
+    {
+        if (!$referer) {
+            return '-';
+        }
+
+        $host = parse_url($referer, PHP_URL_HOST);
+
+        return $host ?: $referer;
+    }
+
+    /**
      * Calculate next generation time based on schedule.
      */
     private function calculateNextGeneration(ExportProfile $profile): ?\Carbon\Carbon
@@ -488,6 +558,7 @@ class ExportManager extends Component
         return view('livewire.admin.export.export-manager', [
             'formatLabels' => $this->getFormatLabels(),
             'scheduleLabels' => $this->getScheduleLabels(),
+            'feedStats' => $this->feedStats,
         ]);
     }
 }

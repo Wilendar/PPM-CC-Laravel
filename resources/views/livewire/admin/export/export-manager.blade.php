@@ -55,17 +55,29 @@
     {{-- ===== PROFILES TAB ===== --}}
     <div>
         {{-- Statistics Cards --}}
-        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-            <div class="enterprise-card p-4 text-center">
+        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
+            <div class="enterprise-card p-3 text-center">
                 <p class="text-2xl font-bold text-white">{{ $this->stats['total'] }}</p>
-                <p class="text-xs text-gray-400">Wszystkie profile</p>
+                <p class="text-xs text-gray-400">Profile</p>
             </div>
-            <div class="enterprise-card p-4 text-center">
+            <div class="enterprise-card p-3 text-center">
                 <p class="text-2xl font-bold text-green-400">{{ $this->stats['active'] }}</p>
-                <p class="text-xs text-gray-400">Aktywne feedy</p>
+                <p class="text-xs text-gray-400">Aktywne</p>
             </div>
-            <div class="enterprise-card p-4 text-center">
-                <p class="text-2xl font-bold text-blue-400">{{ $this->stats['downloads'] }}</p>
+            <div class="enterprise-card p-3 text-center">
+                <p class="text-2xl font-bold text-blue-400">{{ $this->stats['public'] ?? 0 }}</p>
+                <p class="text-xs text-gray-400">Publiczne</p>
+            </div>
+            <div class="enterprise-card p-3 text-center">
+                <p class="text-2xl font-bold text-[#e0ac7e]">{{ $this->stats['total_products'] ?? 0 }}</p>
+                <p class="text-xs text-gray-400">Produktow</p>
+            </div>
+            <div class="enterprise-card p-3 text-center">
+                <p class="text-2xl font-bold text-purple-400">{{ $this->stats['total_size'] ?? '0 B' }}</p>
+                <p class="text-xs text-gray-400">Rozmiar plikow</p>
+            </div>
+            <div class="enterprise-card p-3 text-center">
+                <p class="text-2xl font-bold text-cyan-400">{{ $this->stats['downloads'] }}</p>
                 <p class="text-xs text-gray-400">Pobrania</p>
             </div>
         </div>
@@ -201,22 +213,37 @@
                     </div>
                 @endif
 
+                {{-- Mini Feed Stats --}}
+                @if(isset($feedStats[$profile->id]) && $feedStats[$profile->id]['total_requests'] > 0)
+                    @php $pStats = $feedStats[$profile->id]; @endphp
+                    <div class="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-500">
+                        <span title="Laczna liczba requestow">{{ $pStats['total_requests'] }} req</span>
+                        <span title="Unikalne adresy IP">{{ $pStats['unique_ips'] }} IP</span>
+                        <span title="Requesty od botow">{{ $pStats['bot_requests'] }} botow</span>
+                        <span title="Sredni czas odpowiedzi">avg {{ round($pStats['avg_response_ms'] ?? 0) }}ms</span>
+                        @php
+                            $totalServed = ($pStats['cache_hits'] ?? 0) + ($pStats['cache_misses'] ?? 0);
+                            $cacheRate = $totalServed > 0 ? round(($pStats['cache_hits'] / $totalServed) * 100) : 0;
+                        @endphp
+                        <span title="Cache hit rate">cache {{ $cacheRate }}%</span>
+                    </div>
+                @endif
+
                 {{-- Actions --}}
-                <div class="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-gray-700/50 pt-3">
+                <div class="mt-3 flex flex-wrap items-center gap-x-1 gap-y-2 border-t border-gray-700/50 pt-3">
                     {{-- Generate Now --}}
                     <button wire:click="generateNow({{ $profile->id }})"
                             wire:loading.attr="disabled"
                             wire:target="generateNow({{ $profile->id }})"
-                            class="text-sm font-medium transition-colors"
-                            style="color: var(--mpp-primary);">
+                            class="text-sm font-medium transition-colors text-[#e0ac7e] hover:text-[#c9956a] px-2 py-1 rounded hover:bg-gray-700/50">
                         <span wire:loading.remove wire:target="generateNow({{ $profile->id }})" class="flex items-center gap-1">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
                             </svg>
-                            Generuj teraz
+                            Generuj
                         </span>
                         <span wire:loading wire:target="generateNow({{ $profile->id }})" class="flex items-center gap-1 text-gray-400">
-                            <svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                            <svg class="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
                                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                                 <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
                             </svg>
@@ -224,32 +251,37 @@
                         </span>
                     </button>
 
+                    <span class="text-gray-600">|</span>
+
                     {{-- Download --}}
                     @if($profile->file_path)
                         <a href="{{ $profile->getDownloadUrl() }}"
-                           class="text-sm text-gray-400 hover:text-white transition-colors flex items-center gap-1">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                           class="text-sm text-gray-400 hover:text-white transition-colors flex items-center gap-1 px-2 py-1 rounded hover:bg-gray-700/50">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
                             </svg>
                             Pobierz
                         </a>
+                        <span class="text-gray-600">|</span>
                     @endif
 
                     {{-- Edit --}}
                     @can('export.update')
                         <a href="{{ route('admin.export.edit', $profile) }}" wire:navigate
-                           class="text-sm text-gray-400 hover:text-white transition-colors flex items-center gap-1">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                           class="text-sm text-gray-400 hover:text-white transition-colors flex items-center gap-1 px-2 py-1 rounded hover:bg-gray-700/50">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
                             </svg>
                             Edytuj
                         </a>
                     @endcan
 
+                    <span class="text-gray-600">|</span>
+
                     {{-- Toggle Active --}}
                     @can('export.update')
                         <button wire:click="toggleActive({{ $profile->id }})"
-                                class="text-sm text-gray-400 hover:text-white transition-colors">
+                                class="text-sm text-gray-400 hover:text-white transition-colors px-2 py-1 rounded hover:bg-gray-700/50">
                             {{ $profile->is_active ? 'Dezaktywuj' : 'Aktywuj' }}
                         </button>
                     @endcan
@@ -257,23 +289,26 @@
                     {{-- Toggle Public --}}
                     @can('export.manage_feeds')
                         <button wire:click="togglePublic({{ $profile->id }})"
-                                class="text-sm text-gray-400 hover:text-white transition-colors">
+                                class="text-sm text-gray-400 hover:text-white transition-colors px-2 py-1 rounded hover:bg-gray-700/50">
                             {{ $profile->is_public ? 'Ukryj feed' : 'Upublicznij' }}
                         </button>
                     @endcan
 
+                    <span class="text-gray-600">|</span>
+
                     {{-- Duplicate --}}
                     @can('export.create')
                         <button wire:click="duplicateProfile({{ $profile->id }})"
-                                class="text-sm text-gray-400 hover:text-white transition-colors">
+                                class="text-sm text-gray-400 hover:text-white transition-colors px-2 py-1 rounded hover:bg-gray-700/50">
                             Duplikuj
                         </button>
                     @endcan
 
                     {{-- Delete --}}
                     @can('export.delete')
+                        <span class="text-gray-600">|</span>
                         <button wire:click="confirmDelete({{ $profile->id }})"
-                                class="text-sm text-red-400 hover:text-red-300 transition-colors">
+                                class="text-sm text-red-400 hover:text-red-300 transition-colors px-2 py-1 rounded hover:bg-red-900/30">
                             Usun
                         </button>
                     @endcan
@@ -341,7 +376,15 @@
                     <label class="block text-xs text-gray-400 mb-1">Do</label>
                     <input type="date" wire:model.live="logFilterDateTo" class="form-input-enterprise">
                 </div>
-                @if($logFilterProfile || $logFilterAction || $logFilterDateFrom || $logFilterDateTo)
+                <div>
+                    <label class="block text-xs text-gray-400 mb-1">Typ</label>
+                    <select wire:model.live="logFilterBotType" class="form-input-enterprise">
+                        <option value="">Wszystkie</option>
+                        <option value="bots">Tylko boty</option>
+                        <option value="humans">Tylko ludzie</option>
+                    </select>
+                </div>
+                @if($logFilterProfile || $logFilterAction || $logFilterDateFrom || $logFilterDateTo || $logFilterBotType)
                     <button wire:click="clearLogFilters"
                             class="text-sm text-gray-400 hover:text-white transition-colors">
                         Wyczysc filtry
@@ -359,9 +402,12 @@
                         <th class="px-4 py-3 text-left">Profil</th>
                         <th class="px-4 py-3 text-left">Akcja</th>
                         <th class="px-4 py-3 text-left">Uzytkownik / IP</th>
+                        <th class="px-4 py-3 text-center">Bot</th>
+                        <th class="px-4 py-3 text-center">Zrodlo</th>
+                        <th class="px-4 py-3 text-right">Czas odp.</th>
+                        <th class="px-4 py-3 text-left">Referer</th>
                         <th class="px-4 py-3 text-right">Produktow</th>
                         <th class="px-4 py-3 text-right">Rozmiar</th>
-                        <th class="px-4 py-3 text-right">Czas</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-700">
@@ -388,6 +434,43 @@
                         <td class="px-4 py-3 text-xs">
                             {{ $log->user?->name ?? $log->ip_address ?? '-' }}
                         </td>
+                        {{-- Bot --}}
+                        <td class="px-4 py-3 text-center">
+                            @if($log->is_bot)
+                                <span class="inline-flex items-center gap-1 rounded bg-yellow-900/40 px-2 py-0.5 text-xs text-yellow-400" title="{{ $log->bot_name }}">
+                                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
+                                    </svg>
+                                    {{ $log->bot_name }}
+                                </span>
+                            @else
+                                <span class="text-gray-500 text-xs">
+                                    <svg class="w-3 h-3 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
+                                    </svg>
+                                </span>
+                            @endif
+                        </td>
+                        {{-- Served From --}}
+                        <td class="px-4 py-3 text-center">
+                            @if($log->served_from === 'cache')
+                                <span class="rounded bg-green-900/40 px-2 py-0.5 text-xs text-green-400">Cache</span>
+                            @elseif($log->served_from === 'on_the_fly')
+                                <span class="rounded bg-yellow-900/40 px-2 py-0.5 text-xs text-yellow-400">On-the-fly</span>
+                            @elseif($log->served_from === 'generated')
+                                <span class="rounded bg-blue-900/40 px-2 py-0.5 text-xs text-blue-400">Generacja</span>
+                            @else
+                                <span class="text-gray-500 text-xs">-</span>
+                            @endif
+                        </td>
+                        {{-- Response Time --}}
+                        <td class="px-4 py-3 text-right text-xs">
+                            {{ $this->formatResponseTime($log->response_time_ms) }}
+                        </td>
+                        {{-- Referer --}}
+                        <td class="px-4 py-3 text-xs text-gray-400 max-w-[150px] truncate" title="{{ $log->referer }}">
+                            {{ $this->formatReferer($log->referer) }}
+                        </td>
                         <td class="px-4 py-3 text-right">{{ $log->product_count ?? '-' }}</td>
                         <td class="px-4 py-3 text-right">
                             @if($log->file_size)
@@ -396,16 +479,15 @@
                                 -
                             @endif
                         </td>
-                        <td class="px-4 py-3 text-right">{{ $log->duration ? $log->duration . 'ms' : '-' }}</td>
                     </tr>
                     @if($log->action === 'error' && $log->error_message)
                     <tr class="bg-red-900/10" wire:key="log-err-{{ $log->id }}">
-                        <td colspan="7" class="px-4 py-2 text-xs text-red-400">{{ $log->error_message }}</td>
+                        <td colspan="10" class="px-4 py-2 text-xs text-red-400">{{ $log->error_message }}</td>
                     </tr>
                     @endif
                     @empty
                     <tr>
-                        <td colspan="7" class="px-4 py-8 text-center text-gray-500">Brak logow</td>
+                        <td colspan="10" class="px-4 py-8 text-center text-gray-500">Brak logow</td>
                     </tr>
                     @endforelse
                 </tbody>

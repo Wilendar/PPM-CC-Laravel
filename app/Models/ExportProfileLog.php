@@ -25,6 +25,13 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property int|null $file_size
  * @property int|null $duration
  * @property string|null $error_message
+ * @property int|null $response_time_ms
+ * @property string|null $served_from
+ * @property int|null $http_status
+ * @property string|null $content_type
+ * @property string|null $referer
+ * @property bool $is_bot
+ * @property string|null $bot_name
  * @property \Carbon\Carbon $created_at
  * @property \Carbon\Carbon $updated_at
  */
@@ -35,6 +42,7 @@ class ExportProfileLog extends Model
     // === CONSTANTS ===
 
     const ACTIONS = ['generated', 'downloaded', 'accessed', 'error'];
+    const SERVED_FROM = ['cache', 'generated', 'on_the_fly'];
 
     // === FILLABLE ===
 
@@ -48,14 +56,24 @@ class ExportProfileLog extends Model
         'file_size',
         'duration',
         'error_message',
+        'response_time_ms',
+        'served_from',
+        'http_status',
+        'content_type',
+        'referer',
+        'is_bot',
+        'bot_name',
     ];
 
     // === CASTS ===
 
     protected $casts = [
-        'product_count' => 'integer',
-        'file_size'     => 'integer',
-        'duration'      => 'integer',
+        'product_count'    => 'integer',
+        'file_size'        => 'integer',
+        'duration'         => 'integer',
+        'response_time_ms' => 'integer',
+        'http_status'      => 'integer',
+        'is_bot'           => 'boolean',
     ];
 
     // === RELATIONSHIPS ===
@@ -68,5 +86,23 @@ class ExportProfileLog extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class, 'user_id');
+    }
+
+    // === SCOPES ===
+
+    /**
+     * Scope: only bot requests.
+     */
+    public function scopeBots($query)
+    {
+        return $query->where('is_bot', true);
+    }
+
+    /**
+     * Scope: only human requests.
+     */
+    public function scopeHumans($query)
+    {
+        return $query->where('is_bot', false);
     }
 }
