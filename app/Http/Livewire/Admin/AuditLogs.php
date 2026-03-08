@@ -101,7 +101,7 @@ class AuditLogs extends Component
 
     public function mount()
     {
-        $this->authorize('viewAny', AuditLog::class);
+        $this->authorize('audit.read');
         
         // Set default date filters (last 30 days)
         $this->dateFromFilter = now()->subDays(30)->format('Y-m-d');
@@ -247,7 +247,7 @@ class AuditLogs extends Component
 
     public function openExportModal()
     {
-        $this->authorize('export', AuditLog::class);
+        $this->authorize('audit.read');
         $this->showExportModal = true;
     }
 
@@ -259,7 +259,7 @@ class AuditLogs extends Component
 
     public function exportLogs()
     {
-        $this->authorize('export', AuditLog::class);
+        $this->authorize('audit.read');
         
         $query = $this->getLogsQuery();
         
@@ -280,7 +280,8 @@ class AuditLogs extends Component
             case 'csv':
                 return $this->exportToCsv($logs);
             case 'pdf':
-                return $this->exportToPdf($logs);
+                session()->flash('warning', 'Eksport PDF nie jest jeszcze dostepny. Uzyj formatu Excel lub CSV.');
+                return null;
             default:
                 session()->flash('error', 'Nieznany format eksportu.');
         }

@@ -36,8 +36,7 @@ param(
     [switch]$Full,
     [switch]$SchemaOnly,
     [switch]$ExcludeLarge,
-    [string]$Table,
-    [switch]$Verbose
+    [string]$Table
 )
 
 # ============================================================
@@ -57,7 +56,8 @@ if (Test-Path $ConfigPath) {
         "D:\OneDrive - MPP TRADE\SSH\Hostido\HostidoSSHNoPass.ppk"
     )
     $HostidoKey = $KeyPaths | Where-Object { Test-Path $_ } | Select-Object -First 1
-    $HostidoHost = "host379076@host379076.hostido.net.pl"
+    $HostidoUser = "host379076"
+    $HostidoHost = "host379076.hostido.net.pl"
     $HostidoPort = 64321
     $RemoteLaravelRoot = "domains/ppm.mpptrade.pl/public_html"
 }
@@ -100,7 +100,7 @@ function Write-Fail {
 
 function Write-Detail {
     param([string]$Message)
-    if ($Verbose) {
+    if ($VerbosePreference -eq 'Continue') {
         Write-Host "    $Message" -ForegroundColor Gray
     }
 }
@@ -139,9 +139,13 @@ if (Test-CommandAvailable "pscp") {
 if (Test-CommandAvailable "mysql") {
     Write-Ok "mysql client found"
 } else {
-    # Try XAMPP default location
-    $xamppMysql = "C:\xampp\mysql\bin\mysql.exe"
-    if (Test-Path $xamppMysql) {
+    # Try XAMPP locations (project root or C:\xampp)
+    $xamppMysqlPaths = @(
+        (Join-Path $PSScriptRoot "..\..\XAMPP\mysql\bin\mysql.exe"),
+        "C:\xampp\mysql\bin\mysql.exe"
+    )
+    $xamppMysql = $xamppMysqlPaths | Where-Object { Test-Path $_ } | Select-Object -First 1
+    if ($xamppMysql) {
         Write-Ok "mysql client found at XAMPP location"
         Set-Alias -Name mysql -Value $xamppMysql -Scope Script
     } else {
@@ -212,7 +216,7 @@ if ($SchemaOnly) {
 $ignoreFlags = ($ignoredTables | ForEach-Object { "--ignore-table=$_" }) -join " "
 
 Write-Step "Dump mode: $modeLabel"
-if ($Verbose -and $ignoredTables.Count -gt 0) {
+if (($VerbosePreference -eq 'Continue') -and $ignoredTables.Count -gt 0) {
     Write-Detail "Ignored tables:"
     $ignoredTables | ForEach-Object { Write-Detail "  - $_" }
 }
@@ -232,7 +236,7 @@ $remoteCmd = "mysqldump -u ${ProdDbUser} -p'${ProdDbPass}' ${dumpOptsStr} ${igno
 
 Write-Detail "Remote command: $remoteCmd"
 
-$dumpResult = & plink -ssh $HostidoHost -P $HostidoPort -i $HostidoKey -batch $remoteCmd 2>&1
+$dumpResult = & plink -ssh "$HostidoUser@$HostidoHost" -P $HostidoPort -i $HostidoKey -batch $remoteCmd 2>&1
 
 if ($dumpResult -match "DUMP_OK") {
     Write-Ok "Dump created on server: $remoteDumpPath"
@@ -243,7 +247,7 @@ if ($dumpResult -match "DUMP_OK") {
 }
 
 # Get dump file size
-$sizeResult = & plink -ssh $HostidoHost -P $HostidoPort -i $HostidoKey -batch "ls -lh ${remoteDumpPath} | awk '{print `$5}'" 2>&1
+$sizeResult = & plink -ssh "$HostidoUser@$HostidoHost" -P $HostidoPort -i $HostidoKey -batch "ls -lh ${remoteDumpPath} | awk '{print `$5}'" 2>&1
 Write-Detail "Dump size (gzipped): $sizeResult"
 
 # ============================================================
@@ -262,7 +266,7 @@ $localSqlPath = Join-Path $TempDir $DumpFileName
 
 Write-Detail "Target: $localGzPath"
 
-& pscp -i $HostidoKey -P $HostidoPort "${HostidoHost}:${remoteDumpPath}" $localGzPath 2>&1
+& pscp -i $HostidoKey -P $HostidoPort "${HostidoUser}@${HostidoHost}:${remoteDumpPath}" $localGzPath 2>&1
 
 if ($LASTEXITCODE -ne 0 -or -not (Test-Path $localGzPath)) {
     Write-Fail "Download failed"
@@ -365,7 +369,7 @@ Write-Step "Cleaning up temporary files..."
 
 # Remove remote dump
 Write-Detail "Removing remote dump..."
-& plink -ssh $HostidoHost -P $HostidoPort -i $HostidoKey -batch "rm -f ${remoteDumpPath}" 2>&1 | Out-Null
+& plink -ssh "$HostidoUser@$HostidoHost" -P $HostidoPort -i $HostidoKey -batch "rm -f ${remoteDumpPath}" 2>&1 | Out-Null
 Write-Ok "Remote dump removed"
 
 # Remove local files

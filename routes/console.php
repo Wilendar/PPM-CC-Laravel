@@ -55,13 +55,17 @@ Schedule::command('logs:archive --keep-days=30')
 // Automatic sync_jobs cleanup - retention policy from config/sync.php
 // 2025-11-12: BUG #9 FIX #6 - Configurable retention policy + optional auto-cleanup
 // 2026-03-07: Now reads enabled state from RetentionConfigService (UI toggle in system-settings)
-if (app(\App\Services\RetentionConfigService::class)->isSyncCleanupEnabled()) {
-    Schedule::command('sync:cleanup')
-        ->daily()
-        ->at('02:00')
-        ->name('sync-jobs-cleanup')
-        ->withoutOverlapping()
-        ->runInBackground();
+try {
+    if (app(\App\Services\RetentionConfigService::class)->isSyncCleanupEnabled()) {
+        Schedule::command('sync:cleanup')
+            ->daily()
+            ->at('02:00')
+            ->name('sync-jobs-cleanup')
+            ->withoutOverlapping()
+            ->runInBackground();
+    }
+} catch (\Exception $e) {
+    // Fail silently if system_settings table doesn't exist yet
 }
 
 // ==========================================

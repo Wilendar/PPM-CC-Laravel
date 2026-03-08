@@ -209,44 +209,59 @@
                 Reset kolumn
             </button>
         </div>
-        <div class="overflow-x-auto">
-            <table class="enterprise-table w-full">
+        @php
+            $tableMinWidth = 40 + 56 + 130 + 230
+                + 100 + 100 + 85
+                + 90 + 90 + 90 + 80
+                + 160 + 100 + 150 + 100
+                + 70 + 120;
+            if ($this->effectiveCategoryMaxLevel >= 6) $tableMinWidth += 90;
+            if ($this->effectiveCategoryMaxLevel >= 7) $tableMinWidth += 90;
+        @endphp
+        <div class="overflow-x-auto import-table-scroll-container" x-data="scrollDetector">
+            <table class="enterprise-table" style="min-width: {{ $tableMinWidth }}px">
                 <thead>
                     <tr>
-                        <th class="w-10 px-3">
+                        {{-- LEFT STICKY: Checkbox --}}
+                        <th class="px-3 import-table-sticky-left import-sticky-col-0">
                             <input type="checkbox"
                                    wire:model.live="selectAll"
                                    wire:click="selectAllOnPage"
                                    class="form-checkbox-dark">
                         </th>
-                        <th class="w-14 px-2 {{ !$this->canSeeImages() ? 'opacity-30' : '' }}">Obraz</th>
-                        <th class="px-2 cursor-pointer hover:bg-gray-700/50 relative resizable-column {{ !$this->canSeeBasicData() ? 'opacity-30 pointer-events-none' : '' }}" data-column-id="sku" style="width: 100px;">
+                        {{-- LEFT STICKY: Obraz --}}
+                        <th class="px-2 import-table-sticky-left import-sticky-col-1 {{ !$this->canSeeImages() ? 'opacity-30' : '' }}">Obraz</th>
+                        {{-- LEFT STICKY: SKU --}}
+                        <th class="px-2 cursor-pointer hover:bg-gray-700/50 relative import-table-sticky-left import-sticky-col-2 {{ !$this->canSeeBasicData() ? 'opacity-30 pointer-events-none' : '' }}"
+                            data-column-id="sku">
                             <div class="flex items-center gap-1" wire:click="sortBy('sku')">
                                 SKU
                                 @include('livewire.products.import.partials.sort-indicator', ['field' => 'sku'])
                             </div>
                             <div class="resize-handle" x-on:mousedown="startResize($event, 'sku')"></div>
                         </th>
-                        <th class="px-2 cursor-pointer hover:bg-gray-700/50 relative resizable-column {{ !$this->canSeeBasicData() ? 'opacity-30 pointer-events-none' : '' }}" data-column-id="name" style="width: 140px;">
+                        {{-- LEFT STICKY: Nazwa (shadow edge) --}}
+                        <th class="px-2 cursor-pointer hover:bg-gray-700/50 relative import-table-sticky-left import-sticky-col-3 import-sticky-shadow-left {{ !$this->canSeeBasicData() ? 'opacity-30 pointer-events-none' : '' }}"
+                            data-column-id="name">
                             <div class="flex items-center gap-1" wire:click="sortBy('name')">
                                 Nazwa
                                 @include('livewire.products.import.partials.sort-indicator', ['field' => 'name'])
                             </div>
                             <div class="resize-handle" x-on:mousedown="startResize($event, 'name')"></div>
                         </th>
-                        <th class="px-2 w-24 relative resizable-column {{ !$this->canSeeBasicData() ? 'opacity-30' : '' }}" data-column-id="type" style="width: 96px;">
+                        <th class="px-2 relative resizable-column {{ !$this->canSeeBasicData() ? 'opacity-30' : '' }}" data-column-id="type" style="width: 100px;">
                             <span class="text-xs">Typ</span>
                             <div class="resize-handle" x-on:mousedown="startResize($event, 'type')"></div>
                         </th>
 
                         {{-- MARKA (manufacturer_id) --}}
-                        <th class="px-2 w-24 relative resizable-column {{ !$this->canSeeBasicData() ? 'opacity-30' : '' }}" data-column-id="manufacturer" style="width: 96px;">
+                        <th class="px-2 relative resizable-column {{ !$this->canSeeBasicData() ? 'opacity-30' : '' }}" data-column-id="manufacturer" style="width: 100px;">
                             <span class="text-xs text-gray-400">Marka</span>
                             <div class="resize-handle" x-on:mousedown="startResize($event, 'manufacturer')"></div>
                         </th>
 
                         {{-- CENA - klik otwiera modal cen (FAZA 9.4) --}}
-                        <th class="px-2 w-20 relative resizable-column {{ !$this->canSeePrices() ? 'opacity-30 pointer-events-none' : '' }}" data-column-id="price" style="width: 80px;">
+                        <th class="px-2 relative resizable-column {{ !$this->canSeePrices() ? 'opacity-30 pointer-events-none' : '' }}" data-column-id="price" style="width: 85px;">
                             <div class="flex items-center gap-1">
                                 <span class="text-xs text-gray-400">Cena</span>
                                 <button wire:click="togglePriceDisplay"
@@ -265,44 +280,62 @@
                             $effectiveCategoryMaxLevel = $this->effectiveCategoryMaxLevel;
                         @endphp
 
-                        <th class="px-1 w-24 text-xs relative resizable-column {{ !$this->canSeeCategories() ? 'opacity-30 pointer-events-none' : '' }}" data-column-id="cat_l3" style="width: 96px;">
+                        <th class="px-1 text-xs relative resizable-column {{ !$this->canSeeCategories() ? 'opacity-30 pointer-events-none' : '' }}" data-column-id="cat_l3" style="width: 90px;">
                             @if($hasSelection)
                                 <div class="flex items-center gap-1">
                                     <span class="text-gray-500">L3</span>
                                     @include('livewire.products.import.partials.bulk-category-dropdown', ['level' => 3])
                                 </div>
                             @else
-                                <span class="text-gray-400">Kategoria L3</span>
+                                <span class="text-gray-400">Kat L3</span>
                             @endif
                             <div class="resize-handle" x-on:mousedown="startResize($event, 'cat_l3')"></div>
                         </th>
-                        <th class="px-1 w-24 text-xs relative resizable-column {{ !$this->canSeeCategories() ? 'opacity-30 pointer-events-none' : '' }}" data-column-id="cat_l4" style="width: 96px;">
+                        <th class="px-1 text-xs relative resizable-column {{ !$this->canSeeCategories() ? 'opacity-30 pointer-events-none' : '' }}" data-column-id="cat_l4" style="width: 90px;">
                             @if($hasSelection)
                                 <div class="flex items-center gap-1">
                                     <span class="text-gray-500">L4</span>
                                     @include('livewire.products.import.partials.bulk-category-dropdown', ['level' => 4])
                                 </div>
                             @else
-                                <span class="text-gray-400">Kategoria L4</span>
+                                <span class="text-gray-400">Kat L4</span>
                             @endif
                             <div class="resize-handle" x-on:mousedown="startResize($event, 'cat_l4')"></div>
                         </th>
-                        <th class="px-1 w-24 text-xs relative resizable-column {{ !$this->canSeeCategories() ? 'opacity-30 pointer-events-none' : '' }}" data-column-id="cat_l5" style="width: 96px;">
+                        <th class="px-1 text-xs relative resizable-column {{ !$this->canSeeCategories() ? 'opacity-30 pointer-events-none' : '' }}" data-column-id="cat_l5" style="width: 90px;">
                             @if($hasSelection)
                                 <div class="flex items-center gap-1">
                                     <span class="text-gray-500">L5</span>
                                     @include('livewire.products.import.partials.bulk-category-dropdown', ['level' => 5])
                                 </div>
                             @else
-                                <span class="text-gray-400">Kategoria L5</span>
+                                <span class="text-gray-400">Kat L5</span>
                             @endif
                             <div class="resize-handle" x-on:mousedown="startResize($event, 'cat_l5')"></div>
                         </th>
 
+                        @php
+                            $autoMaxLevel = $this->autoCategoryMaxLevel;
+                            $canCollapse = fn(int $level) => $effectiveCategoryMaxLevel >= $level && $effectiveCategoryMaxLevel > $autoMaxLevel && $effectiveCategoryMaxLevel > 5;
+                        @endphp
+
                         {{-- L6 - ukryte do czasu klikniecia "+" --}}
-                        <th class="px-1 w-24 text-xs text-center text-gray-500 relative resizable-column" data-column-id="cat_l6" style="width: 96px;">
+                        <th class="px-1 text-xs text-center text-gray-500 relative resizable-column" data-column-id="cat_l6" style="width: 90px;">
                             @if($effectiveCategoryMaxLevel >= 6)
-                                <span class="text-gray-400">KAT L6</span>
+                                <div class="flex items-center justify-center gap-1">
+                                    <span class="text-gray-400">KAT L6</span>
+                                    @if($canCollapse(6) && $effectiveCategoryMaxLevel == 6)
+                                        <button type="button"
+                                                wire:click="collapseCategoryColumns"
+                                                class="inline-flex items-center justify-center w-5 h-5 rounded text-gray-500
+                                                       hover:bg-red-900/30 hover:text-red-400 transition-colors"
+                                                title="Ukryj KAT L6">
+                                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4"/>
+                                            </svg>
+                                        </button>
+                                    @endif
+                                </div>
                             @else
                                 <button type="button"
                                         wire:click="expandCategoryColumns"
@@ -319,9 +352,22 @@
 
                         {{-- L7 (placeholder "+" dopoki nie zostanie dodane) --}}
                         @if($effectiveCategoryMaxLevel >= 6)
-                            <th class="px-1 w-24 text-xs text-center text-gray-500 relative resizable-column" data-column-id="cat_l7" style="width: 96px;">
+                            <th class="px-1 text-xs text-center text-gray-500 relative resizable-column" data-column-id="cat_l7" style="width: 90px;">
                                 @if($effectiveCategoryMaxLevel >= 7)
-                                    <span class="text-gray-400">KAT L7</span>
+                                    <div class="flex items-center justify-center gap-1">
+                                        <span class="text-gray-400">KAT L7</span>
+                                        @if($canCollapse(7) && $effectiveCategoryMaxLevel == 7)
+                                            <button type="button"
+                                                    wire:click="collapseCategoryColumns"
+                                                    class="inline-flex items-center justify-center w-5 h-5 rounded text-gray-500
+                                                           hover:bg-red-900/30 hover:text-red-400 transition-colors"
+                                                    title="Ukryj KAT L7">
+                                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4"/>
+                                                </svg>
+                                            </button>
+                                        @endif
+                                    </div>
                                 @else
                                     <button type="button"
                                             wire:click="expandCategoryColumns"
@@ -339,9 +385,22 @@
 
                         {{-- L8 (placeholder "+" dopoki nie zostanie dodane) --}}
                         @if($effectiveCategoryMaxLevel >= 7)
-                            <th class="px-1 w-24 text-xs text-center text-gray-500 relative resizable-column" data-column-id="cat_l8" style="width: 96px;">
+                            <th class="px-1 text-xs text-center text-gray-500 relative resizable-column" data-column-id="cat_l8" style="width: 90px;">
                                 @if($effectiveCategoryMaxLevel >= 8)
-                                    <span class="text-gray-400">KAT L8</span>
+                                    <div class="flex items-center justify-center gap-1">
+                                        <span class="text-gray-400">KAT L8</span>
+                                        @if($canCollapse(8) && $effectiveCategoryMaxLevel == 8)
+                                            <button type="button"
+                                                    wire:click="collapseCategoryColumns"
+                                                    class="inline-flex items-center justify-center w-5 h-5 rounded text-gray-500
+                                                           hover:bg-red-900/30 hover:text-red-400 transition-colors"
+                                                    title="Ukryj KAT L8">
+                                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4"/>
+                                                </svg>
+                                            </button>
+                                        @endif
+                                    </div>
                                 @else
                                     <button type="button"
                                             wire:click="expandCategoryColumns"
@@ -358,28 +417,40 @@
                         @endif
 
                         {{-- PUBLIKACJA (FAZA 9.3 - zastepuje Sklepy) --}}
-                        <th class="px-1 w-28 relative resizable-column {{ !$this->canSeePublication() ? 'opacity-30' : '' }}" data-column-id="publication" style="width: 112px;">
+                        <th class="px-1 relative resizable-column {{ !$this->canSeePublication() ? 'opacity-30' : '' }}" data-column-id="publication" style="width: 160px;">
                             <span class="text-gray-400 text-xs">Publikacja</span>
                             <div class="resize-handle" x-on:mousedown="startResize($event, 'publication')"></div>
                         </th>
+                        {{-- DATA DODANIA (sortowalna) --}}
+                        <th class="px-2 relative resizable-column" data-column-id="imported_at" style="width: 100px;">
+                            <div class="flex items-center gap-1 cursor-pointer" wire:click="sortBy('imported_at')">
+                                <span class="text-gray-400 text-xs">Data dodania</span>
+                                @include('livewire.products.import.partials.sort-indicator', ['field' => 'imported_at'])
+                            </div>
+                            <div class="resize-handle" x-on:mousedown="startResize($event, 'imported_at')"></div>
+                        </th>
                         {{-- DATA PUBLIKACJI (FAZA 9.3) --}}
-                        <th class="px-2 w-36 relative resizable-column {{ !$this->canSeeScheduleDate() ? 'opacity-30' : '' }}" data-column-id="schedule" style="width: 144px;">
+                        <th class="px-2 relative resizable-column {{ !$this->canSeeScheduleDate() ? 'opacity-30' : '' }}" data-column-id="schedule" style="width: 150px;">
                             <span class="text-gray-400 text-xs">Data publikacji</span>
                             <div class="resize-handle" x-on:mousedown="startResize($event, 'schedule')"></div>
                         </th>
                         {{-- PUBLIKUJ button (FAZA 9.3) --}}
-                        <th class="px-2 w-24 text-center relative resizable-column {{ !$this->canPublish() ? 'opacity-30' : '' }}" data-column-id="publish" style="width: 96px;">
+                        <th class="px-2 text-center relative resizable-column {{ !$this->canPublish() ? 'opacity-30' : '' }}" data-column-id="publish" style="width: 100px;">
                             <span class="text-gray-400 text-xs">Publikuj</span>
                             <div class="resize-handle" x-on:mousedown="startResize($event, 'publish')"></div>
                         </th>
-                        <th class="px-2 w-16 text-center cursor-pointer hover:bg-gray-700/50 relative resizable-column" data-column-id="status" style="width: 64px;" wire:click="sortBy('completion_percentage')">
+                        {{-- RIGHT STICKY: Status (shadow edge) --}}
+                        <th class="px-2 text-center cursor-pointer hover:bg-gray-700/50 relative import-table-sticky-right import-sticky-col-r1 import-sticky-shadow-right"
+                            data-column-id="status" wire:click="sortBy('completion_percentage')">
                             <div class="flex items-center justify-center gap-1 text-xs">
                                 Status
                                 @include('livewire.products.import.partials.sort-indicator', ['field' => 'completion_percentage'])
                             </div>
                             <div class="resize-handle" x-on:mousedown="startResize($event, 'status')"></div>
                         </th>
-                        <th class="px-2 w-28 text-right text-xs relative resizable-column" data-column-id="actions" style="width: 112px;">
+                        {{-- RIGHT STICKY: Akcje --}}
+                        <th class="px-2 text-right text-xs relative import-table-sticky-right import-sticky-col-r0"
+                            data-column-id="actions">
                             Akcje
                             <div class="resize-handle" x-on:mousedown="startResize($event, 'actions')"></div>
                         </th>
@@ -394,7 +465,7 @@
                         ])
                     @empty
                         <tr>
-                            <td colspan="{{ 16 + ($effectiveCategoryMaxLevel >= 6 ? 1 : 0) + ($effectiveCategoryMaxLevel >= 7 ? 1 : 0) }}"
+                            <td colspan="{{ 17 + ($effectiveCategoryMaxLevel >= 6 ? 1 : 0) + ($effectiveCategoryMaxLevel >= 7 ? 1 : 0) }}"
                                 class="text-center py-12">
                                 <div class="text-gray-400">
                                     <svg class="w-12 h-12 mx-auto mb-4 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">

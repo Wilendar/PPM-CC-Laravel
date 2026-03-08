@@ -38,10 +38,10 @@
 
             {{-- SECTION 1: Header + Direction --}}
             <div class="modal-header flex justify-between items-center mb-6 border-b pb-4">
-                <h2 class="text-2xl font-bold text-gray-800">Edycja masowa dopasowań</h2>
+                <h2 class="text-2xl font-bold text-white">Edycja masowa dopasowań</h2>
                 <button
                     wire:click="close"
-                    class="btn-close text-gray-400 hover:text-gray-600 text-3xl font-bold"
+                    class="btn-close text-gray-400 hover:text-gray-200 text-3xl font-bold"
                     aria-label="Zamknij"
                 >
                     ×
@@ -49,8 +49,8 @@
             </div>
 
             {{-- Direction Selector --}}
-            <div class="direction-selector mb-6 bg-gray-50 p-4 rounded-lg">
-                <label class="block text-sm font-medium text-gray-700 mb-2">Kierunek operacji:</label>
+            <div class="direction-selector mb-6 bg-gray-700/50 p-4 rounded-lg">
+                <label class="block text-sm font-medium text-gray-300 mb-2">Kierunek operacji:</label>
                 <div class="flex gap-4">
                     <label class="flex items-center cursor-pointer">
                         <input
@@ -87,7 +87,7 @@
                         @foreach($this->selectedParts as $part)
                             <span
                                 wire:key="selected-part-{{ $part->id }}"
-                                class="badge badge-part bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm"
+                                class="badge badge-part bg-blue-900/50 text-blue-300 border border-blue-700 px-3 py-1 rounded-full text-sm"
                             >
                                 {{ $part->sku }} - {{ \Illuminate\Support\Str::limit($part->name, 30) }}
                             </span>
@@ -99,7 +99,7 @@
                         @foreach($this->selectedVehicles as $vehicle)
                             <span
                                 wire:key="selected-vehicle-{{ $vehicle->id }}"
-                                class="badge badge-vehicle bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm"
+                                class="badge badge-vehicle bg-green-900/50 text-green-300 border border-green-700 px-3 py-1 rounded-full text-sm"
                             >
                                 {{ $vehicle->brand }} {{ $vehicle->model }}
                             </span>
@@ -122,25 +122,25 @@
                     type="text"
                     wire:model.live.debounce.300ms="searchQuery"
                     placeholder="Wpisz SKU lub nazwę..."
-                    class="search-input w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    class="search-input w-full border border-gray-600 rounded-lg px-4 py-2 bg-gray-700 text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 >
 
                 {{-- Search Results --}}
                 @if($searchResults && $searchResults->count() > 0)
-                    <div class="search-results mt-4 max-h-80 overflow-y-auto border border-gray-200 rounded-lg p-4">
+                    <div class="search-results mt-4 max-h-80 overflow-y-auto border border-gray-600 rounded-lg p-4 bg-gray-800/50">
 
                         @if($direction === 'part_to_vehicle')
                             {{-- Group by vehicle family --}}
                             @foreach($this->vehicleFamilies as $family => $vehicles)
                                 <div wire:key="family-{{ Str::slug($family) }}" class="family-group mb-4">
-                                    <div class="family-header flex justify-between items-center bg-gray-100 px-3 py-2 rounded">
-                                        <span class="font-semibold text-gray-700">
+                                    <div class="family-header flex justify-between items-center bg-gray-700/50 px-3 py-2 rounded">
+                                        <span class="font-semibold text-gray-200">
                                             {{ $family }}
                                             <span class="text-gray-500 text-sm">({{ count($vehicles) }} pojazdów)</span>
                                         </span>
                                         <button
                                             wire:click="selectAllFamily('{{ $family }}')"
-                                            class="btn-family-helper text-blue-600 hover:text-blue-800 text-sm font-medium"
+                                            class="btn-family-helper text-blue-400 hover:text-blue-300 text-sm font-medium"
                                         >
                                             Zaznacz wszystkie {{ $family }}*
                                         </button>
@@ -150,7 +150,7 @@
                                         @foreach($vehicles as $vehicle)
                                             <label
                                                 wire:key="vehicle-{{ $vehicle->id }}"
-                                                class="search-result-item flex items-center hover:bg-gray-50 p-2 rounded cursor-pointer"
+                                                class="search-result-item flex items-center hover:bg-gray-700/50 p-2 rounded cursor-pointer"
                                             >
                                                 <input
                                                     type="checkbox"
@@ -171,7 +171,7 @@
                                 @foreach($searchResults as $part)
                                     <label
                                         wire:key="part-{{ $part->id }}"
-                                        class="search-result-item flex items-center hover:bg-gray-50 p-2 rounded cursor-pointer"
+                                        class="search-result-item flex items-center hover:bg-gray-700/50 p-2 rounded cursor-pointer"
                                     >
                                         <input
                                             type="checkbox"
@@ -191,7 +191,7 @@
             </div>
 
             {{-- SECTION 4: Compatibility Type --}}
-            <div class="compatibility-type-selector mb-6 bg-gray-50 p-4 rounded-lg">
+            <div class="compatibility-type-selector mb-6 bg-gray-700/50 p-4 rounded-lg">
                 <h3 class="text-lg font-semibold mb-3">Typ dopasowania:</h3>
 
                 <div class="flex gap-6">
@@ -202,7 +202,7 @@
                             value="original"
                             class="mr-2"
                         >
-                        <span class="type-badge badge-original bg-green-100 text-green-800 px-3 py-1 rounded-full">
+                        <span class="type-badge badge-original bg-green-900/50 text-green-300 border border-green-700 px-3 py-1 rounded-full">
                             Oryginał
                         </span>
                         <span class="type-description text-gray-600 text-sm ml-2">OEM parts (original fit)</span>
@@ -215,7 +215,7 @@
                             value="replacement"
                             class="mr-2"
                         >
-                        <span class="type-badge badge-replacement bg-orange-100 text-orange-800 px-3 py-1 rounded-full">
+                        <span class="type-badge badge-replacement bg-orange-900/50 text-orange-300 border border-orange-700 px-3 py-1 rounded-full">
                             Zamiennik
                         </span>
                         <span class="type-description text-gray-600 text-sm ml-2">Aftermarket equivalent</span>
@@ -225,14 +225,14 @@
 
             {{-- SECTION 5: Preview Table --}}
             @if($showPreview && !empty($previewData))
-                <div class="preview-section mb-6 border border-gray-300 rounded-lg p-4">
+                <div class="preview-section mb-6 border border-gray-600 rounded-lg p-4">
                     <h3 class="text-lg font-semibold mb-3">
                         Podgląd zmian ({{ count($previewData['new'] ?? []) }} nowych):
                     </h3>
 
                     <div class="overflow-x-auto max-h-60 overflow-y-auto">
                         <table class="preview-table w-full text-sm">
-                            <thead class="bg-gray-100 sticky top-0">
+                            <thead class="bg-gray-700 sticky top-0">
                                 <tr>
                                     <th class="px-3 py-2 text-left">Część</th>
                                     <th class="px-3 py-2 text-left">Pojazd</th>
@@ -243,7 +243,7 @@
                             <tbody>
                                 {{-- New entries (green) --}}
                                 @foreach($previewData['new'] ?? [] as $index => $item)
-                                    <tr wire:key="preview-new-{{ $index }}" class="preview-row-new bg-green-50 border-b">
+                                    <tr wire:key="preview-new-{{ $index }}" class="preview-row-new bg-green-900/20 border-b border-gray-700">
                                         <td class="px-3 py-2">{{ $item['part_sku'] ?? 'N/A' }}</td>
                                         <td class="px-3 py-2">{{ $item['vehicle_name'] ?? 'N/A' }}</td>
                                         <td class="px-3 py-2">
@@ -251,31 +251,31 @@
                                                 {{ ucfirst($compatibilityType) }}
                                             </span>
                                         </td>
-                                        <td class="px-3 py-2 text-green-600 font-semibold">➕ ADD</td>
+                                        <td class="px-3 py-2 text-green-400 font-semibold">➕ ADD</td>
                                     </tr>
                                 @endforeach
 
                                 {{-- Duplicates (yellow warning) --}}
                                 @foreach($previewData['duplicates'] ?? [] as $index => $dup)
-                                    <tr wire:key="preview-dup-{{ $index }}" class="preview-row-duplicate bg-yellow-50 border-b">
+                                    <tr wire:key="preview-dup-{{ $index }}" class="preview-row-duplicate bg-yellow-900/20 border-b border-gray-700">
                                         <td class="px-3 py-2">{{ $dup['part_sku'] ?? 'N/A' }}</td>
                                         <td class="px-3 py-2">{{ $dup['vehicle_name'] ?? 'N/A' }}</td>
                                         <td class="px-3 py-2">{{ $dup['attribute'] ?? 'N/A' }}</td>
-                                        <td class="px-3 py-2 text-yellow-600 font-semibold">⚠️ SKIP (exists)</td>
+                                        <td class="px-3 py-2 text-yellow-400 font-semibold">⚠️ SKIP (exists)</td>
                                     </tr>
                                 @endforeach
 
                                 {{-- Conflicts (red warning) --}}
                                 @foreach($previewData['conflicts'] ?? [] as $index => $conf)
-                                    <tr wire:key="preview-conflict-{{ $index }}" class="preview-row-conflict bg-red-50 border-b">
+                                    <tr wire:key="preview-conflict-{{ $index }}" class="preview-row-conflict bg-red-900/20 border-b border-gray-700">
                                         <td class="px-3 py-2">{{ $conf['part_sku'] ?? 'N/A' }}</td>
                                         <td class="px-3 py-2">{{ $conf['vehicle_name'] ?? 'N/A' }}</td>
                                         <td class="px-3 py-2">
-                                            <span class="badge badge-conflict bg-red-200 text-red-800 px-2 py-1 rounded text-xs">
+                                            <span class="badge badge-conflict bg-red-900/50 text-red-300 px-2 py-1 rounded text-xs">
                                                 Exists as {{ $conf['existing_attribute'] ?? 'N/A' }}
                                             </span>
                                         </td>
-                                        <td class="px-3 py-2 text-red-600 font-semibold">⚠️ CONFLICT</td>
+                                        <td class="px-3 py-2 text-red-400 font-semibold">⚠️ CONFLICT</td>
                                     </tr>
                                 @endforeach
                             </tbody>
@@ -286,13 +286,13 @@
 
             {{-- Error/Success Messages --}}
             @if($errorMessage)
-                <div class="bg-red-50 border border-red-300 text-red-800 px-4 py-3 rounded mb-4">
+                <div class="bg-red-900/30 border border-red-700 text-red-300 px-4 py-3 rounded mb-4">
                     {{ $errorMessage }}
                 </div>
             @endif
 
             @if($successMessage)
-                <div class="bg-green-50 border border-green-300 text-green-800 px-4 py-3 rounded mb-4">
+                <div class="bg-green-900/30 border border-green-700 text-green-300 px-4 py-3 rounded mb-4">
                     {{ $successMessage }}
                 </div>
             @endif
@@ -301,14 +301,14 @@
             <div class="modal-footer flex justify-end gap-3 pt-4 border-t">
                 <button
                     wire:click="close"
-                    class="btn-cancel px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300"
+                    class="btn-cancel btn-enterprise-secondary"
                 >
                     Anuluj
                 </button>
 
                 <button
                     wire:click="generatePreview"
-                    class="btn-preview px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                    class="btn-preview px-4 py-2 btn-enterprise-primary disabled:opacity-50 disabled:cursor-not-allowed"
                     @disabled(empty($selectedTargetIds))
                     wire:loading.attr="disabled"
                 >
@@ -323,7 +323,7 @@
 
                 <button
                     wire:click="apply"
-                    class="btn-apply px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                    class="btn-apply px-4 py-2 btn-enterprise-primary disabled:opacity-50 disabled:cursor-not-allowed"
                     @disabled(!$showPreview || $isProcessing)
                     wire:loading.attr="disabled"
                 >

@@ -5,12 +5,35 @@
     Features:
     - Tile-based vehicle selection (click = toggle)
     - Per-shop filtering
+    - Advanced filters (category, manufacturer, shop assignment, compat count)
+    - Filter presets (save/load)
     - Smart suggestions panel
+    - Bulk actions
     - Collapsible brand sections
 --}}
 <div class="compatibility-management-panel">
     @vite(['resources/css/products/compatibility-tiles.css'])
 
+    {{-- Tab Navigation --}}
+    <div class="tabs-enterprise">
+        <button class="tab-enterprise {{ $activeTab === 'published' ? 'active' : '' }}"
+                wire:click="switchTab('published')">
+            <i class="fas fa-link icon"></i>
+            <span>Dopasowania</span>
+        </button>
+        @if($this->canAccessPendingTab())
+            <button class="tab-enterprise {{ $activeTab === 'pending' ? 'active' : '' }}"
+                    wire:click="switchTab('pending')">
+                <i class="fas fa-clock icon"></i>
+                <span>Przed publikacja</span>
+                @if($pendingCount > 0)
+                    <span class="compat-tab-badge">{{ $pendingCount }}</span>
+                @endif
+            </button>
+        @endif
+    </div>
+
+    @if($activeTab === 'published')
     {{-- Header --}}
     <div class="compat-panel-header">
         <div class="compat-header-content">
@@ -40,89 +63,18 @@
         </div>
     </div>
 
-    {{-- Filters Bar --}}
-    <div class="compat-filters-bar">
-        <div class="compat-filters-row">
-            {{-- Search Parts --}}
-            <div class="compat-filter-item compat-filter-search">
-                <label>
-                    <i class="fas fa-search"></i>
-                    Szukaj Czesci
-                </label>
-                <input
-                    type="text"
-                    wire:model.live.debounce.300ms="searchPart"
-                    placeholder="SKU lub nazwa czesci..."
-                    class="compat-filter-input"
-                />
-            </div>
+    {{-- Filters Bar (shared partial) --}}
+    @include('livewire.admin.compatibility.partials.filters-bar', [
+        'searchModel' => 'searchPart',
+        'brands' => $brands,
+        'showShopContext' => true,
+        'shops' => $shops,
+        'showNoMatches' => true,
+        'showAdvancedFilters' => true,
+    ])
 
-            {{-- Shop Context --}}
-            <div class="compat-filter-item">
-                <label>
-                    <i class="fas fa-store"></i>
-                    Kontekst Sklepu
-                </label>
-                <select wire:model.live="shopContext" class="compat-filter-select">
-                    <option value="">Dane domyslne</option>
-                    @foreach($shops as $shop)
-                        <option value="{{ $shop->id }}">{{ $shop->name }}</option>
-                    @endforeach
-                </select>
-            </div>
-
-            {{-- Brand Filter --}}
-            <div class="compat-filter-item">
-                <label>
-                    <i class="fas fa-car"></i>
-                    Marka Pojazdu
-                </label>
-                <select wire:model.live="filterBrand" class="compat-filter-select">
-                    <option value="">Wszystkie marki</option>
-                    @foreach($brands as $brand)
-                        <option value="{{ $brand }}">{{ $brand }}</option>
-                    @endforeach
-                </select>
-            </div>
-
-            {{-- Vehicle Search --}}
-            <div class="compat-filter-item">
-                <label>
-                    <i class="fas fa-motorcycle"></i>
-                    Szukaj Pojazdu
-                </label>
-                <input
-                    type="text"
-                    wire:model.live.debounce.300ms="vehicleSearch"
-                    placeholder="Marka lub model..."
-                    class="compat-filter-input"
-                />
-            </div>
-
-            {{-- No Matches Filter --}}
-            <div class="compat-filter-item compat-filter-checkbox">
-                <label class="compat-checkbox-label">
-                    <input
-                        type="checkbox"
-                        wire:model.live="filterNoMatches"
-                        class="compat-checkbox"
-                    />
-                    <span>
-                        <i class="fas fa-exclamation-circle"></i>
-                        Tylko bez dopasowan
-                    </span>
-                </label>
-            </div>
-
-            {{-- Reset Button --}}
-            @if($searchPart || $shopContext || $filterBrand || $vehicleSearch || $filterNoMatches)
-                <button wire:click="resetFilters" class="compat-btn-reset">
-                    <i class="fas fa-undo"></i>
-                    Resetuj
-                </button>
-            @endif
-        </div>
-    </div>
+    {{-- Bulk Action Bar --}}
+    @include('livewire.admin.compatibility.partials.bulk-action-bar')
 
     {{-- Main Content: Two-Column Layout --}}
     <div class="compat-main-content">
@@ -133,12 +85,18 @@
                     <i class="fas fa-puzzle-piece"></i>
                     Lista Czesci
                 </h3>
-                @if(count($selectedPartIds) > 0)
-                    <button wire:click="openBulkEdit" class="compat-btn-bulk">
-                        <i class="fas fa-edit"></i>
-                        Edycja masowa ({{ count($selectedPartIds) }})
-                    </button>
-                @endif
+                <div class="compat-parts-header-actions">
+                    {{-- Select All on Page --}}
+                    <label class="compat-checkbox-label" title="Zaznacz wszystkie na stronie">
+                        <input
+                            type="checkbox"
+                            wire:click="toggleSelectAll"
+                            {{ $selectAllOnPage ? 'checked' : '' }}
+                            class="compat-checkbox"
+                        />
+                        <span>Zaznacz</span>
+                    </label>
+                </div>
             </div>
 
             <div class="compat-parts-list">
@@ -151,7 +109,7 @@
                         <div class="compat-part-checkbox" wire:click.stop="togglePartSelection({{ $part->id }})">
                             <input
                                 type="checkbox"
-                                {{ in_array($part->id, $selectedPartIds) ? 'checked' : '' }}
+                                {{ $this->isPartSelected($part->id) ? 'checked' : '' }}
                             />
                         </div>
 
@@ -168,10 +126,10 @@
                         </div>
 
                         <div class="compat-part-counts">
-                            <span class="inline-flex items-center justify-center min-w-[1.5rem] px-1.5 py-0.5 text-xs font-medium rounded bg-blue-600 text-white" title="Oryginal">
+                            <span class="compat-count-badge-original" title="Oryginal">
                                 {{ $part->original_count }}
                             </span>
-                            <span class="inline-flex items-center justify-center min-w-[1.5rem] px-1.5 py-0.5 text-xs font-medium rounded bg-orange-600 text-white" title="Zamiennik">
+                            <span class="compat-count-badge-zamiennik" title="Zamiennik">
                                 {{ $part->replacement_count }}
                             </span>
                         </div>
@@ -223,11 +181,11 @@
 
                     <div class="compat-selection-counts">
                         <span class="compat-count-label">
-                            <i class="fas fa-circle" style="color: var(--compat-original);"></i>
+                            <i class="fas fa-circle compat-icon-original"></i>
                             Oryginal: {{ $this->getOriginalCount() }}
                         </span>
                         <span class="compat-count-label">
-                            <i class="fas fa-circle" style="color: var(--compat-zamiennik);"></i>
+                            <i class="fas fa-circle compat-icon-zamiennik"></i>
                             Zamiennik: {{ $this->getZamiennikCount() }}
                         </span>
                     </div>
@@ -331,10 +289,8 @@
                                             wire:click="toggleVehicle({{ $vehicle->id }})"
                                         >
                                             <div class="vehicle-tile__content">
-                                                {{-- 2025-12-08: Changed from brand/model to manufacturer/name (Product instead of VehicleModel) --}}
                                                 <span class="vehicle-tile__brand">{{ $vehicle->manufacturer }}</span>
                                                 <span class="vehicle-tile__model">{{ $vehicle->name }}</span>
-                                                {{-- year_from/year_to not available in Product model --}}
                                             </div>
 
                                             {{-- Selection Indicator --}}
@@ -384,7 +340,7 @@
                     @endforelse
                 </div>
 
-                {{-- Floating Action Bar - ZAWSZE widoczny przy edycji dla latwego przelaczania trybu --}}
+                {{-- Floating Action Bar --}}
                 <div class="floating-action-bar floating-action-bar--visible"
                     @if($this->hasSyncJobsActive())
                         wire:poll.2s="refreshSyncStatus"
@@ -497,4 +453,10 @@
             @endif
         </div>
     </div>
+    {{-- Bulk Edit Modal (listens for @open-bulk-modal.window) --}}
+    @livewire('admin.compatibility.bulk-edit-compatibility-modal')
+
+    @elseif($activeTab === 'pending')
+        <livewire:admin.compatibility.pending-compatibility-tab />
+    @endif
 </div>

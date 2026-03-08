@@ -38,10 +38,10 @@ class ProductImportPanel extends Component
     public int $perPage = 25;
 
     /**
-     * Sort configuration - domyslnie wg completion_percentage DESC
+     * Sort configuration - domyslnie wg imported_at DESC (najnowsze na gorze)
      */
     #[Url]
-    public string $sortField = 'completion_percentage';
+    public string $sortField = 'imported_at';
 
     #[Url]
     public string $sortDirection = 'desc';
@@ -150,6 +150,25 @@ class ProductImportPanel extends Component
     {
         $current = $this->effectiveCategoryMaxLevel;
         $this->categoryForcedMaxLevel = min(8, $current + 1);
+
+        // Clear computed cache so Blade sees the new value
+        unset($this->effectiveCategoryMaxLevel);
+    }
+
+    /**
+     * UI: Zwija kolumny kategorii o jeden poziom (nie ponizej auto-wykrytego minimum)
+     */
+    public function collapseCategoryColumns(): void
+    {
+        $current = $this->effectiveCategoryMaxLevel;
+        $auto = $this->autoCategoryMaxLevel;
+        $target = max(5, $auto, $current - 1);
+
+        $this->categoryForcedMaxLevel = $target <= 5 ? null : $target;
+
+        // Clear computed cache so Blade sees the new value
+        unset($this->effectiveCategoryMaxLevel);
+        unset($this->autoCategoryMaxLevel);
     }
 
     /**

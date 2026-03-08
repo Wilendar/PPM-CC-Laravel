@@ -29,8 +29,8 @@
 <tr class="border-b border-gray-700/50 hover:bg-gray-800/30 transition-colors {{ $isFrozen ? 'import-row-frozen' : '' }}"
     wire:key="pending-product-{{ $product->id }}">
 
-    {{-- Checkbox --}}
-    <td class="px-3 py-2">
+    {{-- LEFT STICKY: Checkbox --}}
+    <td class="px-3 py-2 import-table-sticky-left import-sticky-col-0">
         <input type="checkbox"
                wire:click="toggleSelection({{ $product->id }})"
                @checked($this->isSelected($product->id))
@@ -38,8 +38,8 @@
                class="form-checkbox-dark {{ $isFrozen ? 'opacity-40 cursor-not-allowed' : '' }}">
     </td>
 
-    {{-- Miniaturka (klikniecie otwiera modal zdjec) --}}
-    <td class="px-3 py-2 {{ !$this->canSeeImages() ? 'opacity-30 pointer-events-none' : '' }}">
+    {{-- LEFT STICKY: Miniaturka (klikniecie otwiera modal zdjec) --}}
+    <td class="px-3 py-2 import-table-sticky-left import-sticky-col-1 {{ !$this->canSeeImages() ? 'opacity-30 pointer-events-none' : '' }}">
         @php
             $images = $product->temp_media_paths['images'] ?? $product->temp_media_paths ?? [];
             $primaryIndex = $product->primary_media_index ?? 0;
@@ -70,8 +70,8 @@
         @endif
     </td>
 
-    {{-- SKU (edytowalny) --}}
-    <td class="px-3 py-2 {{ !$this->canSeeBasicData() ? 'opacity-30 pointer-events-none' : '' }}">
+    {{-- LEFT STICKY: SKU (edytowalny) --}}
+    <td class="px-3 py-2 import-table-sticky-left import-sticky-col-2 {{ !$this->canSeeBasicData() ? 'opacity-30 pointer-events-none' : '' }}">
         @if($isFrozen)
             <span class="text-gray-400 font-mono text-sm">{{ $product->sku ?? '-' }}</span>
         @elseif($editingProductId === $product->id && $editingField === 'sku')
@@ -90,8 +90,8 @@
         @endif
     </td>
 
-    {{-- Nazwa (edytowalna) --}}
-    <td class="px-3 py-2 {{ !$this->canSeeBasicData() ? 'opacity-30 pointer-events-none' : '' }}">
+    {{-- LEFT STICKY: Nazwa (edytowalna, shadow edge) --}}
+    <td class="px-3 py-2 import-table-sticky-left import-sticky-col-3 import-sticky-shadow-left {{ !$this->canSeeBasicData() ? 'opacity-30 pointer-events-none' : '' }}">
         @if($isFrozen || !$this->canSeeBasicData())
             <span class="text-gray-400 text-sm truncate max-w-xs block">{{ $product->name ?? '(brak nazwy)' }}</span>
         @elseif($editingProductId === $product->id && $editingField === 'name')
@@ -520,7 +520,12 @@
          </div>
      </td>
 
-    {{-- DATA PUBLIKACJI (FAZA 9.3) --}}
+    {{-- DATA DODANIA --}}
+    <td class="px-2 py-2 text-xs text-gray-400 whitespace-nowrap">
+        {{ $product->imported_at ? $product->imported_at->format('d.m.Y') : ($product->created_at ? $product->created_at->format('d.m.Y') : '--') }}
+    </td>
+
+    {{-- DATA PUBLIKACJI (FAZA 9.3) + Czas do publikacji --}}
     <td class="px-2 py-2 import-cell-schedule {{ !$this->canSeeScheduleDate() ? 'opacity-30 pointer-events-none' : '' }}">
         @if($pubStatus === 'published')
             <div class="import-published-date-cell">
@@ -531,6 +536,10 @@
                     {{ $product->published_at?->format('d.m H:i') ?? '-' }}
                 </span>
                 <span class="import-published-by-text">{{ $product->publisher->name ?? 'System' }}</span>
+                @php $addedDate = $product->imported_at ?? $product->created_at; @endphp
+                @if($addedDate && $product->published_at)
+                    <span class="text-[10px] text-green-400">({{ (int) $addedDate->diffInDays($product->published_at) }} dni)</span>
+                @endif
             </div>
         @else
             <input type="datetime-local"
@@ -540,6 +549,10 @@
                    class="import-schedule-input"
                    title="Zaplanuj date publikacji"
                    @disabled(!$this->canSeeScheduleDate())>
+            @php $waitingSince = $product->imported_at ?? $product->created_at; @endphp
+            @if($waitingSince)
+                <span class="text-[10px] text-gray-500 mt-0.5 block">({{ (int) $waitingSince->diffInDays(now()) }} dni czeka)</span>
+            @endif
         @endif
     </td>
 
@@ -611,8 +624,8 @@
         @endif
     </td>
 
-    {{-- STATUS gotowosci --}}
-    <td class="px-3 py-2 text-center">
+    {{-- RIGHT STICKY: STATUS gotowosci (shadow edge) --}}
+    <td class="px-3 py-2 text-center import-table-sticky-right import-sticky-col-r1 import-sticky-shadow-right">
         @php
             // Color thresholds - more granular
             $statusColor = match(true) {
@@ -633,8 +646,8 @@
         </span>
     </td>
 
-    {{-- Akcje --}}
-    <td class="px-2 py-2 text-right">
+    {{-- RIGHT STICKY: Akcje --}}
+    <td class="px-2 py-2 text-right import-table-sticky-right import-sticky-col-r0">
         @php
             // Determine which Quick Actions to show based on product type
             $productTypeSlug = $product->productType?->slug ?? null;
@@ -662,7 +675,7 @@
             $descShortLen = strlen($product->short_description ?? '');
             $descLongLen = strlen($product->long_description ?? '');
         @endphp
-        <div class="flex items-center justify-end gap-0.5 {{ $isFrozen ? 'import-row-frozen-actions' : '' }}">
+        <div class="import-actions-wrap {{ $isFrozen ? 'import-row-frozen-actions' : '' }}">
             {{-- Warianty (FAZA 5.4) - zawsze widoczne, NIE wplywaja na progress --}}
             <button wire:click="$dispatch('openVariantModal', { productId: {{ $product->id }} })"
                     @disabled($isFrozen || !$this->canManageVariants())

@@ -4,6 +4,25 @@
  */
 
 document.addEventListener('alpine:init', () => {
+    /**
+     * Scroll detector for sticky column shadows.
+     * Toggles .has-scroll-left / .has-scroll-right on the scroll container.
+     */
+    Alpine.data('scrollDetector', () => ({
+        init() {
+            this.$nextTick(() => this.checkScroll());
+            this.$el.addEventListener('scroll', () => this.checkScroll(), { passive: true });
+            window.addEventListener('resize', () => this.checkScroll(), { passive: true });
+        },
+        checkScroll() {
+            const el = this.$el;
+            const hasLeft = el.scrollLeft > 0;
+            const hasRight = el.scrollLeft < (el.scrollWidth - el.clientWidth - 1);
+            el.classList.toggle('has-scroll-left', hasLeft);
+            el.classList.toggle('has-scroll-right', hasRight);
+        }
+    }));
+
     Alpine.data('resizableTable', (tableId = 'import-table') => ({
         columnWidths: {},
         isResizing: false,
@@ -63,6 +82,8 @@ document.addEventListener('alpine:init', () => {
                         th.style.width = `${this.columnWidths[columnId]}px`;
                     }
                 });
+
+                this.updateStickyOffsets();
             });
         },
 
@@ -86,7 +107,7 @@ document.addEventListener('alpine:init', () => {
             if (!this.isResizing) return;
 
             const diff = e.pageX - this.startX;
-            const newWidth = Math.max(20, Math.min(500, this.startWidth + diff));
+            const newWidth = Math.max(60, Math.min(500, this.startWidth + diff));
 
             const th = this.$el.querySelector(`th[data-column-id="${this.currentColumn}"]`);
             if (th) {
@@ -104,9 +125,46 @@ document.addEventListener('alpine:init', () => {
             document.body.style.userSelect = '';
 
             this.saveWidths();
+            this.updateStickyOffsets();
 
             document.removeEventListener('mousemove', this._boundDoResize);
             document.removeEventListener('mouseup', this._boundStopResize);
+        },
+
+        updateStickyOffsets() {
+            this.$nextTick(() => {
+                const table = this.$el.querySelector('table') || this.$el;
+
+                // Recalculate LEFT sticky offsets
+                const stickyLeftThs = table.querySelectorAll('thead th.import-table-sticky-left');
+                let leftOffset = 0;
+                stickyLeftThs.forEach(th => {
+                    th.style.left = leftOffset + 'px';
+                    const colIndex = [...th.parentElement.children].indexOf(th);
+                    table.querySelectorAll('tbody tr').forEach(tr => {
+                        const td = tr.children[colIndex];
+                        if (td && td.classList.contains('import-table-sticky-left')) {
+                            td.style.left = leftOffset + 'px';
+                        }
+                    });
+                    leftOffset += th.offsetWidth;
+                });
+
+                // Recalculate RIGHT sticky offsets (reverse order: last column first)
+                const stickyRightThs = [...table.querySelectorAll('thead th.import-table-sticky-right')].reverse();
+                let rightOffset = 0;
+                stickyRightThs.forEach(th => {
+                    th.style.right = rightOffset + 'px';
+                    const colIndex = [...th.parentElement.children].indexOf(th);
+                    table.querySelectorAll('tbody tr').forEach(tr => {
+                        const td = tr.children[colIndex];
+                        if (td && td.classList.contains('import-table-sticky-right')) {
+                            td.style.right = rightOffset + 'px';
+                        }
+                    });
+                    rightOffset += th.offsetWidth;
+                });
+            });
         },
 
         resetWidths() {
@@ -119,6 +177,12 @@ document.addEventListener('alpine:init', () => {
             headers.forEach(th => {
                 th.style.width = '';
                 th.style.minWidth = '';
+            });
+
+            // Reset inline sticky offsets back to CSS defaults
+            table.querySelectorAll('.import-table-sticky-left, .import-table-sticky-right').forEach(el => {
+                el.style.left = '';
+                el.style.right = '';
             });
         }
     }));

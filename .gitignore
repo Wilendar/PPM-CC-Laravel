@@ -162,3 +162,7 @@ tmpclaude-*-cwd
 
 # Microsoft Auth setup guide (contains sensitive config info)
 .Release_docs/MICROSOFT_AUTH_SETUP.md
+
+# XAMPP local installation
+XAMPP/
+xampp/

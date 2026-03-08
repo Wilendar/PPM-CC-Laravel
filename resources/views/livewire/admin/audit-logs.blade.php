@@ -67,7 +67,7 @@
             <div class="flex flex-col sm:flex-row items-start sm:items-center space-y-2 sm:space-y-0 sm:space-x-4">
                 <div class="relative">
                     <input type="text" 
-                           wire:model.debounce.300ms="search"
+                           wire:model.live.debounce.300ms="search"
                            placeholder="Szukaj w logach..."
                            class="pl-10 pr-4 py-2 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 bg-gray-700 text-white">
                     <svg class="w-5 h-5 text-gray-400 absolute left-3 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -135,7 +135,7 @@
         <div class="mt-4 pt-4 border-t border-gray-600 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6 gap-4">
             <div>
                 <label class="block text-xs font-medium text-gray-300 mb-1">Użytkownik</label>
-                <select wire:model="userFilter" 
+                <select wire:model.live="userFilter" 
                         class="w-full px-3 py-2 text-sm border border-gray-600 rounded focus:ring-2 focus:ring-blue-500 bg-gray-700 text-white">
                     <option value="all">Wszyscy</option>
                     <option value="system">System</option>
@@ -147,7 +147,7 @@
             
             <div>
                 <label class="block text-xs font-medium text-gray-300 mb-1">Akcja</label>
-                <select wire:model="actionFilter" 
+                <select wire:model.live="actionFilter" 
                         class="w-full px-3 py-2 text-sm border border-gray-600 rounded focus:ring-2 focus:ring-blue-500 bg-gray-700 text-white">
                     <option value="all">Wszystkie</option>
                     @foreach($actions as $action)
@@ -158,7 +158,7 @@
             
             <div>
                 <label class="block text-xs font-medium text-gray-300 mb-1">Model</label>
-                <select wire:model="modelFilter" 
+                <select wire:model.live="modelFilter" 
                         class="w-full px-3 py-2 text-sm border border-gray-600 rounded focus:ring-2 focus:ring-blue-500 bg-gray-700 text-white">
                     <option value="all">Wszystkie</option>
                     @foreach($models as $model)
@@ -170,21 +170,21 @@
             <div>
                 <label class="block text-xs font-medium text-gray-300 mb-1">Od daty</label>
                 <input type="date" 
-                       wire:model="dateFromFilter"
+                       wire:model.live="dateFromFilter"
                        class="w-full px-3 py-2 text-sm border border-gray-600 rounded focus:ring-2 focus:ring-blue-500 bg-gray-700 text-white">
             </div>
             
             <div>
                 <label class="block text-xs font-medium text-gray-300 mb-1">Do daty</label>
                 <input type="date" 
-                       wire:model="dateToFilter"
+                       wire:model.live="dateToFilter"
                        class="w-full px-3 py-2 text-sm border border-gray-600 rounded focus:ring-2 focus:ring-blue-500 bg-gray-700 text-white">
             </div>
             
             <div class="flex items-end">
                 <label class="flex items-center">
                     <input type="checkbox" 
-                           wire:model="suspiciousOnly"
+                           wire:model.live="suspiciousOnly"
                            class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
                     <span class="ml-2 text-sm text-gray-300">Tylko podejrzane</span>
                 </label>
@@ -229,9 +229,9 @@
                                 @include('components.sort-icon', ['field' => 'user_id'])
                             </th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider cursor-pointer"
-                                wire:click="sortBy('action')">
+                                wire:click="sortBy('event')">
                                 Akcja
-                                @include('components.sort-icon', ['field' => 'action'])
+                                @include('components.sort-icon', ['field' => 'event'])
                             </th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
                                 Model
