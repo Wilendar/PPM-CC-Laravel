@@ -82,7 +82,7 @@ class LoginFromNewIpNotification extends Notification implements ShouldQueue
             ->subject($data['title'])
             ->view('emails.notification-branded', [
                 'title' => $data['title'],
-                'message' => $data['message'],
+                'notificationMessage' => $data['message'],
                 'type' => $data['type'],
                 'actionUrl' => url($data['action_url']),
                 'actionText' => 'Zobacz w panelu',
