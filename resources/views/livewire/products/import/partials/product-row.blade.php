@@ -593,9 +593,9 @@
                  x-on:mouseleave="hovering = false">
                 <span x-show="!hovering"
                       class="import-publish-btn import-publish-btn-scheduled import-countdown"
-                      x-data="{ targetTime: '{{ $product->scheduled_publish_at->toIso8601String() }}' }"
+                      x-data="{ targetLocal: '{{ $product->scheduled_publish_at->format('Y-m-d\TH:i:s') }}' }"
                       x-text="(() => {
-                          const diff = new Date(targetTime) - new Date();
+                          const diff = new Date(targetLocal) - new Date();
                           if (diff <= 0) return 'Teraz...';
                           const d = Math.floor(diff/86400000);
                           const h = Math.floor((diff%86400000)/3600000);
