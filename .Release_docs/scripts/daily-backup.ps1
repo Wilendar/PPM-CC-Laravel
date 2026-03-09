@@ -58,6 +58,32 @@ function Get-RobocopyExcludes {
     return $result
 }
 
+function Write-ProgressBar {
+    param(
+        [int]$Current,
+        [int]$Total,
+        [string]$Label = '',
+        [int]$BarWidth = 30
+    )
+    if ($Total -le 0) { return }
+
+    $percent = [math]::Floor(($Current / $Total) * 100)
+    $filled = [math]::Floor(($Current / $Total) * $BarWidth)
+    $empty = $BarWidth - $filled
+
+    $bar = ([char]0x2588).ToString() * $filled  # Full block char
+    $trail = ([char]0x2591).ToString() * $empty  # Light shade char
+
+    $sizeInfo = ""
+    if ($Label) { $sizeInfo = " $Label" }
+
+    $line = "  [{0}{1}] {2,3}%  {3}/{4}{5}" -f $bar, $trail, $percent, $Current, $Total, $sizeInfo
+    # Pad to overwrite previous longer line
+    $padded = $line.PadRight(100)
+
+    Write-Host "`r$padded" -NoNewline
+}
+
 # ============================================================================
 # MAIN EXECUTION
 # ============================================================================
@@ -139,21 +165,48 @@ else {
         '/XD'
     ) + $xdParams
 
-    Write-Host "  Copying files..." -ForegroundColor Gray -NoNewline
-    & robocopy @robocopyArgs | Out-Null
+    # First: quick count of source files for progress tracking
+    Write-Host "  Scanning source..." -ForegroundColor Gray -NoNewline
+    $sourceFileCount = (Get-ChildItem -Path $ProjectRoot -Recurse -File -ErrorAction SilentlyContinue |
+        Where-Object {
+            $rel = $_.FullName.Substring($ProjectRoot.Length + 1)
+            $skip = $false
+            foreach ($ex in $ExcludeDirs) {
+                if ($rel.StartsWith($ex + '\') -or $rel.StartsWith($ex + '/')) { $skip = $true; break }
+            }
+            -not $skip
+        }).Count
+    Write-Host " $sourceFileCount files" -ForegroundColor Green
+
+    # Robocopy with per-file output for progress tracking
+    $robocopyProgressArgs = @(
+        $ProjectRoot,
+        $tempDir,
+        '/MIR',
+        '/NDL', '/NJH', '/NJS', '/NP',
+        '/XF', 'nul',
+        '/XD'
+    ) + $xdParams
+
+    $copiedFiles = 0
+    & robocopy @robocopyProgressArgs 2>&1 | ForEach-Object {
+        if ($_ -match '\S') {
+            $copiedFiles++
+            if ($copiedFiles % 50 -eq 0 -or $copiedFiles -eq $sourceFileCount) {
+                Write-ProgressBar -Current $copiedFiles -Total $sourceFileCount -Label "files copied"
+            }
+        }
+    }
+    Write-Host ""  # newline after progress bar
 
     # Robocopy exit codes: 0-7 = success, 8+ = error
     if ($LASTEXITCODE -ge 8) {
-        Write-Host "" # newline
         Write-Err "Robocopy failed with exit code $LASTEXITCODE"
         exit 1
     }
 
-    # Verify temp dir has content
-    Write-Host " Counting..." -ForegroundColor Gray -NoNewline
     $tempFileCount = (Get-ChildItem -Path $tempDir -Recurse -File).Count
-    Write-Host " Done!" -ForegroundColor Green
-    Write-Ok "Mirror created: $tempFileCount files in temp directory"
+    Write-Ok "Mirror created: $tempFileCount files"
 }
 
 # --- Compress to ZIP ---
@@ -167,8 +220,6 @@ else {
         Remove-Item -Path $zipFullPath -Force
     }
 
-    Write-Host "  Compressing $tempFileCount files..." -ForegroundColor Gray -NoNewline
-
     # Use .NET ZipFile for progress (Compress-Archive has no progress callback)
     Add-Type -AssemblyName System.IO.Compression.FileSystem
     $compressionLevel = [System.IO.Compression.CompressionLevel]::Optimal
@@ -176,12 +227,15 @@ else {
     # Get all files for progress tracking
     $allFiles = Get-ChildItem -Path $tempDir -Recurse -File
     $totalFiles = $allFiles.Count
+    $totalSizeBytes = ($allFiles | Measure-Object -Property Length -Sum).Sum
+    $totalSizeMB = [math]::Round($totalSizeBytes / 1MB, 0)
     $processedFiles = 0
-    $lastPercent = -1
+    $processedBytes = 0
 
-    # Create ZIP manually with progress
+    # Create ZIP manually with progress bar
     $zipStream = [System.IO.File]::Create($zipFullPath)
     $archive = [System.IO.Compression.ZipArchive]::new($zipStream, [System.IO.Compression.ZipArchiveMode]::Create)
+    $compressTimer = [System.Diagnostics.Stopwatch]::StartNew()
 
     foreach ($file in $allFiles) {
         $relativePath = $file.FullName.Substring($tempDir.Length + 1)
@@ -193,16 +247,23 @@ else {
         $entryStream.Close()
 
         $processedFiles++
-        $percent = [math]::Floor(($processedFiles / $totalFiles) * 100)
-        if ($percent -ne $lastPercent -and ($percent % 10 -eq 0)) {
-            Write-Host " ${percent}%" -ForegroundColor Cyan -NoNewline
-            $lastPercent = $percent
+        $processedBytes += $file.Length
+
+        # Update progress bar every 100 files or on last file
+        if ($processedFiles % 100 -eq 0 -or $processedFiles -eq $totalFiles) {
+            $processedMB = [math]::Round($processedBytes / 1MB, 0)
+            $elapsedSec = $compressTimer.Elapsed.TotalSeconds
+            $speed = if ($elapsedSec -gt 0) { [math]::Round($processedMB / $elapsedSec, 1) } else { 0 }
+            Write-ProgressBar -Current $processedFiles -Total $totalFiles -Label "${processedMB}/${totalSizeMB} MB (${speed} MB/s)"
         }
     }
 
     $archive.Dispose()
     $zipStream.Close()
-    Write-Host " Done!" -ForegroundColor Green
+    $compressTimer.Stop()
+    Write-Host ""  # newline after progress bar
+    $compressElapsed = $compressTimer.Elapsed.ToString("mm\:ss")
+    Write-Ok "Compression complete in $compressElapsed"
 
     # Verify ZIP
     if (-not (Test-Path $zipFullPath)) {

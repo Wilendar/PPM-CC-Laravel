@@ -207,23 +207,58 @@ try {
     }
     else {
         Write-Step "Pushing to origin/$Branch..."
-        Write-Host "  Uploading..." -ForegroundColor Gray -NoNewline
-        $pushResult = & git push origin $Branch 2>&1
-        if ($LASTEXITCODE -ne 0) {
-            Write-Host "" # newline
-            Write-Warn "Push failed, retrying in 5 seconds..."
+
+        # Animated push with spinner
+        $spinChars = @('|', '/', '-', '\')
+        $spinIdx = 0
+        $pushJob = Start-Job -ScriptBlock {
+            param($root, $branch)
+            Set-Location $root
+            & git push origin $branch 2>&1
+        } -ArgumentList $ProjectRoot, $Branch
+
+        while ($pushJob.State -eq 'Running') {
+            $spin = $spinChars[$spinIdx % 4]
+            Write-Host "`r  [$spin] Uploading to remote...  " -ForegroundColor Cyan -NoNewline
+            $spinIdx++
+            Start-Sleep -Milliseconds 200
+        }
+
+        $pushResult = Receive-Job -Job $pushJob
+        $pushExitOk = ($pushJob.State -eq 'Completed')
+        Remove-Job -Job $pushJob -Force
+
+        if (-not $pushExitOk -or ($pushResult | Out-String) -match 'error|rejected|fatal') {
+            Write-Host "`r  [!] Push failed, retrying in 5s...       " -ForegroundColor Yellow
             Start-Sleep -Seconds 5
-            Write-Host "  Retrying..." -ForegroundColor Gray -NoNewline
-            $pushResult = & git push origin $Branch 2>&1
-            if ($LASTEXITCODE -ne 0) {
-                Write-Host "" # newline
+
+            $pushJob2 = Start-Job -ScriptBlock {
+                param($root, $branch)
+                Set-Location $root
+                & git push origin $branch 2>&1
+            } -ArgumentList $ProjectRoot, $Branch
+
+            while ($pushJob2.State -eq 'Running') {
+                $spin = $spinChars[$spinIdx % 4]
+                Write-Host "`r  [$spin] Retrying upload...      " -ForegroundColor Yellow -NoNewline
+                $spinIdx++
+                Start-Sleep -Milliseconds 200
+            }
+
+            $pushResult = Receive-Job -Job $pushJob2
+            $pushExitOk = ($pushJob2.State -eq 'Completed')
+            Remove-Job -Job $pushJob2 -Force
+
+            if (-not $pushExitOk -or ($pushResult | Out-String) -match 'error|rejected|fatal') {
+                Write-Host ""
                 Write-Err "Push failed after retry!"
                 Write-Err "Try: git pull --rebase origin $Branch"
                 Write-Host ($pushResult | Out-String) -ForegroundColor Gray
                 exit 1
             }
         }
-        Write-Host " Done!" -ForegroundColor Green
+
+        Write-Host "`r  [OK] Upload complete!                    " -ForegroundColor Green
         # Show push details
         $pushText = ($pushResult | Out-String).Trim()
         if ($pushText -match '([a-f0-9]+)\.\.([a-f0-9]+)') {

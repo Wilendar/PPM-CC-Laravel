@@ -1,0 +1,621 @@
+/* ============================================================
+   Landing & Login Animations - Premium Zero-Layout-Shift
+   resources/css/auth/landing-animations.css
+   ============================================================ */
+
+/* --- CSS Variables --- */
+:root {
+    --ease-landing: cubic-bezier(0.16, 1, 0.3, 1);
+    --ease-landing-bounce: cubic-bezier(0.34, 1.56, 0.64, 1);
+    --dur-logo: 1000ms;
+    --dur-word: 600ms;
+    --dur-wipe: 1000ms;
+    --dur-card: 800ms;
+    --dur-cta: 800ms;
+    --dur-fade: 800ms;
+    --delay-logo: 0ms;
+    --delay-motto: 200ms;
+    --delay-subtitle: 400ms;
+    --delay-desc: 500ms;
+    --delay-cards: 700ms;
+    --delay-card-stagger: 150ms;
+    --delay-cta: 1100ms;
+    --word-stagger: 80ms;
+}
+
+/* --- Keyframes --- */
+
+/* Logo: blur->clear + scale down */
+@keyframes landing-logo-reveal {
+    from {
+        opacity: 0;
+        filter: blur(10px);
+        transform: scale(1.1);
+    }
+    to {
+        opacity: 1;
+        filter: blur(0);
+        transform: scale(1);
+    }
+}
+
+/* Per-word fade+blur reveal */
+@keyframes landing-word-reveal {
+    from {
+        opacity: 0;
+        filter: blur(6px);
+        transform: translateY(8px);
+    }
+    to {
+        opacity: 1;
+        filter: blur(0);
+        transform: translateY(0);
+    }
+}
+
+/* Clip-path wipe left->right */
+@keyframes landing-wipe-left {
+    from {
+        opacity: 0;
+        clip-path: inset(0 100% 0 0);
+    }
+    to {
+        opacity: 1;
+        clip-path: inset(0 0 0 0);
+    }
+}
+
+/* 3D perspective card entrance */
+@keyframes landing-card-3d {
+    from {
+        opacity: 0;
+        transform: perspective(600px) rotateX(15deg) translateY(30px) translateZ(-30px);
+    }
+    to {
+        opacity: 1;
+        transform: perspective(600px) rotateX(0) translateY(0) translateZ(0);
+    }
+}
+
+/* CTA bounce appear */
+@keyframes landing-cta-appear {
+    0% {
+        opacity: 0;
+        transform: scale(0.9) translateY(10px);
+    }
+    70% {
+        opacity: 1;
+        transform: scale(1.05) translateY(-2px);
+    }
+    100% {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
+}
+
+/* CTA pulsating glow (infinite) */
+@keyframes landing-cta-glow {
+    0%, 100% {
+        box-shadow:
+            0 8px 25px rgba(224, 172, 126, 0.3),
+            0 0 0 0 rgba(224, 172, 126, 0);
+    }
+    50% {
+        box-shadow:
+            0 8px 25px rgba(224, 172, 126, 0.5),
+            0 0 20px 4px rgba(224, 172, 126, 0.15);
+    }
+}
+
+/* Simple fade+translateY */
+@keyframes landing-fade-up {
+    from {
+        opacity: 0;
+        transform: translateY(16px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Floating background orbs */
+@keyframes orb-float-1 {
+    0%, 100% { transform: translate(0, 0) scale(1); }
+    25% { transform: translate(30px, -40px) scale(1.05); }
+    50% { transform: translate(-20px, -60px) scale(0.95); }
+    75% { transform: translate(40px, -20px) scale(1.02); }
+}
+
+@keyframes orb-float-2 {
+    0%, 100% { transform: translate(0, 0) scale(1); }
+    33% { transform: translate(-40px, 30px) scale(1.08); }
+    66% { transform: translate(30px, 50px) scale(0.93); }
+}
+
+@keyframes orb-float-3 {
+    0%, 100% { transform: translate(0, 0) scale(1); }
+    20% { transform: translate(50px, 20px) scale(1.03); }
+    40% { transform: translate(-30px, 40px) scale(0.97); }
+    60% { transform: translate(20px, -30px) scale(1.06); }
+    80% { transform: translate(-40px, -10px) scale(0.94); }
+}
+
+/* Login: glassmorphism card entrance */
+@keyframes login-card-enter {
+    from {
+        opacity: 0;
+        transform: translateY(20px) scale(0.98);
+        backdrop-filter: blur(0);
+        -webkit-backdrop-filter: blur(0);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+    }
+}
+
+/* Login: shine sweep on CTA */
+@keyframes login-shine-sweep {
+    0%, 85% {
+        transform: translateX(-100%) skewX(-12deg);
+    }
+    100% {
+        transform: translateX(200%) skewX(-12deg);
+    }
+}
+
+/* Login: floating particles */
+@keyframes login-particle-float {
+    0%, 100% {
+        transform: translateY(0) translateX(0);
+        opacity: 0;
+    }
+    10% { opacity: 0.6; }
+    50% {
+        transform: translateY(-120px) translateX(20px);
+        opacity: 0.4;
+    }
+    90% { opacity: 0; }
+    100% {
+        transform: translateY(-200px) translateX(-10px);
+        opacity: 0;
+    }
+}
+
+/* --- Initial state: all elements invisible, NO display:none --- */
+
+.landing-animate .landing-logo,
+.landing-animate .landing-motto-word,
+.landing-animate .landing-subtitle,
+.landing-animate .landing-description,
+.landing-animate .landing-card,
+.landing-animate .landing-cta,
+.landing-animate .landing-footer-text {
+    opacity: 0;
+    will-change: opacity, transform;
+}
+
+/* --- Triggered state: .is-loaded on container --- */
+
+/* Logo */
+.landing-animate.is-loaded .landing-logo {
+    animation: landing-logo-reveal var(--dur-logo) var(--ease-landing) var(--delay-logo) both;
+}
+
+/* Motto per-word */
+.landing-animate.is-loaded .landing-motto-word {
+    animation: landing-word-reveal var(--dur-word) var(--ease-landing) both;
+    animation-delay: calc(var(--delay-motto) + var(--word-index, 0) * var(--word-stagger));
+}
+
+/* Subtitle */
+.landing-animate.is-loaded .landing-subtitle {
+    animation: landing-fade-up var(--dur-fade) var(--ease-landing) var(--delay-subtitle) both;
+}
+
+/* Description wipe */
+.landing-animate.is-loaded .landing-description {
+    animation: landing-wipe-left var(--dur-wipe) var(--ease-landing) var(--delay-desc) both;
+}
+
+/* Cards with stagger */
+.landing-animate.is-loaded .landing-card {
+    animation: landing-card-3d var(--dur-card) var(--ease-landing) both;
+}
+
+.landing-animate.is-loaded .landing-card:nth-child(1) {
+    animation-delay: var(--delay-cards);
+}
+
+.landing-animate.is-loaded .landing-card:nth-child(2) {
+    animation-delay: calc(var(--delay-cards) + var(--delay-card-stagger));
+}
+
+.landing-animate.is-loaded .landing-card:nth-child(3) {
+    animation-delay: calc(var(--delay-cards) + var(--delay-card-stagger) * 2);
+}
+
+/* CTA */
+.landing-animate.is-loaded .landing-cta {
+    animation: landing-cta-appear var(--dur-cta) var(--ease-landing-bounce) var(--delay-cta) both;
+}
+
+/* CTA glow - starts after cta appear finishes */
+.landing-animate.is-loaded .landing-cta-btn {
+    animation: landing-cta-glow 2.5s ease-in-out 2s infinite;
+}
+
+/* Footer text */
+.landing-animate.is-loaded .landing-footer-text {
+    animation: landing-fade-up var(--dur-fade) var(--ease-landing) 1300ms both;
+}
+
+/* --- Background orbs --- */
+
+.landing-orb {
+    position: absolute;
+    border-radius: 50%;
+    pointer-events: none;
+    will-change: transform;
+    filter: blur(60px);
+}
+
+.landing-orb--1 {
+    width: 400px;
+    height: 400px;
+    top: -100px;
+    left: -100px;
+    background: radial-gradient(circle, rgba(224, 172, 126, 0.08) 0%, transparent 70%);
+    animation: orb-float-1 20s ease-in-out infinite;
+}
+
+.landing-orb--2 {
+    width: 500px;
+    height: 500px;
+    bottom: -150px;
+    right: -150px;
+    background: radial-gradient(circle, rgba(99, 102, 241, 0.06) 0%, transparent 70%);
+    animation: orb-float-2 24s ease-in-out infinite;
+}
+
+.landing-orb--3 {
+    width: 350px;
+    height: 350px;
+    top: 40%;
+    left: 50%;
+    background: radial-gradient(circle, rgba(224, 172, 126, 0.05) 0%, transparent 70%);
+    animation: orb-float-3 28s ease-in-out infinite;
+}
+
+/* --- Login: Glassmorphism card --- */
+
+.login-glass-card {
+    background: rgba(31, 41, 55, 0.3);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(107, 114, 128, 0.3);
+    border-radius: 1rem;
+    padding: 2rem;
+    box-shadow:
+        0 25px 50px -12px rgba(0, 0, 0, 0.4),
+        inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    width: 384px;
+    max-width: calc(100vw - 2rem);
+    margin: 0 auto;
+    animation: login-card-enter 800ms var(--ease-landing) both;
+    /* pointer-events NOT blocked during animation */
+}
+
+/* --- Login: Input focus glow --- */
+
+.login-input-glow {
+    background: rgba(55, 65, 81, 0.3);
+    border: 1px solid rgba(107, 114, 128, 0.5);
+    border-radius: 0.5rem;
+    color: white;
+    transition: all 0.3s var(--ease-landing);
+}
+
+.login-input-glow:focus {
+    border-color: var(--mpp-primary, #e0ac7e);
+    box-shadow:
+        0 0 0 3px rgba(224, 172, 126, 0.2),
+        0 4px 12px rgba(224, 172, 126, 0.1);
+    transform: translateY(-1px);
+    outline: none;
+}
+
+.login-input-glow:hover {
+    background: rgba(55, 65, 81, 0.5);
+    border-color: rgba(156, 163, 175, 0.6);
+}
+
+/* --- Login: CTA shine sweep --- */
+
+.login-cta-shine {
+    position: relative;
+    overflow: hidden;
+    background: linear-gradient(135deg, #e0ac7e 0%, #d1975a 50%, #c4824a 100%);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2), inset 0 -1px 0 rgba(0, 0, 0, 0.1);
+}
+
+.login-cta-shine::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 50%;
+    height: 100%;
+    background: linear-gradient(
+        90deg,
+        transparent,
+        rgba(255, 255, 255, 0.25),
+        transparent
+    );
+    animation: login-shine-sweep 4s ease-in-out 2s infinite;
+    pointer-events: none;
+}
+
+.login-cta-shine:hover {
+    box-shadow:
+        0 15px 35px rgba(224, 172, 126, 0.4),
+        0 5px 15px rgba(0, 0, 0, 0.1),
+        inset 0 1px 0 rgba(255, 255, 255, 0.3);
+    transform: scale(1.05) translateY(-2px);
+}
+
+.login-cta-shine:active {
+    transform: scale(0.95) translateY(0);
+    box-shadow:
+        0 5px 15px rgba(224, 172, 126, 0.3),
+        inset 0 3px 7px rgba(0, 0, 0, 0.2);
+}
+
+/* --- Login: Particles --- */
+
+.login-particles {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    pointer-events: none;
+    z-index: 0;
+}
+
+.login-particle {
+    position: absolute;
+    width: 3px;
+    height: 3px;
+    border-radius: 50%;
+    background: rgba(224, 172, 126, 0.5);
+    animation: login-particle-float linear infinite;
+}
+
+.login-particle:nth-child(1) {
+    left: 15%;
+    bottom: 0;
+    animation-duration: 8s;
+    animation-delay: 0s;
+}
+
+.login-particle:nth-child(2) {
+    left: 35%;
+    bottom: 0;
+    animation-duration: 10s;
+    animation-delay: 1.5s;
+    width: 2px;
+    height: 2px;
+}
+
+.login-particle:nth-child(3) {
+    left: 55%;
+    bottom: 0;
+    animation-duration: 7s;
+    animation-delay: 3s;
+}
+
+.login-particle:nth-child(4) {
+    left: 75%;
+    bottom: 0;
+    animation-duration: 9s;
+    animation-delay: 0.5s;
+    width: 4px;
+    height: 4px;
+}
+
+.login-particle:nth-child(5) {
+    left: 25%;
+    bottom: 0;
+    animation-duration: 11s;
+    animation-delay: 2s;
+    width: 2px;
+    height: 2px;
+}
+
+.login-particle:nth-child(6) {
+    left: 65%;
+    bottom: 0;
+    animation-duration: 8.5s;
+    animation-delay: 4s;
+}
+
+/* --- Landing: Icon chips (standalone from components.css) --- */
+
+.landing-animate .icon-chip {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 3rem;
+    height: 3rem;
+    border-radius: 0.75rem;
+    background: rgba(224, 172, 126, 0.18);
+    color: var(--mpp-primary, #e0ac7e);
+}
+
+.landing-animate .icon-chip svg {
+    width: 1.5rem;
+    height: 1.5rem;
+    stroke: var(--mpp-primary, #e0ac7e);
+}
+
+/* --- Landing: CTA gradient border --- */
+
+.landing-cta-btn {
+    position: relative;
+    z-index: 1;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+}
+
+.landing-cta-btn::before {
+    content: '';
+    position: absolute;
+    inset: -2px;
+    border-radius: 9999px;
+    background: linear-gradient(135deg, #e0ac7e, #d1975a, #c4824a, #e0ac7e);
+    background-size: 300% 300%;
+    z-index: -1;
+    animation: landing-gradient-border 4s ease infinite;
+}
+
+.landing-cta-btn::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 9999px;
+    background: linear-gradient(135deg, #e0ac7e 0%, #d1975a 50%, #c4824a 100%);
+    z-index: -1;
+}
+
+@keyframes landing-gradient-border {
+    0%, 100% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+}
+
+/* --- Reusable utility classes --- */
+
+.landing-logo-img {
+    width: 100%;
+    max-width: 900px;
+    height: 200px;
+    object-fit: cover;
+    margin: 0 auto 30px;
+    display: block;
+}
+
+.brand-mantra {
+    color: var(--mpp-primary, #e0ac7e);
+}
+
+.microsoft-login-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.75rem 1rem;
+    border-radius: 0.75rem;
+    background: rgba(55, 65, 81, 0.3);
+    border: 1px solid rgba(107, 114, 128, 0.5);
+    color: white;
+    font-weight: 500;
+    font-size: 0.875rem;
+    transition: all 0.2s ease;
+    text-decoration: none;
+    position: relative;
+    overflow: hidden;
+}
+
+.microsoft-login-btn::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 50%;
+    height: 100%;
+    background: linear-gradient(
+        90deg,
+        transparent,
+        rgba(255, 255, 255, 0.15),
+        transparent
+    );
+    animation: login-shine-sweep 4s ease-in-out 4s infinite;
+    pointer-events: none;
+}
+
+.microsoft-login-btn:hover {
+    background: rgba(55, 65, 81, 0.5);
+    border-color: rgba(156, 163, 175, 0.5);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+/* Grid pattern background */
+.bg-grid-pattern {
+    background-image:
+        linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+    background-size: 50px 50px;
+}
+
+/* --- Accessibility: reduced motion --- */
+
+@media (prefers-reduced-motion: reduce) {
+    .landing-animate .landing-logo,
+    .landing-animate .landing-motto-word,
+    .landing-animate .landing-subtitle,
+    .landing-animate .landing-description,
+    .landing-animate .landing-card,
+    .landing-animate .landing-cta,
+    .landing-animate .landing-footer-text {
+        opacity: 1;
+        animation: none !important;
+    }
+
+    .landing-orb {
+        animation: none !important;
+    }
+
+    .login-glass-card {
+        animation: none !important;
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+        opacity: 1;
+    }
+
+    .login-cta-shine::after {
+        animation: none !important;
+    }
+
+    .login-particle {
+        animation: none !important;
+        display: none;
+    }
+
+    .landing-cta-btn {
+        animation: none !important;
+    }
+}
+
+/* --- Responsive --- */
+
+@media (max-width: 640px) {
+    .bg-grid-pattern {
+        background-size: 30px 30px;
+    }
+
+    .landing-logo-img {
+        height: 120px;
+        max-width: 100%;
+        margin-bottom: 15px;
+    }
+
+    .landing-orb {
+        display: none;
+    }
+
+    .login-glass-card {
+        width: 100%;
+        padding: 1.5rem;
+    }
+}
