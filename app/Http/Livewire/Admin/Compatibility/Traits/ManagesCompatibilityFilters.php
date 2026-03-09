@@ -203,7 +203,8 @@ trait ManagesCompatibilityFilters
         // Category: selected category + all descendants
         if ($this->filterCategory !== '') {
             $categoryId = (int) $this->filterCategory;
-            $descendantIds = Category::descendants($categoryId)->pluck('id');
+            $category = Category::find($categoryId);
+            $descendantIds = $category ? $category->descendants->pluck('id') : collect();
             $allCategoryIds = $descendantIds->push($categoryId)->unique()->values();
 
             $query->whereHas('categories', function (Builder $q) use ($allCategoryIds) {
@@ -410,7 +411,8 @@ trait ManagesCompatibilityFilters
 
         if ($exclude !== 'category' && $this->filterCategory !== '') {
             $categoryId = (int) $this->filterCategory;
-            $descendantIds = Category::descendants($categoryId)->pluck('id');
+            $category = Category::find($categoryId);
+            $descendantIds = $category ? $category->descendants->pluck('id') : collect();
             $allCategoryIds = $descendantIds->push($categoryId)->unique()->values();
             $query->whereHas('categories', fn(Builder $q) => $q->whereIn('categories.id', $allCategoryIds));
         }

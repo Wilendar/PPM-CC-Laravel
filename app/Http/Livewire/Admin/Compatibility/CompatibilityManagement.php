@@ -46,6 +46,9 @@ class CompatibilityManagement extends Component
     |--------------------------------------------------------------------------
     */
 
+    /** Filter preset context identifier */
+    protected string $presetContext = 'compatibility_management';
+
     /** Current product for compatibility editing */
     public ?int $editingProductId = null;
 

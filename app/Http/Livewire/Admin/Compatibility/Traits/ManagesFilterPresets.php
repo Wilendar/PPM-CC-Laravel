@@ -18,8 +18,6 @@ trait ManagesFilterPresets
     public string $newPresetName = '';
     public ?int $activePresetId = null;
 
-    protected string $presetContext = 'compatibility_management';
-
     public function getFilterState(): array
     {
         return [

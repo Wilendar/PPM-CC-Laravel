@@ -211,6 +211,61 @@
                             </svg>
                         </button>
                     </div>
+                    {{-- Security badges --}}
+                    <div class="mt-1.5 flex flex-wrap items-center gap-2">
+                        @if($profile->token_expires_at)
+                            @if($profile->isTokenExpired())
+                                <span class="inline-flex items-center rounded bg-red-900/40 px-2 py-0.5 text-xs text-red-400">
+                                    Token wygasl {{ $profile->token_expires_at->diffForHumans() }}
+                                </span>
+                            @else
+                                <span class="inline-flex items-center rounded bg-gray-700/50 px-2 py-0.5 text-xs text-gray-400">
+                                    Wygasa {{ $profile->token_expires_at->diffForHumans() }}
+                                </span>
+                            @endif
+                        @endif
+                        @if($profile->token_rotated_at)
+                            <span class="inline-flex items-center rounded bg-gray-700/50 px-2 py-0.5 text-xs text-gray-500" title="Ostatnia rotacja tokena">
+                                Rotacja {{ $profile->token_rotated_at->diffForHumans() }}
+                            </span>
+                        @endif
+                        @if(!empty($profile->allowed_ips))
+                            <span class="inline-flex items-center rounded bg-blue-900/40 px-2 py-0.5 text-xs text-blue-400" title="{{ implode(', ', $profile->allowed_ips) }}">
+                                IP whitelist: {{ count($profile->allowed_ips) }}
+                            </span>
+                        @endif
+
+                        {{-- Rate Limit Status --}}
+                        @php $rlStatus = $this->getRateLimitStatus($profile->id); @endphp
+                        @if($rlStatus['blocked'])
+                            <span class="inline-flex items-center rounded bg-red-900/40 px-2 py-0.5 text-xs text-red-400">
+                                Rate limit: ZABLOKOWANY
+                            </span>
+                            @can('export.manage_feeds')
+                                <button wire:click="clearRateLimit({{ $profile->id }})"
+                                        class="text-xs text-yellow-400 transition-colors hover:text-yellow-300">
+                                    Odblokuj
+                                </button>
+                            @endcan
+                        @elseif($rlStatus['attempts'] > 0)
+                            <span class="inline-flex items-center rounded bg-gray-700/50 px-2 py-0.5 text-xs text-gray-500">
+                                {{ $rlStatus['remaining'] }}/30 req
+                            </span>
+                        @endif
+
+                        {{-- Generation Lock Status --}}
+                        @if($this->isGenerationLocked($profile->id))
+                            <span class="inline-flex items-center rounded bg-yellow-900/40 px-2 py-0.5 text-xs text-yellow-400">
+                                Generacja aktywna
+                            </span>
+                            @can('export.manage_feeds')
+                                <button wire:click="releaseGenerationLock({{ $profile->id }})"
+                                        class="text-xs text-yellow-400 transition-colors hover:text-yellow-300">
+                                    Zwolnij lock
+                                </button>
+                            @endcan
+                        @endif
+                    </div>
                 @endif
 
                 {{-- Mini Feed Stats --}}
@@ -296,6 +351,19 @@
 
                     <span class="text-gray-600">|</span>
 
+                    {{-- Regenerate Token --}}
+                    @can('export.manage_feeds')
+                        @if($profile->is_public)
+                            <button wire:click="regenerateToken({{ $profile->id }})"
+                                    wire:confirm="Regeneracja tokena spowoduje zmiane URL feeda. Stary URL przestanie dzialac. Kontynuowac?"
+                                    class="text-sm text-yellow-400 hover:text-yellow-300 transition-colors px-2 py-1 rounded hover:bg-yellow-900/30"
+                                    title="Zmien token (stary URL przestanie dzialac)">
+                                Regeneruj token
+                            </button>
+                            <span class="text-gray-600">|</span>
+                        @endif
+                    @endcan
+
                     {{-- Duplicate --}}
                     @can('export.create')
                         <button wire:click="duplicateProfile({{ $profile->id }})"
@@ -365,6 +433,8 @@
                         <option value="generated">Wygenerowano</option>
                         <option value="downloaded">Pobrano</option>
                         <option value="accessed">Dostep</option>
+                        <option value="alert">Alerty</option>
+                        <option value="token_rotated">Rotacja tokena</option>
                         <option value="error">Blad</option>
                     </select>
                 </div>
@@ -426,6 +496,12 @@
                                 @case('accessed')
                                     <span class="rounded bg-gray-700 px-2 py-0.5 text-xs text-gray-300">Dostep</span>
                                     @break
+                                @case('alert')
+                                    <span class="rounded bg-orange-900/50 px-2 py-0.5 text-xs text-orange-400">Alert</span>
+                                    @break
+                                @case('token_rotated')
+                                    <span class="rounded bg-purple-900/50 px-2 py-0.5 text-xs text-purple-400">Rotacja tokena</span>
+                                    @break
                                 @case('error')
                                     <span class="rounded bg-red-900/50 px-2 py-0.5 text-xs text-red-400">Blad</span>
                                     @break
@@ -480,9 +556,11 @@
                             @endif
                         </td>
                     </tr>
-                    @if($log->action === 'error' && $log->error_message)
-                    <tr class="bg-red-900/10" wire:key="log-err-{{ $log->id }}">
-                        <td colspan="10" class="px-4 py-2 text-xs text-red-400">{{ $log->error_message }}</td>
+                    @if(in_array($log->action, ['error', 'alert', 'token_rotated']) && $log->error_message)
+                    <tr class="{{ $log->action === 'alert' ? 'bg-orange-900/10' : ($log->action === 'token_rotated' ? 'bg-purple-900/10' : 'bg-red-900/10') }}" wire:key="log-err-{{ $log->id }}">
+                        <td colspan="10" class="px-4 py-2 text-xs {{ $log->action === 'alert' ? 'text-orange-400' : ($log->action === 'token_rotated' ? 'text-purple-400' : 'text-red-400') }}">
+                            {{ $log->error_message }}
+                        </td>
                     </tr>
                     @endif
                     @empty

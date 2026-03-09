@@ -28,20 +28,10 @@
             />
         </div>
 
-        {{-- Category Filter --}}
+        {{-- Category Filter - Tree Dropdown --}}
         @if($showAdvancedFilters ?? true)
             <div class="compat-filter-item compat-filter-category">
-                <label>
-                    <i class="fas fa-folder-tree"></i>
-                    Kategoria
-                </label>
-                <select wire:model.live="filterCategory" class="compat-filter-select">
-                    <option value="">Wszystkie kategorie</option>
-                    @foreach($this->getCategoryFilterOptions() as $catId => $catName)
-                        @php $catCount = $filterCounts['categories'][$catId] ?? 0; @endphp
-                        <option value="{{ $catId }}">{{ $catName }} ({{ $catCount }})</option>
-                    @endforeach
-                </select>
+                <x-category-tree-filter wire-model="filterCategory" label="Kategoria" />
             </div>
         @endif
 

@@ -1,7 +1,7 @@
 <div class="mt-4 p-4 card glass-effect rounded-lg border border-primary">
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
         {{-- Category Filter - Tree Dropdown --}}
-        @include('livewire.products.listing.partials.category-tree-dropdown')
+        <x-category-tree-filter wire-model="categoryFilter" />
 
         {{-- Status Filter - SECURITY: only with products.status --}}
         @if($this->userCan('status_read'))

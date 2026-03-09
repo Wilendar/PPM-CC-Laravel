@@ -77,6 +77,9 @@ class ExportProfile extends Model
         'schedule',
         'is_active',
         'is_public',
+        'token_expires_at',
+        'token_rotated_at',
+        'allowed_ips',
         'file_path',
         'file_size',
         'product_count',
@@ -95,6 +98,7 @@ class ExportProfile extends Model
         'price_groups'        => 'array',
         'warehouses'          => 'array',
         'shop_ids'            => 'array',
+        'allowed_ips'         => 'array',
         'is_active'           => 'boolean',
         'is_public'           => 'boolean',
         'file_size'           => 'integer',
@@ -102,6 +106,8 @@ class ExportProfile extends Model
         'generation_duration' => 'integer',
         'last_generated_at'   => 'datetime',
         'next_generation_at'  => 'datetime',
+        'token_expires_at'    => 'datetime',
+        'token_rotated_at'    => 'datetime',
     ];
 
     protected $hidden = [
@@ -176,6 +182,43 @@ class ExportProfile extends Model
         }
 
         return !$this->isFeedFresh();
+    }
+
+    /**
+     * Check if token has expired.
+     */
+    public function isTokenExpired(): bool
+    {
+        if ($this->token_expires_at === null) {
+            return false;
+        }
+
+        return $this->token_expires_at->isPast();
+    }
+
+    /**
+     * Check if given IP is allowed for this profile.
+     * Returns true if no IP restrictions are set.
+     */
+    public function isIpAllowed(string $ip): bool
+    {
+        if (empty($this->allowed_ips)) {
+            return true;
+        }
+
+        return in_array($ip, $this->allowed_ips, true);
+    }
+
+    /**
+     * Regenerate token with new random string.
+     */
+    public function regenerateToken(?int $expiresInDays = null): void
+    {
+        $this->update([
+            'token' => Str::random(64),
+            'token_rotated_at' => now(),
+            'token_expires_at' => $expiresInDays ? now()->addDays($expiresInDays) : $this->token_expires_at,
+        ]);
     }
 
     // === SCOPES ===

@@ -58,6 +58,7 @@ return Application::configure(basePath: dirname(__DIR__))
         // Global middleware dla wszystkich requests
         $middleware->web(append: [
             TrackUserSessionMiddleware::class,
+            \App\Http\Middleware\NoIndexMiddleware::class,
         ]);
         
         // API middleware

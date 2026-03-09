@@ -52,6 +52,10 @@ class ExportProfileForm extends Component
     public string $format = 'csv';
     public string $schedule = 'manual';
 
+    // Step 1: Security settings (collapsible)
+    public string $tokenExpiryDays = '';
+    public string $allowedIpsText = '';
+
     // Step 4: Price groups & Warehouses
     public array $selectedPriceGroups = [];
     public array $selectedWarehouses = [];
@@ -291,6 +295,10 @@ class ExportProfileForm extends Component
             'warehouses' => array_map('intval', $this->selectedWarehouses),
             'shop_ids' => array_map('intval', $this->filterShopIds),
             'is_active' => true,
+            'token_expires_at' => $this->tokenExpiryDays
+                ? now()->addDays((int) $this->tokenExpiryDays)
+                : null,
+            'allowed_ips' => $this->parseIpList($this->allowedIpsText),
         ];
     }
 
@@ -373,6 +381,25 @@ class ExportProfileForm extends Component
     */
 
     /**
+     * Parse IP list from textarea (one IP per line) to array.
+     *
+     * @return array<string>|null
+     */
+    protected function parseIpList(string $text): ?array
+    {
+        if (trim($text) === '') {
+            return null;
+        }
+
+        $ips = array_filter(
+            array_map('trim', explode("\n", $text)),
+            fn(string $ip) => $ip !== '' && filter_var($ip, FILTER_VALIDATE_IP)
+        );
+
+        return !empty($ips) ? array_values($ips) : null;
+    }
+
+    /**
      * Load data from an existing profile for edit mode.
      */
     protected function loadExistingProfile(int $profileId): void
@@ -399,5 +426,20 @@ class ExportProfileForm extends Component
         // Load price groups & warehouses
         $this->selectedPriceGroups = array_map('strval', $profile->price_groups ?? []);
         $this->selectedWarehouses = array_map('strval', $profile->warehouses ?? []);
+
+        // Load security settings
+        $this->tokenExpiryDays = '';
+        if ($profile->token_expires_at && $profile->token_expires_at->isFuture()) {
+            $days = (int) now()->diffInDays($profile->token_expires_at);
+            // Snap to nearest option
+            $this->tokenExpiryDays = match (true) {
+                $days <= 7   => '7',
+                $days <= 30  => '30',
+                $days <= 90  => '90',
+                $days <= 180 => '180',
+                default      => '365',
+            };
+        }
+        $this->allowedIpsText = implode("\n", $profile->allowed_ips ?? []);
     }
 }

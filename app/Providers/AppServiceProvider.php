@@ -60,8 +60,37 @@ class AppServiceProvider extends ServiceProvider
 
         $this->registerProductStatusCacheObservers();
         $this->registerOAuthRateLimiters();
+        $this->registerFeedRateLimiters();
         $this->registerSocialiteProviders();
         $this->applyDatabaseMailConfig();
+    }
+
+    /**
+     * Register feed access rate limiters (per-token instead of per-IP).
+     */
+    private function registerFeedRateLimiters(): void
+    {
+        // Feed view: 30 requests per minute per token
+        RateLimiter::for('feed-access', function ($request) {
+            $token = $request->route('token');
+            return Limit::perMinute(30)
+                ->by('feed:' . ($token ?? $request->ip()))
+                ->response(function () {
+                    return response('Too Many Requests', 429)
+                        ->header('Retry-After', '60');
+                });
+        });
+
+        // Feed download: 10 requests per minute per token
+        RateLimiter::for('feed-download', function ($request) {
+            $token = $request->route('token');
+            return Limit::perMinute(10)
+                ->by('feed-dl:' . ($token ?? $request->ip()))
+                ->response(function () {
+                    return response('Too Many Requests', 429)
+                        ->header('Retry-After', '60');
+                });
+        });
     }
 
     /**

@@ -461,3 +461,23 @@ Schedule::command('permission:cache-reset')
     ->sundays()
     ->at('03:00');
 */
+
+// ==========================================
+// Session Cleanup: Expire inactive sessions
+// ==========================================
+// Marks sessions as expired after 120 min of inactivity
+// and removes their Laravel session from DB
+Schedule::call(function () {
+    try {
+        $service = app(\App\Services\User\SessionManagementService::class);
+        $expired = $service->expireInactiveSessions(120);
+
+        if ($expired > 0) {
+            \Log::info("Sessions cleanup: expired {$expired} inactive sessions");
+        }
+    } catch (\Exception $e) {
+        \Log::warning('Session expiry scheduler failed: ' . $e->getMessage());
+    }
+})->everyFifteenMinutes()
+  ->name('sessions:expire-inactive')
+  ->withoutOverlapping();

@@ -5,7 +5,9 @@ namespace App\Http\Livewire\Admin\Export;
 use App\Models\ExportProfile;
 use App\Models\ExportProfileLog;
 use App\Services\Export\ExportProfileService;
+use Illuminate\Cache\RateLimiter;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Log;
 use Livewire\Attributes\Layout;
@@ -419,6 +421,35 @@ class ExportManager extends Component
     }
 
     /**
+     * Regenerate token for a profile (invalidates old URL).
+     */
+    public function regenerateToken(int $profileId): void
+    {
+        if (Auth::check()) {
+            Gate::authorize('export.manage_feeds');
+        }
+
+        $profile = ExportProfile::findOrFail($profileId);
+        $oldToken = substr($profile->token, 0, 8) . '...';
+        $profile->regenerateToken();
+
+        ExportProfileLog::create([
+            'export_profile_id' => $profile->id,
+            'action'            => 'token_rotated',
+            'user_id'           => Auth::id(),
+            'error_message'     => "Token rotated (old prefix: {$oldToken})",
+        ]);
+
+        Log::info('Feed token regenerated', [
+            'profile_id'   => $profile->id,
+            'profile_name' => $profile->name,
+            'user_id'      => Auth::id(),
+        ]);
+
+        session()->flash('success', "Token dla \"{$profile->name}\" zostal zregenerowany. Stary URL przestanie dzialac.");
+    }
+
+    /**
      * Dispatch browser event to copy feed URL.
      */
     public function copyFeedUrl(int $profileId): void
@@ -449,6 +480,84 @@ class ExportManager extends Component
         $this->logFilterDateTo = '';
         $this->logFilterBotType = '';
         $this->resetPage(pageName: 'logsPage');
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | SECURITY ACTIONS
+    |--------------------------------------------------------------------------
+    */
+
+    /**
+     * Get rate limit status for a profile token.
+     */
+    public function getRateLimitStatus(int $profileId): array
+    {
+        $profile = ExportProfile::find($profileId);
+        if (!$profile || !$profile->token) {
+            return ['attempts' => 0, 'remaining' => 30, 'blocked' => false];
+        }
+
+        $limiter = app(RateLimiter::class);
+        $key = 'feed:' . $profile->token;
+        $attempts = $limiter->attempts($key);
+        $remaining = max(0, 30 - $attempts);
+
+        return [
+            'attempts' => $attempts,
+            'remaining' => $remaining,
+            'blocked' => $remaining === 0,
+        ];
+    }
+
+    /**
+     * Check if generation lock (mutex) is active for a profile.
+     */
+    public function isGenerationLocked(int $profileId): bool
+    {
+        return Cache::has('feed-generate:' . $profileId);
+    }
+
+    /**
+     * Manually clear rate limit for a profile.
+     */
+    public function clearRateLimit(int $profileId): void
+    {
+        Gate::authorize('export.manage_feeds');
+
+        $profile = ExportProfile::findOrFail($profileId);
+        $limiter = app(RateLimiter::class);
+
+        $limiter->clear('feed:' . $profile->token);
+        $limiter->clear('feed-dl:' . $profile->token);
+
+        Log::info('Rate limit cleared manually', [
+            'profile_id' => $profile->id,
+            'profile_name' => $profile->name,
+            'user_id' => Auth::id(),
+        ]);
+
+        session()->flash('success', "Rate limit dla \"{$profile->name}\" wyczyszczony.");
+    }
+
+    /**
+     * Manually release generation lock for a profile.
+     */
+    public function releaseGenerationLock(int $profileId): void
+    {
+        Gate::authorize('export.manage_feeds');
+
+        $profile = ExportProfile::findOrFail($profileId);
+
+        Cache::forget('feed-generate:' . $profile->id);
+
+        Log::info('Generation lock released manually', [
+            'profile_id' => $profile->id,
+            'profile_name' => $profile->name,
+            'user_id' => Auth::id(),
+        ]);
+
+        session()->flash('success', "Lock generacji dla \"{$profile->name}\" zwolniony.");
     }
 
     /*
