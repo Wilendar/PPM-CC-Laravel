@@ -41,6 +41,7 @@ class JobProgressBar extends Component
     public array $progress = [];
     public bool $isVisible = true;
     public bool $isCompleted = false;
+    public int $heartbeatTick = 0;
 
     // ETAP_07c: Track if user already took action (hide button, show processing state)
     public bool $userActionTaken = false;
@@ -94,6 +95,7 @@ class JobProgressBar extends Component
         try {
             $service = app(JobProgressService::class);
             $this->progress = $service->getProgress($this->jobId);
+            $this->heartbeatTick++;
 
             // Check completion status
             // ETAP_07c: awaiting_user is NOT completed - user action required!
@@ -552,6 +554,14 @@ class JobProgressBar extends Component
     public function getJobTypeLabelProperty(): string
     {
         return $this->progress['job_type_label'] ?? ucfirst($this->progress['job_type'] ?? 'Job');
+    }
+
+    /**
+     * Get worker heartbeat status (alive/stale/dead/unknown)
+     */
+    public function getHeartbeatStatusProperty(): string
+    {
+        return $this->progress['heartbeat_status'] ?? 'unknown';
     }
 
     /**

@@ -7107,6 +7107,125 @@ hex-color-picker {
 }
 
 /* ========================================
+   HEARTBEAT INDICATOR DOT
+   Shows worker health status in progress bar
+   ======================================== */
+
+/* Wrapper - relative positioning for sonar ring */
+.heartbeat-dot-wrapper {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
+    margin-left: 2px;
+}
+
+/* Core dot - small, static glow */
+.heartbeat-dot {
+    display: block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    position: relative;
+    z-index: 2;
+}
+
+.heartbeat-dot--alive {
+    background: rgb(96, 165, 250);
+    box-shadow: 0 0 4px rgba(59, 130, 246, 0.6), 0 0 8px rgba(59, 130, 246, 0.3);
+}
+
+.heartbeat-dot--stale {
+    background: rgb(251, 191, 36);
+    box-shadow: 0 0 4px rgba(245, 158, 11, 0.6), 0 0 8px rgba(245, 158, 11, 0.3);
+}
+
+.heartbeat-dot--dead {
+    background: rgb(248, 113, 113);
+    box-shadow: 0 0 6px rgba(239, 68, 68, 0.9), 0 0 12px rgba(239, 68, 68, 0.5);
+}
+
+/* Sonar ring - expands outward on ping */
+.heartbeat-sonar {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 8px;
+    height: 8px;
+    margin-top: -4px;
+    margin-left: -4px;
+    border-radius: 50%;
+    opacity: 0;
+    z-index: 1;
+}
+
+.heartbeat-sonar--alive {
+    border: 2px solid rgba(59, 130, 246, 0.7);
+}
+
+.heartbeat-sonar--stale {
+    border: 2px solid rgba(245, 158, 11, 0.7);
+}
+
+.heartbeat-sonar--dead {
+    border: 2px solid rgba(239, 68, 68, 0.7);
+}
+
+/* Sonar ping animation - ring expands and fades */
+.heartbeat-sonar--ping.heartbeat-sonar--alive {
+    animation: sonar-ping-blue 0.9s ease-out 1;
+}
+
+.heartbeat-sonar--ping.heartbeat-sonar--stale {
+    animation: sonar-ping-yellow 0.9s ease-out 1;
+}
+
+@keyframes sonar-ping-blue {
+    0% {
+        transform: scale(1);
+        opacity: 0.8;
+        border-color: rgba(59, 130, 246, 0.8);
+        box-shadow: 0 0 4px rgba(59, 130, 246, 0.4);
+    }
+    70% {
+        transform: scale(3);
+        opacity: 0.3;
+        border-color: rgba(59, 130, 246, 0.3);
+        box-shadow: 0 0 12px rgba(59, 130, 246, 0.2);
+    }
+    100% {
+        transform: scale(3.5);
+        opacity: 0;
+        border-color: rgba(59, 130, 246, 0);
+        box-shadow: none;
+    }
+}
+
+@keyframes sonar-ping-yellow {
+    0% {
+        transform: scale(1);
+        opacity: 0.8;
+        border-color: rgba(245, 158, 11, 0.8);
+        box-shadow: 0 0 4px rgba(245, 158, 11, 0.4);
+    }
+    70% {
+        transform: scale(3);
+        opacity: 0.3;
+        border-color: rgba(245, 158, 11, 0.3);
+        box-shadow: 0 0 12px rgba(245, 158, 11, 0.2);
+    }
+    100% {
+        transform: scale(3.5);
+        opacity: 0;
+        border-color: rgba(245, 158, 11, 0);
+        box-shadow: none;
+    }
+}
+
+/* ========================================
    SIDEBAR DISABLED LINKS (W przygotowaniu)
    Style dla linkow do sekcji niezaimplementowanych
    ======================================== */

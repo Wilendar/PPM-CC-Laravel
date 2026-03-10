@@ -58,6 +58,26 @@
                     @endswitch">
                     {{ $this->jobTypeLabel }}
                 </span>
+
+                {{-- Heartbeat Indicator Dot with Sonar Ping --}}
+                @if($this->status === 'running' && $this->heartbeatStatus !== 'unknown')
+                    <span class="heartbeat-dot-wrapper"
+                          x-data="{ pinging: false }"
+                          x-effect="
+                              let tick = $wire.heartbeatTick;
+                              if (tick > 0) {
+                                  pinging = true;
+                                  setTimeout(() => pinging = false, 900);
+                              }
+                          "
+                          title="{{ $this->heartbeatStatus === 'alive' ? 'Worker aktywny' : ($this->heartbeatStatus === 'stale' ? 'Worker nie odpowiada' : 'Worker nie zyje') }}">
+                        {{-- Sonar ring (expands outward on ping) --}}
+                        <span class="heartbeat-sonar heartbeat-sonar--{{ $this->heartbeatStatus }}"
+                              :class="{ 'heartbeat-sonar--ping': pinging }"></span>
+                        {{-- Core dot (static glow) --}}
+                        <span class="heartbeat-dot heartbeat-dot--{{ $this->heartbeatStatus }}"></span>
+                    </span>
+                @endif
             </div>
 
             <!-- Progress Info -->
