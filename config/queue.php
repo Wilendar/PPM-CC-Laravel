@@ -38,7 +38,11 @@ return [
             'driver' => 'database',
             'table' => 'jobs',
             'queue' => 'default',
-            'retry_after' => 90,
+            // FIX 2026-03-10: retry_after MUST be > timeout of longest job (900s)
+            // Previous value (90s) caused duplicate workers: after 90s the driver
+            // assumed the job was dead and gave it to another worker, while the
+            // original worker was still processing (BulkCreateCategories ~5min)
+            'retry_after' => 1200, // 20 minutes (> 15min job timeout)
             'after_commit' => false,
         ],
 

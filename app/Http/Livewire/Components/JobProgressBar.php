@@ -421,33 +421,38 @@ class JobProgressBar extends Component
 
     /**
      * Get status message
+     * Uses server-side formatProgressMessage() which respects phase_label metadata
      */
     public function getMessageProperty(): string
     {
+        // Use server-formatted message from JobProgressService::getProgress()
+        // which handles phase_label, job_type, and proper formatting
+        if (!empty($this->progress['message'])) {
+            return $this->progress['message'];
+        }
+
+        // Fallback only if message is empty
         $status = $this->status;
         $current = $this->progress['current'] ?? 0;
         $total = $this->progress['total'] ?? 0;
         $shopName = $this->progress['shop_name'] ?? 'Unknown Shop';
 
         if ($status === 'running') {
-            return "Importowanie... {$current}/{$total} Produktow z {$shopName}";
+            return "Przetwarzanie... {$current}/{$total} z {$shopName}";
         }
 
         if ($status === 'completed') {
-            return "Ukonczone! {$current}/{$total} Produktow z {$shopName}";
+            return "Ukonczone! {$current}/{$total} z {$shopName}";
         }
 
         if ($status === 'failed') {
-            return "Blad importu z {$shopName}";
+            return "Blad operacji z {$shopName}";
         }
 
-        // ETAP_07c FIX: Handle awaiting_user status
         if ($status === 'awaiting_user') {
-            // If user already took action, show processing message
             if ($this->userActionTaken) {
                 return "Przetwarzanie wybranych kategorii - {$total} produktow z {$shopName}";
             }
-
             $actionLabel = $this->progress['action_button']['label'] ?? 'Wymaga akcji';
             return "{$actionLabel} - {$total} produktow z {$shopName}";
         }

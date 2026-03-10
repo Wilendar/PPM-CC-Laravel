@@ -222,6 +222,19 @@ button:focus {
     color: #deaa7c;
 }
 
+/* Global: auto-hide search icon when input has content */
+/* Covers SVG icons in pointer-events-none containers */
+.relative:has(> input:not(:placeholder-shown)) > .pointer-events-none {
+    opacity: 0;
+    transition: opacity 150ms ease;
+}
+
+/* Covers FontAwesome <i class="fa-search absolute ..."> icons */
+.relative:has(> input:not(:placeholder-shown)) > i.fa-search {
+    opacity: 0;
+    transition: opacity 150ms ease;
+}
+
 @media print {
     .no-print {
         display: none !important;

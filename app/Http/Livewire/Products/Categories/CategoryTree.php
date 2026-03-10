@@ -5,6 +5,7 @@ namespace App\Http\Livewire\Products\Categories;
 use Livewire\Component;
 use Livewire\WithPagination;
 use Livewire\Attributes\On;
+use App\Models\AuditLog;
 use App\Models\Category;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
@@ -1688,6 +1689,15 @@ class CategoryTree extends Component
                         $product->categories()
                                ->wherePivotNull('shop_id')
                                ->detach($sourceCategory->id);
+
+                        // Audit log: category merge pivot change
+                        AuditLog::log(
+                            AuditLog::EVENT_UPDATED,
+                            $product,
+                            ['category_removed' => $sourceCategory->id],
+                            ['category_added' => $targetCategory->id],
+                            "Merge kategorii: przeniesienie produktu z '{$sourceCategory->name}' do '{$targetCategory->name}'"
+                        );
 
                         // Update primary category if source was primary
                         if ($product->primary_category_id === $sourceCategory->id) {

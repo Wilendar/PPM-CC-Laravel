@@ -107,15 +107,23 @@ class JobProgressService
             return null;
         }
 
+        $previousStatus = $progress->status;
+
+        // Reset progress for new phase (e.g. categories -> products transition)
+        // Accepts any status: pending, running, completed, awaiting_user
+        // FIX 2026-03-10: Do NOT reset error_count/error_details on phase transition
+        // Errors from previous phase (e.g. category creation) should be preserved
         $progress->update([
             'status' => 'running',
+            'current_count' => 0,
             'total_count' => $actualTotalCount,
         ]);
 
-        Log::info('JobProgress updated: pending → running', [
+        Log::info("JobProgress updated: {$previousStatus} -> running", [
             'progress_id' => $progress->id,
             'job_id' => $jobId,
             'total_count' => $actualTotalCount,
+            'previous_status' => $previousStatus,
         ]);
 
         return $progress->id;
@@ -407,7 +415,7 @@ class JobProgressService
             'shop_name' => $progress->shop?->name ?? 'Unknown Shop',
             'job_id' => $progress->job_id, // For ErrorDetailsModal
             'job_type' => $progress->job_type, // ETAP_07c: For UI differentiation
-            'job_type_label' => $progress->getJobTypeLabel(), // ETAP_07c: Human-readable label
+            'job_type_label' => $progress->getMetadataValue('job_type_override', '') ?: $progress->getJobTypeLabel(), // ETAP_07c: Human-readable label (metadata override or default)
             'user_name' => $progress->user?->name ?? null, // ETAP_07c: Who initiated
             'metadata' => $progress->metadata ?? [], // ETAP_07c: Rich context
             'action_button' => $progress->action_button, // ETAP_07c: UI action button
@@ -476,6 +484,12 @@ class JobProgressService
 
         switch ($progress->status) {
             case 'running':
+                // Check phase_label from metadata for ALL job types
+                // BulkCreateCategories reuses the same job_id as AnalyzeMissingCategories
+                $phaseLabel = $progress->getMetadataValue('phase_label', '');
+                if ($phaseLabel) {
+                    return "{$phaseLabel}... {$current}/{$total} z {$shopName}";
+                }
                 if ($jobType === 'category_analysis') {
                     return "Analizuje kategorie... {$current}/{$total} produktow z {$shopName}";
                 }
@@ -489,6 +503,10 @@ class JobProgressService
 
             case 'pending':
                 if ($jobType === 'category_analysis') {
+                    $phaseLabel = $progress->getMetadataValue('phase_label', '');
+                    if ($phaseLabel) {
+                        return "{$phaseLabel} - {$shopName}";
+                    }
                     return "Przygotowanie analizy kategorii... {$shopName}";
                 }
                 return "Oczekiwanie... {$shopName}";

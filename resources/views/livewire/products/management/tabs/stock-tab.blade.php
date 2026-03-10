@@ -333,14 +333,56 @@
                                             </span>
                                         </template>
 
-                                        {{-- Input for adding new location --}}
-                                        <input type="text"
-                                               x-ref="newLocationInput"
-                                               @keydown.enter.prevent="addLocation($el.value); $el.value=''"
-                                               @blur="addLocation($el.value); $el.value=''"
-                                               class="location-input"
-                                               maxlength="20"
-                                               placeholder="+ Dodaj lokalizacje...">
+                                        {{-- Input for adding new location with ghost text autocomplete --}}
+                                        <div class="location-ghost-wrapper">
+                                            <span class="location-ghost-overlay"
+                                                  x-show="ghostVisible"
+                                                  x-text="ghostText"
+                                                  x-cloak></span>
+                                            <span class="location-ghost-hint"
+                                                  x-show="ghostVisible"
+                                                  x-cloak>Tab &#x21B9;</span>
+                                            <input type="text"
+                                                   x-ref="newLocationInput"
+                                                   @input.debounce.150ms="onLocationInput($el.value)"
+                                                   @focus="onLocationFocus($el.value)"
+                                                   @keydown.enter.prevent="
+                                                       if (dropdownOpen && selectedIndex >= 0) {
+                                                           selectSuggestion(selectedIndex);
+                                                       } else {
+                                                           addLocation($el.value); $el.value='';
+                                                       }
+                                                   "
+                                                   @keydown.tab.prevent="
+                                                       if (!acceptGhost($el)) {
+                                                           $el.blur();
+                                                       } else {
+                                                           $el.value = '';
+                                                       }
+                                                   "
+                                                   @keydown.escape="clearSuggestions()"
+                                                   @keydown.arrow-down.prevent="navigateDropdown('down')"
+                                                   @keydown.arrow-up.prevent="navigateDropdown('up')"
+                                                   @blur="setTimeout(() => { if (!dropdownOpen) { addLocation($el.value); $el.value=''; clearSuggestions(); } }, 200)"
+                                                   class="location-input"
+                                                   maxlength="20"
+                                                   autocomplete="off"
+                                                   placeholder="+ Dodaj lokalizacje...">
+                                            {{-- Suggestions dropdown --}}
+                                            <div class="location-suggestions-dropdown"
+                                                 x-show="dropdownOpen && suggestions.length > 0"
+                                                 x-cloak>
+                                                <template x-for="(s, idx) in suggestions" :key="idx">
+                                                    <button type="button"
+                                                            @mousedown.prevent="selectSuggestion(idx)"
+                                                            class="location-suggestion-item"
+                                                            :class="{ 'location-suggestion-item--active': idx === selectedIndex }">
+                                                        <span x-text="s.code" class="font-medium"></span>
+                                                        <span x-text="s.count + ' prod.'" class="text-xs text-gray-500"></span>
+                                                    </button>
+                                                </template>
+                                            </div>
+                                        </div>
                                     </div>
                                 </td>
 

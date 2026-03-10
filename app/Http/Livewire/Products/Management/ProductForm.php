@@ -28,6 +28,7 @@ use App\Http\Livewire\Products\Management\Traits\VariantShopContextTrait;
 use App\Http\Livewire\Products\Management\Traits\VariantModalsTrait;
 use App\Http\Livewire\Products\Management\Traits\ProductFormCompatibility;
 use App\Http\Livewire\Products\Management\Traits\ProductFormVisualDescription;
+use App\Http\Livewire\Products\Management\Traits\ProductFormLocationSuggestions;
 use App\Http\Livewire\Products\Management\Services\ProductMultiStoreManager;
 use App\Http\Livewire\Products\Management\Services\ProductCategoryManager;
 use App\Http\Livewire\Products\Management\Services\ProductFormSaver;
@@ -69,6 +70,7 @@ class ProductForm extends Component
     use VariantModalsTrait;
     use ProductFormCompatibility;
     use ProductFormVisualDescription;
+    use ProductFormLocationSuggestions;
 
     protected function getPermissionModule(): string
     {

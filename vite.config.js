@@ -23,6 +23,7 @@ export default defineConfig({
                 'resources/css/components/category-preview-modal.css',
                 'resources/css/visual-editor/editor.css',
                 'resources/css/visual-editor/preview.css',
+                'resources/css/admin/location-manager.css',
                 'resources/css/auth/landing-animations.css',
                 'resources/js/app.js',
             ],

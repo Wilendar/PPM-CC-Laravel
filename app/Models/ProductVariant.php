@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\Auditable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -30,7 +31,7 @@ use App\Models\Concerns\HasIntegrationMappings;
  */
 class ProductVariant extends Model
 {
-    use HasFactory, SoftDeletes, HasIntegrationMappings;
+    use HasFactory, SoftDeletes, HasIntegrationMappings, Auditable;
 
     /**
      * Table name

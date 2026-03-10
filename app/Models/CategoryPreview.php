@@ -427,6 +427,32 @@ class CategoryPreview extends Model
     }
 
     /**
+     * Get analyzed products from file or inline DB data
+     *
+     * FIX: Large imports store analyzed_products in a JSON file (not DB)
+     * to avoid max_allowed_packet limit. This method transparently reads
+     * from file if path exists, or falls back to inline data.
+     *
+     * @return array
+     */
+    public function getAnalyzedProducts(): array
+    {
+        $context = $this->import_context_json ?? [];
+
+        // New format: file-based storage
+        if (!empty($context['analyzed_products_file'])) {
+            $disk = \Illuminate\Support\Facades\Storage::disk('local');
+            if ($disk->exists($context['analyzed_products_file'])) {
+                $data = json_decode($disk->get($context['analyzed_products_file']), true);
+                return is_array($data) ? $data : [];
+            }
+        }
+
+        // Legacy format: inline in DB
+        return $context['analyzed_products'] ?? $context['products'] ?? [];
+    }
+
+    /**
      * Validate business rules
      *
      * Enterprise validation dla preview data integrity

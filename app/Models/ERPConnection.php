@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\Auditable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -76,7 +77,7 @@ use Carbon\Carbon;
  */
 class ERPConnection extends Model
 {
-    use HasFactory;
+    use HasFactory, Auditable;
 
     /**
      * The table associated with the model.

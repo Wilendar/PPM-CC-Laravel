@@ -68,13 +68,14 @@ class PullProductsFromPrestaShop implements ShouldQueue, ShouldBeUnique
     /**
      * Number of times job may be attempted
      */
-    public int $tries = 3;
+    public int $tries = 5;
 
     /**
      * Maximum seconds job can run before timing out
      * ETAP_07 FAZA 9.2: Dynamic timeout from SystemSettings (2025-11-13)
+     * Default: 1800 seconds (30 minutes) for large imports
      */
-    public int $timeout;
+    public int $timeout = 1800;
 
     /**
      * Unique job lock duration in seconds

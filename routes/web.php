@@ -555,6 +555,10 @@ Route::prefix('admin')->name('admin.')->middleware($adminMiddleware)->group(func
     Route::get('/product-parameters', fn() => view('admin.product-parameters'))
         ->name('product-parameters')->middleware('permission:parameters.read');
 
+    // Location Management Panel - Warehouse location browser
+    Route::get('/locations', \App\Http\Livewire\Admin\Parameters\LocationManager::class)
+        ->name('locations.index')->middleware('permission:stock.locations');
+
     // Supplier Management Panel (ETAP_15)
     Route::get('/suppliers', \App\Http\Livewire\Admin\Suppliers\BusinessPartnerPanel::class)
         ->name('suppliers.index')->middleware('permission:suppliers.read');

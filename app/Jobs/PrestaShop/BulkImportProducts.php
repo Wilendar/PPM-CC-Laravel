@@ -271,12 +271,21 @@ class BulkImportProducts implements ShouldQueue
 
             // 📊 UPDATE PENDING PROGRESS TO RUNNING (or create new if legacy dispatch)
             if ($this->jobId) {
-                // Pre-generated job_id exists → Update pending progress to running
+                // Pre-generated job_id exists → Update progress to running
+                // Works even if progress was in 'running' state from BulkCreateCategories
                 $progressId = $progressService->startPendingJob($this->jobId, $total);
 
+                if ($progressId) {
+                    // Set phase_label for product import phase
+                    $progressService->updateMetadata($progressId, [
+                        'phase' => 'importing_products',
+                        'phase_label' => 'Importowanie produktow',
+                    ]);
+                }
+
                 if (!$progressId) {
-                    // Fallback: pending progress not found, create new
-                    Log::warning('Pending progress not found, creating new', ['job_id' => $this->jobId]);
+                    // Fallback: progress not found, create new
+                    Log::warning('Progress not found, creating new', ['job_id' => $this->jobId]);
                     $progressId = $progressService->createJobProgress(
                         $this->jobId,
                         $this->shop,
@@ -344,7 +353,30 @@ class BulkImportProducts implements ShouldQueue
                         $errors = []; // Reset errors array after batch update
                     }
 
-                    $result = $this->importProduct($prestashopProductId, $sku, $importService);
+                    // Deadlock retry: InnoDB gap locks on product_categories cause deadlocks
+                    // when multiple queue workers import products with overlapping categories
+                    $maxDeadlockRetries = 3;
+                    $result = null;
+                    for ($deadlockAttempt = 1; $deadlockAttempt <= $maxDeadlockRetries; $deadlockAttempt++) {
+                        try {
+                            $result = $this->importProduct($prestashopProductId, $sku, $importService);
+                            break;
+                        } catch (\Illuminate\Database\QueryException $qe) {
+                            if ($qe->errorInfo[1] === 1213 && $deadlockAttempt < $maxDeadlockRetries) {
+                                // Deadlock detected - exponential backoff with jitter
+                                $sleepMs = random_int(50000, 200000) * (2 ** ($deadlockAttempt - 1));
+                                usleep($sleepMs);
+                                Log::warning('Deadlock retry', [
+                                    'sku' => $sku,
+                                    'attempt' => $deadlockAttempt,
+                                    'sleep_ms' => $sleepMs / 1000,
+                                    'prestashop_id' => $prestashopProductId,
+                                ]);
+                                continue;
+                            }
+                            throw $qe;
+                        }
+                    }
 
                     // FIX 2025-12-22: Handle both legacy string and new array result
                     if (is_array($result)) {
@@ -640,21 +672,13 @@ class BulkImportProducts implements ShouldQueue
                 return [];
             }
 
-            // STEP 4: Fetch all products using OR filter on ID
-            // PrestaShop API supports: filter[id]=[1|2|3|4]
-            $idsFilter = '[' . implode('|', $productIds) . ']';
-
-            $params = [
-                'display' => 'full',
-                'filter[id]' => $idsFilter,
-            ];
-
+            // STEP 4: Fetch all products using chunked ID filter
+            // Uses getProductsByIds() to avoid HTTP 414 "URI Too Long" with many IDs
             Log::info('BulkImportProducts: Fetching products by IDs', [
                 'product_ids_count' => count($productIds),
-                'filter' => $idsFilter,
             ]);
 
-            $response = $client->getProducts($params);
+            $response = $client->getProductsByIds($productIds);
 
             // Parse response
             $products = [];

@@ -818,6 +818,26 @@
     justify-content: flex-end;
 }
 
+/* Audit Modal Dialog - reusable dialog container inside .modal-overlay */
+.audit-modal-dialog {
+    background: linear-gradient(145deg, rgba(31, 41, 55, 0.98), rgba(17, 24, 39, 0.98));
+    border: 1px solid rgba(75, 85, 99, 0.4);
+    border-radius: 0.75rem;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+    width: 100%;
+    margin: 1rem;
+    max-height: 85vh;
+    overflow-y: auto;
+    text-align: left;
+}
+
+@media (max-width: 640px) {
+    .audit-modal-dialog {
+        margin: 0.5rem;
+        max-height: 95vh;
+    }
+}
+
 /* ========================================
    NOTIFICATIONS
    ======================================== */
@@ -10550,5 +10570,172 @@ hex-color-picker {
     width: 380px;
     max-width: calc(100vw - 3rem);
     pointer-events: none;
+}
+
+/* ========================================
+   ADMIN TAB NAVIGATION
+   ======================================== */
+
+.admin-tab {
+    padding: 0.5rem 0.25rem;
+    border-bottom: 2px solid transparent;
+    font-weight: 500;
+    font-size: 0.875rem;
+    color: #9ca3af;
+    transition: color 0.2s, border-color 0.2s;
+    background: none;
+    cursor: pointer;
+}
+
+.admin-tab:hover {
+    color: #d1d5db;
+    border-color: #6b7280;
+}
+
+.admin-tab--active {
+    border-color: var(--mpp-primary);
+    color: var(--mpp-primary);
+}
+
+/* ========================================
+   TOGGLE SWITCH
+   ======================================== */
+
+.toggle-switch {
+    position: relative;
+    display: inline-flex;
+    flex-shrink: 0;
+    height: 1.5rem;
+    width: 2.75rem;
+    border: 2px solid transparent;
+    border-radius: 9999px;
+    cursor: pointer;
+    transition: background-color 0.2s ease-in-out;
+    background-color: #4b5563;
+}
+
+.toggle-switch:focus {
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(var(--mpp-primary-rgb), 0.35);
+}
+
+.toggle-switch--active {
+    background-color: var(--mpp-primary);
+}
+
+.toggle-switch__dot {
+    pointer-events: none;
+    display: inline-block;
+    height: 1.25rem;
+    width: 1.25rem;
+    border-radius: 9999px;
+    background-color: #1f2937;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+    transform: translateX(0);
+    transition: transform 0.2s ease-in-out;
+}
+
+.toggle-switch--active .toggle-switch__dot {
+    transform: translateX(1.25rem);
+}
+
+/* ========================================
+   FILE INPUT ENTERPRISE
+   ======================================== */
+
+.file-input-enterprise {
+    display: block;
+    width: 100%;
+    font-size: 0.875rem;
+    color: #9ca3af;
+}
+
+.file-input-enterprise::file-selector-button {
+    margin-right: 1rem;
+    padding: 0.5rem 1rem;
+    border-radius: 0.375rem;
+    border: none;
+    font-size: 0.875rem;
+    font-weight: 600;
+    background-color: #374151;
+    color: var(--mpp-primary);
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.file-input-enterprise::file-selector-button:hover {
+    background-color: #4b5563;
+}
+
+/* ========================================
+   PASSWORD STRENGTH BAR
+   ======================================== */
+
+.password-strength-bar {
+    flex: 1;
+    background-color: #374151;
+    border-radius: 9999px;
+    height: 0.5rem;
+}
+
+.password-strength-fill {
+    height: 0.5rem;
+    border-radius: 9999px;
+    background-color: var(--mpp-primary);
+    transition: width 0.3s;
+    width: var(--progress, 0%);
+}
+
+/* ========================================
+   ROLE BADGES (ENTERPRISE DARK MODE)
+   ======================================== */
+
+.role-badge {
+    padding: 0.25rem 0.75rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    border-radius: 9999px;
+}
+
+.role-badge--admin {
+    background: rgba(239, 68, 68, 0.15);
+    color: #f87171;
+    border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.role-badge--manager {
+    background: rgba(249, 115, 22, 0.15);
+    color: #fb923c;
+    border: 1px solid rgba(249, 115, 22, 0.3);
+}
+
+.role-badge--editor {
+    background: rgba(34, 197, 94, 0.15);
+    color: #4ade80;
+    border: 1px solid rgba(34, 197, 94, 0.3);
+}
+
+.role-badge--warehouse {
+    background: rgba(59, 130, 246, 0.15);
+    color: #60a5fa;
+    border: 1px solid rgba(59, 130, 246, 0.3);
+}
+
+.role-badge--sales {
+    background: rgba(168, 85, 247, 0.15);
+    color: #c084fc;
+    border: 1px solid rgba(168, 85, 247, 0.3);
+}
+
+.role-badge--claims {
+    background: rgba(20, 184, 166, 0.15);
+    color: #2dd4bf;
+    border: 1px solid rgba(20, 184, 166, 0.3);
+}
+
+.role-badge--default {
+    background: rgba(107, 114, 128, 0.15);
+    color: #d1d5db;
+    border: 1px solid rgba(107, 114, 128, 0.3);
 }
 
