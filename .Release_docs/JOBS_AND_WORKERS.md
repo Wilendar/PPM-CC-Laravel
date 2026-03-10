@@ -1,9 +1,9 @@
 # PPM - Jobs & Workers Documentation
 
-> **Wersja:** 2.0
-> **Data:** 2026-02-23
+> **Wersja:** 3.0
+> **Data:** 2026-03-10
 > **Status:** Production Ready
-> **Changelog:** Aktualizacja: CategoryTypeMapper integration, fix type detection cascade, nowe referencje do CATEGORY_PREVIEW_MODAL.md
+> **Changelog:** Worker Guard v2: heartbeat monitoring, resume via ProductShopData, status 'interrupted', forceReleaseReservedJobs, crontab --timeout removed, retry_after=600, $timeout=0 for long imports
 
 ---
 
@@ -175,12 +175,35 @@ PPM-CC-Laravel wykorzystuje **49 zdefiniowanych JOBow** zorganizowanych w 9 kate
 - **SyncJob Stats Fix** - prawidlowe mapowanie metadata do kolumn UI
 - **UI Improvements** - "PPM" uppercase, "← Import" badge dla pull_* jobs
 
+### Nowe w v3.0 (Worker Guard v2 - Resilient Import System)
+
+- **Worker Guard v2** - System odpornego importu dla dlugotrwalych jobow (9554+ produktow):
+  - **Heartbeat monitoring** - Worker wysyla ping co 10 produktow, dead detection po 120s braku heartbeat
+  - **Resume via ProductShopData** - Po restarcie workera import kontynuuje od ostatnio zaimportowanego produktu (nie od zera)
+  - **Status 'interrupted'** - Nowy status w JobProgress: worker umarl, ale job bedzie wznowiony (pomaranczowy progress bar)
+  - **forceReleaseReservedJobs()** - Natychmiast zwalnia zarezerwowany job po smierci workera (nie czeka retry_after)
+  - **Death counter** - Po 3 smiereciach workera → status 'failed' (nie nieskonczony retry)
+  - **Crontab fix** - Usuniety `--timeout=300` z crontab queue workera (zabijaE import po 5min)
+  - **`$timeout=0`** - BulkImportProducts bez limitu czasowego (heartbeat monitoruje liveness)
+  - **`retry_after=600`** - Zmniejszone z 1200s na 600s (szybszy retry po smierci)
+  - **`$uniqueFor=600`** - Zmniejszone z 1800s na 600s (match retry_after)
+- **WorkerGuardService** - Centralny serwis zarzadzania workerami:
+  - `registerWorker()` - Rejestracja workera na poczatku handle()
+  - `sendHeartbeat()` - Periodyczny ping (co 10 produktow)
+  - `cleanupStaleWorkers()` - Wykrywa dead workery, ustawia 'interrupted'/'failed'
+  - `forceReleaseReservedJobs()` - Zwalnia reserved joby z tabeli jobs
+  - `hasActiveWorker()` - Anti-duplication check
+  - `canSpawnManualWorker()` - Guard dla schedulera
+- **WorkerHeartbeat model** - Tabela `worker_heartbeats` z PID, job_id, last_heartbeat_at
+- **Heartbeat UI** - Pulsujaca kropka w progress barze (niebieska=alive, zolta=stale, czerwona=dead, pomaranczowa=interrupted)
+
 ### Modele Trackingowe
 
 | Model | Tabela | Przeznaczenie |
 |-------|--------|---------------|
 | SyncJob | `sync_jobs` | Kompleksowy tracking synchronizacji |
 | JobProgress | `job_progress` | Real-time UI progress bar |
+| WorkerHeartbeat | `worker_heartbeats` | Worker Guard - heartbeat monitoring |
 | BackupJob | `backup_jobs` | Status backupow |
 | MaintenanceTask | `maintenance_tasks` | Status zadan konserwacyjnych |
 | ProductErpData | `product_erp_data` | Status sync ERP per produkt |
@@ -214,14 +237,22 @@ Shared Hosting: Brak queue worker - uzycie onConnection('sync')
 
 ### 2.3 Retry Logic
 
-| JOB | Max Tries | Backoff | Unique |
-|-----|-----------|---------|--------|
-| SyncProductToPrestaShop | 3 | 30s, 60s, 300s | 1h |
-| SyncCategoryToPrestaShop | 3 | 30s, 60s, 300s | 1h |
-| SyncProductToERP | 3 | 60s, 180s, 600s | 1h |
-| BackupDatabaseJob | 1 | 60s, 300s, 900s | - |
-| MaintenanceTaskJob | 2 | 300s, 900s | - |
-| BulkSyncProducts | 1 | - | - |
+| JOB | Max Tries | Backoff | Unique | Timeout |
+|-----|-----------|---------|--------|---------|
+| SyncProductToPrestaShop | 3 | 30s, 60s, 300s | 1h | 300s |
+| SyncCategoryToPrestaShop | 3 | 30s, 60s, 300s | 1h | 300s |
+| SyncProductToERP | 3 | 60s, 180s, 600s | 1h | 300s |
+| **BulkImportProducts** | **3** | - | **600s** | **0 (unlimited)** |
+| BackupDatabaseJob | 1 | 60s, 300s, 900s | - | 1800s |
+| MaintenanceTaskJob | 2 | 300s, 900s | - | 300-7200s |
+| BulkSyncProducts | 1 | - | - | 300s |
+| PullProductsFromSubiektGT | 3 | 60s, 300s, 600s | 1h | 3600s |
+
+**Worker Guard v2 (BulkImportProducts):**
+- `$timeout=0` (unlimited) - heartbeat monitoruje liveness zamiast timeout
+- `$uniqueFor=600` (10min, match retry_after)
+- `$tries=3` - po 3 smierciach workera -> failed
+- Resume via ProductShopData (nie restartuje od zera)
 
 ---
 
@@ -368,17 +399,54 @@ Dane pobierane:
 | `logs:cleanup` | Codziennie 04:00 | sync_logs, integration_logs, failed_jobs |
 | `db:health-check --alert` | Codziennie 06:00 | Monitorowanie rozmiaru tabel + alerty |
 
-### 3.4 Queue Worker (Shared Hosting)
+### 3.4 Queue Workers (Shared Hosting - Dual System, Worker Guard v2)
 
+**CRONTAB Worker (PRIMARY - przetwarza joby):**
 ```
-Harmonogram: Co minute
-Komenda: queue:work database --queue=erp_default,erp_high,default,sync --once --max-time=55
+Harmonogram: Co minute (crontab)
+Komenda: queue:work database --stop-when-empty --tries=3
+BEZ --timeout (Worker Guard v2 monitoruje liveness via heartbeat)
 
 Przeznaczenie:
-- Shared hosting (Hostido) nie moze uruchomic daemona queue:work
-- Scheduler uruchamia worker co minute z --once
-- Przetwarza JEDEN job i konczy
+- Glowny worker przetwarzajacy wszystkie joby z kolejki
+- --stop-when-empty: konczy po przetworzeniu kolejki (nie wisi)
+- Brak --timeout: dlugotrwale importy (9554 produktow ~8h) nie sa zabijane
+- Heartbeat (120s threshold) wykrywa dead workery zamiast timeout
+
+WAZNE: Stary --timeout=300 zabijaL import po 5min! Usuniety w Worker Guard v2.
+```
+
+**SCHEDULER Worker (SECONDARY - smart spawn):**
+```
+Harmonogram: Co minute (schedule:run -> routes/console.php closure)
+Komenda: queue:work database --stop-when-empty --max-time=55
+Kolejki: prestashop_sync,prestashop-sync,erp-sync,erp_default,erp_high,default,sync
+
+Przeznaczenie:
+- Smart scheduler z WorkerGuard anti-duplication
+- cleanupStaleWorkers(120) co minute (dead worker detection)
+- Sprawdza pending jobs i active workers przed spawn
 - --max-time=55 zapobiega overlapping z kolejnym CRON
+```
+
+**Worker Guard v2 - Resilient Import Flow:**
+```
+1. BulkImportProducts::handle() starts
+2. registerWorker() -> WorkerHeartbeat record z PID
+3. Resume: query ProductShopData -> filtruj juz zaimportowane produkty
+4. Import loop: sendHeartbeat() co 10 produktow, updateProgress() co 5
+5. Hosting kill ~15min -> heartbeat stops
+6. schedule:run -> cleanupStaleWorkers(120):
+   a. Detects dead heartbeat (>120s)
+   b. Marks JobProgress as 'interrupted' (nie 'failed')
+   c. forceReleaseReservedJobs() -> job dostepny natychmiast
+   d. Increments worker_death_count
+7. Crontab worker picks up released job
+8. BulkImportProducts::handle() restarts:
+   a. ProductShopData query -> skip already imported
+   b. Counter: resumeOffset + index (nie 0!)
+   c. phase_label: "Wznowione importowanie produktow"
+9. Po 3 smierciach (worker_death_count >= 3) -> status 'failed'
 ```
 
 ### 3.5 Konfiguracja SystemSettings
@@ -441,31 +509,41 @@ Kazde ERPConnection ma 3 niezalezne czestotliwosci sync:
 ### 3.6 Diagram Przeplywu Danych
 
 ```
-                    SCHEDULER (CRON co minute)
-                              |
-        +---------------------+---------------------+
-        |                     |                     |
-  [PrestaShop Pull]    [Subiekt GT]          [Cleanup]
-   (co 6h domyslnie)   (co 15min detect)     (co godzine/dzien)
-        |                     |
-        v                     v
-+------------------+   +------------------+
-| PullProductsFrom |   | DetectSubiektGT  |
-| PrestaShop       |   | Changes          |
-+------------------+   +------------------+
-        |                     |
-        v                     v (jesli zmiany)
-+------------------+   +------------------+
-| ProductShopData  |   | PullProductsFrom |
-| (Shop Tab)       |   | SubiektGT        |
-+------------------+   +------------------+
-        |                     |
-        v                     v
-+------------------+   +------------------+
-| product_prices   |   | ProductErpData   |
-| product_stock    |   | (ERP Tab)        |
-+------------------+   +------------------+
+              CRON co minute (2 wpisy)
+              ┌───────────┬──────────────┐
+              │           │              │
+      [queue:work]  [schedule:run]       │
+      (przetwarza)  (orchestruje)        │
+              │           │              │
+              │     ┌─────┴─────┐        │
+              │     │           │        │
+              │ [WorkerGuard]  [Scheduled Tasks]
+              │ cleanupStale   │
+              │ canSpawn       ├── [PrestaShop Pull] (co 6h)
+              │                ├── [ERP Dynamic Sync] (co 15min-24h)
+              │                ├── [Subiekt GT Detect] (co 15min)
+              │                └── [Cleanup Tasks] (co godzine/dzien)
+              │
+              ▼
+      ┌──────────────┐     ┌──────────────┐
+      │ Manual Import│     │ Scheduled    │
+      │ (UI Panel)   │     │ Pull/Sync    │
+      │ BulkImport   │     │ (ONLY UPDATE │
+      │ Products     │     │  existing!)  │
+      └──────┬───────┘     └──────┬───────┘
+             │                     │
+             ▼                     ▼
+      [Worker Guard v2]    [PullProductsFromPS]
+      - heartbeat          - ONLY linked products
+      - resume             - date_upd optimization
+      - interrupted        [PullProductsFromSubiektGT]
+      - forceRelease       - linked_only mode
+                           - batch parallel HTTP
 ```
+
+**WAZNE:** Scheduled joby (Pull*) NIGDY nie tworza nowych produktow!
+Tylko aktualizuja istniejace (linked via ProductShopData/ProductErpData).
+Nowe produkty tworzy TYLKO manualny import z UI (BulkImportProducts).
 
 ---
 
@@ -767,9 +845,42 @@ SyncShopVariantsToPrestaShopJob:
   setCombinationCovers(productId, {combinationId: coverPsImageId})
 ```
 
+#### BulkImportProducts (Worker Guard v2)
+```
+Sciezka: app/Jobs/PrestaShop/BulkImportProducts.php
+Kolejka: default
+Timeout: 0 (unlimited - heartbeat monitoruje liveness)
+Tries: 3
+UniqueFor: 600s (match retry_after)
+Unique: per shop_id
+
+Przeznaczenie:
+- Masowy import produktow z PrestaShop do PPM
+- Obsluguje tryby: all, category, individual
+- Worker Guard v2: resume, heartbeat, interrupted status
+
+Worker Guard v2 Features:
+- $timeout=0: Brak limitu czasowego (hosting kill ~15min, nie Laravel)
+- Resume via ProductShopData: Po restarcie pomija juz zaimportowane produkty
+  (query prestashop_product_id per shop, filtracja z listy do importu)
+- Heartbeat: sendHeartbeat() co 10 produktow (via WorkerGuardService)
+- Progress z offsetem: counter = resumeOffset + index (nie 0 po restarcie)
+- Phase label: "Wznowione importowanie produktow" przy resume
+
+Serwisy:
+- WorkerGuardService (register, heartbeat, cleanup)
+- JobProgressService (progress tracking)
+- PrestaShopImportService (product import logic)
+- PrestaShopClientFactory (API client)
+
+Tracking:
+- SyncJob: job_type='import_products'
+- JobProgress: real-time UI z heartbeat dot
+- WorkerHeartbeat: PID, last_heartbeat_at
+```
+
 #### Inne PrestaShop Jobs
 - `DeleteProductFromPrestaShop` - Usuwanie produktu
-- `BulkImportProducts` - Batch import z PS
 - `AnalyzeMissingCategories` - Analiza brakujacych kategorii
 - `PullSingleProductFromPrestaShop` - Pull jednego produktu
 - `SyncProductsJob` - Legacy batch sync
@@ -1366,6 +1477,7 @@ const STATUS_COMPLETED = 'completed';
 const STATUS_FAILED = 'failed';
 const STATUS_AWAITING_USER = 'awaiting_user';
 const STATUS_CANCELLED = 'cancelled';
+const STATUS_INTERRUPTED = 'interrupted'; // Worker Guard v2: worker died, job will retry
 
 // Kluczowe pola
 - job_id: string (Laravel Queue job ID)
@@ -1438,7 +1550,21 @@ return [
             'driver' => 'database',
             'table' => 'jobs',
             'queue' => 'default',
-            'retry_after' => 90,
+            // Worker Guard v2: retry_after = 600s (10min)
+            // Heartbeat (120s) + cleanup + spawn (~180s) = 600s is 3x safety margin
+            'retry_after' => 600,
+        ],
+        'scan' => [
+            'driver' => 'database',
+            'table' => 'jobs',
+            'queue' => 'scan',
+            'retry_after' => 3700, // 1h + buffer (product scanning)
+        ],
+        'erp-sync' => [
+            'driver' => 'database',
+            'table' => 'jobs',
+            'queue' => 'erp-sync',
+            'retry_after' => 3700, // 1h + buffer (ERP sync)
         ],
     ],
 
@@ -1466,7 +1592,9 @@ job_batches (id, name, total_jobs, pending_jobs, failed_jobs, ...)
 
 -- Custom PPM tables
 sync_jobs (...)
-job_progress (...)
+job_progress (..., worker_pid, last_heartbeat_at)  -- Worker Guard v2
+worker_heartbeats (id, job_progress_id, job_id, worker_pid, worker_type,
+                   queue_name, status, started_at, last_heartbeat_at, metadata)
 backup_jobs (...)
 maintenance_tasks (...)
 product_erp_data (...)
@@ -1479,27 +1607,39 @@ product_erp_data (...)
 ### 7.1 Hostido Shared Hosting
 
 **Ograniczenia:**
-- Brak queue worker (brak stale uruchomionego procesu)
-- Brak Node.js
+- Brak stale uruchomionego queue daemon (shared hosting kill ~15min)
+- Brak Node.js (build lokalnie, upload assets)
+- Brak pcntl extension (brak graceful shutdown signali)
 - Tylko database driver
 
-**Rozwiazania:**
+**Rozwiazania (Worker Guard v2):**
 
-1. **Synchroniczne wykonanie** dla krytycznych jobow:
+1. **Dual Worker System** (crontab + scheduler):
+```bash
+# CRONTAB - PRIMARY worker (przetwarza joby)
+* * * * * cd /path && php artisan queue:work database --stop-when-empty --tries=3
+
+# CRONTAB - SCHEDULER (smart spawn + cleanup)
+* * * * * cd /path && php artisan schedule:run >> /dev/null 2>&1
+```
+
+2. **Worker Guard** dla dlugotrwalych jobow:
+   - Heartbeat monitoring (120s threshold)
+   - Resume via ProductShopData (nie od zera)
+   - Status 'interrupted' (progress bar widoczny)
+   - forceReleaseReservedJobs (natychmiastowy retry)
+
+3. **Synchroniczne wykonanie** dla krytycznych jobow:
 ```php
-// PushMediaToPrestaShop
-public function __construct(...)
-{
-    $this->onConnection('sync');  // Natychmiastowe wykonanie
-}
+$this->onConnection('sync');  // PushMediaToPrestaShop
 ```
 
-2. **CRON dla kolejki** (alternatywa):
-```
-* * * * * cd /path && php artisan queue:work --once
-```
+4. **Database driver** - nie wymaga zewnetrznych zaleznosci
 
-3. **Database driver** - nie wymaga zewnetrznych zaleznosci
+**WAZNE: Crontab worker BEZ --timeout!**
+- Stary: `--timeout=300` zabijaL import po 5min
+- Worker Guard v2: heartbeat monitoruje liveness zamiast timeout
+- Hosting kill ~15min to jedyny "timeout" - resume obsluguje restart
 
 ### 7.2 Uruchamianie Queue Worker
 
@@ -1510,12 +1650,26 @@ php artisan queue:work
 # Z konkretna kolejka
 php artisan queue:work --queue=erp_high,erp_default,default
 
-# Jednorazowe wykonanie (dla CRON)
-php artisan queue:work --once
+# Production (crontab) - BEZ --timeout!
+php artisan queue:work database --stop-when-empty --tries=3
 
-# Z timeout
-php artisan queue:work --timeout=300
+# Jednorazowe testowanie
+php artisan queue:work --once
 ```
+
+### 7.3 Worker Guard v2 - Pliki
+
+| Plik | Rola |
+|------|------|
+| `app/Services/WorkerGuardService.php` | Centralny serwis (register, heartbeat, cleanup, forceRelease) |
+| `app/Models/WorkerHeartbeat.php` | Model heartbeat (PID, job_id, status, timestamps) |
+| `app/Models/JobProgress.php` | Status 'interrupted' w scopeActive(), labels, badges |
+| `app/Services/JobProgressService.php` | formatProgressMessage() dla 'interrupted' |
+| `app/Jobs/PrestaShop/BulkImportProducts.php` | $timeout=0, resume via ProductShopData |
+| `config/queue.php` | retry_after=600 |
+| `routes/console.php` | Smart scheduler (bez --timeout) |
+| `resources/views/.../job-progress-bar.blade.php` | Interrupted UI (pomaranczowy bar + heartbeat dot) |
+| `resources/css/admin/components.css` | .job-progress-bar--interrupted, heartbeat-sonar--interrupted |
 
 ---
 
@@ -1572,6 +1726,41 @@ SELECT * FROM job_progress WHERE status = 'running';
 - **Admin Panel** -> ERP Manager (connection health)
 - **Admin Panel** -> Backup Manager (backup status)
 - **Admin Panel** -> Maintenance (task status)
+- **ActiveOperationsBar** -> Real-time progress z heartbeat dot (Worker Guard v2)
+
+### 8.5 Worker Guard v2 Monitoring
+
+```sql
+-- Aktywne heartbeaty (zywe workery)
+SELECT * FROM worker_heartbeats WHERE status = 'processing'
+  AND last_heartbeat_at > DATE_SUB(NOW(), INTERVAL 120 SECOND);
+
+-- Martwe heartbeaty (do cleanup)
+SELECT * FROM worker_heartbeats WHERE status = 'processing'
+  AND last_heartbeat_at < DATE_SUB(NOW(), INTERVAL 120 SECOND);
+
+-- Interrupted joby (worker umarl, czeka na retry)
+SELECT * FROM job_progress WHERE status = 'interrupted';
+
+-- Death count per job (ile razy worker umarl)
+SELECT job_id, JSON_EXTRACT(metadata, '$.worker_death_count') as deaths
+FROM job_progress WHERE status IN ('interrupted', 'failed')
+  AND JSON_EXTRACT(metadata, '$.worker_death_count') > 0;
+
+-- Reserved joby (powinny byc 0 po forceRelease)
+SELECT * FROM jobs WHERE reserved_at IS NOT NULL;
+```
+
+```bash
+# Logi Worker Guard
+grep "WorkerGuard:" storage/logs/laravel.log | tail -20
+
+# Heartbeat events
+grep "Worker registered\|heartbeat\|Marking stale\|interrupted\|forceRelease" storage/logs/laravel.log
+
+# Resume detection
+grep "resume_offset\|Wznowione" storage/logs/laravel.log
+```
 
 ---
 

@@ -530,6 +530,10 @@ class JobProgressService
                 }
                 return "Wymaga akcji uzytkownika ({$shopName})";
 
+            case 'interrupted':
+                $deathCount = $progress->getMetadataValue('worker_death_count', 0);
+                return "Worker przerwany (proba {$deathCount}/3) - wznowienie za ~60s ({$shopName})";
+
             default:
                 return "Status nieznany";
         }

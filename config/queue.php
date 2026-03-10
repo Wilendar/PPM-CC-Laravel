@@ -38,11 +38,12 @@ return [
             'driver' => 'database',
             'table' => 'jobs',
             'queue' => 'default',
-            // FIX 2026-03-10: retry_after MUST be > timeout of longest job (900s)
-            // Previous value (90s) caused duplicate workers: after 90s the driver
-            // assumed the job was dead and gave it to another worker, while the
-            // original worker was still processing (BulkCreateCategories ~5min)
-            'retry_after' => 1200, // 20 minutes (> 15min job timeout)
+            // Worker Guard v2: retry_after = 600s (10min)
+            // With $timeout=0 (unlimited) on long jobs, heartbeat monitors liveness.
+            // If worker dies, cleanupStaleWorkers() detects it in 120s and
+            // forceReleaseReservedJobs() makes job available immediately.
+            // 600s is a safety net for edge cases where cleanup doesn't fire.
+            'retry_after' => 600,
             'after_commit' => false,
         ],
 

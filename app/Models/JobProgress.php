@@ -269,7 +269,8 @@ class JobProgress extends Model
     public function scopeActive($query)
     {
         // ETAP_07c FIX: Include awaiting_user - job requires user action but is still "active"
-        return $query->whereIn('status', ['pending', 'running', 'awaiting_user']);
+        // Worker Guard v2: Include 'interrupted' - worker died but job will be retried
+        return $query->whereIn('status', ['pending', 'running', 'awaiting_user', 'interrupted']);
     }
 
     /**
@@ -667,6 +668,7 @@ class JobProgress extends Model
             'failed' => 'Blad',
             'cancelled' => 'Anulowane',
             'awaiting_user' => 'Oczekuje na akcje',
+            'interrupted' => 'Worker przerwany',
             default => ucfirst($this->status),
         };
     }
@@ -685,6 +687,7 @@ class JobProgress extends Model
             'failed' => 'bg-red-500',
             'cancelled' => 'bg-orange-500',
             'awaiting_user' => 'bg-yellow-500',
+            'interrupted' => 'bg-orange-400',
             default => 'bg-gray-500',
         };
     }
@@ -698,7 +701,7 @@ class JobProgress extends Model
      */
     public function cancelByUser(): bool
     {
-        if (!in_array($this->status, ['running', 'pending', 'awaiting_user'])) {
+        if (!in_array($this->status, ['running', 'pending', 'awaiting_user', 'interrupted'])) {
             return false;
         }
 

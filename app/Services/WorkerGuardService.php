@@ -157,6 +157,9 @@ class WorkerGuardService
     /**
      * Cleanup stale workers (dead heartbeats)
      *
+     * Worker Guard v2: Uses 'interrupted' status instead of 'failed' to allow
+     * the progress bar to remain visible. Only marks 'failed' after max retries.
+     *
      * @param int $thresholdSeconds Seconds after which worker is considered dead
      * @return int Number of workers cleaned up
      */
@@ -175,25 +178,51 @@ class WorkerGuardService
 
             $worker->markDead();
 
-            // If related job_progress is still 'running', mark it as failed
+            // Worker Guard v2: Track death count and use 'interrupted' status
             if ($worker->job_progress_id) {
                 $jobProgress = JobProgress::find($worker->job_progress_id);
-                if ($jobProgress && $jobProgress->status === 'running') {
-                    $jobProgress->update([
-                        'status' => 'failed',
-                        'completed_at' => now(),
-                    ]);
+                if ($jobProgress && in_array($jobProgress->status, ['running', 'interrupted'])) {
+                    $deathCount = ($jobProgress->getMetadataValue('worker_death_count', 0)) + 1;
+                    $maxDeaths = 3; // After 3 deaths, mark as truly failed
 
-                    // Add error detail about dead worker
-                    $jobProgress->addError(
-                        'SYSTEM',
-                        'Worker przestal odpowiadac (heartbeat timeout). Job oznaczony jako nieudany.'
-                    );
+                    if ($deathCount >= $maxDeaths) {
+                        // Max retries exceeded — mark as failed
+                        $jobProgress->update([
+                            'status' => 'failed',
+                            'completed_at' => now(),
+                        ]);
+                        $jobProgress->updateMetadata(['worker_death_count' => $deathCount]);
+                        $jobProgress->addError(
+                            'SYSTEM',
+                            "Worker przestal odpowiadac {$deathCount}x. Job oznaczony jako nieudany po przekroczeniu limitu prob."
+                        );
 
-                    Log::warning('WorkerGuard: Marked job_progress as failed due to dead worker', [
-                        'job_progress_id' => $worker->job_progress_id,
-                        'job_id' => $worker->job_id,
-                    ]);
+                        Log::warning('WorkerGuard: Marked job_progress as failed (max deaths exceeded)', [
+                            'job_progress_id' => $worker->job_progress_id,
+                            'job_id' => $worker->job_id,
+                            'death_count' => $deathCount,
+                        ]);
+                    } else {
+                        // Mark as interrupted — will be retried
+                        $jobProgress->update(['status' => 'interrupted']);
+                        $jobProgress->updateMetadata([
+                            'worker_death_count' => $deathCount,
+                            'last_interrupted_at' => now()->toDateTimeString(),
+                        ]);
+                        $jobProgress->addError(
+                            'SYSTEM',
+                            "Worker przestal odpowiadac (proba {$deathCount}/{$maxDeaths}). Wznowienie za ~60s."
+                        );
+
+                        Log::warning('WorkerGuard: Marked job_progress as interrupted', [
+                            'job_progress_id' => $worker->job_progress_id,
+                            'job_id' => $worker->job_id,
+                            'death_count' => $deathCount,
+                        ]);
+                    }
+
+                    // Force-release reserved job for immediate retry
+                    $this->forceReleaseReservedJobs($worker->job_id);
                 }
             }
         }
@@ -205,6 +234,35 @@ class WorkerGuardService
         }
 
         return $count;
+    }
+
+    /**
+     * Force-release reserved jobs matching a job_id
+     *
+     * When a worker dies, the queue driver keeps the job "reserved" for retry_after seconds.
+     * This method immediately makes the job available for another worker to pick up.
+     *
+     * @param string $jobId UUID from job_progress.job_id
+     * @return int Number of jobs released
+     */
+    public function forceReleaseReservedJobs(string $jobId): int
+    {
+        $released = DB::table('jobs')
+            ->whereNotNull('reserved_at')
+            ->where('payload', 'like', '%' . $jobId . '%')
+            ->update([
+                'reserved_at' => null,
+                'available_at' => now()->timestamp,
+            ]);
+
+        if ($released > 0) {
+            Log::info('WorkerGuard: Force-released reserved jobs', [
+                'job_id' => $jobId,
+                'released_count' => $released,
+            ]);
+        }
+
+        return $released;
     }
 
     /**

@@ -148,17 +148,18 @@ Schedule::call(function () {
     }
 
     // 4. Spawn worker - processes ALL available jobs within 55s
+    // NOTE: --timeout removed intentionally (Worker Guard v2)
+    // Long-running jobs (BulkImportProducts) use $timeout=0 (unlimited)
+    // and are monitored via heartbeat system instead of process timeout.
     Artisan::call('queue:work', [
         'connection' => 'database',
         '--queue' => 'prestashop_sync,prestashop-sync,erp-sync,erp_default,erp_high,default,sync',
         '--stop-when-empty' => true,
         '--max-time' => 55,
-        '--timeout' => 300,
     ]);
 })->everyMinute()
   ->name('queue-worker-smart')
-  ->withoutOverlapping()
-  ->runInBackground();
+  ->withoutOverlapping();
 
 // ==========================================
 // PRESTASHOP SYNC TASKS

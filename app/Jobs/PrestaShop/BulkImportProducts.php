@@ -50,9 +50,10 @@ class BulkImportProducts implements ShouldQueue, ShouldBeUnique
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     /**
-     * Unique lock timeout (30 minutes)
+     * Unique lock timeout - matches retry_after (600s)
+     * Worker Guard v2: reduced from 1800 to allow faster re-dispatch after worker death
      */
-    public int $uniqueFor = 1800;
+    public int $uniqueFor = 600;
 
     /**
      * The PrestaShop shop instance
@@ -98,11 +99,14 @@ class BulkImportProducts implements ShouldQueue, ShouldBeUnique
     public int $tries = 3;
 
     /**
-     * Timeout for the job (15 minutes)
+     * Timeout for the job - unlimited (Worker Guard v2)
+     * Heartbeat system monitors liveness instead of process timeout.
+     * On shared hosting without pcntl, PHP process timeout was killing
+     * long imports (9554 products ~8h). Heartbeat + cleanup handles dead workers.
      *
      * @var int
      */
-    public int $timeout = 900;
+    public int $timeout = 0;
 
     /**
      * Create a new job instance
@@ -234,12 +238,35 @@ class BulkImportProducts implements ShouldQueue, ShouldBeUnique
             // 🔧 FIX: Fetch products FIRST to know total count for JobProgress
             $client = app(PrestaShopClientFactory::class)->create($this->shop);
             $productsToImport = $this->getProductsToImport($client);
-            $total = count($productsToImport);
+            $originalTotal = count($productsToImport);
+
+            // Worker Guard v2: RESUME — filter out already-imported products
+            // ProductShopData stores prestashop_product_id per shop after successful import.
+            // On worker restart, we skip products that already have a mapping.
+            $resumeOffset = 0;
+            $alreadyImportedPsIds = \App\Models\ProductShopData::where('shop_id', $this->shop->id)
+                ->whereNotNull('prestashop_product_id')
+                ->pluck('prestashop_product_id')
+                ->flip()
+                ->toArray();
+
+            if (!empty($alreadyImportedPsIds)) {
+                $productsToImport = array_values(array_filter($productsToImport, function ($p) use ($alreadyImportedPsIds) {
+                    $psId = (int) ($p['id'] ?? 0);
+                    return $psId === 0 || !isset($alreadyImportedPsIds[$psId]);
+                }));
+                $resumeOffset = $originalTotal - count($productsToImport);
+            }
+
+            $total = count($productsToImport) + $resumeOffset;
 
             Log::info('BulkImportProducts: Products fetched', [
                 'shop_id' => $this->shop->id,
                 'shop_name' => $this->shop->name,
                 'total_products' => $total,
+                'original_total' => $originalTotal,
+                'resume_offset' => $resumeOffset,
+                'remaining' => count($productsToImport),
                 'mode' => $this->mode,
             ]);
 
@@ -312,11 +339,21 @@ class BulkImportProducts implements ShouldQueue, ShouldBeUnique
                 if ($progressId) {
                     // Set phase_label for product import phase
                     // FIX: Clear job_type_override from BulkCreateCategories phase
+                    $phaseLabel = $resumeOffset > 0
+                        ? 'Wznowione importowanie produktow'
+                        : 'Importowanie produktow';
                     $progressService->updateMetadata($progressId, [
                         'phase' => 'importing_products',
-                        'phase_label' => 'Importowanie produktow',
-                        'job_type_override' => 'Importowanie produktow',
+                        'phase_label' => $phaseLabel,
+                        'job_type_override' => $phaseLabel,
+                        'resume_offset' => $resumeOffset,
                     ]);
+
+                    // Worker Guard v2: Set current_count to resumeOffset so progress
+                    // doesn't jump back to 0 on worker restart
+                    if ($resumeOffset > 0) {
+                        $progressService->updateProgress($progressId, $resumeOffset, []);
+                    }
                 }
 
                 if (!$progressId) {
@@ -384,8 +421,9 @@ class BulkImportProducts implements ShouldQueue, ShouldBeUnique
                     $sku = $psProduct['reference'] ?? null;
 
                     // 📊 UPDATE PROGRESS every 5 products for efficiency
+                    // Worker Guard v2: offset counter by resumeOffset for correct progress display
                     if ($index % 5 === 0 && $progressId) {
-                        $progressService->updateProgress($progressId, $index + 1, $errors);
+                        $progressService->updateProgress($progressId, $resumeOffset + $index + 1, $errors);
                         $errors = []; // Reset errors array after batch update
                     }
 
@@ -474,6 +512,7 @@ class BulkImportProducts implements ShouldQueue, ShouldBeUnique
             }
 
             // 📊 FINAL PROGRESS UPDATE with remaining errors
+            // Worker Guard v2: total already includes resumeOffset
             if ($progressId) {
                 $progressService->updateProgress($progressId, $total, $errors);
             }
