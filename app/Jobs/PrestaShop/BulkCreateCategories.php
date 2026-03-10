@@ -625,7 +625,8 @@ class BulkCreateCategories implements ShouldQueue, ShouldBeUnique
                     'metadata' => DB::raw("JSON_SET(
                         COALESCE(metadata, '{}'),
                         '$.phase', 'importing_products',
-                        '$.phase_label', 'Dodawanie produktow - uruchamianie...'
+                        '$.phase_label', 'Dodawanie produktow - uruchamianie...',
+                        '$.job_type_override', 'Importowanie produktow'
                     )"),
                     'updated_at' => now(),
                 ]);

@@ -311,9 +311,11 @@ class BulkImportProducts implements ShouldQueue, ShouldBeUnique
 
                 if ($progressId) {
                     // Set phase_label for product import phase
+                    // FIX: Clear job_type_override from BulkCreateCategories phase
                     $progressService->updateMetadata($progressId, [
                         'phase' => 'importing_products',
                         'phase_label' => 'Importowanie produktow',
+                        'job_type_override' => 'Importowanie produktow',
                     ]);
                 }
 
