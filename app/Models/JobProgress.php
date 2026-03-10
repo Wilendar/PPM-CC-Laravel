@@ -109,6 +109,8 @@ class JobProgress extends Model
         'action_button',
         'started_at',
         'completed_at',
+        'worker_pid',
+        'last_heartbeat_at',
     ];
 
     /**
@@ -127,6 +129,7 @@ class JobProgress extends Model
         'action_button' => 'array',
         'started_at' => 'datetime',
         'completed_at' => 'datetime',
+        'last_heartbeat_at' => 'datetime',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
     ];

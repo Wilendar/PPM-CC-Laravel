@@ -119,16 +119,46 @@ Schedule::command('db:health-check --alert')
     ->runInBackground();
 
 // ==========================================
-// QUEUE WORKER (SHARED HOSTING)
+// QUEUE WORKER (SHARED HOSTING) - Smart Worker Guard
 // ==========================================
-// 2026-01-19: Auto-process queue jobs every minute (shared hosting compatible)
-// On shared hosting we can't run `queue:work` as daemon, so we use scheduler
+// 2026-03-10: Smart scheduler with WorkerGuard anti-duplication
+// Replaces simple --once with --stop-when-empty for efficiency
+// Checks for active workers before spawning new one
 
-Schedule::command('queue:work database --queue=prestashop_sync,prestashop-sync,erp-sync,erp_default,erp_high,default,sync --once --max-time=55')
-    ->everyMinute()
-    ->name('queue-worker-erp')
-    ->withoutOverlapping()
-    ->runInBackground();
+Schedule::call(function () {
+    $guard = app(\App\Services\WorkerGuardService::class);
+
+    // 1. Cleanup stale heartbeats (dead > 120s)
+    $guard->cleanupStaleWorkers(120);
+
+    // 2. Check if there are pending jobs
+    $pendingCount = \Illuminate\Support\Facades\DB::table('jobs')
+        ->where('available_at', '<=', now()->timestamp)
+        ->whereNull('reserved_at')
+        ->count();
+
+    if ($pendingCount === 0) {
+        return;
+    }
+
+    // 3. Check if a worker is already active
+    if (!$guard->canSpawnManualWorker()) {
+        \Illuminate\Support\Facades\Log::debug('WorkerGuard: Active worker detected, skipping spawn');
+        return;
+    }
+
+    // 4. Spawn worker - processes ALL available jobs within 55s
+    Artisan::call('queue:work', [
+        'connection' => 'database',
+        '--queue' => 'prestashop_sync,prestashop-sync,erp-sync,erp_default,erp_high,default,sync',
+        '--stop-when-empty' => true,
+        '--max-time' => 55,
+        '--timeout' => 300,
+    ]);
+})->everyMinute()
+  ->name('queue-worker-smart')
+  ->withoutOverlapping()
+  ->runInBackground();
 
 // ==========================================
 // PRESTASHOP SYNC TASKS

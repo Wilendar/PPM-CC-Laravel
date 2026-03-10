@@ -424,6 +424,15 @@ class JobProgressService
             'pending_conflicts' => [], // Default: no conflicts
         ];
 
+        // === HEARTBEAT STATUS ===
+        $heartbeatStatus = 'unknown';
+        if ($progress->status === 'running' && $progress->last_heartbeat_at) {
+            $seconds = now()->diffInSeconds($progress->last_heartbeat_at);
+            $heartbeatStatus = $seconds < 120 ? 'alive' : ($seconds < 300 ? 'stale' : 'dead');
+        }
+        $result['heartbeat_status'] = $heartbeatStatus;
+        $result['worker_pid'] = $progress->worker_pid;
+
         // === CONFLICT DETECTION (2025-10-13) ===
         // When import completes, check for products needing resolution
         if ($progress->status === 'completed' && $progress->job_type === 'import' && $progress->shop_id) {

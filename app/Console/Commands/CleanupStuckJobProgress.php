@@ -5,6 +5,7 @@ namespace App\Console\Commands;
 use Illuminate\Console\Command;
 use App\Models\JobProgress;
 use App\Models\CategoryPreview;
+use App\Models\WorkerHeartbeat;
 use Illuminate\Support\Facades\DB;
 
 class CleanupStuckJobProgress extends Command
@@ -124,7 +125,61 @@ class CleanupStuckJobProgress extends Command
         if ($dryRun) {
             $this->info("DRY RUN complete. Re-run without --dry-run to apply changes.");
         } else {
-            $this->info("✅ Cleaned {$cleaned} stuck jobs");
+            $this->info("Cleaned {$cleaned} stuck jobs");
+        }
+
+        // === WORKER HEARTBEAT CLEANUP ===
+        $this->newLine();
+        $this->info("=== WORKER HEARTBEAT CLEANUP ===");
+
+        // Mark stale heartbeats (>300s) as dead
+        $staleHeartbeats = WorkerHeartbeat::where('status', 'processing')
+            ->where('last_heartbeat_at', '<', now()->subSeconds(300))
+            ->get();
+
+        if ($staleHeartbeats->isNotEmpty()) {
+            $this->warn("Found {$staleHeartbeats->count()} stale heartbeats:");
+
+            foreach ($staleHeartbeats as $hb) {
+                $age = now()->diffInSeconds($hb->last_heartbeat_at);
+                $this->line("  Heartbeat #{$hb->id}: job_id={$hb->job_id}, pid={$hb->worker_pid}, age={$age}s");
+
+                if (!$dryRun) {
+                    $hb->markDead();
+
+                    // Mark related job_progress as failed if still running
+                    if ($hb->job_progress_id) {
+                        $jp = JobProgress::find($hb->job_progress_id);
+                        if ($jp && $jp->status === 'running') {
+                            $jp->update([
+                                'status' => 'failed',
+                                'completed_at' => now(),
+                            ]);
+                            $jp->addError('SYSTEM', 'Worker przestal odpowiadac (heartbeat timeout)');
+                            $this->info("  -> job_progress #{$jp->id} marked as failed");
+                        }
+                    }
+                }
+            }
+        } else {
+            $this->info("No stale heartbeats found.");
+        }
+
+        // Cleanup old heartbeat records (>7 days)
+        $oldCount = WorkerHeartbeat::where('created_at', '<', now()->subDays(7))
+            ->whereIn('status', ['idle', 'dead'])
+            ->count();
+
+        if ($oldCount > 0) {
+            $this->line("Found {$oldCount} old heartbeat records (>7 days)");
+            if (!$dryRun) {
+                WorkerHeartbeat::where('created_at', '<', now()->subDays(7))
+                    ->whereIn('status', ['idle', 'dead'])
+                    ->delete();
+                $this->info("Deleted {$oldCount} old heartbeat records");
+            } else {
+                $this->comment("[DRY RUN] Would delete {$oldCount} old records");
+            }
         }
 
         return 0;

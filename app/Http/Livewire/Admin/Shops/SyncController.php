@@ -2418,6 +2418,15 @@ class SyncController extends Component
     public function runQueueWorker(int $maxJobs = 10): void
     {
         try {
+            // WorkerGuard: Check if a worker is already active
+            $guard = app(\App\Services\WorkerGuardService::class);
+            if (!$guard->canSpawnManualWorker()) {
+                $this->dispatch('warning', [
+                    'message' => 'Queue worker jest juz aktywny i przetwarza zadania. Poczekaj na zakonczenie.'
+                ]);
+                return;
+            }
+
             // Get pending jobs count before with details
             $pendingBefore = DB::table('jobs')->count();
             $jobsByQueueBefore = DB::table('jobs')

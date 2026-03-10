@@ -4,6 +4,7 @@ namespace App\Jobs\PrestaShop;
 
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
@@ -44,9 +45,14 @@ use App\Jobs\Media\SyncMediaFromPrestaShop;
  * @version 1.0
  * @since ETAP_07_FAZA_3
  */
-class BulkImportProducts implements ShouldQueue
+class BulkImportProducts implements ShouldQueue, ShouldBeUnique
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+
+    /**
+     * Unique lock timeout (30 minutes)
+     */
+    public int $uniqueFor = 1800;
 
     /**
      * The PrestaShop shop instance
@@ -155,6 +161,14 @@ class BulkImportProducts implements ShouldQueue
     }
 
     /**
+     * Unique ID for ShouldBeUnique - per shop
+     */
+    public function uniqueId(): string
+    {
+        return 'bulk-import-products-shop-' . $this->shop->id;
+    }
+
+    /**
      * Get SyncJob instance (gracefully handles deleted jobs)
      *
      * @return SyncJob|null
@@ -183,7 +197,9 @@ class BulkImportProducts implements ShouldQueue
     {
         $startTime = microtime(true);
         $progressId = null;
+        $heartbeatId = null;
         $syncJob = $this->getSyncJob();
+        $guard = app(\App\Services\WorkerGuardService::class);
 
         Log::info('BulkImportProducts job started', [
             'shop_id' => $this->shop->id,
@@ -194,7 +210,25 @@ class BulkImportProducts implements ShouldQueue
             'sync_job_id' => $syncJob?->id,
         ]);
 
+        // WorkerGuard: Check if another worker is already processing this job
+        if ($this->jobId && $guard->hasActiveWorker($this->jobId)) {
+            Log::warning('BulkImportProducts: Active worker detected, aborting', [
+                'job_id' => $this->jobId,
+                'shop_id' => $this->shop->id,
+            ]);
+            return;
+        }
+
         try {
+            // WorkerGuard: Register this worker
+            if ($this->jobId) {
+                $heartbeatId = $guard->registerWorker($this->jobId, 'scheduler', [
+                    'job_class' => 'BulkImportProducts',
+                    'shop_id' => $this->shop->id,
+                    'mode' => $this->mode,
+                ]);
+            }
+
             // FIX 2025-11-25: Update SyncJob status to running
             $syncJob?->start();
             // 🔧 FIX: Fetch products FIRST to know total count for JobProgress
@@ -351,6 +385,11 @@ class BulkImportProducts implements ShouldQueue
                     if ($index % 5 === 0 && $progressId) {
                         $progressService->updateProgress($progressId, $index + 1, $errors);
                         $errors = []; // Reset errors array after batch update
+                    }
+
+                    // WorkerGuard: Send heartbeat every 10 products
+                    if ($heartbeatId && $index % 10 === 0) {
+                        $guard->sendHeartbeat($heartbeatId);
                     }
 
                     // Deadlock retry: InnoDB gap locks on product_categories cause deadlocks
@@ -563,6 +602,11 @@ class BulkImportProducts implements ShouldQueue
             ]);
 
             throw $e;
+        } finally {
+            // WorkerGuard: Always unregister worker on exit
+            if ($heartbeatId) {
+                $guard->unregisterWorker($heartbeatId);
+            }
         }
     }
 

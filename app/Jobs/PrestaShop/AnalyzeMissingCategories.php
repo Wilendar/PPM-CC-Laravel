@@ -4,6 +4,7 @@ namespace App\Jobs\PrestaShop;
 
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
@@ -54,9 +55,14 @@ use App\Events\PrestaShop\CategoryPreviewReady;
  * @version 1.0
  * @since ETAP_07 FAZA 3D
  */
-class AnalyzeMissingCategories implements ShouldQueue
+class AnalyzeMissingCategories implements ShouldQueue, ShouldBeUnique
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+
+    /**
+     * Unique lock timeout (30 minutes)
+     */
+    public int $uniqueFor = 1800;
 
     /**
      * Array of PrestaShop product IDs to analyze
@@ -125,6 +131,14 @@ class AnalyzeMissingCategories implements ShouldQueue
         $this->shop = $shop;
         $this->jobId = $jobId;
         $this->originalImportOptions = $originalImportOptions;
+    }
+
+    /**
+     * Unique ID for ShouldBeUnique - per shop
+     */
+    public function uniqueId(): string
+    {
+        return 'analyze-cats-shop-' . $this->shop->id;
     }
 
     /**

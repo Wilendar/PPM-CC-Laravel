@@ -4,6 +4,7 @@ namespace App\Jobs\PrestaShop;
 
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
@@ -51,9 +52,14 @@ use App\Services\JobProgressService;
  * @version 1.0
  * @since ETAP_07 FAZA 3D
  */
-class BulkCreateCategories implements ShouldQueue
+class BulkCreateCategories implements ShouldQueue, ShouldBeUnique
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+
+    /**
+     * Unique lock timeout (30 minutes)
+     */
+    public int $uniqueFor = 1800;
 
     /**
      * CategoryPreview record ID
@@ -108,6 +114,14 @@ class BulkCreateCategories implements ShouldQueue
     }
 
     /**
+     * Unique ID for ShouldBeUnique - per preview
+     */
+    public function uniqueId(): string
+    {
+        return 'bulk-create-cats-preview-' . $this->previewId;
+    }
+
+    /**
      * Execute the job
      *
      * @param PrestaShopImportService $importService
@@ -119,6 +133,8 @@ class BulkCreateCategories implements ShouldQueue
         JobProgressService $progressService
     ): void {
         $startTime = microtime(true);
+        $heartbeatId = null;
+        $guard = app(\App\Services\WorkerGuardService::class);
 
         Log::info('BulkCreateCategories job started', [
             'preview_id' => $this->previewId,
@@ -129,6 +145,24 @@ class BulkCreateCategories implements ShouldQueue
         try {
             // STEP 1: Load CategoryPreview record
             $preview = CategoryPreview::findOrFail($this->previewId);
+
+            // WorkerGuard: Check if another worker is already processing this job
+            if ($preview->job_id && $guard->hasActiveWorker($preview->job_id)) {
+                Log::warning('BulkCreateCategories: Active worker detected, aborting', [
+                    'job_id' => $preview->job_id,
+                    'preview_id' => $this->previewId,
+                ]);
+                return;
+            }
+
+            // WorkerGuard: Register this worker
+            if ($preview->job_id) {
+                $heartbeatId = $guard->registerWorker($preview->job_id, 'scheduler', [
+                    'job_class' => 'BulkCreateCategories',
+                    'preview_id' => $this->previewId,
+                    'shop_id' => $preview->shop_id,
+                ]);
+            }
 
             Log::info('CategoryPreview loaded', [
                 'preview_id' => $preview->id,
@@ -197,6 +231,11 @@ class BulkCreateCategories implements ShouldQueue
                     if ($index % 3 === 0 && $progressId) {
                         $progressService->updateProgress($progressId, $index + 1, $errors);
                         $errors = []; // Reset errors after batch update
+                    }
+
+                    // WorkerGuard: Send heartbeat every 5 categories
+                    if ($heartbeatId && $index % 5 === 0) {
+                        $guard->sendHeartbeat($heartbeatId);
                     }
 
                     // Import category using PrestaShopImportService
@@ -328,6 +367,11 @@ class BulkCreateCategories implements ShouldQueue
             }
 
             throw $e;
+        } finally {
+            // WorkerGuard: Always unregister worker on exit
+            if ($heartbeatId) {
+                $guard->unregisterWorker($heartbeatId);
+            }
         }
     }
 
@@ -568,6 +612,24 @@ class BulkCreateCategories implements ShouldQueue
     {
         $shop = $preview->shop;
         $jobId = $preview->job_id;
+
+        // FIX: Atomic phase label update BEFORE dispatch
+        // So UI shows "Dodawanie produktow" immediately, not stale "Tworzenie kategorii"
+        if ($jobId) {
+            DB::table('job_progress')
+                ->where('job_id', $jobId)
+                ->update([
+                    'status' => 'running',
+                    'current_count' => 0,
+                    'total_count' => 0,
+                    'metadata' => DB::raw("JSON_SET(
+                        COALESCE(metadata, '{}'),
+                        '$.phase', 'importing_products',
+                        '$.phase_label', 'Dodawanie produktow - uruchamianie...'
+                    )"),
+                    'updated_at' => now(),
+                ]);
+        }
 
         // 🔧 FIX: Flatten nested options structure + prevent infinite loop
         // originalImportOptions has: ['mode' => 'category', 'options' => ['category_id' => 12, ...]]
