@@ -994,7 +994,46 @@
                 <div class="{{ $categoryContainerClasses }} min-h-40 max-h-96 overflow-y-auto resize-y"
                      wire:key="categories-ctx-{{ $activeShopId ?? 'default' }}"
                      :class="{ 'category-tree-frozen': $wire.activeShopId !== null && ($wire.activeJobStatus === 'pending' || $wire.activeJobStatus === 'processing') }">
-                    @foreach($availableCategories as $rootCategory)
+                    @php
+                        // PERFORMANCE: Prune tree to only branches with selected categories
+                        // Unpruned branches get has_children_unpruned flag for Alpine lazy loading
+                        // $depth tracks recursion level: 0 = root (show all with lazy flag)
+                        $pruneTree = function($categories, $selectedIds, $expandedIds, $depth = 0) use (&$pruneTree) {
+                            $result = [];
+                            $allRelevant = array_flip(array_merge($selectedIds, $expandedIds));
+                            foreach ($categories as $cat) {
+                                $isRelevant = isset($allRelevant[$cat->id]);
+                                $originalChildCount = ($cat->children && $cat->children->count() > 0) ? $cat->children->count() : 0;
+                                $prunedChildren = collect([]);
+                                if ($originalChildCount > 0) {
+                                    $prunedChildren = collect($pruneTree($cat->children, $selectedIds, $expandedIds, $depth + 1));
+                                }
+                                if ($isRelevant || $prunedChildren->count() > 0) {
+                                    // On selected path or has relevant children
+                                    $clone = clone $cat;
+                                    $clone->children = $prunedChildren;
+                                    $clone->has_children_unpruned = ($originalChildCount > $prunedChildren->count());
+                                    $result[] = $clone;
+                                } elseif ($depth <= 1) {
+                                    // Top 2 levels: include ALL categories (with lazy flag if they have children)
+                                    // CRITICAL: set children to empty collect() to prevent Blade from rendering full subtree
+                                    $shallow = (object) [
+                                        'id' => $cat->id,
+                                        'name' => $cat->name,
+                                        'parent_id' => $cat->parent_id ?? null,
+                                        'sort_order' => $cat->sort_order ?? 0,
+                                        'children' => collect([]),
+                                        'has_children_unpruned' => ($originalChildCount > 0),
+                                        'is_pending' => $cat->is_pending ?? false,
+                                    ];
+                                    $result[] = $shallow;
+                                }
+                            }
+                            return $result;
+                        };
+                        $categoriesToRender = $pruneTree($availableCategories, $precomputedSelectedIds ?? [], $computedExpandedIds ?? []);
+                    @endphp
+                    @foreach($categoriesToRender as $rootCategory)
                         @include('livewire.products.management.partials.category-tree-item', [
                             'category' => $rootCategory,
                             'level' => 0,
@@ -1004,6 +1043,7 @@
                             'primaryCategoryId' => $precomputedPrimaryId,
                         ])
                     @endforeach
+                    {{-- Lazy load info: unpruned branches load on-demand via Alpine --}}
                 </div>
 
                 @if($this->getCategoriesForContext($activeShopId))

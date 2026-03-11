@@ -25,13 +25,21 @@ export function registerCategoryPanel(Alpine) {
 
         // Hover state
         hoveredProductId: null,
-        highlightedCategories: [],
+        highlightedCategoriesMap: {},     // O(1) lookup: { [catId]: true }
         expandedForHover: new Set(),
         manuallyExpanded: new Set(),
 
         // Checkbox selection state
-        selectionHighlightedCategories: [],
-        selectionPrimaryCategories: [],
+        selectionHighlightedMap: {},      // O(1) lookup: { [catId]: true }
+        selectionPrimaryMap: {},          // O(1) lookup: { [catId]: true }
+
+        // filteredTree cache
+        _cachedFilteredTree: null,
+        _lastSearchTerm: '',
+
+        // Map refresh guard
+        _fetchingMap: false,
+        _morphTimer: null,
 
         // Resize state
         _startX: 0,
@@ -51,17 +59,29 @@ export function registerCategoryPanel(Alpine) {
             // Build flat map for O(1) lookups
             this.buildCategoryMap(this.categoryTree);
 
-            // Refresh productCategoryMap after Livewire updates (pagination, filters)
-            Livewire.hook('commit', ({ succeed }) => {
-                succeed(() => {
-                    setTimeout(() => {
-                        if (this.panelSide && this.$wire) {
-                            this.$wire.call('getProductCategoryMapForPanel').then(map => {
-                                this.productCategoryMap = map || {};
-                            });
-                        }
-                    }, 100);
-                });
+            // Detect product list changes via MutationObserver on table body.
+            // Fires ONLY when rows are added/removed (pagination, filter) - NOT on polls
+            // or text updates. Zero memory leak (no setInterval, no Performance API).
+            this.$nextTick(() => {
+                const tbody = this.$el.closest('[wire\\:id]')?.querySelector('table tbody');
+                if (tbody) {
+                    this._rowObserver = new MutationObserver(() => {
+                        if (!this.panelSide || this._fetchingMap) return;
+                        if (this._morphTimer) clearTimeout(this._morphTimer);
+                        this._morphTimer = setTimeout(() => {
+                            if (this.panelSide && this.$wire && !this._fetchingMap) {
+                                this._fetchingMap = true;
+                                this.$wire.call('getProductCategoryMapForPanel').then(map => {
+                                    this.productCategoryMap = map || {};
+                                    this._fetchingMap = false;
+                                }).catch(() => {
+                                    this._fetchingMap = false;
+                                });
+                            }
+                        }, 300);
+                    });
+                    this._rowObserver.observe(tbody, { childList: true });
+                }
             });
 
             // Watch selectedProducts for checkbox integration
@@ -123,13 +143,16 @@ export function registerCategoryPanel(Alpine) {
             this.hoveredProductId = productId;
             const mapping = this.productCategoryMap[productId];
             if (!mapping) {
-                this.highlightedCategories = [];
+                this.highlightedCategoriesMap = {};
                 this.collapseHoverExpanded();
                 return;
             }
 
-            this.highlightedCategories = mapping.categories || [];
-            this.expandToCategories(this.highlightedCategories);
+            const cats = mapping.categories || [];
+            const map = {};
+            for (const id of cats) map[id] = true;
+            this.highlightedCategoriesMap = map;
+            this.expandToCategories(cats);
 
             // Auto-scroll to primary category (or first highlighted)
             // Delay to ensure Alpine has rendered expanded nodes in DOM
@@ -142,34 +165,29 @@ export function registerCategoryPanel(Alpine) {
         },
 
         expandToCategories(categoryIds) {
-            // Collapse previously hover-expanded
-            this.expandedForHover.forEach(id => {
-                if (!this.manuallyExpanded.has(id)) {
-                    this.expandedForHover.delete(id);
-                }
-            });
+            // Build new Set in one go (single assignment = single reactivity trigger)
+            const newExpanded = new Set();
 
-            // Walk parent chain for each category and expand
-            const toExpand = new Set();
+            // Keep manually expanded nodes
+            this.manuallyExpanded.forEach(id => newExpanded.add(id));
+
+            // Walk parent chain for each category
             categoryIds.forEach(catId => {
                 let node = this.categoryMap[catId];
                 while (node && node.parentId) {
                     const parent = this.categoryMap[node.parentId];
-                    if (parent) {
-                        toExpand.add(parent.id);
-                    }
+                    if (parent) newExpanded.add(parent.id);
                     node = parent;
                 }
             });
 
-            toExpand.forEach(id => {
-                this.expandedForHover.add(id);
-            });
+            // Single assignment instead of multiple add/delete mutations
+            this.expandedForHover = newExpanded;
         },
 
         collapseHoverExpanded() {
             // Sticky hover: keep hoveredProductId, only clear visual state
-            this.highlightedCategories = [];
+            this.highlightedCategoriesMap = {};
             this.expandedForHover = new Set();
         },
 
@@ -177,28 +195,34 @@ export function registerCategoryPanel(Alpine) {
         onSelectionChanged(selectedIds) {
             if (!this.panelSide) return;
             if (!selectedIds || selectedIds.length === 0) {
-                this.selectionHighlightedCategories = [];
-                this.selectionPrimaryCategories = [];
+                this.selectionHighlightedMap = {};
+                this.selectionPrimaryMap = {};
                 return;
             }
 
-            const allCats = new Set();
-            const allPrimary = new Set();
+            const highlightMap = {};
+            const primaryMap = {};
+            const allCatIds = [];
             let lastProductId = null;
 
             for (const pid of selectedIds) {
                 const mapping = this.productCategoryMap[pid];
                 if (mapping) {
-                    (mapping.categories || []).forEach(c => allCats.add(c));
-                    if (mapping.primary) allPrimary.add(mapping.primary);
+                    for (const c of (mapping.categories || [])) {
+                        if (!highlightMap[c]) {
+                            highlightMap[c] = true;
+                            allCatIds.push(c);
+                        }
+                    }
+                    if (mapping.primary) primaryMap[mapping.primary] = true;
                     lastProductId = pid;
                 }
             }
 
-            this.selectionHighlightedCategories = [...allCats];
-            this.selectionPrimaryCategories = [...allPrimary];
+            this.selectionHighlightedMap = highlightMap;
+            this.selectionPrimaryMap = primaryMap;
 
-            this.expandToCategories([...allCats]);
+            this.expandToCategories(allCatIds);
 
             // Auto-scroll to primary category of last selected product
             if (lastProductId) {
@@ -226,7 +250,7 @@ export function registerCategoryPanel(Alpine) {
 
             // Clear sticky hover (tree stays expanded via manuallyExpanded)
             this.hoveredProductId = null;
-            this.highlightedCategories = [];
+            this.highlightedCategoriesMap = {};
             this.expandedForHover = new Set();
 
             if (this.selectedCategoryId === id) {
@@ -270,8 +294,8 @@ export function registerCategoryPanel(Alpine) {
                 classes['category-panel__node--selected'] = true;
             }
 
-            // 2. Hover highlight (mouseenter on product row)
-            if (this.highlightedCategories.includes(node.id)) {
+            // 2. Hover highlight (mouseenter on product row) - O(1) lookup
+            if (this.highlightedCategoriesMap[node.id]) {
                 classes['category-panel__node--highlighted'] = true;
                 const mapping = this.productCategoryMap[this.hoveredProductId];
                 if (mapping && mapping.primary === node.id) {
@@ -279,10 +303,10 @@ export function registerCategoryPanel(Alpine) {
                 }
             }
 
-            // 3. Checkbox highlight (selected products)
-            if (this.selectionHighlightedCategories.includes(node.id)) {
+            // 3. Checkbox highlight (selected products) - O(1) lookup
+            if (this.selectionHighlightedMap[node.id]) {
                 classes['category-panel__node--selection-highlighted'] = true;
-                if (this.selectionPrimaryCategories.includes(node.id)) {
+                if (this.selectionPrimaryMap[node.id]) {
                     classes['category-panel__node--selection-primary'] = true;
                 }
             }
@@ -299,9 +323,9 @@ export function registerCategoryPanel(Alpine) {
                     if (mapping.categories && mapping.categories.includes(nodeId)) return '\u25CF';
                 }
             }
-            // Priority 2: checkbox markers
-            if (this.selectionPrimaryCategories.includes(nodeId)) return '\u2605';
-            if (this.selectionHighlightedCategories.includes(nodeId)) return '\u25CF';
+            // Priority 2: checkbox markers - O(1) lookup
+            if (this.selectionPrimaryMap[nodeId]) return '\u2605';
+            if (this.selectionHighlightedMap[nodeId]) return '\u25CF';
             return '';
         },
 
@@ -314,17 +338,25 @@ export function registerCategoryPanel(Alpine) {
                     if (mapping.categories && mapping.categories.includes(nodeId)) return 'category-panel__marker--other';
                 }
             }
-            // Priority 2: checkbox markers
-            if (this.selectionPrimaryCategories.includes(nodeId)) return 'category-panel__marker--selection-primary';
-            if (this.selectionHighlightedCategories.includes(nodeId)) return 'category-panel__marker--selection-other';
+            // Priority 2: checkbox markers - O(1) lookup
+            if (this.selectionPrimaryMap[nodeId]) return 'category-panel__marker--selection-primary';
+            if (this.selectionHighlightedMap[nodeId]) return 'category-panel__marker--selection-other';
             return '';
         },
 
         // -- Search --
         filteredTree() {
-            if (!this.searchTerm) return this.categoryTree;
-            const term = this.searchTerm.toLowerCase();
-            return this.filterNodes(this.categoryTree, term);
+            if (this.searchTerm === this._lastSearchTerm && this._cachedFilteredTree) {
+                return this._cachedFilteredTree;
+            }
+            this._lastSearchTerm = this.searchTerm;
+            if (!this.searchTerm) {
+                this._cachedFilteredTree = this.categoryTree;
+            } else {
+                const term = this.searchTerm.toLowerCase();
+                this._cachedFilteredTree = this.filterNodes(this.categoryTree, term);
+            }
+            return this._cachedFilteredTree;
         },
 
         filterNodes(nodes, term) {

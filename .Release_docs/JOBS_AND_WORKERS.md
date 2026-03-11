@@ -1,9 +1,10 @@
 # PPM - Jobs & Workers Documentation
 
-> **Wersja:** 3.1
+> **Wersja:** 3.2
 > **Data:** 2026-03-11
 > **Status:** Production Ready
-> **Changelog:** v3.1: SyncJob heartbeat monitoring, ERP scheduler dedup fix, manual ERP sync buttons, cancel removes from queue, queue name alignment, active jobs priority sorting
+> **Changelog:** v3.2: Delta sync (price change tracking + stock checksums), removed duplicate change detection scheduler, crontab queue fix (erp-sync), SyncJob::create() required fields documented
+> **Previous:** v3.1: SyncJob heartbeat monitoring, ERP scheduler dedup fix, manual ERP sync buttons, cancel removes from queue, queue name alignment, active jobs priority sorting
 
 ---
 
@@ -340,24 +341,18 @@ Optymalizacja (2026-01-19):
 
 ### 3.2 Subiekt GT ERP Sync
 
-#### subiekt-gt:change-detection
+#### subiekt-gt:change-detection (DEPRECATED v3.2)
 ```
-Harmonogram: Co 15 minut
-Job: DetectSubiektGTChanges
-Timeout: 60s
+STATUS: USUNIETY z routes/console.php (2026-03-11)
+POWOD: Duplikowal dynamiczny scheduler (erp:dynamic-sync).
+       Delta sync jest teraz wbudowany w pullLinkedProducts() (SubiektGTService).
+       Dynamiczny scheduler respektuje czestotliwosci z UI konfiguracji.
 
-Co robi:
-1. Wykonuje lightweight COUNT query na tw__Towar (tw_DataMod)
-2. Sprawdza dedup: czy istnieje pending/running job pull_products (v3.1 FIX)
-3. Jesli zmiany >= threshold I brak duplikatu, dispatch PullProductsFromSubiektGT
-4. Aktualizuje connection health status
-
-Charakterystyka:
-- Bardzo szybki (single SQL query)
-- Nie blokuje kolejki (queue: default)
-- Automatyczny incremental pull przy zmianach
-- Dedup check: source_type='subiekt_gt' + source_id (v3.1 FIX)
-- Spojne pola: source_type/source_id zamiast target_type/target_id (v3.1 FIX)
+POPRZEDNIO:
+- Harmonogram: Co 15 minut (hardcoded, niezalezny od UI config)
+- Job: DetectSubiektGTChanges
+- Problem: Stawial connection_status='error' gdy SyncJob::create() brakowalo
+  wymaganych pol (job_id, job_name) lub trigger_type spoza enum
 ```
 
 #### erp:dynamic-sync (ETAP_08 FAZA 6 - 2026-01-26)
@@ -451,8 +446,9 @@ Dane pobierane:
 **CRONTAB Worker (PRIMARY - przetwarza joby):**
 ```
 Harmonogram: Co minute (crontab)
-Komenda: queue:work database --stop-when-empty --tries=3
+Komenda: queue:work database --queue=erp-sync,default --stop-when-empty --tries=3
 BEZ --timeout (Worker Guard v2 monitoruje liveness via heartbeat)
+WAZNE: --queue=erp-sync,default WYMAGANE aby ERP joby sie przetwarzaly! (FIX v3.2)
 
 Przeznaczenie:
 - Glowny worker przetwarzajacy wszystkie joby z kolejki
@@ -1417,6 +1413,71 @@ Linked Only Mode:
 
 ### END BATCH PARALLEL FETCH ###
 
+### DELTA SYNC (v3.2 - 2026-03-11) ###
+
+Optymalizacja synchronizacji - pobieranie TYLKO zmienionych danych zamiast full sync.
+Implementacja w `SubiektGTService::pullLinkedProducts()`.
+
+**Price Delta (Change Tracking):**
+```
+Marker: ERPConnection.last_change_time (datetime)
+Subiekt GT kolumna: twz_CzasModyf (datetime modyfikacji towaru)
+API Endpoint: GET /api/products/changes-since?since=YYYY-MM-DDTHH:MM:SS
+Flow:
+  1. Fetch /api/products/changes-since?since=last_change_time
+  2. API zwraca {modified_count: N, products: [...], max_change_time: "..."}
+  3. Filtruj tylko linked SKU (intersection ze zbiorem PPM)
+  4. Fetch pelne dane TYLKO dla zmienionych produktow
+  5. Update last_change_time = max_change_time
+  6. Jesli modified_count=0 -> SKIP caly fetch (0 API calls)
+
+Performance (zweryfikowane na produkcji, 8886 linked produktow):
+  - Full sync: ~977s (16 min)
+  - Delta (brak zmian): 0.7s (1400x szybciej)
+  - Delta (1 zmiana): ~1s
+```
+
+**Stock Delta (Checksums):**
+```
+Marker: ERPConnection.last_stock_checksum_at (datetime)
+API Endpoint: GET /api/stock/checksums?skus=SKU1,SKU2,...&since=DATETIME
+Flow:
+  1. Podziel linked SKU na chunki po 500
+  2. Fetch /api/stock/checksums dla kazdego chunka
+  3. API zwraca checksum per-SKU + max_change_time
+  4. Porownaj z cached checksums w ERPConnection
+  5. Fetch pelne dane stock TYLKO dla zmienionych SKU
+  6. Update last_stock_checksum_at
+
+Performance (zweryfikowane na produkcji):
+  - Full sync: ~977s
+  - Delta (z checksumami): 57-204s (5-17x szybciej)
+  - Zalezne od liczby zmian w Subiekt GT
+```
+
+**ERPConnection - nowe kolumny delta sync:**
+
+| Kolumna | Typ | Opis |
+|---------|-----|------|
+| `last_change_time` | timestamp | Ostatni twz_CzasModyf z Subiekt GT |
+| `last_stock_checksum_at` | timestamp | Ostatni checksum fetch |
+
+**Fallback:**
+- Jesli delta API zwroci HTTP error -> automatyczny fallback do full sync
+- Log: `pullLinkedProducts: Delta sync failed, falling back to full sync`
+- Pierwszy sync (last_change_time=NULL) -> zawsze full sync + zapis initial marker
+
+**Logi delta sync (storage/logs/laravel.log):**
+```
+pullLinkedProducts: Delta sync (change tracking) {"total_changes":1,"linked_changes":1}
+pullLinkedProducts: Fetch scope {"delta_sync":true,"fetch_count":1,"total_linked":8886}
+pullLinkedProducts: No changes detected via delta, skipping fetch
+pullLinkedProducts: Delta sync (stock checksums) {"tw_changes":1,"checksum_changes":2500}
+pullLinkedProducts: Completed {"duration_seconds":0.69,"delta_sync":true}
+```
+
+### END DELTA SYNC ###
+
 SyncJob Stats Mapping (FIX 2026-01-26):
 - metadata['total'] -> total_items
 - metadata['imported'] + metadata['updated'] -> successful_items
@@ -1434,19 +1495,29 @@ Tracking:
 - Logs to IntegrationLog
 ```
 
-#### DetectSubiektGTChanges
+#### DetectSubiektGTChanges (DEPRECATED - v3.2)
 ```
 Sciezka: app/Jobs/ERP/DetectSubiektGTChanges.php
 Kolejka: default
 Timeout: 60s
 Tries: 3
 
-Przeznaczenie:
-- Lightweight change detection w Subiekt GT
-- Dispatch incremental pull jesli zmiany wykryte
+STATUS: DEPRECATED (2026-03-11)
+Scheduler co 15 min zostal USUNIETY z routes/console.php.
+Delta sync jest teraz wbudowany w pullLinkedProducts() (SubiektGTService).
+Dynamiczny ERP scheduler (ETAP_08 FAZA 6) uruchamia PullProductsFromSubiektGT
+z odpowiednimi czestotliwosciami, a delta jest automatyczna.
+
+Plik zostaje w kodzie jako utility (mozna wywolac recznie),
+ale NIE jest juz schedulowany automatycznie.
 
 Dane wejsciowe:
 - int $connectionId - ERPConnection ID
+
+WAZNE: Jesli uzyjesz SyncJob::create() w tym jobie, WYMAGANE pola:
+- job_id: \Str::uuid()->toString()
+- job_name: "Delta sync: ..."
+- trigger_type: 'scheduled' (NIE 'change_detection' - brak w enum!)
 ```
 
 ---
@@ -1663,8 +1734,8 @@ product_erp_data (...)
 
 1. **Dual Worker System** (crontab + scheduler):
 ```bash
-# CRONTAB - PRIMARY worker (przetwarza joby)
-* * * * * cd /path && php artisan queue:work database --stop-when-empty --tries=3
+# CRONTAB - PRIMARY worker (przetwarza joby) - v3.2: dodano --queue=erp-sync,default
+* * * * * cd /path && php artisan queue:work database --queue=erp-sync,default --stop-when-empty --tries=3
 
 # CRONTAB - SCHEDULER (smart spawn + cleanup)
 * * * * * cd /path && php artisan schedule:run >> /dev/null 2>&1

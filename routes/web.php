@@ -429,7 +429,16 @@ Route::prefix('admin')->name('admin.')->middleware($adminMiddleware)->group(func
 
         // Product editing - Blade wrapper with admin layout
         Route::get('/{product}/edit', function ($product) {
-            $productModel = \App\Models\Product::find($product);
+            $productModel = \App\Models\Product::with([
+                'shopData.shop',
+                'erpData',
+                'features.featureType',
+                'features.featureValue',
+                'variants',
+                'categories',
+                'productType',
+                'stocks',
+            ])->find($product);
             return view('pages.product-form-edit', compact('product', 'productModel'));
         })->name('edit')->middleware('permission:products.read');
 

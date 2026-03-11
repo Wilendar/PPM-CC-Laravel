@@ -6,6 +6,8 @@
 
 @php
     $hasChildren = $category->children && $category->children->count() > 0;
+    $hasUnprunedChildren = !empty($category->has_children_unpruned);
+    $hasAnyChildren = $hasChildren || $hasUnprunedChildren;
     // BUG FIX 2026-02-20: Use pre-computed arrays instead of calling method per category (was causing memory exhaustion - 4780 calls)
     $isSelected = in_array($category->id, $selectedCategoryIds ?? []);
     $isPrimary = ($primaryCategoryId ?? null) == $category->id;
@@ -153,8 +155,8 @@ wire:key="category-tree-{{ $context }}-{{ $category->id }}-{{ $isMarkedForDeleti
          wire:key="category-row-{{ $context }}-{{ $category->id }}-{{ $isMarkedForDeletion ? 'd' : '' }}{{ $parentIsMarkedForDeletion ? 'p' : '' }}"
          style="padding-left: {{ $level * 1.5 }}rem;">
 
-        {{-- Collapse/Expand chevron (only if has children) --}}
-        @if($hasChildren)
+        {{-- Collapse/Expand chevron (if has children or unpruned children) --}}
+        @if($hasAnyChildren)
             <button
                 type="button"
                 @click="collapsed = !collapsed"
@@ -342,19 +344,34 @@ wire:key="category-tree-{{ $context }}-{{ $category->id }}-{{ $isMarkedForDeleti
 
     {{-- Recursively render children with collapse/expand animation --}}
     {{-- PERFORMANCE FIX 2025-11-27: Use GPU-accelerated opacity-only transition (no reflow) --}}
-    @if($hasChildren)
+    {{-- LAZY LOAD 2026-03-11: Hybrid render - server for pruned branches, Alpine for unpruned --}}
+    @if($hasAnyChildren)
         <div x-show="!collapsed"
              x-transition.opacity.duration.100ms>
-            @foreach($category->children->sortBy('sort_order') as $child)
-                @include('livewire.products.management.partials.category-tree-item', [
-                    'category' => $child,
-                    'level' => $level + 1,
-                    'context' => $context,
-                    'expandedCategoryIds' => $expandedCategoryIds,
-                    'selectedCategoryIds' => $selectedCategoryIds ?? [],
-                    'primaryCategoryId' => $primaryCategoryId ?? null,
-                ])
-            @endforeach
+            @if($hasChildren)
+                {{-- Server-rendered (pruned branches that lead to selected categories) --}}
+                @foreach($category->children->sortBy('sort_order') as $child)
+                    @include('livewire.products.management.partials.category-tree-item', [
+                        'category' => $child,
+                        'level' => $level + 1,
+                        'context' => $context,
+                        'expandedCategoryIds' => $expandedCategoryIds,
+                        'selectedCategoryIds' => $selectedCategoryIds ?? [],
+                        'primaryCategoryId' => $primaryCategoryId ?? null,
+                    ])
+                @endforeach
+            @endif
+            @if($hasUnprunedChildren)
+                {{-- Lazy load placeholder - loads children on-demand via Alpine --}}
+                <div x-data="categoryTreeLazy({
+                    parentId: {{ $category->id }},
+                    context: '{{ $context }}',
+                    level: {{ $level + 1 }}
+                })" x-init="loadChildren()"
+                     wire:key="lazy-{{ $context }}-{{ $category->id }}">
+                    @include('livewire.products.management.partials.category-tree-lazy-children')
+                </div>
+            @endif
         </div>
     @endif
 </div>

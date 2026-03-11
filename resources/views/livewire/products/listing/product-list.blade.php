@@ -190,10 +190,15 @@
 .text-orange-900 { color: #7c2d12 !important; }
 .dark\:text-orange-200 { color: #fed7aa !important; }
 
-/* Smooth transitions */
-* {
-    transition-duration: 0.3s !important;
-    transition-timing-function: ease !important;
+/* Smooth transitions - targeted selectors only (not * which forces layout on ALL elements) */
+.product-list-row,
+.btn-enterprise-primary,
+.btn-enterprise-secondary,
+.btn-enterprise-danger,
+.enterprise-card,
+.form-input-enterprise,
+input[type="checkbox"] {
+    transition: all 0.3s ease;
 }
 
 /* Custom checkbox styling */
