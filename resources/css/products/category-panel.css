@@ -1,0 +1,367 @@
+/* ============================================
+   CATEGORY PANEL - Product List Sidebar
+   ============================================ */
+
+/* Flex wrapper for panel + content */
+.product-list-with-panel {
+    display: flex;
+    min-height: 0;
+    width: 100%;
+}
+
+.product-list-with-panel__content {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+}
+
+/* Panel container */
+.category-panel {
+    flex-shrink: 0;
+    background: rgba(17, 24, 39, 0.95);
+    border: 1px solid rgba(75, 85, 99, 0.3);
+    display: flex;
+    flex-direction: column;
+    height: calc(100vh - 180px);
+    position: sticky;
+    top: 180px;
+    overflow: hidden;
+    transition: width 0.3s ease;
+    z-index: 10;
+}
+
+.category-panel--left {
+    order: -1;
+    border-right: 1px solid rgba(75, 85, 99, 0.3);
+    border-left: none;
+    border-radius: 0 0.5rem 0.5rem 0;
+}
+
+.category-panel--right {
+    order: 1;
+    border-left: 1px solid rgba(75, 85, 99, 0.3);
+    border-right: none;
+    border-radius: 0.5rem 0 0 0.5rem;
+}
+
+/* Resize handle */
+.category-panel__resize-handle {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 8px;
+    cursor: col-resize;
+    background: transparent;
+    transition: background 0.2s ease;
+    z-index: 11;
+}
+
+.category-panel__resize-handle:hover,
+.category-panel__resize-handle--active {
+    background: var(--mpp-primary);
+}
+
+.category-panel--left .category-panel__resize-handle {
+    right: 0;
+}
+
+.category-panel--right .category-panel__resize-handle {
+    left: 0;
+}
+
+/* Body class during resize */
+.category-panel--resizing {
+    cursor: col-resize !important;
+    user-select: none !important;
+}
+
+.category-panel--resizing * {
+    cursor: col-resize !important;
+    user-select: none !important;
+}
+
+/* Disable transition on panel during resize for smooth dragging */
+.category-panel--resizing .category-panel {
+    transition: none !important;
+}
+
+/* Panel header */
+.category-panel__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid rgba(75, 85, 99, 0.3);
+    background: rgba(31, 41, 55, 0.5);
+    flex-shrink: 0;
+}
+
+.category-panel__title {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--mpp-primary);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.category-panel__close-btn {
+    padding: 0.25rem;
+    border-radius: 0.375rem;
+    color: #9ca3af;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.category-panel__close-btn:hover {
+    color: white;
+    background: rgba(75, 85, 99, 0.5);
+}
+
+/* Search input */
+.category-panel__search {
+    padding: 0.5rem 1rem;
+    border-bottom: 1px solid rgba(75, 85, 99, 0.2);
+    flex-shrink: 0;
+}
+
+.category-panel__search-input {
+    width: 100%;
+    padding: 0.375rem 0.75rem;
+    padding-left: 2rem;
+    font-size: 0.75rem;
+    background: rgba(55, 65, 81, 0.5);
+    border: 1px solid rgba(75, 85, 99, 0.3);
+    border-radius: 0.375rem;
+    color: #f3f4f6;
+    outline: none;
+    transition: border-color 0.2s ease;
+}
+
+.category-panel__search-input:focus {
+    border-color: var(--mpp-primary);
+    box-shadow: 0 0 0 2px rgba(224, 172, 126, 0.15);
+}
+
+.category-panel__search-input::placeholder {
+    color: #6b7280;
+}
+
+/* Tree container */
+.category-panel__tree {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 0.5rem 0;
+}
+
+/* Tree node */
+.category-panel__node {
+    display: flex;
+    align-items: center;
+    padding: 0.375rem 0.75rem;
+    cursor: pointer;
+    font-size: 0.8125rem;
+    color: #d1d5db;
+    transition: all 0.15s ease;
+    border-left: 3px solid transparent;
+    gap: 0.375rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.category-panel__node:hover {
+    background: rgba(55, 65, 81, 0.4);
+    color: white;
+}
+
+/* Selected (active filter) */
+.category-panel__node--selected {
+    background: rgba(224, 172, 126, 0.15) !important;
+    color: var(--mpp-primary) !important;
+    border-left-color: var(--mpp-primary);
+    font-weight: 600;
+}
+
+/* Highlighted by product hover */
+.category-panel__node--highlighted {
+    background: rgba(224, 172, 126, 0.1);
+    border-left-color: rgba(224, 172, 126, 0.6);
+    color: #f4b986;
+}
+
+/* Primary category marker */
+.category-panel__node--primary {
+    font-weight: 600;
+}
+
+/* Checkbox selection highlight (purple tint to distinguish from hover) */
+.category-panel__node--selection-highlighted {
+    background: rgba(147, 130, 220, 0.1);
+    border-left-color: rgba(147, 130, 220, 0.5);
+    color: #c4b5fd;
+}
+
+.category-panel__node--selection-primary {
+    font-weight: 600;
+}
+
+/* Hover takes priority over selection */
+.category-panel__node--highlighted.category-panel__node--selection-highlighted {
+    background: rgba(224, 172, 126, 0.1);
+    border-left-color: rgba(224, 172, 126, 0.6);
+    color: #f4b986;
+}
+
+/* Selection markers */
+.category-panel__marker--selection-primary {
+    color: #c4b5fd;
+}
+
+.category-panel__marker--selection-other {
+    color: #8b7fc7;
+}
+
+/* Expand/collapse button */
+.category-panel__expand-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 1rem;
+    height: 1rem;
+    flex-shrink: 0;
+    color: #6b7280;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    padding: 0;
+    transition: transform 0.2s ease, color 0.2s ease;
+}
+
+.category-panel__expand-btn:hover {
+    color: #9ca3af;
+}
+
+.category-panel__expand-btn--expanded {
+    transform: rotate(90deg);
+}
+
+.category-panel__expand-btn svg {
+    width: 0.75rem;
+    height: 0.75rem;
+}
+
+/* Spacer for nodes without expand button */
+.category-panel__expand-spacer {
+    width: 1rem;
+    flex-shrink: 0;
+}
+
+/* Category marker (star/dot) */
+.category-panel__marker {
+    flex-shrink: 0;
+    font-size: 0.625rem;
+    width: 0.75rem;
+    text-align: center;
+}
+
+.category-panel__marker--primary {
+    color: var(--mpp-primary);
+}
+
+.category-panel__marker--other {
+    color: #6b7280;
+}
+
+/* Category name */
+.category-panel__name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    flex: 1;
+    min-width: 0;
+}
+
+/* Category count badge */
+.category-panel__count {
+    font-size: 0.625rem;
+    color: #6b7280;
+    flex-shrink: 0;
+    margin-left: auto;
+    padding-left: 0.375rem;
+}
+
+/* Toggle button in header bar */
+.category-panel-toggle-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.375rem 0.75rem;
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: #9ca3af;
+    background: rgba(31, 41, 55, 0.8);
+    border: 1px solid rgba(75, 85, 99, 0.2);
+    border-radius: 0.5rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+}
+
+.category-panel-toggle-btn:hover {
+    color: white;
+    background: rgba(55, 65, 81, 0.8);
+    border-color: rgba(75, 85, 99, 0.4);
+}
+
+.category-panel-toggle-btn--active {
+    color: var(--mpp-primary);
+    background: rgba(224, 172, 126, 0.1);
+    border-color: rgba(224, 172, 126, 0.3);
+}
+
+.category-panel-toggle-btn svg {
+    width: 0.875rem;
+    height: 0.875rem;
+}
+
+/* No results */
+.category-panel__empty {
+    padding: 1.5rem 1rem;
+    text-align: center;
+    color: #6b7280;
+    font-size: 0.75rem;
+}
+
+/* Hide on mobile */
+@media (max-width: 1023px) {
+    .category-panel {
+        display: none;
+    }
+    .category-panel-toggle-btn {
+        display: none;
+    }
+}
+
+/* Scrollbar styling for panel */
+.category-panel__tree::-webkit-scrollbar {
+    width: 4px;
+}
+
+.category-panel__tree::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.category-panel__tree::-webkit-scrollbar-thumb {
+    background: rgba(224, 172, 126, 0.2);
+    border-radius: 2px;
+}
+
+.category-panel__tree::-webkit-scrollbar-thumb:hover {
+    background: rgba(224, 172, 126, 0.4);
+}

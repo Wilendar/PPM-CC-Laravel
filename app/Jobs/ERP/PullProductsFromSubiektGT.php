@@ -190,7 +190,7 @@ class PullProductsFromSubiektGT implements ShouldQueue, ShouldBeUnique
             // Execute pull operation based on mode
             // ETAP_08 FAZA 7: Scheduled modes (prices, stock, basic_data) use optimized linked_only
             // This ensures scheduled jobs only process linked products (like PrestaShop jobs)
-            $optimizedModes = ['linked_only', 'prices', 'stock', 'basic_data', 'stock_only'];
+            $optimizedModes = ['linked_only', 'prices', 'stock', 'basic_data', 'stock_only', 'location'];
 
             if (in_array($this->mode, $optimizedModes)) {
                 // OPTIMIZED: Pull only products already linked to this ERP connection
@@ -423,8 +423,12 @@ class PullProductsFromSubiektGT implements ShouldQueue, ShouldBeUnique
             }
         }
 
+        // Heartbeat: always update on status change
+        $updateData['last_heartbeat_at'] = Carbon::now();
+
         if ($status === 'running' && !$syncJob->started_at) {
             $updateData['started_at'] = Carbon::now();
+            $updateData['worker_pid'] = @getmypid() ?: 0;
         }
 
         if ($status === 'completed' || $status === 'failed') {

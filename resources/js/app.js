@@ -6,6 +6,9 @@ import 'vanilla-colorful/hex-color-picker.js';
 // Import resizable columns for import panel
 import './resizable-columns.js';
 
+// Import category panel for product listing
+import { registerCategoryPanel } from './category-panel.js';
+
 // =====================================================
 // PPM DIAGNOSTICS - Bug Report System Support
 // Tracks user actions and console errors for bug reports
@@ -124,6 +127,9 @@ function registerAlpineComponents(Alpine) {
     Alpine._ppmAppJsRegistered = true;
 
     console.log('[PPM app.js] Registering Alpine components...');
+
+    // Register category panel component
+    registerCategoryPanel(Alpine);
 
     // Theme store (using localStorage directly instead of Alpine.$persist to avoid Livewire conflicts)
     Alpine.store('theme', {

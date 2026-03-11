@@ -1,9 +1,9 @@
 # PPM - Jobs & Workers Documentation
 
-> **Wersja:** 3.0
-> **Data:** 2026-03-10
+> **Wersja:** 3.1
+> **Data:** 2026-03-11
 > **Status:** Production Ready
-> **Changelog:** Worker Guard v2: heartbeat monitoring, resume via ProductShopData, status 'interrupted', forceReleaseReservedJobs, crontab --timeout removed, retry_after=600, $timeout=0 for long imports
+> **Changelog:** v3.1: SyncJob heartbeat monitoring, ERP scheduler dedup fix, manual ERP sync buttons, cancel removes from queue, queue name alignment, active jobs priority sorting
 
 ---
 
@@ -175,6 +175,47 @@ PPM-CC-Laravel wykorzystuje **49 zdefiniowanych JOBow** zorganizowanych w 9 kate
 - **SyncJob Stats Fix** - prawidlowe mapowanie metadata do kolumn UI
 - **UI Improvements** - "PPM" uppercase, "← Import" badge dla pull_* jobs
 
+### Nowe w v3.1 (SyncJob Heartbeat + ERP Scheduler Fixes + Manual ERP Sync)
+
+- **SyncJob Heartbeat Monitoring** - Rozszerzenie systemu heartbeat na sync_jobs (wczesniej tylko job_progress):
+  - Migracja: `worker_pid` + `last_heartbeat_at` dodane do tabeli `sync_jobs`
+  - `SyncJob::start()` automatycznie rejestruje PID workera i first heartbeat
+  - `SyncJob::sendHeartbeat()` + `getHeartbeatStatus()` (alive <120s, stale 120-300s, dead >300s)
+  - `SyncJob::updateProgress()` automatycznie aktualizuje heartbeat przy kazdym progress update
+  - `PullProductsFromSubiektGT::updateSyncJobStatus()` wysyla heartbeat przy kazdej zmianie statusu
+  - **UI**: Sonar heartbeat dot na kazdym aktywnym jobie w sekcji "Aktywne synchronizacje"
+  - `wire:poll.5s="refreshActiveSyncJobs"` - auto-refresh statusu heartbeat co 5s
+  - Reuse istniejacych CSS klas: `heartbeat-dot--alive/stale/dead`, `heartbeat-sonar--ping`
+
+- **ERP Scheduler Deduplication Fix (CRITICAL BUG)** - Scheduler tworzyl zduplikowane joby:
+  - **Root cause**: `$dispatchSyncJob` sprawdzal `target_type='subiekt_gt'` ale SyncJob tworzony z `target_type='ppm'`
+  - **Fix**: Zmiana na `source_type='subiekt_gt'` + `source_id=$connection->id` (match tworzenia)
+  - **DetectSubiektGTChanges**: Dodany brakujacy dedup check + spojne pola source_type/source_id
+  - **Safety net**: Max 5 pending jobs per connection (hard cap w schedulerze)
+  - **Cleanup**: 74 zduplikowane pending sync_jobs + 16 orphaned queue jobs usuniete
+
+- **Manual ERP Sync Buttons** - Nowe przyciski w sekcji "Polaczenia ERP":
+  - `dispatchErpSync($connectionId, $syncType)` - metoda w SyncController
+  - 3 przyciski per ERP connection: **Stany** (emerald), **Ceny** (amber), **Dane** (blue)
+  - Dedup check przed dispatch (nie tworzy duplikatow)
+  - `trigger_type='manual'` + `user_id` w SyncJob (audit trail)
+  - Przyciski widoczne tylko dla aktywnych + polaczonych connections
+
+- **Cancel SyncJob - Queue Cleanup** - Anulowanie teraz usuwa tez z tabeli `jobs`:
+  - `cancelSyncJob()` szuka po UUID + integer ID w payload kolejki
+  - Eliminuje "zombie" queue jobs po anulowaniu synchronizacji
+  - Spójność miedzy `sync_jobs` (status=cancelled) a `jobs` table (usuniety)
+
+- **Manual Worker Queue Alignment (CRITICAL BUG)** - Manual worker nie przetwarzal ERP jobow:
+  - **Root cause**: `runQueueWorker()` nasluchiwal `erp_default,prestashop,default` - brakowalo `erp-sync`
+  - **Fix**: Zsynchronizowano liste kolejek z schedulerem: `prestashop_sync,prestashop-sync,erp-sync,erp_default,erp_high,default,sync`
+  - Worker teraz przetwarza WSZYSTKIE typy jobow (PS + ERP)
+
+- **Recent Jobs Priority Sorting** - Aktywne joby zawsze na gorze listy:
+  - `getRecentSyncJobs()` sortuje: pending/running FIRST, potem created_at DESC
+  - Eliminuje problem gdy ERP joby (created_at 02:00) giely na dalszych stronach paginacji
+  - Spójność z sekcja "Aktywne synchronizacje"
+
 ### Nowe w v3.0 (Worker Guard v2 - Resilient Import System)
 
 - **Worker Guard v2** - System odpornego importu dla dlugotrwalych jobow (9554+ produktow):
@@ -201,9 +242,9 @@ PPM-CC-Laravel wykorzystuje **49 zdefiniowanych JOBow** zorganizowanych w 9 kate
 
 | Model | Tabela | Przeznaczenie |
 |-------|--------|---------------|
-| SyncJob | `sync_jobs` | Kompleksowy tracking synchronizacji |
-| JobProgress | `job_progress` | Real-time UI progress bar |
-| WorkerHeartbeat | `worker_heartbeats` | Worker Guard - heartbeat monitoring |
+| SyncJob | `sync_jobs` | Kompleksowy tracking synchronizacji + heartbeat (v3.1: worker_pid, last_heartbeat_at) |
+| JobProgress | `job_progress` | Real-time UI progress bar + heartbeat |
+| WorkerHeartbeat | `worker_heartbeats` | Worker Guard - heartbeat monitoring (import jobs) |
 | BackupJob | `backup_jobs` | Status backupow |
 | MaintenanceTask | `maintenance_tasks` | Status zadan konserwacyjnych |
 | ProductErpData | `product_erp_data` | Status sync ERP per produkt |
@@ -227,6 +268,7 @@ Shared Hosting: Brak queue worker - uzycie onConnection('sync')
 | `prestashop_sync` | Batch sync PS | BulkSyncProducts |
 | `prestashop_high` | Priorytetowe PS | High priority products |
 | `prestashop` | Description sync | SyncDescriptionToPrestaShopJob |
+| `erp-sync` | **Subiekt GT pull sync** | **PullProductsFromSubiektGT (stock/prices/basic_data)** |
 | `erp_high` | Priorytetowe ERP | Featured products |
 | `erp_default` | Standardowe ERP | SyncProductToERP, BaselinkerSyncJob |
 | `backups-heavy` | Full backup | BackupDatabaseJob (full) |
@@ -306,13 +348,16 @@ Timeout: 60s
 
 Co robi:
 1. Wykonuje lightweight COUNT query na tw__Towar (tw_DataMod)
-2. Jesli zmiany >= threshold, dispatch PullProductsFromSubiektGT
-3. Aktualizuje connection health status
+2. Sprawdza dedup: czy istnieje pending/running job pull_products (v3.1 FIX)
+3. Jesli zmiany >= threshold I brak duplikatu, dispatch PullProductsFromSubiektGT
+4. Aktualizuje connection health status
 
 Charakterystyka:
 - Bardzo szybki (single SQL query)
 - Nie blokuje kolejki (queue: default)
 - Automatyczny incremental pull przy zmianach
+- Dedup check: source_type='subiekt_gt' + source_id (v3.1 FIX)
+- Spojne pola: source_type/source_id zamiast target_type/target_id (v3.1 FIX)
 ```
 
 #### erp:dynamic-sync (ETAP_08 FAZA 6 - 2026-01-26)
@@ -336,7 +381,9 @@ Dostepne czestotliwosci (ERPConnection::FREQ_*):
 Logika schedulera (routes/console.php):
 1. Co 15 min sprawdza wszystkie aktywne ERPConnections
 2. Dla kazdego typu sync sprawdza czy czestotliwosc odpowiada aktualnej minucie
-3. Jesli tak - dispatch PullProductsFromSubiektGT z odpowiednim mode
+3. Dedup check: source_type='subiekt_gt' + source_id + job_type (v3.1 FIX)
+4. Safety net: max 5 pending jobs per connection (v3.1)
+5. Jesli OK - dispatch PullProductsFromSubiektGT z odpowiednim mode
 
 Przyklad:
 - price_sync_frequency = 'hourly' -> sync uruchamiany gdy now()->minute === 0
@@ -1727,6 +1774,18 @@ SELECT * FROM job_progress WHERE status = 'running';
 - **Admin Panel** -> Backup Manager (backup status)
 - **Admin Panel** -> Maintenance (task status)
 - **ActiveOperationsBar** -> Real-time progress z heartbeat dot (Worker Guard v2)
+- **Sync Panel** -> Aktywne synchronizacje z heartbeat sonar dot (v3.1):
+  - Niebieski = worker aktywny (heartbeat <120s)
+  - Zolty = worker nie odpowiada / pending (120-300s)
+  - Czerwony = worker nie zyje (>300s)
+  - Auto-refresh co 5s (`wire:poll.5s="refreshActiveSyncJobs"`)
+- **Sync Panel** -> Manual ERP sync buttons (v3.1):
+  - Stany / Ceny / Dane per ERP connection
+  - `dispatchErpSync($connectionId, $syncType)` z dedup check
+- **Sync Panel** -> Recent Jobs priority sorting (v3.1):
+  - Pending/running joby zawsze na gorze (niezaleznie od created_at)
+- **Sync Panel** -> Cancel removes from queue (v3.1):
+  - Anulowanie synchronizacji usuwa tez fizyczny job z tabeli `jobs`
 
 ### 8.5 Worker Guard v2 Monitoring
 

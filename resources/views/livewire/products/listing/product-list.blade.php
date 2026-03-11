@@ -27,13 +27,33 @@
         @endif
     </div>
 
-    {{-- Main Content --}}
-    <div class="px-4 sm:px-6 lg:px-8 py-6">
-        @if($viewMode === 'table')
-            @include('livewire.products.listing.partials.table-view')
-        @else
-            @include('livewire.products.listing.partials.grid-view')
-        @endif
+    {{-- Main Content with Category Panel --}}
+    <div class="product-list-with-panel"
+         x-data="categoryPanel({
+            tree: @js($this->categoryTreeForPanel),
+            productMap: @js($this->getProductCategoryMapForPanel()),
+            initialFilter: @js($categoryFilter)
+         })"
+         @toggle-category-panel.window="togglePanel($event.detail.side)"
+         @product-hover.window="onProductHover($event.detail.id)">
+
+        {{-- Left Panel --}}
+        <template x-if="panelSide === 'left'">
+            @include('livewire.products.listing.partials.category-panel', ['side' => 'left'])
+        </template>
+
+        <div class="product-list-with-panel__content px-4 sm:px-6 lg:px-8 py-6">
+            @if($viewMode === 'table')
+                @include('livewire.products.listing.partials.table-view')
+            @else
+                @include('livewire.products.listing.partials.grid-view')
+            @endif
+        </div>
+
+        {{-- Right Panel --}}
+        <template x-if="panelSide === 'right'">
+            @include('livewire.products.listing.partials.category-panel', ['side' => 'right'])
+        </template>
     </div>
 
     @include('livewire.products.listing.partials.preview-modal')

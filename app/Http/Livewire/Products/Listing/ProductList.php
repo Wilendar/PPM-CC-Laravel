@@ -14,6 +14,7 @@ use App\Http\Livewire\Products\Listing\Traits\ProductListPreferences;
 use App\Http\Livewire\Products\Listing\Traits\ProductListPresets;
 use App\Http\Livewire\Products\Listing\Traits\ProductListQuickActions;
 use App\Http\Livewire\Concerns\AuthorizesWithSpatie;
+use App\Http\Livewire\Products\Listing\Traits\ProductListCategoryPanel;
 
 /**
  * ProductList Component - Main product listing interface
@@ -44,6 +45,7 @@ class ProductList extends Component
     use ProductListPresets;
     use ProductListERPImport;
     use ProductListQuickActions;
+    use ProductListCategoryPanel;
 
     /*
     |--------------------------------------------------------------------------

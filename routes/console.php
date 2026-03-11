@@ -306,8 +306,10 @@ $shouldSyncNow = function (string $frequency): bool {
  */
 $dispatchSyncJob = function (ERPConnection $connection, string $syncType, string $frequency): void {
     // Skip if already has pending/running sync job for this type
-    $existingJob = SyncJob::where('target_type', 'subiekt_gt')
-        ->where('target_id', $connection->id)
+    // FIX: Check source_type/source_id (not target_type/target_id)
+    // SyncJob is created with source_type='subiekt_gt', target_type='ppm'
+    $existingJob = SyncJob::where('source_type', 'subiekt_gt')
+        ->where('source_id', $connection->id)
         ->where('job_type', 'pull_' . $syncType)
         ->whereIn('status', ['pending', 'running'])
         ->exists();
@@ -318,6 +320,20 @@ $dispatchSyncJob = function (ERPConnection $connection, string $syncType, string
             'connection_name' => $connection->instance_name,
             'sync_type' => $syncType,
             'frequency' => $frequency,
+        ]);
+        return;
+    }
+
+    // Safety net: if >5 pending jobs exist for this connection (any type), warn and skip
+    $pendingCount = SyncJob::where('source_type', 'subiekt_gt')
+        ->where('source_id', $connection->id)
+        ->where('status', 'pending')
+        ->count();
+
+    if ($pendingCount >= 5) {
+        \Log::warning("ERP {$syncType} sync skipped - too many pending jobs ({$pendingCount})", [
+            'connection_id' => $connection->id,
+            'pending_count' => $pendingCount,
         ]);
         return;
     }
@@ -389,6 +405,12 @@ Schedule::call(function () use ($shouldSyncNow, $dispatchSyncJob) {
             $basicFreq = $connection->basic_data_sync_frequency ?? ERPConnection::FREQ_DAILY;
             if ($shouldSyncNow($basicFreq)) {
                 $dispatchSyncJob($connection, 'basic_data', $basicFreq);
+            }
+
+            // === SYNC LOKALIZACJI MAGAZYNOWYCH ===
+            $locationFreq = $connection->location_sync_frequency ?? ERPConnection::FREQ_DAILY;
+            if ($shouldSyncNow($locationFreq)) {
+                $dispatchSyncJob($connection, 'location', $locationFreq);
             }
         }
     } catch (\Exception $e) {

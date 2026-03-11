@@ -632,7 +632,7 @@ class User extends Authenticatable implements MustVerifyEmail
             return substr(strrchr($this->oauth_email, "@"), 1);
         }
         
-        return $this->oauth_domain;
+        return $this->attributes['oauth_domain'] ?? null;
     }
 
     /**

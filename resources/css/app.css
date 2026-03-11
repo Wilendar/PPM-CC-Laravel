@@ -3,6 +3,7 @@
 /* All @import statements MUST come first (CSS spec) */
 @import 'products/product-list-search.css';
 @import 'products/product-list-columns.css';
+@import 'products/category-panel.css';
 @import 'admin/cross-source-matrix.css';
 @import 'dashboard/dashboard.css';
 
