@@ -96,17 +96,6 @@ abstract class BasePrestaShopClient
         $startTime = microtime(true);
         $url = $this->buildUrl($endpoint);
 
-        // Safety net: warn if URL approaches server limits
-        $urlLength = strlen($url);
-        if ($urlLength > 2000) {
-            Log::warning('[PrestaShop API] URL length exceeds safe limit', [
-                'url_length' => $urlLength,
-                'method' => $method,
-                'endpoint_preview' => substr($endpoint, 0, 200),
-                'shop_id' => $this->shop->id,
-            ]);
-        }
-
         try {
             // Build HTTP client with configuration
             $client = Http::withHeaders(array_merge([
@@ -501,93 +490,6 @@ abstract class BasePrestaShopClient
         $filters['output_format'] = 'JSON';
 
         return http_build_query($filters);
-    }
-
-    /**
-     * Fetch resources by IDs in chunks to avoid HTTP 414 "URI Too Long"
-     *
-     * Splits large ID arrays into configurable chunks, makes separate API requests,
-     * and merges results. Prevents URL length exceeding server limits.
-     *
-     * @param string $resource API resource name (e.g., 'products', 'categories')
-     * @param array $ids Array of resource IDs to fetch
-     * @param array $extraParams Additional query params (e.g., ['display' => 'full'])
-     * @param string $filterKey Filter parameter name (default: 'filter[id]')
-     * @param int|null $chunkSize Max IDs per request (null = use config)
-     * @return array Merged response with resource key (e.g., ['products' => [...]])
-     * @throws PrestaShopAPIException
-     */
-    protected function getResourceByIdsChunked(
-        string $resource,
-        array $ids,
-        array $extraParams = [],
-        string $filterKey = 'filter[id]',
-        ?int $chunkSize = null
-    ): array {
-        if (empty($ids)) {
-            return [$resource => []];
-        }
-
-        $chunkSize = $chunkSize ?? config('prestashop.api_filter_chunk_size', 100);
-        $chunks = array_chunk(array_values($ids), $chunkSize);
-        $allResults = [];
-
-        Log::info("[PrestaShop API] getResourceByIdsChunked starting", [
-            'resource' => $resource,
-            'total_ids' => count($ids),
-            'chunk_size' => $chunkSize,
-            'chunks' => count($chunks),
-            'shop_id' => $this->shop->id,
-        ]);
-
-        foreach ($chunks as $chunkIndex => $chunkIds) {
-            $idsFilter = '[' . implode('|', array_map('intval', $chunkIds)) . ']';
-            $params = array_merge($extraParams, [$filterKey => $idsFilter]);
-            $queryString = $this->buildQueryParams($params);
-            $endpoint = "/{$resource}?{$queryString}";
-
-            $response = $this->makeRequest('GET', $endpoint);
-
-            // Extract items from response
-            $items = $response[$resource] ?? [];
-
-            // Edge case: PrestaShop returns object instead of array for single result
-            if (!empty($items) && !isset($items[0]) && isset($items['id'])) {
-                $items = [$items];
-            }
-
-            $allResults = array_merge($allResults, $items);
-
-            if (count($chunks) > 1) {
-                Log::debug("[PrestaShop API] Chunk processed", [
-                    'resource' => $resource,
-                    'chunk' => ($chunkIndex + 1) . '/' . count($chunks),
-                    'chunk_ids' => count($chunkIds),
-                    'chunk_results' => count($items),
-                ]);
-            }
-        }
-
-        Log::info("[PrestaShop API] getResourceByIdsChunked completed", [
-            'resource' => $resource,
-            'total_results' => count($allResults),
-            'shop_id' => $this->shop->id,
-        ]);
-
-        return [$resource => $allResults];
-    }
-
-    /**
-     * Convenience method: fetch products by IDs with chunking
-     *
-     * @param array $productIds Array of PrestaShop product IDs
-     * @param array $extraParams Additional query params (default: display=full)
-     * @return array Response with 'products' key
-     * @throws PrestaShopAPIException
-     */
-    public function getProductsByIds(array $productIds, array $extraParams = ['display' => 'full']): array
-    {
-        return $this->getResourceByIdsChunked('products', $productIds, $extraParams);
     }
 
     /**

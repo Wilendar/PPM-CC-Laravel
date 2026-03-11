@@ -2,7 +2,6 @@
 
 namespace App\Http\Livewire\Products\Management\Services;
 
-use App\Models\AuditLog;
 use App\Models\Product;
 use App\Models\ProductShopData;
 use App\Models\ProductPrice;
@@ -361,12 +360,6 @@ class ProductFormSaver
         }
 
         try {
-            // Capture old category IDs before sync
-            $oldCategoryIds = $this->component->product->categories()
-                ->wherePivotNull('shop_id')
-                ->pluck('categories.id')
-                ->sort()->values()->toArray();
-
             // Use the category manager if available
             if (property_exists($this->component, 'categoryManager') && $this->component->categoryManager) {
                 $this->component->categoryManager->syncCategories();
@@ -379,23 +372,6 @@ class ProductFormSaver
                     ];
                 }
                 $this->component->product->categories()->sync($categoryData);
-            }
-
-            // Capture new category IDs after sync
-            $newCategoryIds = $this->component->product->categories()
-                ->wherePivotNull('shop_id')
-                ->pluck('categories.id')
-                ->sort()->values()->toArray();
-
-            // Audit log if categories changed
-            if ($oldCategoryIds !== $newCategoryIds) {
-                AuditLog::log(
-                    AuditLog::EVENT_UPDATED,
-                    $this->component->product,
-                    ['categories' => $oldCategoryIds],
-                    ['categories' => $newCategoryIds],
-                    'Zmiana kategorii produktu (default)'
-                );
             }
         } catch (\Exception $e) {
             Log::warning('Category sync failed', [
@@ -562,12 +538,6 @@ class ProductFormSaver
                 ];
             }
 
-            // Capture old shop categories before detach for audit
-            $oldShopCategoryIds = $this->component->product->categories()
-                ->wherePivot('shop_id', $shopId)
-                ->pluck('categories.id')
-                ->sort()->values()->toArray();
-
             // Detach existing shop-specific categories first
             $this->component->product->categories()->wherePivot('shop_id', $shopId)->detach();
 
@@ -581,18 +551,6 @@ class ProductFormSaver
                     'category_count' => count($ppmCategoryIds),
                     'ppm_ids' => $ppmCategoryIds,
                 ]);
-            }
-
-            // Audit log if shop categories changed
-            $newShopCategoryIds = collect($ppmCategoryIds)->sort()->values()->toArray();
-            if ($oldShopCategoryIds !== $newShopCategoryIds) {
-                AuditLog::log(
-                    AuditLog::EVENT_UPDATED,
-                    $this->component->product,
-                    ['shop_categories' => $oldShopCategoryIds, 'shop_id' => $shopId],
-                    ['shop_categories' => $newShopCategoryIds, 'shop_id' => $shopId],
-                    "Zmiana kategorii produktu dla sklepu ID:{$shopId}"
-                );
             }
 
             // Step 2: Sync category_mappings cache from pivot table

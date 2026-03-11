@@ -85,43 +85,11 @@
         </div>
     </div>
 
-    {{-- Bulk Actions Bar --}}
-    @if(count($selectedIds) > 0)
-        <div class="flex items-center justify-between bg-gray-800 border border-gray-600 rounded-lg p-3 mb-4">
-            <span class="text-sm text-gray-300">
-                Zaznaczono: <strong class="text-white">{{ count($selectedIds) }}</strong>
-            </span>
-            <div class="flex items-center gap-2">
-                <button wire:click="bulkToggleActive(true)"
-                        class="inline-flex items-center px-3 py-1.5 text-xs font-medium text-green-400 bg-green-900/30 hover:bg-green-900/50 rounded-lg transition-colors">
-                    Aktywuj
-                </button>
-                <button wire:click="bulkToggleActive(false)"
-                        class="inline-flex items-center px-3 py-1.5 text-xs font-medium text-gray-400 bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors">
-                    Dezaktywuj
-                </button>
-                <button wire:click="bulkDelete"
-                        wire:confirm="Czy na pewno chcesz usunac {{ count($selectedIds) }} zaznaczonych marek? Produkty zostana odlaczone od tych marek."
-                        class="inline-flex items-center px-3 py-1.5 text-xs font-medium text-red-400 bg-red-900/30 hover:bg-red-900/50 rounded-lg transition-colors">
-                    <svg class="w-3.5 h-3.5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
-                    </svg>
-                    Usun zaznaczone
-                </button>
-            </div>
-        </div>
-    @endif
-
     {{-- Table --}}
     <div class="bg-gray-800/50 rounded-lg border border-gray-700 overflow-hidden">
         <table class="min-w-full divide-y divide-gray-700">
             <thead class="bg-gray-800">
                 <tr>
-                    <th class="px-4 py-3 text-center w-10">
-                        <input type="checkbox"
-                               wire:model.live="selectAll"
-                               class="rounded border-gray-600 bg-gray-700 text-[#e0ac7e] focus:ring-[#e0ac7e]">
-                    </th>
                     <th class="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Nazwa</th>
                     <th class="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Kod</th>
                     <th class="px-4 py-3 text-center text-xs font-medium text-gray-400 uppercase tracking-wider">Produkty</th>
@@ -132,14 +100,7 @@
             </thead>
             <tbody class="divide-y divide-gray-700">
                 @forelse($this->manufacturers as $manufacturer)
-                    <tr class="hover:bg-gray-700/50 transition-colors {{ in_array((string)$manufacturer->id, $selectedIds) ? 'bg-gray-700/30' : '' }}">
-                        <td class="px-4 py-3 text-center">
-                            <input type="checkbox"
-                                   wire:model.live="selectedIds"
-                                   wire:key="select-{{ $manufacturer->id }}"
-                                   value="{{ $manufacturer->id }}"
-                                   class="rounded border-gray-600 bg-gray-700 text-[#e0ac7e] focus:ring-[#e0ac7e]">
-                        </td>
+                    <tr class="hover:bg-gray-700/50 transition-colors">
                         <td class="px-4 py-3">
                             <div class="flex items-center gap-3">
                                 @if($manufacturer->logo_path)
@@ -210,7 +171,7 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="7" class="px-4 py-12 text-center text-gray-500">
+                        <td colspan="6" class="px-4 py-12 text-center text-gray-500">
                             <svg class="mx-auto h-10 w-10 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
                             </svg>
@@ -434,17 +395,8 @@
                                 <div class="mt-2">
                                     <p class="text-sm text-gray-400">
                                         Czy na pewno chcesz usunac marke <strong class="text-white">{{ $deleteName }}</strong>?
+                                        Ta operacja jest nieodwracalna.
                                     </p>
-                                    @if($deleteProductsCount > 0)
-                                        <div class="mt-3 p-3 bg-yellow-900/30 border border-yellow-800 rounded-lg">
-                                            <p class="text-sm text-yellow-400">
-                                                <svg class="w-4 h-4 inline-block mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
-                                                </svg>
-                                                {{ $deleteProductsCount }} {{ $deleteProductsCount === 1 ? 'produkt zostanie odlaczony' : ($deleteProductsCount < 5 ? 'produkty zostana odlaczone' : 'produktow zostanie odlaczonych') }} od tej marki.
-                                            </p>
-                                        </div>
-                                    @endif
                                 </div>
                             </div>
                         </div>

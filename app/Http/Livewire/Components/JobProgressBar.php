@@ -41,7 +41,6 @@ class JobProgressBar extends Component
     public array $progress = [];
     public bool $isVisible = true;
     public bool $isCompleted = false;
-    public int $heartbeatTick = 0;
 
     // ETAP_07c: Track if user already took action (hide button, show processing state)
     public bool $userActionTaken = false;
@@ -95,7 +94,6 @@ class JobProgressBar extends Component
         try {
             $service = app(JobProgressService::class);
             $this->progress = $service->getProgress($this->jobId);
-            $this->heartbeatTick++;
 
             // Check completion status
             // ETAP_07c: awaiting_user is NOT completed - user action required!
@@ -423,38 +421,33 @@ class JobProgressBar extends Component
 
     /**
      * Get status message
-     * Uses server-side formatProgressMessage() which respects phase_label metadata
      */
     public function getMessageProperty(): string
     {
-        // Use server-formatted message from JobProgressService::getProgress()
-        // which handles phase_label, job_type, and proper formatting
-        if (!empty($this->progress['message'])) {
-            return $this->progress['message'];
-        }
-
-        // Fallback only if message is empty
         $status = $this->status;
         $current = $this->progress['current'] ?? 0;
         $total = $this->progress['total'] ?? 0;
         $shopName = $this->progress['shop_name'] ?? 'Unknown Shop';
 
         if ($status === 'running') {
-            return "Przetwarzanie... {$current}/{$total} z {$shopName}";
+            return "Importowanie... {$current}/{$total} Produktow z {$shopName}";
         }
 
         if ($status === 'completed') {
-            return "Ukonczone! {$current}/{$total} z {$shopName}";
+            return "Ukonczone! {$current}/{$total} Produktow z {$shopName}";
         }
 
         if ($status === 'failed') {
-            return "Blad operacji z {$shopName}";
+            return "Blad importu z {$shopName}";
         }
 
+        // ETAP_07c FIX: Handle awaiting_user status
         if ($status === 'awaiting_user') {
+            // If user already took action, show processing message
             if ($this->userActionTaken) {
                 return "Przetwarzanie wybranych kategorii - {$total} produktow z {$shopName}";
             }
+
             $actionLabel = $this->progress['action_button']['label'] ?? 'Wymaga akcji';
             return "{$actionLabel} - {$total} produktow z {$shopName}";
         }
@@ -554,14 +547,6 @@ class JobProgressBar extends Component
     public function getJobTypeLabelProperty(): string
     {
         return $this->progress['job_type_label'] ?? ucfirst($this->progress['job_type'] ?? 'Job');
-    }
-
-    /**
-     * Get worker heartbeat status (alive/stale/dead/unknown)
-     */
-    public function getHeartbeatStatusProperty(): string
-    {
-        return $this->progress['heartbeat_status'] ?? 'unknown';
     }
 
     /**

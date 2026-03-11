@@ -1,9 +1,9 @@
 # PPM - ProductForm Component Documentation
 
-> **Wersja:** 1.2
-> **Data:** 2026-02-09
+> **Wersja:** 1.3
+> **Data:** 2026-03-11
 > **Status:** Production Ready
-> **Changelog:** Bidirectional UVE Sync, BUG#1-3 fixes (defaultData sync, cross-context save, character counts)
+> **Changelog:** Lazy Load Category Tree - on-demand loading zamiast pelnego renderowania 772 kategorii
 
 ---
 
@@ -388,6 +388,8 @@ public array $pendingDeleteCategories = [];     // Do usuniecia
 public bool $showCreateCategoryModal = false;
 public string $newCategoryName = '';
 public ?int $newCategoryParentId = null;
+// REMOVED in v1.3: public bool $categoriesLoaded = false;
+// Zastapione lazy load per-level (Alpine categoryTreeLazy)
 ```
 
 ### 4.8 Shop Management
@@ -478,7 +480,7 @@ public array $originalFormData = [];
 |--------|------|
 | `switchTab(string $tab)` | Przelacz aktywny tab |
 
-### 5.3 Category Management (~25 metod)
+### 5.3 Category Management (~28 metod)
 
 | Metoda | Opis |
 |--------|------|
@@ -490,6 +492,9 @@ public array $originalFormData = [];
 | `openCreateCategoryModal()` | Otworz modal tworzenia |
 | `createNewCategory()` | Utworz nowa kategorie |
 | `loadPrestaShopCategories(int $shopId)` | Zaladuj kategorie z PS |
+| `#[Renderless] fetchChildCategories(int $parentId, string $context)` | **v1.3** Lazy load dzieci kategorii (bez re-render!) |
+| `findChildrenInShopTree(int $shopId, int $parentId)` | **v1.3** Znajdz dzieci w cached PS tree |
+| `searchTreeForChildren(array $categories, int $parentId)` | **v1.3** Rekurencyjne szukanie dzieci |
 
 ### 5.4 Shop Management (~20 metod)
 
@@ -1055,16 +1060,91 @@ class ProductCategoryManager
 }
 ```
 
-### 12.2 CategoryPicker Component
+### 12.2 Lazy Load Category Tree (v1.3)
+
+**Problem:** 772 kategorii eager-loaded 5 levels deep = 8.8MB HTML = 32s TTFB.
+
+**Rozwiazanie:** Hybrid render - server-side pruned tree + Alpine.js lazy load on-demand.
+
+#### Architektura
+
+```
+[Initial Load ~500ms]
+  pruneTree() w Blade filtruje do ~20-30 kategorii na sciezkach do wybranych
+  + shallow nodes (depth <=1) z has_children_unpruned flag
+
+[User Click - Chevron]
+  Alpine categoryTreeLazy -> $wire.fetchChildCategories(parentId, context)
+  -> #[Renderless] = ZERO re-render komponentu Livewire
+  -> Alpine renderuje dzieci z JSON (x-for lub JS innerHTML + Alpine.initTree)
+
+[Sub-children - Recursive]
+  Kazdy lazy-loaded child z hasChildren=true -> klik chevron -> kolejny fetchChildCategories
+  Rekursja w JS (_buildChildrenHtml + Alpine.initTree), NIE w Blade @include
+```
+
+#### Pliki
+
+| Plik | Opis |
+|------|------|
+| `ProductForm.php` | `#[Renderless] fetchChildCategories()`, `findChildrenInShopTree()`, `searchTreeForChildren()` |
+| `basic-tab.blade.php` | `pruneTree()` z `has_children_unpruned` flag, `depth <= 1` shallow nodes |
+| `category-tree-item.blade.php` | Hybrid children render: server + lazy placeholder z `excludeIds` |
+| `category-tree-lazy-children.blade.php` | Alpine `x-for` template (1 poziom), sub-children via JS |
+| `category-tree-lazy.js` | Alpine `categoryTreeLazy` component + `_buildChildrenHtml()` recursive JS |
+
+#### pruneTree Logic (Blade)
+
+```php
+$pruneTree = function($categories, $selectedIds, $expandedIds, $depth = 0) {
+    foreach ($categories as $cat) {
+        if ($isRelevant || $prunedChildren->count() > 0) {
+            // Na sciezce do wybranej kategorii - server render
+            $clone->has_children_unpruned = ($originalChildCount > $prunedChildren->count());
+        } elseif ($depth <= 1) {
+            // Top 2 levels - shallow node z lazy flag (bez eager-loaded children!)
+            $shallow = (object) ['id' => ..., 'children' => collect([]), 'has_children_unpruned' => true];
+        }
+    }
+};
+```
+
+**KRYTYCZNE:** Shallow nodes uzywaja `(object)` zamiast `clone $cat` aby uniknac kopiowania eager-loaded subtree (memory exhaustion).
+
+#### excludeIds - Anti-duplicate
+
+Gdy node ma ZAROWNO server-rendered children (pruned) I `has_children_unpruned`, lazy loader otrzymuje `excludeIds` = IDs juz wyrenderowanych dzieci. Alpine filtruje je z odpowiedzi:
+
+```javascript
+if (this.excludeIds.length > 0) {
+    data = data.filter(c => !this.excludeIds.includes(c.id));
+}
+```
+
+#### Sub-children Recursion (JS)
+
+Blade `@include` rekursja powoduje stack overflow przy kompilacji. Rozwiazanie: `_buildChildrenHtml()` generuje HTML string + `Alpine.initTree()` inicjalizuje nowe elementy:
+
+```javascript
+// W category-tree-lazy-children.blade.php - chevron click:
+$wire.fetchChildCategories(child.id, context).then(data => {
+    const builder = Alpine.$data($el.closest('[x-data*="categoryTreeLazy"]'));
+    sub.innerHTML = builder._buildChildrenHtml(data, level + 1);
+    Alpine.initTree(sub);  // Inicjalizacja Alpine na nowych elementach
+});
+```
+
+### 12.3 CategoryPicker Component
 
 Hierarchiczny wybor kategorii z:
-- Checkbox selection
-- Primary category radio
-- Expandable tree
-- Search filter
-- Inline create new
+- Checkbox selection (x-model + $wire.toggleCategory)
+- Primary category button (optimistic UI via category-event dispatch)
+- Expandable tree (server-rendered pruned + lazy loaded)
+- Search filter (Alpine window event)
+- Inline create new (pure Alpine form, no Livewire re-render)
+- Delete/Undo (deferred - batch on Save)
 
-### 12.3 Batch Operations
+### 12.4 Batch Operations
 
 ```php
 // Pending operations (batched)
@@ -1387,6 +1467,31 @@ if (isset($this->pendingChanges['default']) && $this->isEditMode && $this->produ
 | Warehouse | `warehouses` | Magazyny |
 | PrestaShopShop | `prestashop_shops` | Sklepy PrestaShop |
 | ERPConnection | `erp_connections` | Polaczenia ERP |
+
+---
+
+## Changelog
+
+### v1.3 (2026-03-11)
+
+- **Lazy Load Category Tree** - on-demand loading dzieci kategorii zamiast pelnego renderowania 772 kategorii
+- **`#[Renderless] fetchChildCategories()`** - nowa metoda Livewire bez re-renderu komponentu
+- **Alpine `categoryTreeLazy` component** - nowy `resources/js/category-tree-lazy.js` (~150 linii)
+- **Blade `category-tree-lazy-children.blade.php`** - nowy partial dla lazy-loaded dzieci
+- **`pruneTree` z `has_children_unpruned` flag** - shallow nodes zamiast clone (fix memory exhaustion)
+- **`excludeIds` anti-duplicate** - zapobiega podwojnemu wyswietlaniu kategorii server-rendered + lazy-loaded
+- **JS recursion zamiast Blade @include** - `_buildChildrenHtml()` + `Alpine.initTree()` (fix stack overflow)
+- **Usuniety przycisk "Pokaz pelne drzewo"** - zastapiony lazy load per-level
+- **Performance:** 772 -> ~20-30 kategorii na initial load, 32s TTFB -> <1s
+
+### v1.2 (2026-02-09)
+
+- **Bidirectional UVE Sync** - ProductDescription <-> ProductShopData auto-sync
+- **BUG#1-3 fixes** - defaultData sync, cross-context save, character counts
+
+### v1.0 (2025-11-28)
+
+- **Inicjalna wersja** dokumentacji ProductForm
 
 ---
 

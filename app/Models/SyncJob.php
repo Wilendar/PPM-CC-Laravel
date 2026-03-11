@@ -140,8 +140,6 @@ class SyncJob extends Model
         'parent_job_id',
         'dependent_jobs',
         'batch_id',
-        'worker_pid',
-        'last_heartbeat_at',
     ];
 
     /**
@@ -165,7 +163,6 @@ class SyncJob extends Model
         'completed_at' => 'datetime',
         'next_retry_at' => 'datetime',
         'last_notification_sent' => 'datetime',
-        'last_heartbeat_at' => 'datetime',
         'progress_percentage' => 'decimal:2',
         'avg_item_processing_time' => 'decimal:3',
         'cpu_time_seconds' => 'decimal:3',
@@ -409,48 +406,10 @@ class SyncJob extends Model
      */
     public function start(): void
     {
-        $pid = @getmypid() ?: crc32(uniqid('w-', true)) & 0x7FFFFFFF;
-
         $this->update([
             'status' => self::STATUS_RUNNING,
             'started_at' => Carbon::now(),
-            'worker_pid' => $pid,
-            'last_heartbeat_at' => Carbon::now(),
         ]);
-    }
-
-    /**
-     * Send heartbeat - call periodically during job processing.
-     * Thresholds: <120s = alive, 120-300s = stale, >300s = dead.
-     */
-    public function sendHeartbeat(): void
-    {
-        $this->update(['last_heartbeat_at' => Carbon::now()]);
-    }
-
-    /**
-     * Get heartbeat status: alive, stale, dead, or unknown.
-     */
-    public function getHeartbeatStatus(): string
-    {
-        if (!in_array($this->status, [self::STATUS_RUNNING, self::STATUS_PENDING])) {
-            return 'unknown';
-        }
-
-        if (!$this->last_heartbeat_at) {
-            return $this->status === self::STATUS_PENDING ? 'pending' : 'unknown';
-        }
-
-        $seconds = now()->diffInSeconds($this->last_heartbeat_at);
-
-        if ($seconds < 120) {
-            return 'alive';
-        }
-        if ($seconds < 300) {
-            return 'stale';
-        }
-
-        return 'dead';
     }
 
     /**
@@ -588,9 +547,6 @@ class SyncJob extends Model
         if ($avgProcessingTime !== null) {
             $updateData['avg_item_processing_time'] = $avgProcessingTime;
         }
-
-        // Heartbeat: update timestamp on every progress update
-        $updateData['last_heartbeat_at'] = Carbon::now();
 
         $this->update($updateData);
     }

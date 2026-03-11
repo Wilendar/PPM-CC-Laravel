@@ -524,7 +524,7 @@ trait ImportPanelPublicationTrait
                 'label' => null, // countdown display
                 'cssClass' => 'import-publish-btn-scheduled',
                 'disabled' => true,
-                'countdown' => $product->scheduled_publish_at->timestamp * 1000,
+                'countdown' => $product->scheduled_publish_at->toIso8601String(),
             ];
         }
 

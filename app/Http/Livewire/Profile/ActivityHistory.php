@@ -184,17 +184,13 @@ class ActivityHistory extends Component
             'created' => 'text-emerald-400 bg-emerald-500/20',
             'updated' => 'text-amber-400 bg-amber-500/20',
             'deleted' => 'text-red-400 bg-red-500/20',
-            'restored' => 'text-purple-400 bg-purple-500/20',
-            'login' => 'text-blue-400 bg-blue-500/20',
+            'restored' => 'text-blue-400 bg-blue-500/20',
+            'login' => 'text-purple-400 bg-purple-500/20',
             'login_failed' => 'text-red-400 bg-red-500/20',
             'logout' => 'text-gray-400 bg-gray-500/20',
             'bulk_delete' => 'text-red-400 bg-red-500/20',
             'bulk_update' => 'text-amber-400 bg-amber-500/20',
             'bulk_export' => 'text-blue-400 bg-blue-500/20',
-            'synced' => 'text-cyan-400 bg-cyan-500/20',
-            'imported' => 'text-indigo-400 bg-indigo-500/20',
-            'exported' => 'text-teal-400 bg-teal-500/20',
-            'matched' => 'text-yellow-400 bg-yellow-500/20',
             default => 'text-gray-400 bg-gray-500/20',
         };
     }
@@ -215,10 +211,6 @@ class ActivityHistory extends Component
             'bulk_delete' => 'trash',
             'bulk_update' => 'pencil-square',
             'bulk_export' => 'arrow-down-tray',
-            'synced' => 'arrow-path',
-            'imported' => 'arrow-down-on-square',
-            'exported' => 'arrow-up-on-square',
-            'matched' => 'link',
             default => 'information-circle',
         };
     }
@@ -239,87 +231,8 @@ class ActivityHistory extends Component
             'bulk_delete' => 'Masowe usuwanie',
             'bulk_update' => 'Masowa aktualizacja',
             'bulk_export' => 'Masowy eksport',
-            'synced' => 'Zsynchronizowano',
-            'imported' => 'Zaimportowano',
-            'exported' => 'Wyeksportowano',
-            'matched' => 'Dopasowano',
             default => ucfirst(str_replace('_', ' ', $event)),
         };
-    }
-
-    /**
-     * Get human-readable Polish label for a model class name.
-     */
-    public function getModelLabel(string $auditableType): string
-    {
-        return match ($auditableType) {
-            'App\\Models\\Product' => 'Produkt',
-            'App\\Models\\Category' => 'Kategoria',
-            'App\\Models\\User' => 'Uzytkownik',
-            'App\\Models\\BusinessPartner' => 'Kontrahent',
-            'App\\Models\\FeatureType' => 'Cecha',
-            'App\\Models\\FeatureValue' => 'Wartosc cechy',
-            'App\\Models\\FeatureTemplate' => 'Szablon cech',
-            'App\\Models\\FeatureGroup' => 'Grupa cech',
-            'App\\Models\\PriceGroup' => 'Grupa cenowa',
-            'App\\Models\\PrestaShopShop' => 'Sklep',
-            'App\\Models\\ERPConnection' => 'Polaczenie ERP',
-            'App\\Models\\ProductVariant' => 'Wariant produktu',
-            'App\\Models\\Warehouse' => 'Magazyn',
-            'App\\Models\\Manufacturer' => 'Producent',
-            'App\\Models\\AuditLog' => 'Log audytu',
-            default => class_basename($auditableType),
-        };
-    }
-
-    /**
-     * Get a short summary of changed fields for display in the list.
-     */
-    public function getChangeSummary(AuditLog $log): string
-    {
-        $newValues = $log->new_values ?? [];
-        $oldValues = $log->old_values ?? [];
-
-        // For created events, show count of fields set
-        if ($log->event === 'created' && !empty($newValues)) {
-            $fields = array_keys($newValues);
-            $count = count($fields);
-            if ($count === 0) {
-                return '';
-            }
-            $shown = array_slice($fields, 0, 3);
-            $summary = implode(', ', $shown);
-            if ($count > 3) {
-                $summary .= ' (+' . ($count - 3) . ' wiecej)';
-            }
-            return $summary;
-        }
-
-        // For updated events, show changed fields
-        if (in_array($log->event, ['updated', 'bulk_update'])) {
-            $changes = $log->getChanges();
-            $fields = array_keys($changes);
-            $count = count($fields);
-            if ($count === 0) {
-                return '';
-            }
-            $shown = array_slice($fields, 0, 3);
-            $summary = implode(', ', $shown);
-            if ($count > 3) {
-                $summary .= ' (+' . ($count - 3) . ' wiecej)';
-            }
-            return $summary;
-        }
-
-        // For deleted events, show what was deleted
-        if ($log->event === 'deleted' && !empty($oldValues)) {
-            $nameField = $oldValues['name'] ?? $oldValues['sku'] ?? $oldValues['email'] ?? null;
-            if ($nameField) {
-                return \Illuminate\Support\Str::limit((string) $nameField, 40);
-            }
-        }
-
-        return '';
     }
 
     // ==========================================

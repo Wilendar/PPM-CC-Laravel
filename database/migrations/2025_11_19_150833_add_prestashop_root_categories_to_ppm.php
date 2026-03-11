@@ -57,8 +57,6 @@ return new class extends Migration
                     'description' => 'PrestaShop Root Category (automatically added)',
                     'is_active' => true,
                     'sort_order' => 0,
-                    'level' => 0,
-                    'path' => null,
                     'created_at' => now(),
                     'updated_at' => now(),
                 ]);
@@ -76,8 +74,6 @@ return new class extends Migration
                     'description' => 'PrestaShop Home Category (automatically added)',
                     'is_active' => true,
                     'sort_order' => 0,
-                    'level' => 1,
-                    'path' => '/1',
                     'created_at' => now(),
                     'updated_at' => now(),
                 ]);

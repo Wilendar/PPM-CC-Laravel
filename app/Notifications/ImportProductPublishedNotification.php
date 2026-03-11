@@ -64,7 +64,7 @@ class ImportProductPublishedNotification extends Notification implements ShouldQ
             ->subject($data['title'])
             ->view('emails.notification-branded', [
                 'title' => $data['title'],
-                'notificationMessage' => $data['message'],
+                'message' => $data['message'],
                 'type' => $data['type'],
                 'actionUrl' => url($data['action_url']),
                 'actionText' => 'Zobacz w panelu',

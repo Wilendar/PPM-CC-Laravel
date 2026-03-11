@@ -2,7 +2,6 @@
 
 namespace App\Models;
 
-use App\Models\Concerns\Auditable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -33,9 +32,7 @@ use Illuminate\Support\Facades\Log;
  */
 class ProductErpData extends Model
 {
-    use HasFactory, Auditable;
-
-    protected array $auditExclude = ['sync_status'];
+    use HasFactory;
 
     protected $table = 'product_erp_data';
 

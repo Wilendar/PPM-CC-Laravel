@@ -4,7 +4,6 @@ namespace App\Http\Livewire\Admin\Users;
 
 use Livewire\Component;
 use Livewire\WithPagination;
-use App\Models\AuditLog;
 use App\Models\User;
 use Spatie\Permission\Models\Role;
 use Illuminate\Database\Eloquent\Builder;
@@ -340,20 +339,7 @@ class UserList extends Component
         $users = User::whereIn('id', $this->selectedUsers)->get();
 
         foreach ($users as $user) {
-            $oldRoles = $user->roles->pluck('name')->sort()->values()->toArray();
-
             $user->syncRoles([$role->name]);
-
-            $newRoles = [$role->name];
-            if ($oldRoles !== $newRoles) {
-                AuditLog::log(
-                    AuditLog::EVENT_UPDATED,
-                    $user,
-                    ['roles' => $oldRoles],
-                    ['roles' => $newRoles],
-                    "Masowe przypisanie roli '{$role->name}'"
-                );
-            }
         }
 
         session()->flash('success', 'Przypisano rolę "' . $role->name . '" dla ' . count($this->selectedUsers) . ' użytkowników.');

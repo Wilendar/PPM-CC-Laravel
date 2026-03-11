@@ -1,0 +1,142 @@
+<?php
+
+use App\Http\Middleware\AdminMiddleware;
+use App\Http\Middleware\CheckAccountLockMiddleware;
+use App\Http\Middleware\CheckBlockedIp;
+use App\Http\Middleware\DevAuthBypass;
+use App\Http\Middleware\ForcePasswordChangeMiddleware;
+use App\Http\Middleware\PermissionMiddleware;
+use App\Http\Middleware\RoleMiddleware;
+use App\Http\Middleware\RoleOrPermissionMiddleware;
+use App\Http\Middleware\TrackUserSessionMiddleware;
+use Illuminate\Foundation\Application;
+use Illuminate\Foundation\Configuration\Exceptions;
+use Illuminate\Foundation\Configuration\Middleware;
+use Illuminate\Support\Facades\Route;
+
+return Application::configure(basePath: dirname(__DIR__))
+    ->withRouting(
+        web: __DIR__.'/../routes/web.php',
+        api: __DIR__.'/../routes/api.php',
+        commands: __DIR__.'/../routes/console.php',
+        channels: __DIR__.'/../routes/channels.php',
+        health: '/up',
+        then: function () {
+            Route::middleware('web')
+                ->group(base_path('routes/oauth.php'));
+        },
+    )
+    ->withProviders([
+        App\Providers\AppServiceProvider::class,
+        App\Providers\AuthServiceProvider::class,
+        App\Providers\VisualEditorServiceProvider::class,
+    ])
+    ->withMiddleware(function (Middleware $middleware) {
+        //
+        // PPM Custom Middleware Registration
+        // FAZA A: Spatie Setup + Middleware
+        //
+        
+        // Role-based middleware
+        $middleware->alias([
+            'role' => RoleMiddleware::class,
+            'permission' => PermissionMiddleware::class,
+            'role_or_permission' => RoleOrPermissionMiddleware::class,
+            'admin' => AdminMiddleware::class,
+            // Security middleware (FAZA C)
+            'track_session' => TrackUserSessionMiddleware::class,
+            'force_password_change' => ForcePasswordChangeMiddleware::class,
+            'check_account_lock' => CheckAccountLockMiddleware::class,
+            'check.blocked.ip' => CheckBlockedIp::class,
+        ]);
+        
+        // Dev auth bypass - auto-login admin w trybie dev (MUSI być przed innymi!)
+        $middleware->web(prepend: [
+            DevAuthBypass::class,
+        ]);
+
+        // Global middleware dla wszystkich requests
+        $middleware->web(append: [
+            TrackUserSessionMiddleware::class,
+            \App\Http\Middleware\NoIndexMiddleware::class,
+        ]);
+        
+        // API middleware
+        $middleware->api(prepend: [
+            // API-specific middleware
+        ]);
+        
+        // Authenticated middleware group
+        $middleware->group('auth', [
+            'auth:sanctum', // Sanctum auth dla API
+        ]);
+        
+        // Admin middleware group (role-based)
+        $middleware->group('admin', [
+            'auth',
+            'role:Admin',
+        ]);
+        
+        // Manager middleware group (hierarchical)
+        $middleware->group('manager', [
+            'auth', 
+            'role:Admin,Manager',
+        ]);
+        
+        // Editor middleware group
+        $middleware->group('editor', [
+            'auth',
+            'role:Admin,Manager,Editor', 
+        ]);
+        
+        // API access group
+        $middleware->group('api_access', [
+            'auth:sanctum',
+            'permission:api.access',
+        ]);
+    })
+    ->withExceptions(function (Exceptions $exceptions) {
+        //
+        // PPM Exception Handling
+        // FAZA A: Spatie Setup + Middleware
+        //
+        
+        // Handle authentication exceptions
+        $exceptions->render(function (\Illuminate\Auth\AuthenticationException $e, $request) {
+            if ($request->expectsJson()) {
+                return response()->json([
+                    'error' => 'Unauthenticated',
+                    'message' => 'You must be logged in to access this resource.'
+                ], 401);
+            }
+            
+            return redirect()->guest(route('login'));
+        });
+        
+        // Handle authorization exceptions (403)
+        $exceptions->render(function (\Illuminate\Auth\Access\AuthorizationException $e, $request) {
+            if ($request->expectsJson()) {
+                return response()->json([
+                    'error' => 'Unauthorized',
+                    'message' => $e->getMessage() ?: 'You do not have permission to access this resource.'
+                ], 403);
+            }
+
+            return redirect('/admin')
+                ->with('error', 'Nie masz uprawnien do tego zasobu.');
+        });
+
+        // Handle role/permission exceptions from Spatie
+        $exceptions->render(function (\Spatie\Permission\Exceptions\UnauthorizedException $e, $request) {
+            if ($request->expectsJson()) {
+                return response()->json([
+                    'error' => 'Permission denied',
+                    'message' => $e->getMessage()
+                ], 403);
+            }
+
+            return redirect('/admin')
+                ->with('error', 'Nie masz wymaganych uprawnien.');
+        });
+    })
+    ->create();

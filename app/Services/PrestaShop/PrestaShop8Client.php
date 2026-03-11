@@ -175,11 +175,13 @@ class PrestaShop8Client extends BasePrestaShopClient
             return [];
         }
 
+        // PrestaShop API uses pipe (|) as OR separator for filter values
+        $idsFilter = implode('|', array_map('intval', $productIds));
+
+        $endpoint = "/products?display=[id,date_upd]&filter[id]=[{$idsFilter}]";
+
         try {
-            // Use chunked fetching to avoid HTTP 414 "URI Too Long"
-            $response = $this->getResourceByIdsChunked('products', $productIds, [
-                'display' => '[id,date_upd]',
-            ]);
+            $response = $this->makeRequest('GET', $endpoint);
 
             $result = [];
 

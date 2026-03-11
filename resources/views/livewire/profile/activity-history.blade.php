@@ -191,26 +191,6 @@
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
                                             </svg>
                                             @break
-                                        @case('synced')
-                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
-                                            </svg>
-                                            @break
-                                        @case('imported')
-                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
-                                            </svg>
-                                            @break
-                                        @case('exported')
-                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
-                                            </svg>
-                                            @break
-                                        @case('matched')
-                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/>
-                                            </svg>
-                                            @break
                                         @default
                                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
@@ -226,7 +206,7 @@
                                         {{ $log->event_display }}
                                     </span>
                                     <span class="text-sm text-gray-300">
-                                        {{ $this->getModelLabel($log->auditable_type) }}
+                                        {{ $log->short_model_type }}
                                     </span>
                                     @if($log->auditable_id)
                                         <span class="text-xs text-gray-500">(ID: {{ $log->auditable_id }})</span>
@@ -237,14 +217,6 @@
                                         </span>
                                     @endif
                                 </div>
-
-                                {{-- Change summary line --}}
-                                @php $changeSummary = $this->getChangeSummary($log); @endphp
-                                @if($changeSummary)
-                                    <div class="mt-0.5 text-xs text-gray-400">
-                                        <span class="font-mono">{{ $changeSummary }}</span>
-                                    </div>
-                                @endif
 
                                 <div class="flex items-center gap-3 mt-1 text-xs text-gray-500">
                                     <span title="{{ $log->created_at->format('Y-m-d H:i:s') }}">
@@ -265,8 +237,8 @@
                                     @endif
                                 </div>
 
-                                {{-- Expandable changes for events with data --}}
-                                @if(in_array($log->event, ['created', 'updated', 'deleted', 'bulk_update', 'imported', 'synced']) && ($log->old_values || $log->new_values))
+                                {{-- Expandable changes for updated events --}}
+                                @if(in_array($log->event, ['updated', 'bulk_update']) && ($log->old_values || $log->new_values))
                                     <button @click="expanded = !expanded"
                                             class="mt-2 text-xs text-orange-400 hover:text-orange-300 transition-colors flex items-center gap-1">
                                         <svg class="w-3 h-3 transition-transform" :class="expanded && 'rotate-90'" fill="none" stroke="currentColor" viewBox="0 0 24 24">

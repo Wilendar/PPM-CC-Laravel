@@ -125,21 +125,6 @@ class DetectSubiektGTChanges implements ShouldQueue
 
             // Dispatch incremental pull if changes detected
             if ($modifiedCount >= $this->threshold) {
-                // Skip if already has pending/running pull job for this connection
-                $existingJob = SyncJob::where('source_type', 'subiekt_gt')
-                    ->where('source_id', $this->connectionId)
-                    ->where('job_type', 'pull_products')
-                    ->whereIn('status', ['pending', 'running'])
-                    ->exists();
-
-                if ($existingJob) {
-                    Log::debug('DetectSubiektGTChanges: Skipped - pull job already pending', [
-                        'connection_id' => $this->connectionId,
-                        'modified_count' => $modifiedCount,
-                    ]);
-                    return;
-                }
-
                 Log::info('DetectSubiektGTChanges: Changes detected, dispatching pull', [
                     'connection_id' => $this->connectionId,
                     'modified_count' => $modifiedCount,
@@ -147,17 +132,12 @@ class DetectSubiektGTChanges implements ShouldQueue
                 ]);
 
                 // Create SyncJob for tracking
-                // Use source_type/source_id consistently (subiekt_gt is the SOURCE)
                 $syncJob = SyncJob::create([
-                    'job_id' => \Str::uuid()->toString(),
-                    'job_name' => "Delta sync: Subiekt GT #{$this->connectionId}",
-                    'source_type' => 'subiekt_gt',
-                    'source_id' => $this->connectionId,
-                    'target_type' => 'ppm',
-                    'target_id' => null,
+                    'target_type' => 'subiekt_gt',
+                    'target_id' => $this->connectionId,
                     'job_type' => 'pull_products',
                     'status' => 'pending',
-                    'trigger_type' => 'scheduled',
+                    'status_message' => 'Wykryto zmiany: ' . $modifiedCount . ' produktow',
                     'metadata' => [
                         'mode' => 'incremental',
                         'since' => $since,

@@ -1430,52 +1430,18 @@ class ProductTransformer
         // Generate code from name
         $code = \Illuminate\Support\Str::slug($manufacturerName, '_');
 
-        // FIX 2026-03-10: Smart matching + withTrashed to handle soft-deleted records
-        // Root cause: soft-deleted manufacturers are invisible to Eloquent but block
-        // INSERT on unique index (bp_type_code_unique) causing race condition failures
-        $manufacturer = Manufacturer::withTrashed()->where('code', $code)->first();
+        // Look up existing manufacturer by code
+        $manufacturer = Manufacturer::where('code', $code)->first();
 
-        // Also try matching by exact name (smart matching per user request)
         if (!$manufacturer) {
-            $manufacturer = Manufacturer::withTrashed()
-                ->where('name', $manufacturerName)
-                ->first();
-        }
+            // Create new manufacturer
+            $manufacturer = Manufacturer::create([
+                'name' => $manufacturerName,
+                'code' => $code,
+                'is_active' => true,
+                'sort_order' => 0,
+            ]);
 
-        if ($manufacturer) {
-            // Restore if soft-deleted
-            if ($manufacturer->trashed()) {
-                $manufacturer->restore();
-                $manufacturer->update(['is_active' => true]);
-                Log::info('ProductTransformer: Restored soft-deleted manufacturer', [
-                    'id' => $manufacturer->id, 'code' => $code, 'name' => $manufacturerName,
-                ]);
-            }
-        } else {
-            // Create new - with race condition protection
-            try {
-                $manufacturer = Manufacturer::create([
-                    'code' => $code,
-                    'name' => $manufacturerName,
-                    'is_active' => true,
-                    'sort_order' => 0,
-                ]);
-            } catch (\Illuminate\Database\QueryException $e) {
-                // Race condition: another worker created it simultaneously
-                $manufacturer = Manufacturer::withTrashed()->where('code', $code)->first();
-                if (!$manufacturer) {
-                    $manufacturer = Manufacturer::withTrashed()->where('name', $manufacturerName)->first();
-                }
-                if (!$manufacturer) {
-                    throw $e;
-                }
-                if ($manufacturer->trashed()) {
-                    $manufacturer->restore();
-                }
-            }
-        }
-
-        if ($manufacturer->wasRecentlyCreated) {
             Log::info('ProductTransformer: Created new manufacturer during import', [
                 'manufacturer_id' => $manufacturer->id,
                 'name' => $manufacturerName,
@@ -1594,47 +1560,18 @@ class ProductTransformer
 
         $code = Str::slug($supplierName, '_');
 
-        // FIX 2026-03-10: Smart matching + withTrashed (same pattern as importManufacturer)
-        $importer = BusinessPartner::withTrashed()
-            ->where('code', $code)
+        // Look up existing importer by code
+        $importer = BusinessPartner::where('code', $code)
             ->where('type', 'importer')
             ->first();
 
         if (!$importer) {
-            $importer = BusinessPartner::withTrashed()
-                ->where('name', $supplierName)
-                ->where('type', 'importer')
-                ->first();
-        }
-
-        if ($importer) {
-            if ($importer->trashed()) {
-                $importer->restore();
-                $importer->update(['is_active' => true]);
-            }
-        } else {
-            try {
-                $importer = BusinessPartner::create([
-                    'code' => $code,
-                    'type' => 'importer',
-                    'name' => $supplierName,
-                    'is_active' => true,
-                ]);
-            } catch (\Illuminate\Database\QueryException $e) {
-                $importer = BusinessPartner::withTrashed()
-                    ->where('code', $code)
-                    ->where('type', 'importer')
-                    ->first();
-                if (!$importer) {
-                    throw $e;
-                }
-                if ($importer->trashed()) {
-                    $importer->restore();
-                }
-            }
-        }
-
-        if ($importer->wasRecentlyCreated) {
+            $importer = BusinessPartner::create([
+                'name' => $supplierName,
+                'code' => $code,
+                'type' => 'importer',
+                'is_active' => true,
+            ]);
 
             Log::info('ProductTransformer: Created new importer during import', [
                 'importer_id' => $importer->id,

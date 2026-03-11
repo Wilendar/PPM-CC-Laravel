@@ -1111,180 +1111,10 @@ class SubiektGTService implements ERPSyncServiceInterface
                 'sample' => array_slice($skus, 0, 5),
             ]);
 
-            // ======================================================================
-            // DELTA SYNC: Reduce API calls by detecting only changed products
-            // ======================================================================
-            $useDeltaSync = false;
-            $deltaSkus = null; // null = fetch all (full sync), array = fetch only these
-
-            if ($connectionMode === 'rest_api' && $this->restApiClient !== null) {
-                try {
-                    // Delta detection for prices/basic_data: use tw_ZmianaTw.twz_CzasModyf (timestamp)
-                    if (in_array($syncType, ['prices', 'basic_data', 'linked_only'])) {
-                        $lastChangeTime = $connection->last_change_time;
-
-                        if ($lastChangeTime !== null) {
-                            $changedProducts = $this->restApiClient->getChangedSkusSince(
-                                $lastChangeTime->toIso8601String()
-                            );
-                            $changedSkus = array_column($changedProducts, 'sku');
-
-                            // Filter to only linked SKUs
-                            $deltaSkus = array_values(array_intersect($skus, $changedSkus));
-                            $useDeltaSync = true;
-
-                            // Save latest change time for next run
-                            if (!empty($changedProducts)) {
-                                $maxChangeTime = max(array_column($changedProducts, 'changeTime'));
-                                $connection->last_change_time = Carbon::parse($maxChangeTime);
-                                $connection->save();
-                            }
-
-                            Log::info('pullLinkedProducts: Delta sync (change tracking)', [
-                                'total_changes' => count($changedProducts),
-                                'linked_changes' => count($deltaSkus),
-                                'total_linked' => count($skus),
-                                'last_change_time' => $lastChangeTime->toDateTimeString(),
-                            ]);
-
-                            if (empty($deltaSkus)) {
-                                Log::info('pullLinkedProducts: No changes detected via delta, skipping fetch');
-                                $results['skipped'] = count($skus);
-                                return $results;
-                            }
-                        } else {
-                            Log::info('pullLinkedProducts: First run, no last_change_time - full sync');
-                        }
-                    }
-
-                    // Delta detection for stock: use checksum comparison
-                    if ($syncType === 'stock') {
-                        $lastChangeTime = $connection->last_change_time;
-                        $config = $connection->connection_config;
-                        $defaultWarehouseId = $config['default_warehouse_id'] ?? 1;
-
-                        // First check tw_ZmianaTw for any product changes (may include stock)
-                        $changedFromTw = [];
-                        $stockMaxChangeTime = null;
-                        if ($lastChangeTime !== null) {
-                            $changedProducts = $this->restApiClient->getChangedSkusSince(
-                                $lastChangeTime->toIso8601String()
-                            );
-                            $changedFromTw = array_column($changedProducts, 'sku');
-
-                            if (!empty($changedProducts)) {
-                                $stockMaxChangeTime = max(array_column($changedProducts, 'changeTime'));
-                                // Defer save until delta is confirmed (after checksum comparison)
-                            }
-                        }
-
-                        // Then use checksum comparison for stock-specific changes
-                        $stockChangedSkus = [];
-                        $allChecksums = [];
-
-                        foreach (array_chunk($skus, 500) as $chunk) {
-                            try {
-                                $checksums = $this->restApiClient->getStockChecksums($chunk, $defaultWarehouseId);
-                                $allChecksums = array_merge($allChecksums, $checksums);
-                            } catch (\Exception $e) {
-                                Log::warning('pullLinkedProducts: Stock checksum fetch failed for chunk', [
-                                    'chunk_size' => count($chunk),
-                                    'error' => $e->getMessage(),
-                                ]);
-                                // On checksum failure, fall back to full sync for this chunk
-                                $stockChangedSkus = array_merge($stockChangedSkus, $chunk);
-                            }
-                        }
-
-                        // Compare checksums with cached values
-                        foreach ($allChecksums as $sku => $checksum) {
-                            $erpData = $skuToErpData[$sku] ?? null;
-                            $cachedChecksum = null;
-
-                            if ($erpData) {
-                                $externalData = $erpData->external_data ?? [];
-                                $cachedChecksum = $externalData['stock_checksum'] ?? null;
-                            }
-
-                            if ($cachedChecksum === null || $cachedChecksum !== $checksum) {
-                                $stockChangedSkus[] = $sku;
-                            }
-                        }
-
-                        // Merge: SKUs from tw_ZmianaTw + SKUs with different stock checksums
-                        $combinedChanged = array_unique(array_merge(
-                            array_intersect($changedFromTw, $skus),
-                            $stockChangedSkus
-                        ));
-
-                        if ($lastChangeTime !== null && !empty($allChecksums)) {
-                            $deltaSkus = array_values($combinedChanged);
-                            $useDeltaSync = true;
-
-                            // Now safe to advance last_change_time (delta confirmed)
-                            if ($stockMaxChangeTime !== null) {
-                                $connection->last_change_time = Carbon::parse($stockMaxChangeTime);
-                                $connection->save();
-                            }
-
-                            Log::info('pullLinkedProducts: Delta sync (stock checksums)', [
-                                'tw_changes' => count(array_intersect($changedFromTw, $skus)),
-                                'checksum_changes' => count($stockChangedSkus),
-                                'combined_unique' => count($deltaSkus),
-                                'total_linked' => count($skus),
-                            ]);
-
-                            if (empty($deltaSkus)) {
-                                Log::info('pullLinkedProducts: No stock changes detected, skipping fetch');
-                                $results['skipped'] = count($skus);
-                                $connection->last_stock_checksum_at = Carbon::now();
-                                $connection->save();
-                                return $results;
-                            }
-                        }
-
-                        // Save new checksums after processing (done later in the update loop)
-                        $results['_stock_checksums'] = $allChecksums;
-                    }
-
-                    // First-time setup: save current change time for future delta
-                    if (!$useDeltaSync && $connection->last_change_time === null) {
-                        try {
-                            $latestChange = $this->restApiClient->getLatestChangeInfo();
-                            $connection->last_change_time = Carbon::parse($latestChange['latest_change_time']);
-                            $connection->save();
-                            Log::info('pullLinkedProducts: Saved initial change time for future delta', [
-                                'change_time' => $latestChange['latest_change_time'],
-                            ]);
-                        } catch (\Exception $e) {
-                            Log::warning('pullLinkedProducts: Could not fetch latest change info', [
-                                'error' => $e->getMessage(),
-                            ]);
-                        }
-                    }
-
-                } catch (\Exception $e) {
-                    Log::warning('pullLinkedProducts: Delta sync failed, falling back to full sync', [
-                        'error' => $e->getMessage(),
-                    ]);
-                    $deltaSkus = null;
-                    $useDeltaSync = false;
-                }
-            }
-
-            // Apply delta filter: only fetch changed SKUs
-            $fetchSkus = $useDeltaSync && $deltaSkus !== null ? $deltaSkus : $skus;
-
-            Log::info('pullLinkedProducts: Fetch scope', [
-                'delta_sync' => $useDeltaSync,
-                'fetch_count' => count($fetchSkus),
-                'total_linked' => count($skus),
-            ]);
-
             // STEP 3: Fetch products from Subiekt by SKUs
             if ($connectionMode === 'rest_api' && $this->restApiClient !== null) {
                 $subiektProducts = $this->restApiClient->getProductsBySkus(
-                    $fetchSkus,
+                    $skus,
                     $defaultPriceTypeId,
                     $defaultWarehouseId
                 );
@@ -1310,9 +1140,8 @@ class SubiektGTService implements ERPSyncServiceInterface
             }
 
             Log::info('pullLinkedProducts: Fetched from Subiekt', [
-                'requested' => count($fetchSkus),
+                'requested' => count($skus),
                 'found' => count($subiektProducts),
-                'delta_sync' => $useDeltaSync,
             ]);
 
             // STEP 3.5: ETAP_08 FAZA 7.4 - Batch pre-fetch prices/stock for ALL SKUs
@@ -1321,17 +1150,17 @@ class SubiektGTService implements ERPSyncServiceInterface
             $batchStocks = [];
 
             if ($syncType === 'prices' && $this->restApiClient) {
-                $batchPrices = $this->restApiClient->batchFetchPricesBySku($fetchSkus);
+                $batchPrices = $this->restApiClient->batchFetchPricesBySku($skus);
                 Log::info('pullLinkedProducts: Batch fetched prices', [
-                    'requested' => count($fetchSkus),
+                    'requested' => count($skus),
                     'fetched' => count($batchPrices),
                 ]);
             }
 
             if ($syncType === 'stock' && $this->restApiClient) {
-                $batchStocks = $this->restApiClient->batchFetchStockBySku($fetchSkus);
+                $batchStocks = $this->restApiClient->batchFetchStockBySku($skus);
                 Log::info('pullLinkedProducts: Batch fetched stock', [
-                    'requested' => count($fetchSkus),
+                    'requested' => count($skus),
                     'fetched' => count($batchStocks),
                 ]);
             }
@@ -1347,16 +1176,6 @@ class SubiektGTService implements ERPSyncServiceInterface
                         'sku' => $sku,
                         'product_id' => $ppmProduct->id,
                     ]);
-
-                    // Save stock checksum even for not-found SKUs to prevent
-                    // perpetual re-syncs (cached null != fetched checksum)
-                    if ($syncType === 'stock' && isset($results['_stock_checksums'][$sku]) && $erpData) {
-                        $externalData = $erpData->external_data ?? [];
-                        $externalData['stock_checksum'] = $results['_stock_checksums'][$sku];
-                        $erpData->external_data = $externalData;
-                        $erpData->save();
-                    }
-
                     continue;
                 }
 
@@ -1453,17 +1272,6 @@ class SubiektGTService implements ERPSyncServiceInterface
                             $updateDetails = ['type' => 'full'];
                     }
 
-                    // Save stock checksum for future delta comparison
-                    if ($syncType === 'stock' && isset($results['_stock_checksums'][$sku])) {
-                        $erpData = $skuToErpData[$sku] ?? null;
-                        if ($erpData) {
-                            $externalData = $erpData->external_data ?? [];
-                            $externalData['stock_checksum'] = $results['_stock_checksums'][$sku];
-                            $erpData->external_data = $externalData;
-                            $erpData->save();
-                        }
-                    }
-
                     // === PULL VARIANTS IF PRODUCT IS VARIANT MASTER ===
                     $variantsUpdated = 0;
                     $variantsFailed = 0;
@@ -1536,15 +1344,6 @@ class SubiektGTService implements ERPSyncServiceInterface
                 }
             }
 
-            // Update stock checksum timestamp after successful stock sync
-            if ($syncType === 'stock' && isset($results['_stock_checksums'])) {
-                $connection->last_stock_checksum_at = Carbon::now();
-                $connection->save();
-            }
-
-            // Clean up internal data before returning results
-            unset($results['_stock_checksums']);
-
             $duration = $startTime->diffInSeconds(Carbon::now());
 
             Log::info('pullLinkedProducts: Completed', [
@@ -1555,7 +1354,6 @@ class SubiektGTService implements ERPSyncServiceInterface
                 'skipped' => $results['skipped'],
                 'not_found' => $results['not_found'],
                 'errors_count' => count($results['errors']),
-                'delta_sync' => $useDeltaSync,
             ]);
 
             // Update connection stats
@@ -4491,34 +4289,10 @@ class SubiektGTService implements ERPSyncServiceInterface
             $connectionMode = $config['connection_mode'] ?? 'rest_api';
 
             if ($connectionMode === 'rest_api') {
-                if ($this->restApiClient === null) {
-                    Log::warning('SubiektGTService: restApiClient not initialized for getModifiedProductsCount');
-                    return 0;
-                }
-
-                try {
-                    $latestChange = $this->restApiClient->getLatestChangeInfo();
-                    $lastKnownTime = $connection->last_change_time;
-
-                    if ($lastKnownTime !== null) {
-                        $latestApiTime = Carbon::parse($latestChange['latest_change_time']);
-                        if ($latestApiTime->gt($lastKnownTime)) {
-                            $changes = $this->restApiClient->getChangedSkusSince(
-                                $lastKnownTime->toIso8601String()
-                            );
-                            return count($changes);
-                        }
-                        return 0;
-                    }
-
-                    // First run - no baseline, report total changes as unknown
-                    return $latestChange['total_changes'] > 0 ? 1 : 0;
-                } catch (\Exception $e) {
-                    Log::warning('SubiektGTService: Delta detection failed, falling back', [
-                        'error' => $e->getMessage(),
-                    ]);
-                    return 0;
-                }
+                // REST API doesn't have a modified count endpoint
+                // Return 0 to indicate unknown count (will process all linked products)
+                Log::debug('SubiektGTService: getModifiedProductsCount not available in REST API mode');
+                return 0;
             }
 
             // SQL Direct mode - use queryBuilder

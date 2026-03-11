@@ -10,7 +10,6 @@ use App\Models\Warehouse;
 use App\Models\ProductShopData;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Livewire\Attributes\Computed;
@@ -226,21 +225,9 @@ trait ProductListFilters
         }
 
         if (!empty($this->categoryFilter)) {
-            $categoryId = (int) $this->categoryFilter;
-            $descendantIds = Cache::remember("cat_descendants_{$categoryId}", 3600, function () use ($categoryId) {
-                $category = Category::select('id', 'path')->find($categoryId);
-                if (!$category) {
-                    return [$categoryId];
-                }
-                $searchPath = $category->path ? $category->path . '/' . $category->id : '/' . $category->id;
-                return Category::where('path', 'LIKE', $searchPath . '%')
-                    ->pluck('id')
-                    ->push($categoryId)
-                    ->unique()
-                    ->values()
-                    ->toArray();
+            $query->whereHas('categories', function ($q) {
+                $q->where('categories.id', $this->categoryFilter);
             });
-            $query->whereHas('categories', fn($q) => $q->whereIn('categories.id', $descendantIds));
         }
 
         // SECURITY: Only apply status filter if user has status_read permission

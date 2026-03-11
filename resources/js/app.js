@@ -6,12 +6,6 @@ import 'vanilla-colorful/hex-color-picker.js';
 // Import resizable columns for import panel
 import './resizable-columns.js';
 
-// Import category panel for product listing
-import { registerCategoryPanel } from './category-panel.js';
-
-// Import category tree lazy loading for ProductForm
-import { registerCategoryTreeLazy } from './category-tree-lazy.js';
-
 // =====================================================
 // PPM DIAGNOSTICS - Bug Report System Support
 // Tracks user actions and console errors for bug reports
@@ -130,12 +124,6 @@ function registerAlpineComponents(Alpine) {
     Alpine._ppmAppJsRegistered = true;
 
     console.log('[PPM app.js] Registering Alpine components...');
-
-    // Register category panel component
-    registerCategoryPanel(Alpine);
-
-    // Register category tree lazy loading component
-    registerCategoryTreeLazy(Alpine);
 
     // Theme store (using localStorage directly instead of Alpine.$persist to avoid Livewire conflicts)
     Alpine.store('theme', {
@@ -2097,15 +2085,6 @@ function registerAlpineComponents(Alpine) {
         rawValue: initialValue || '',
         warehouseId: warehouseId,
 
-        // Ghost text / autocomplete
-        ghostText: '',
-        ghostVisible: false,
-        suggestions: [],
-        dropdownOpen: false,
-        selectedIndex: -1,
-        debounceTimer: null,
-        smartDebounceTimer: null,
-
         // Parse comma-separated locations into array
         get locations() {
             if (!this.rawValue || typeof this.rawValue !== 'string') return [];
@@ -2134,7 +2113,6 @@ function registerAlpineComponents(Alpine) {
 
             current.push(trimmed);
             this.locations = current;
-            this.clearSuggestions();
 
             // Notify Livewire about dirty state
             if (this.$wire) {
@@ -2220,102 +2198,6 @@ function registerAlpineComponents(Alpine) {
                     });
                 }
             }
-        },
-
-        // Prefix match z 150ms debounce
-        onLocationInput(value) {
-            clearTimeout(this.debounceTimer);
-            this.ghostText = '';
-            this.ghostVisible = false;
-
-            if (!value || value.length < 2) {
-                this.suggestions = [];
-                this.dropdownOpen = false;
-                return;
-            }
-
-            this.debounceTimer = setTimeout(async () => {
-                try {
-                    const result = await this.$wire.suggestLocationByPrefix(this.warehouseId, value);
-                    if (result && result.ghost) {
-                        // Ghost text = full code, overlay shows only the completion part
-                        this.ghostText = result.ghost;
-                        this.ghostVisible = value.length < result.ghost.length &&
-                            result.ghost.toUpperCase().startsWith(value.toUpperCase());
-                    }
-                    if (result && result.alternatives && result.alternatives.length > 0) {
-                        this.suggestions = result.alternatives;
-                        this.dropdownOpen = true;
-                        this.selectedIndex = -1;
-                    } else {
-                        this.suggestions = [];
-                        this.dropdownOpen = false;
-                    }
-                } catch (e) {
-                    console.warn('[LocationLabels] Prefix suggestion error:', e);
-                }
-            }, 150);
-        },
-
-        // SMART suggestion z 300ms debounce (gdy input pusty)
-        onLocationFocus(value) {
-            if (value && value.length > 0) return; // Nie SMART gdy juz cos wpisane
-
-            clearTimeout(this.smartDebounceTimer);
-            this.smartDebounceTimer = setTimeout(async () => {
-                try {
-                    const result = await this.$wire.suggestLocationSmart(this.warehouseId);
-                    if (result && result.ghost) {
-                        this.ghostText = result.ghost;
-                        this.ghostVisible = true;
-                    }
-                } catch (e) {
-                    console.warn('[LocationLabels] SMART suggestion error:', e);
-                }
-            }, 300);
-        },
-
-        // Tab akceptuje ghost text
-        acceptGhost(inputEl) {
-            if (this.ghostVisible && this.ghostText) {
-                this.addLocation(this.ghostText);
-                inputEl.value = '';
-                this.clearSuggestions();
-                return true; // prevent default Tab
-            }
-            return false; // allow default Tab
-        },
-
-        // Wybierz sugestie z dropdown
-        selectSuggestion(index) {
-            const suggestion = this.suggestions[index];
-            if (suggestion) {
-                this.addLocation(suggestion.code);
-                this.$refs.newLocationInput.value = '';
-                this.clearSuggestions();
-            }
-        },
-
-        // Arrow Up/Down w dropdown
-        navigateDropdown(direction) {
-            if (!this.dropdownOpen || this.suggestions.length === 0) return;
-
-            if (direction === 'down') {
-                this.selectedIndex = Math.min(this.selectedIndex + 1, this.suggestions.length - 1);
-            } else {
-                this.selectedIndex = Math.max(this.selectedIndex - 1, -1);
-            }
-        },
-
-        // Zamknij ghost i dropdown
-        clearSuggestions() {
-            this.ghostText = '';
-            this.ghostVisible = false;
-            this.suggestions = [];
-            this.dropdownOpen = false;
-            this.selectedIndex = -1;
-            clearTimeout(this.debounceTimer);
-            clearTimeout(this.smartDebounceTimer);
         },
 
         // Init: Listen for Livewire updates to sync location from server

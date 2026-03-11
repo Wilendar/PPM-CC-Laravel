@@ -5,7 +5,6 @@ namespace App\Console\Commands;
 use App\Models\CategoryPreview;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Storage;
 
 /**
  * Cleanup Expired Category Previews Command
@@ -138,18 +137,15 @@ class CleanupExpiredCategoryPreviews extends Command
             $this->line('✨ No old completed previews found');
         }
 
-        // STEP 3: Cleanup orphaned import-preview files (older than 24h)
-        $importPreviewsDeleted = $this->cleanupImportPreviewFiles($isDryRun);
-
-        // STEP 4: Summary statistics
+        // STEP 3: Summary statistics
+        $totalDeleted = $expiredCount + $oldCompletedCount;
         $remainingCount = CategoryPreview::count();
 
         $this->newLine();
         $this->info('📊 Cleanup Summary:');
         $this->line("   - Expired previews: {$expiredCount}");
         $this->line("   - Old completed: {$oldCompletedCount}");
-        $this->line("   - Import preview files: {$importPreviewsDeleted}");
-        $this->line("   - Total cleaned: " . ($expiredCount + $oldCompletedCount + $importPreviewsDeleted));
+        $this->line("   - Total cleaned: {$totalDeleted}");
         $this->line("   - Remaining active: {$remainingCount}");
 
         if ($isDryRun) {
@@ -162,61 +158,5 @@ class CleanupExpiredCategoryPreviews extends Command
         $this->info('✅ Cleanup completed successfully');
 
         return Command::SUCCESS;
-    }
-
-    /**
-     * Cleanup orphaned import-preview JSON files from storage
-     *
-     * Files in storage/app/import-previews/ are created by AnalyzeMissingCategories
-     * to avoid DB max_allowed_packet limits. They can grow large (2.6MB+ per import).
-     * Remove files older than 24 hours.
-     *
-     * @param bool $isDryRun Whether to simulate without deleting
-     * @return int Number of files deleted
-     */
-    protected function cleanupImportPreviewFiles(bool $isDryRun): int
-    {
-        $disk = Storage::disk('local');
-        $directory = 'import-previews';
-
-        if (!$disk->exists($directory)) {
-            $this->line('✨ No import-previews directory found');
-            return 0;
-        }
-
-        $files = $disk->files($directory);
-        $deletedCount = 0;
-        $cutoff = now()->subDay();
-
-        foreach ($files as $file) {
-            $lastModified = $disk->lastModified($file);
-            $fileTime = \Carbon\Carbon::createFromTimestamp($lastModified);
-
-            if ($fileTime->lt($cutoff)) {
-                if ($isDryRun) {
-                    $sizeKb = round($disk->size($file) / 1024, 1);
-                    $this->line("   Would delete: {$file} ({$sizeKb} KB, {$fileTime->diffForHumans()})");
-                } else {
-                    $disk->delete($file);
-                }
-                $deletedCount++;
-            }
-        }
-
-        if ($deletedCount > 0) {
-            $action = $isDryRun ? 'Would delete' : 'Deleted';
-            $this->info("📁 {$action} {$deletedCount} old import-preview file(s)");
-
-            if (!$isDryRun) {
-                Log::info('Import preview files cleanup', [
-                    'deleted_count' => $deletedCount,
-                    'directory' => $directory,
-                ]);
-            }
-        } else {
-            $this->line('✨ No old import-preview files found');
-        }
-
-        return $deletedCount;
     }
 }

@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <meta name="robots" content="noindex, nofollow">
     <title>@yield('title', 'Admin Panel - PPM Management')</title>
 
     {{-- Tailwind CSS is compiled via Vite in app.css (Tailwind 3.4 properly configured) --}}
@@ -31,8 +30,7 @@
         'resources/css/admin/supplier-panel.css',
         'resources/css/products/import-panel.css',
         'resources/css/products/import-modals.css',
-        'resources/css/components/category-preview-modal.css',
-        'resources/css/admin/location-manager.css'
+        'resources/css/components/category-preview-modal.css'
     ])
 
     {{-- Alpine.js is included with Livewire 3.x - no need to load separately --}}
@@ -81,7 +79,6 @@
             'integrations.read' => $user?->can('integrations.read'),
             'scan.read' => $user?->can('scan.read'),
             'visual-editor.read' => $user?->can('visual-editor.read'),
-            'stock.locations' => $user?->can('stock.locations'),
         ];
         $hasAnySystemPerm = ($sidebarPerms['users.read'] ?? false) || ($sidebarPerms['users.roles'] ?? false) || ($sidebarPerms['system.config'] ?? false) || ($sidebarPerms['system.manage'] ?? false) || ($sidebarPerms['sessions.read'] ?? false) || ($sidebarPerms['audit.read'] ?? false) || ($sidebarPerms['backup.manage'] ?? false) || ($sidebarPerms['maintenance.manage'] ?? false) || ($sidebarPerms['media.read'] ?? false) || ($sidebarPerms['media.manage'] ?? false) || ($sidebarPerms['bug-reports.read'] ?? false) || ($sidebarPerms['integrations.read'] ?? false) || ($sidebarPerms['scan.read'] ?? false) || ($sidebarPerms['visual-editor.read'] ?? false) || ($sidebarPerms['reports.read'] ?? false);
         $hasAnyShopPerm = ($sidebarPerms['shops.read'] ?? false) || ($sidebarPerms['shops.create'] ?? false) || ($sidebarPerms['shops.sync'] ?? false);
@@ -506,18 +503,6 @@
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M18 18.72a9.094 9.094 0 003.741-.479 3 3 0 00-4.682-2.72m.94 3.198l.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0112 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 016 18.719m12 0a5.971 5.971 0 00-.941-3.197m0 0A5.995 5.995 0 0012 12.75a5.995 5.995 0 00-5.058 2.772m0 0a3 3 0 00-4.681 2.72 8.986 8.986 0 003.74.477m.94-3.197a5.971 5.971 0 00-.94 3.197M15 6.75a3 3 0 11-6 0 3 3 0 016 0zm6 3a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0zm-13.5 0a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0z" />
                                     </svg>
                                     <span x-show="!sidebarCollapsed" x-transition class="whitespace-nowrap">Zarzadzanie dostawcami</span>
-                                </a>
-                                <a href="/admin/locations" class="{{ !($sidebarPerms['stock.locations'] ?? false) ? 'sidebar-link-no-access' : '' }} flex items-center px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-700 hover:text-white transition-colors duration-200 {{ request()->is('admin/locations*') ? 'bg-gray-700 text-white' : '' }}"
-                                   @unless($sidebarPerms['stock.locations'] ?? false) tabindex="-1" aria-disabled="true" @endunless
-                                   :title="sidebarCollapsed ? 'Lokalizacje magazynowe' : ''"
-                                   :class="{ 'justify-center': sidebarCollapsed }">
-                                    <svg class="w-4 h-4 flex-shrink-0"
-                                         :class="{ 'mr-0': sidebarCollapsed, 'mr-3': !sidebarCollapsed }"
-                                         fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
-                                    </svg>
-                                    <span x-show="!sidebarCollapsed" x-transition class="whitespace-nowrap">Lokalizacje magazynowe</span>
                                 </a>
                             </div>
 

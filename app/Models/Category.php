@@ -2,7 +2,6 @@
 
 namespace App\Models;
 
-use App\Models\Concerns\Auditable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -85,15 +84,13 @@ use App\Services\PrestaShop\PrestaShopImportService;
  */
 class Category extends Model
 {
-    use HasFactory, SoftDeletes, Auditable;
+    use HasFactory, SoftDeletes;
 
     /**
      * Maximum category tree depth (business rule)
-     * FIX 2026-03-10: Restored to 20 (was briefly increased to 50)
-     * Deep PS trees (>20) indicate data corruption (duplicate root categories)
-     * Real max depth in healthy PS tree: ~7 levels
+     * 11 poziomów: Baza(0) -> Poziom1 -> ... -> Poziom10
      */
-    public const MAX_LEVEL = 20;
+    public const MAX_LEVEL = 10;
 
     /**
      * The attributes that are mass assignable.

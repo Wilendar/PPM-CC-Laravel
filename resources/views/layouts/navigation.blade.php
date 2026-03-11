@@ -280,35 +280,19 @@
         <h3 class="px-2 text-xs font-semibold text-blue-500 dark:text-blue-400 uppercase tracking-wider">
             Magazyn
         </h3>
-
-        <a href="{{ route('admin.deliveries.index') }}"
+        
+        <a href="{{ route('admin.deliveries.index') }}" 
            class="group flex items-center px-2 py-2 text-sm font-medium rounded-md
-                  {{ request()->routeIs('warehouse.*')
-                      ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-200'
-                      : 'text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700'
+                  {{ request()->routeIs('warehouse.*') 
+                      ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-200' 
+                      : 'text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700' 
                   }}">
-            <svg class="mr-3 h-5 w-5 {{ request()->routeIs('warehouse.*') ? 'text-blue-500' : 'text-gray-400' }}"
+            <svg class="mr-3 h-5 w-5 {{ request()->routeIs('warehouse.*') ? 'text-blue-500' : 'text-gray-400' }}" 
                  fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path>
             </svg>
             Dostawy
         </a>
-
-        @can('stock.locations')
-        <a href="{{ route('admin.locations.index') }}"
-           class="group flex items-center px-2 py-2 text-sm font-medium rounded-md
-                  {{ request()->is('admin/locations*')
-                      ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-200'
-                      : 'text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700'
-                  }}">
-            <svg class="mr-3 h-5 w-5 {{ request()->is('admin/locations*') ? 'text-blue-500' : 'text-gray-400' }}"
-                 fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
-            </svg>
-            Lokalizacje
-        </a>
-        @endcan
     </div>
     
     <hr class="my-4 border-gray-200 dark:border-gray-700">

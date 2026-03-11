@@ -27,33 +27,13 @@
         @endif
     </div>
 
-    {{-- Main Content with Category Panel --}}
-    <div class="product-list-with-panel"
-         x-data="categoryPanel({
-            tree: @js($this->categoryTreeForPanel),
-            productMap: @js($this->getProductCategoryMapForPanel()),
-            initialFilter: @js($categoryFilter)
-         })"
-         @toggle-category-panel.window="togglePanel($event.detail.side)"
-         @product-hover.window="onProductHover($event.detail.id)">
-
-        {{-- Left Panel --}}
-        <template x-if="panelSide === 'left'">
-            @include('livewire.products.listing.partials.category-panel', ['side' => 'left'])
-        </template>
-
-        <div class="product-list-with-panel__content px-4 sm:px-6 lg:px-8 py-6">
-            @if($viewMode === 'table')
-                @include('livewire.products.listing.partials.table-view')
-            @else
-                @include('livewire.products.listing.partials.grid-view')
-            @endif
-        </div>
-
-        {{-- Right Panel --}}
-        <template x-if="panelSide === 'right'">
-            @include('livewire.products.listing.partials.category-panel', ['side' => 'right'])
-        </template>
+    {{-- Main Content --}}
+    <div class="px-4 sm:px-6 lg:px-8 py-6">
+        @if($viewMode === 'table')
+            @include('livewire.products.listing.partials.table-view')
+        @else
+            @include('livewire.products.listing.partials.grid-view')
+        @endif
     </div>
 
     @include('livewire.products.listing.partials.preview-modal')
@@ -190,15 +170,10 @@
 .text-orange-900 { color: #7c2d12 !important; }
 .dark\:text-orange-200 { color: #fed7aa !important; }
 
-/* Smooth transitions - targeted selectors only (not * which forces layout on ALL elements) */
-.product-list-row,
-.btn-enterprise-primary,
-.btn-enterprise-secondary,
-.btn-enterprise-danger,
-.enterprise-card,
-.form-input-enterprise,
-input[type="checkbox"] {
-    transition: all 0.3s ease;
+/* Smooth transitions */
+* {
+    transition-duration: 0.3s !important;
+    transition-timing-function: ease !important;
 }
 
 /* Custom checkbox styling */

@@ -48,9 +48,13 @@
                     <button wire:click="openBulkAssignModal({{ $template['id'] }})" class="btn-enterprise-primary btn-sm">
                         Przypisz
                     </button>
-                    <button wire:click="editTemplate({{ $template['id'] }})" class="btn-enterprise-ghost btn-sm">&#9998;</button>
-                    <button wire:click="duplicateTemplate({{ $template['id'] }})" class="btn-enterprise-ghost btn-sm">&#128203;</button>
-                    <button wire:click="deleteTemplate({{ $template['id'] }})" wire:confirm="Usunac szablon '{{ $template['name'] }}'?" class="btn-enterprise-ghost btn-sm text-red-400">&#128465;</button>
+                    @if(!$template['is_predefined'])
+                        <button wire:click="editTemplate({{ $template['id'] }})" class="btn-enterprise-ghost btn-sm">&#9998;</button>
+                        <button wire:click="duplicateTemplate({{ $template['id'] }})" class="btn-enterprise-ghost btn-sm">&#128203;</button>
+                        <button wire:click="deleteTemplate({{ $template['id'] }})" wire:confirm="Usunac szablon?" class="btn-enterprise-ghost btn-sm text-red-400">&#128465;</button>
+                    @else
+                        <button wire:click="duplicateTemplate({{ $template['id'] }})" class="btn-enterprise-ghost btn-sm">&#128203;</button>
+                    @endif
                 </div>
 
                 {{-- Expandable Preview --}}

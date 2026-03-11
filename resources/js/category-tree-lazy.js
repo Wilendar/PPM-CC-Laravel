@@ -14,6 +14,7 @@ export function registerCategoryTreeLazy(Alpine) {
         context: config.context || 'default',
         level: config.level || 0,
         children: config.preloaded || [],
+        excludeIds: config.excludeIds || [],
         loading: false,
         loaded: !!(config.preloaded && config.preloaded.length),
 
@@ -21,7 +22,12 @@ export function registerCategoryTreeLazy(Alpine) {
             if (this.loaded || this.loading) return;
             this.loading = true;
             try {
-                this.children = await this.$wire.fetchChildCategories(this.parentId, this.context);
+                let data = await this.$wire.fetchChildCategories(this.parentId, this.context);
+                // Filter out already server-rendered children (prevents duplicates)
+                if (this.excludeIds.length > 0) {
+                    data = data.filter(c => !this.excludeIds.includes(c.id));
+                }
+                this.children = data;
                 this.loaded = true;
             } catch (e) {
                 console.error('[categoryTreeLazy] Failed to load children for', this.parentId, e);

@@ -2,7 +2,6 @@
 
 namespace App\Models;
 
-use App\Models\Concerns\Auditable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -71,7 +70,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  */
 class Warehouse extends Model
 {
-    use HasFactory, SoftDeletes, Auditable;
+    use HasFactory, SoftDeletes;
 
     /**
      * The attributes that are mass assignable.
@@ -131,18 +130,6 @@ class Warehouse extends Model
     | RELATIONSHIPS
     |--------------------------------------------------------------------------
     */
-
-    /**
-     * Location entries in this warehouse
-     *
-     * @return \Illuminate\Database\Eloquent\Relations\HasMany
-     */
-    public function locations(): HasMany
-    {
-        return $this->hasMany(Location::class, 'warehouse_id')
-                    ->orderBy('sort_order')
-                    ->orderBy('code');
-    }
 
     /**
      * Product stock levels in this warehouse

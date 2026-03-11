@@ -52,7 +52,6 @@ class AuditLogs extends Component
     public $dateToFilter = '';
     public $ipFilter = '';
     public $suspiciousOnly = false;
-    public $hideSystemEvents = false;
     
     // ==========================================
     // SORTING & DISPLAY
@@ -155,11 +154,6 @@ class AuditLogs extends Component
         $this->resetPage();
     }
 
-    public function updatedHideSystemEvents()
-    {
-        $this->resetPage();
-    }
-
     public function clearFilters()
     {
         $this->search = '';
@@ -170,7 +164,6 @@ class AuditLogs extends Component
         $this->dateToFilter = now()->format('Y-m-d');
         $this->ipFilter = '';
         $this->suspiciousOnly = false;
-        $this->hideSystemEvents = false;
         $this->resetPage();
         $this->calculateStats();
     }
@@ -522,50 +515,16 @@ class AuditLogs extends Component
     public function setViewMode($mode)
     {
         $this->viewMode = $mode;
-
+        
         if ($mode === 'chart') {
             $this->calculateChartData();
         }
     }
 
-    public function updatedChartPeriod()
-    {
-        $this->calculateChartData();
-    }
-
-    public function getTimelineDataProperty()
-    {
-        $logs = $this->getLogsQuery()->limit(50)->get();
-
-        return $logs->groupBy(function ($log) {
-            return $log->created_at->format('Y-m-d');
-        })->map(function ($dayLogs, $date) {
-            return [
-                'date' => Carbon::parse($date)->translatedFormat('d M Y'),
-                'logs' => $dayLogs,
-            ];
-        });
-    }
-
-    public $chartData = [];
-
     protected function calculateChartData()
     {
-        $days = $this->chartPeriod === 'day' ? 1 : ($this->chartPeriod === 'week' ? 7 : 30);
-
-        $this->chartData = AuditLog::select(
-                DB::raw('DATE(created_at) as date'),
-                DB::raw('count(*) as total'),
-                DB::raw("SUM(CASE WHEN event = 'created' THEN 1 ELSE 0 END) as created_count"),
-                DB::raw("SUM(CASE WHEN event = 'updated' THEN 1 ELSE 0 END) as updated_count"),
-                DB::raw("SUM(CASE WHEN event = 'deleted' THEN 1 ELSE 0 END) as deleted_count"),
-                DB::raw("SUM(CASE WHEN event IN ('login','logout') THEN 1 ELSE 0 END) as auth_count")
-            )
-            ->where('created_at', '>=', now()->subDays($days))
-            ->groupBy(DB::raw('DATE(created_at)'))
-            ->orderBy('date')
-            ->get()
-            ->toArray();
+        // Chart data calculation will be implemented for timeline view
+        // This would generate data for activity charts by day/week/month
     }
 
     // ==========================================
@@ -616,9 +575,6 @@ class AuditLogs extends Component
             })
             ->when($this->ipFilter, function ($query) {
                 $query->where('ip_address', 'like', '%' . $this->ipFilter . '%');
-            })
-            ->when($this->hideSystemEvents, function ($query) {
-                $query->whereNotNull('user_id');
             })
             ->when($this->suspiciousOnly, function ($query) {
                 $query->where(function ($q) {
@@ -696,99 +652,18 @@ class AuditLogs extends Component
     protected function humanizeFieldName($field)
     {
         $mapping = [
-            'first_name' => 'Imie',
+            'first_name' => 'Imię',
             'last_name' => 'Nazwisko',
             'email' => 'Email',
             'company' => 'Firma',
-            'is_active' => 'Status aktywnosci',
+            'is_active' => 'Status aktywności',
             'name' => 'Nazwa',
             'description' => 'Opis',
             'price' => 'Cena',
-            'stock' => 'Stan magazynowy',
-            'sku' => 'SKU',
-            'manufacturer_id' => 'Producent',
-            'category_id' => 'Kategoria',
-            'weight' => 'Waga',
-            'ean13' => 'EAN-13',
-            'reference' => 'Referencja',
-            'active' => 'Aktywny',
-            'quantity' => 'Ilosc',
+            'stock' => 'Stan magazynowy'
         ];
-
+        
         return $mapping[$field] ?? ucfirst(str_replace('_', ' ', $field));
-    }
-
-    /**
-     * Get human-readable Polish label for a model class name.
-     */
-    public function getModelLabel(string $auditableType): string
-    {
-        return match ($auditableType) {
-            'App\\Models\\Product' => 'Produkt',
-            'App\\Models\\Category' => 'Kategoria',
-            'App\\Models\\User' => 'Uzytkownik',
-            'App\\Models\\BusinessPartner' => 'Kontrahent',
-            'App\\Models\\FeatureType' => 'Cecha',
-            'App\\Models\\FeatureValue' => 'Wartosc cechy',
-            'App\\Models\\FeatureTemplate' => 'Szablon cech',
-            'App\\Models\\FeatureGroup' => 'Grupa cech',
-            'App\\Models\\PriceGroup' => 'Grupa cenowa',
-            'App\\Models\\PrestaShopShop' => 'Sklep',
-            'App\\Models\\ERPConnection' => 'Polaczenie ERP',
-            'App\\Models\\ProductVariant' => 'Wariant produktu',
-            'App\\Models\\Warehouse' => 'Magazyn',
-            'App\\Models\\Manufacturer' => 'Producent',
-            'App\\Models\\AuditLog' => 'Log audytu',
-            default => class_basename($auditableType),
-        };
-    }
-
-    /**
-     * Get human-readable Polish label for an event type.
-     */
-    public function getEventLabel(string $event): string
-    {
-        return match ($event) {
-            'created' => 'Utworzono',
-            'updated' => 'Zaktualizowano',
-            'deleted' => 'Usunieto',
-            'restored' => 'Przywrocono',
-            'login' => 'Logowanie',
-            'login_failed' => 'Nieudane logowanie',
-            'logout' => 'Wylogowanie',
-            'bulk_delete' => 'Masowe usuwanie',
-            'bulk_update' => 'Masowa aktualizacja',
-            'bulk_export' => 'Masowy eksport',
-            'synced' => 'Zsynchronizowano',
-            'imported' => 'Zaimportowano',
-            'exported' => 'Wyeksportowano',
-            'matched' => 'Dopasowano',
-            default => ucfirst(str_replace('_', ' ', $event)),
-        };
-    }
-
-    /**
-     * Get CSS classes for event badge in the admin table.
-     */
-    public function getEventBadgeClasses(string $event): string
-    {
-        return match ($event) {
-            'created' => 'bg-emerald-900/50 text-emerald-200',
-            'updated' => 'bg-blue-900/50 text-blue-200',
-            'deleted' => 'bg-red-900/50 text-red-200',
-            'restored' => 'bg-purple-900/50 text-purple-200',
-            'login' => 'bg-indigo-900/50 text-indigo-200',
-            'login_failed' => 'bg-red-900/50 text-red-200',
-            'logout' => 'bg-gray-700 text-gray-300',
-            'bulk_delete' => 'bg-red-900/50 text-red-200',
-            'bulk_update' => 'bg-blue-900/50 text-blue-200',
-            'bulk_export' => 'bg-teal-900/50 text-teal-200',
-            'synced' => 'bg-cyan-900/50 text-cyan-200',
-            'imported' => 'bg-indigo-900/50 text-indigo-200',
-            'exported' => 'bg-teal-900/50 text-teal-200',
-            'matched' => 'bg-yellow-900/50 text-yellow-200',
-            default => 'bg-gray-700 text-gray-200',
-        };
     }
 
     // ==========================================

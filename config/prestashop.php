@@ -26,14 +26,6 @@ return [
      */
     'api_retry_delay_ms' => env('PRESTASHOP_API_RETRY_DELAY_MS', 1000),
 
-    /**
-     * Max number of IDs per filter[id] query parameter
-     *
-     * Prevents HTTP 414 "URI Too Long" when fetching many products.
-     * 100 IDs ≈ 700 chars in URL filter, safely below 2048 limit.
-     */
-    'api_filter_chunk_size' => env('PRESTASHOP_API_FILTER_CHUNK_SIZE', 100),
-
     /*
     |--------------------------------------------------------------------------
     | Category Import Preview System

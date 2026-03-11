@@ -107,23 +107,15 @@ class JobProgressService
             return null;
         }
 
-        $previousStatus = $progress->status;
-
-        // Reset progress for new phase (e.g. categories -> products transition)
-        // Accepts any status: pending, running, completed, awaiting_user
-        // FIX 2026-03-10: Do NOT reset error_count/error_details on phase transition
-        // Errors from previous phase (e.g. category creation) should be preserved
         $progress->update([
             'status' => 'running',
-            'current_count' => 0,
             'total_count' => $actualTotalCount,
         ]);
 
-        Log::info("JobProgress updated: {$previousStatus} -> running", [
+        Log::info('JobProgress updated: pending → running', [
             'progress_id' => $progress->id,
             'job_id' => $jobId,
             'total_count' => $actualTotalCount,
-            'previous_status' => $previousStatus,
         ]);
 
         return $progress->id;
@@ -415,7 +407,7 @@ class JobProgressService
             'shop_name' => $progress->shop?->name ?? 'Unknown Shop',
             'job_id' => $progress->job_id, // For ErrorDetailsModal
             'job_type' => $progress->job_type, // ETAP_07c: For UI differentiation
-            'job_type_label' => $progress->getMetadataValue('job_type_override', '') ?: $progress->getJobTypeLabel(), // ETAP_07c: Human-readable label (metadata override or default)
+            'job_type_label' => $progress->getJobTypeLabel(), // ETAP_07c: Human-readable label
             'user_name' => $progress->user?->name ?? null, // ETAP_07c: Who initiated
             'metadata' => $progress->metadata ?? [], // ETAP_07c: Rich context
             'action_button' => $progress->action_button, // ETAP_07c: UI action button
@@ -423,15 +415,6 @@ class JobProgressService
             'started_at' => $progress->started_at?->toIso8601String(), // ETAP_07c FAZA 2: For accordion duration
             'pending_conflicts' => [], // Default: no conflicts
         ];
-
-        // === HEARTBEAT STATUS ===
-        $heartbeatStatus = 'unknown';
-        if ($progress->status === 'running' && $progress->last_heartbeat_at) {
-            $seconds = now()->diffInSeconds($progress->last_heartbeat_at);
-            $heartbeatStatus = $seconds < 120 ? 'alive' : ($seconds < 300 ? 'stale' : 'dead');
-        }
-        $result['heartbeat_status'] = $heartbeatStatus;
-        $result['worker_pid'] = $progress->worker_pid;
 
         // === CONFLICT DETECTION (2025-10-13) ===
         // When import completes, check for products needing resolution
@@ -493,12 +476,6 @@ class JobProgressService
 
         switch ($progress->status) {
             case 'running':
-                // Check phase_label from metadata for ALL job types
-                // BulkCreateCategories reuses the same job_id as AnalyzeMissingCategories
-                $phaseLabel = $progress->getMetadataValue('phase_label', '');
-                if ($phaseLabel) {
-                    return "{$phaseLabel}... {$current}/{$total} z {$shopName}";
-                }
                 if ($jobType === 'category_analysis') {
                     return "Analizuje kategorie... {$current}/{$total} produktow z {$shopName}";
                 }
@@ -512,10 +489,6 @@ class JobProgressService
 
             case 'pending':
                 if ($jobType === 'category_analysis') {
-                    $phaseLabel = $progress->getMetadataValue('phase_label', '');
-                    if ($phaseLabel) {
-                        return "{$phaseLabel} - {$shopName}";
-                    }
                     return "Przygotowanie analizy kategorii... {$shopName}";
                 }
                 return "Oczekiwanie... {$shopName}";
@@ -529,10 +502,6 @@ class JobProgressService
                     return "Analiza zakonczona - kliknij aby zobaczyc wyniki ({$shopName})";
                 }
                 return "Wymaga akcji uzytkownika ({$shopName})";
-
-            case 'interrupted':
-                $deathCount = $progress->getMetadataValue('worker_death_count', 0);
-                return "Worker przerwany (proba {$deathCount}/3) - wznowienie za ~60s ({$shopName})";
 
             default:
                 return "Status nieznany";

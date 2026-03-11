@@ -65,7 +65,7 @@
     <div class="relative z-10 max-w-7xl mx-auto px-6 sm:px-8 lg:px-12 py-8">
 
         <!-- Sync Statistics Cards -->
-        <div wire:poll.10s class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
             <div class="relative backdrop-blur-xl shadow-lg rounded-lg p-6 border" 
                  style="background: linear-gradient(135deg, rgba(31, 41, 55, 0.8), rgba(17, 24, 39, 0.8)); border: 1px solid rgba(224, 172, 126, 0.2);">
                 <div class="flex items-center">
@@ -227,8 +227,7 @@
         </div>
 
         <!-- Queue Worker Status Panel -->
-        <div wire:key="queue-worker-status-{{ $queueWorkerStatus['status'] }}"
-             class="relative backdrop-blur-xl shadow-2xl rounded-xl border p-6 mb-8"
+        <div class="relative backdrop-blur-xl shadow-2xl rounded-xl border p-6 mb-8"
              style="background: linear-gradient(135deg, rgba(31, 41, 55, 0.95), rgba(17, 24, 39, 0.95)); border: 1px solid rgba(124, 58, 237, 0.3);">
 
             <div class="flex items-center justify-between mb-6">
@@ -615,23 +614,12 @@
                                 <p class="text-xs text-gray-400">Stany z ERP nadpisuja stany w PPM</p>
                             </div>
                         </label>
-
-                        <label class="flex items-center gap-3 cursor-pointer {{ !$selectedErpConnectionId ? 'opacity-50' : '' }}">
-                            <input type="checkbox"
-                                   wire:model="erpIsLocationSource"
-                                   class="rounded border-gray-600 bg-gray-800 bg-opacity-60 text-green-500 focus:ring-green-500"
-                                   {{ !$selectedErpConnectionId ? 'disabled' : '' }}>
-                            <div>
-                                <span class="text-sm font-medium text-white">ERP jest zrodlem lokalizacji</span>
-                                <p class="text-xs text-gray-400">Lokalizacje magazynowe z ERP nadpisuja PPM</p>
-                            </div>
-                        </label>
                     </div>
                 </div>
             </div>
 
-            {{-- Row 2: 4 Independent Sync Frequencies --}}
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+            {{-- Row 2: 3 Independent Sync Frequencies --}}
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
                 {{-- Price Sync Frequency --}}
                 <div>
                     <label class="block text-sm font-medium text-white mb-2 flex items-center">
@@ -684,25 +672,6 @@
                         @endforeach
                     </select>
                     <p class="text-xs text-gray-400 mt-1">Nazwa, opis, parametry (ERP Tab)</p>
-                </div>
-
-                {{-- Location Sync Frequency --}}
-                <div>
-                    <label class="block text-sm font-medium text-white mb-2 flex items-center">
-                        <svg class="w-4 h-4 text-pink-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
-                        </svg>
-                        Sync lokalizacji
-                    </label>
-                    <select wire:model="erpLocationSyncFrequency"
-                            class="w-full px-4 py-3 bg-gray-800 bg-opacity-60 border border-gray-600 text-white rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all duration-200"
-                            {{ !$selectedErpConnectionId ? 'disabled' : '' }}>
-                        @foreach(\App\Models\ERPConnection::getFrequencyOptions() as $value => $label)
-                            <option value="{{ $value }}">{{ $label }}</option>
-                        @endforeach
-                    </select>
-                    <p class="text-xs text-gray-400 mt-1">Lokalizacje magazynowe (regaly, polki)</p>
                 </div>
             </div>
 
@@ -1297,8 +1266,7 @@
 
         <!-- Active Sync Jobs -->
         @if(count($activeSyncJobs) > 0)
-            <div class="relative backdrop-blur-xl shadow-lg rounded-lg p-6 mb-8 border"
-                 wire:poll.5s="refreshActiveSyncJobs"
+            <div class="relative backdrop-blur-xl shadow-lg rounded-lg p-6 mb-8 border" 
                  style="background: linear-gradient(135deg, rgba(31, 41, 55, 0.8), rgba(17, 24, 39, 0.8)); border: 1px solid rgba(224, 172, 126, 0.2);">
                 
                 <h3 class="text-lg font-semibold text-white mb-4 flex items-center">
@@ -1312,27 +1280,9 @@
                     @foreach($activeSyncJobs as $job)
                         <div class="bg-gray-800 bg-opacity-40 border border-gray-600 rounded-lg p-4">
                             <div class="flex items-center justify-between">
-                                <div class="flex items-center gap-2">
-                                    {{-- Heartbeat sonar dot --}}
-                                    @php $hbStatus = $job['heartbeat_status'] ?? 'unknown'; @endphp
-                                    <span class="heartbeat-dot-wrapper"
-                                          x-data="{ pinging: false }"
-                                          x-init="setInterval(() => { pinging = true; setTimeout(() => pinging = false, 900); }, 3000)"
-                                          title="{{ match($hbStatus) {
-                                              'alive' => 'Worker aktywny',
-                                              'stale' => 'Worker nie odpowiada',
-                                              'dead' => 'Worker nie żyje',
-                                              'pending' => 'Oczekuje na worker',
-                                              default => 'Status nieznany'
-                                          } }}">
-                                        <span class="heartbeat-sonar heartbeat-sonar--{{ $hbStatus === 'pending' ? 'stale' : $hbStatus }}"
-                                              :class="{ 'heartbeat-sonar--ping': pinging }"></span>
-                                        <span class="heartbeat-dot heartbeat-dot--{{ $hbStatus === 'pending' ? 'stale' : ($hbStatus === 'unknown' ? 'stale' : $hbStatus) }}"></span>
-                                    </span>
-                                    <div>
-                                        <h4 class="font-medium text-white">{{ $job['job_name'] ?? 'Synchronizacja' }}</h4>
-                                        <p class="text-sm text-gray-400">ID: {{ $job['job_id'] }}</p>
-                                    </div>
+                                <div>
+                                    <h4 class="font-medium text-white">{{ $job['job_name'] ?? 'Synchronizacja' }}</h4>
+                                    <p class="text-sm text-gray-400">ID: {{ $job['job_id'] }}</p>
                                 </div>
                                 
                                 <div class="flex items-center space-x-3">
@@ -1791,7 +1741,6 @@
                             <th class="px-6 py-3 text-left text-xs font-medium text-blue-300 uppercase tracking-wider">Auth</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-blue-300 uppercase tracking-wider">Ostatnia sync</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-blue-300 uppercase tracking-wider">Statystyki</th>
-                            <th class="px-6 py-3 text-center text-xs font-medium text-blue-300 uppercase tracking-wider">Akcje</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-blue-600/20">
@@ -1896,57 +1845,10 @@
                                         @endif
                                     </div>
                                 </td>
-
-                                {{-- ERP Sync Action Buttons --}}
-                                <td class="px-6 py-4 whitespace-nowrap">
-                                    @if($erp->is_active && $erp->connection_status === 'connected')
-                                        <div class="flex items-center gap-1.5">
-                                            <button wire:click="dispatchErpSync({{ $erp->id }}, 'stock')"
-                                                    wire:loading.attr="disabled"
-                                                    class="px-2 py-1 text-xs font-medium rounded bg-emerald-900/50 text-emerald-300 border border-emerald-700/50 hover:bg-emerald-800/60 transition-colors"
-                                                    title="Sync stanow magazynowych">
-                                                <svg class="w-3 h-3 inline mr-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
-                                                </svg>
-                                                Stany
-                                            </button>
-                                            <button wire:click="dispatchErpSync({{ $erp->id }}, 'prices')"
-                                                    wire:loading.attr="disabled"
-                                                    class="px-2 py-1 text-xs font-medium rounded bg-amber-900/50 text-amber-300 border border-amber-700/50 hover:bg-amber-800/60 transition-colors"
-                                                    title="Sync cen">
-                                                <svg class="w-3 h-3 inline mr-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                                                </svg>
-                                                Ceny
-                                            </button>
-                                            <button wire:click="dispatchErpSync({{ $erp->id }}, 'basic_data')"
-                                                    wire:loading.attr="disabled"
-                                                    class="px-2 py-1 text-xs font-medium rounded bg-blue-900/50 text-blue-300 border border-blue-700/50 hover:bg-blue-800/60 transition-colors"
-                                                    title="Sync danych podstawowych">
-                                                <svg class="w-3 h-3 inline mr-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-                                                </svg>
-                                                Dane
-                                            </button>
-                                            <button wire:click="dispatchErpSync({{ $erp->id }}, 'location')"
-                                                    wire:loading.attr="disabled"
-                                                    class="px-2 py-1 text-xs font-medium rounded bg-pink-900/50 text-pink-300 border border-pink-700/50 hover:bg-pink-800/60 transition-colors"
-                                                    title="Sync lokalizacji magazynowych">
-                                                <svg class="w-3 h-3 inline mr-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
-                                                </svg>
-                                                Lokalizacje
-                                            </button>
-                                        </div>
-                                    @else
-                                        <span class="text-xs text-gray-500 italic">Niedostepne</span>
-                                    @endif
-                                </td>
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="7" class="px-6 py-12 text-center text-gray-400">
+                                <td colspan="6" class="px-6 py-12 text-center text-gray-400">
                                     <svg class="w-12 h-12 mx-auto mb-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
                                     </svg>

@@ -92,7 +92,7 @@
                             <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
                                 <tr>
                                     <td style="color: #cbd5e1; font-size: 15px; line-height: 1.7; padding: 0;">
-                                        {!! nl2br(e($notificationMessage)) !!}
+                                        {!! nl2br(e($message)) !!}
                                     </td>
                                 </tr>
                             </table>

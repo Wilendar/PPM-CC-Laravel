@@ -4,7 +4,6 @@ namespace App\Jobs\PrestaShop;
 
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
-use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
@@ -45,15 +44,9 @@ use App\Jobs\Media\SyncMediaFromPrestaShop;
  * @version 1.0
  * @since ETAP_07_FAZA_3
  */
-class BulkImportProducts implements ShouldQueue, ShouldBeUnique
+class BulkImportProducts implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
-
-    /**
-     * Unique lock timeout - matches retry_after (600s)
-     * Worker Guard v2: reduced from 1800 to allow faster re-dispatch after worker death
-     */
-    public int $uniqueFor = 600;
 
     /**
      * The PrestaShop shop instance
@@ -99,14 +92,11 @@ class BulkImportProducts implements ShouldQueue, ShouldBeUnique
     public int $tries = 3;
 
     /**
-     * Timeout for the job - unlimited (Worker Guard v2)
-     * Heartbeat system monitors liveness instead of process timeout.
-     * On shared hosting without pcntl, PHP process timeout was killing
-     * long imports (9554 products ~8h). Heartbeat + cleanup handles dead workers.
+     * Timeout for the job (15 minutes)
      *
      * @var int
      */
-    public int $timeout = 0;
+    public int $timeout = 900;
 
     /**
      * Create a new job instance
@@ -165,14 +155,6 @@ class BulkImportProducts implements ShouldQueue, ShouldBeUnique
     }
 
     /**
-     * Unique ID for ShouldBeUnique - per shop
-     */
-    public function uniqueId(): string
-    {
-        return 'bulk-import-products-shop-' . $this->shop->id;
-    }
-
-    /**
      * Get SyncJob instance (gracefully handles deleted jobs)
      *
      * @return SyncJob|null
@@ -201,9 +183,7 @@ class BulkImportProducts implements ShouldQueue, ShouldBeUnique
     {
         $startTime = microtime(true);
         $progressId = null;
-        $heartbeatId = null;
         $syncJob = $this->getSyncJob();
-        $guard = app(\App\Services\WorkerGuardService::class);
 
         Log::info('BulkImportProducts job started', [
             'shop_id' => $this->shop->id,
@@ -214,59 +194,18 @@ class BulkImportProducts implements ShouldQueue, ShouldBeUnique
             'sync_job_id' => $syncJob?->id,
         ]);
 
-        // WorkerGuard: Check if another worker is already processing this job
-        if ($this->jobId && $guard->hasActiveWorker($this->jobId)) {
-            Log::warning('BulkImportProducts: Active worker detected, aborting', [
-                'job_id' => $this->jobId,
-                'shop_id' => $this->shop->id,
-            ]);
-            return;
-        }
-
         try {
-            // WorkerGuard: Register this worker
-            if ($this->jobId) {
-                $heartbeatId = $guard->registerWorker($this->jobId, 'scheduler', [
-                    'job_class' => 'BulkImportProducts',
-                    'shop_id' => $this->shop->id,
-                    'mode' => $this->mode,
-                ]);
-            }
-
             // FIX 2025-11-25: Update SyncJob status to running
             $syncJob?->start();
             // 🔧 FIX: Fetch products FIRST to know total count for JobProgress
             $client = app(PrestaShopClientFactory::class)->create($this->shop);
             $productsToImport = $this->getProductsToImport($client);
-            $originalTotal = count($productsToImport);
-
-            // Worker Guard v2: RESUME — filter out already-imported products
-            // ProductShopData stores prestashop_product_id per shop after successful import.
-            // On worker restart, we skip products that already have a mapping.
-            $resumeOffset = 0;
-            $alreadyImportedPsIds = \App\Models\ProductShopData::where('shop_id', $this->shop->id)
-                ->whereNotNull('prestashop_product_id')
-                ->pluck('prestashop_product_id')
-                ->flip()
-                ->toArray();
-
-            if (!empty($alreadyImportedPsIds)) {
-                $productsToImport = array_values(array_filter($productsToImport, function ($p) use ($alreadyImportedPsIds) {
-                    $psId = (int) ($p['id'] ?? 0);
-                    return $psId === 0 || !isset($alreadyImportedPsIds[$psId]);
-                }));
-                $resumeOffset = $originalTotal - count($productsToImport);
-            }
-
-            $total = count($productsToImport) + $resumeOffset;
+            $total = count($productsToImport);
 
             Log::info('BulkImportProducts: Products fetched', [
                 'shop_id' => $this->shop->id,
                 'shop_name' => $this->shop->name,
                 'total_products' => $total,
-                'original_total' => $originalTotal,
-                'resume_offset' => $resumeOffset,
-                'remaining' => count($productsToImport),
                 'mode' => $this->mode,
             ]);
 
@@ -332,33 +271,12 @@ class BulkImportProducts implements ShouldQueue, ShouldBeUnique
 
             // 📊 UPDATE PENDING PROGRESS TO RUNNING (or create new if legacy dispatch)
             if ($this->jobId) {
-                // Pre-generated job_id exists → Update progress to running
-                // Works even if progress was in 'running' state from BulkCreateCategories
+                // Pre-generated job_id exists → Update pending progress to running
                 $progressId = $progressService->startPendingJob($this->jobId, $total);
 
-                if ($progressId) {
-                    // Set phase_label for product import phase
-                    // FIX: Clear job_type_override from BulkCreateCategories phase
-                    $phaseLabel = $resumeOffset > 0
-                        ? 'Wznowione importowanie produktow'
-                        : 'Importowanie produktow';
-                    $progressService->updateMetadata($progressId, [
-                        'phase' => 'importing_products',
-                        'phase_label' => $phaseLabel,
-                        'job_type_override' => $phaseLabel,
-                        'resume_offset' => $resumeOffset,
-                    ]);
-
-                    // Worker Guard v2: Set current_count to resumeOffset so progress
-                    // doesn't jump back to 0 on worker restart
-                    if ($resumeOffset > 0) {
-                        $progressService->updateProgress($progressId, $resumeOffset, []);
-                    }
-                }
-
                 if (!$progressId) {
-                    // Fallback: progress not found, create new
-                    Log::warning('Progress not found, creating new', ['job_id' => $this->jobId]);
+                    // Fallback: pending progress not found, create new
+                    Log::warning('Pending progress not found, creating new', ['job_id' => $this->jobId]);
                     $progressId = $progressService->createJobProgress(
                         $this->jobId,
                         $this->shop,
@@ -421,41 +339,12 @@ class BulkImportProducts implements ShouldQueue, ShouldBeUnique
                     $sku = $psProduct['reference'] ?? null;
 
                     // 📊 UPDATE PROGRESS every 5 products for efficiency
-                    // Worker Guard v2: offset counter by resumeOffset for correct progress display
                     if ($index % 5 === 0 && $progressId) {
-                        $progressService->updateProgress($progressId, $resumeOffset + $index + 1, $errors);
+                        $progressService->updateProgress($progressId, $index + 1, $errors);
                         $errors = []; // Reset errors array after batch update
                     }
 
-                    // WorkerGuard: Send heartbeat every 10 products
-                    if ($heartbeatId && $index % 10 === 0) {
-                        $guard->sendHeartbeat($heartbeatId);
-                    }
-
-                    // Deadlock retry: InnoDB gap locks on product_categories cause deadlocks
-                    // when multiple queue workers import products with overlapping categories
-                    $maxDeadlockRetries = 3;
-                    $result = null;
-                    for ($deadlockAttempt = 1; $deadlockAttempt <= $maxDeadlockRetries; $deadlockAttempt++) {
-                        try {
-                            $result = $this->importProduct($prestashopProductId, $sku, $importService);
-                            break;
-                        } catch (\Illuminate\Database\QueryException $qe) {
-                            if ($qe->errorInfo[1] === 1213 && $deadlockAttempt < $maxDeadlockRetries) {
-                                // Deadlock detected - exponential backoff with jitter
-                                $sleepMs = random_int(50000, 200000) * (2 ** ($deadlockAttempt - 1));
-                                usleep($sleepMs);
-                                Log::warning('Deadlock retry', [
-                                    'sku' => $sku,
-                                    'attempt' => $deadlockAttempt,
-                                    'sleep_ms' => $sleepMs / 1000,
-                                    'prestashop_id' => $prestashopProductId,
-                                ]);
-                                continue;
-                            }
-                            throw $qe;
-                        }
-                    }
+                    $result = $this->importProduct($prestashopProductId, $sku, $importService);
 
                     // FIX 2025-12-22: Handle both legacy string and new array result
                     if (is_array($result)) {
@@ -512,7 +401,6 @@ class BulkImportProducts implements ShouldQueue, ShouldBeUnique
             }
 
             // 📊 FINAL PROGRESS UPDATE with remaining errors
-            // Worker Guard v2: total already includes resumeOffset
             if ($progressId) {
                 $progressService->updateProgress($progressId, $total, $errors);
             }
@@ -643,11 +531,6 @@ class BulkImportProducts implements ShouldQueue, ShouldBeUnique
             ]);
 
             throw $e;
-        } finally {
-            // WorkerGuard: Always unregister worker on exit
-            if ($heartbeatId) {
-                $guard->unregisterWorker($heartbeatId);
-            }
         }
     }
 
@@ -757,13 +640,21 @@ class BulkImportProducts implements ShouldQueue, ShouldBeUnique
                 return [];
             }
 
-            // STEP 4: Fetch all products using chunked ID filter
-            // Uses getProductsByIds() to avoid HTTP 414 "URI Too Long" with many IDs
+            // STEP 4: Fetch all products using OR filter on ID
+            // PrestaShop API supports: filter[id]=[1|2|3|4]
+            $idsFilter = '[' . implode('|', $productIds) . ']';
+
+            $params = [
+                'display' => 'full',
+                'filter[id]' => $idsFilter,
+            ];
+
             Log::info('BulkImportProducts: Fetching products by IDs', [
                 'product_ids_count' => count($productIds),
+                'filter' => $idsFilter,
             ]);
 
-            $response = $client->getProductsByIds($productIds);
+            $response = $client->getProducts($params);
 
             // Parse response
             $products = [];

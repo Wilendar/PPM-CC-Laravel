@@ -1,0 +1,807 @@
+<?php
+
+namespace App\Models;
+
+use App\Models\Concerns\Auditable;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
+use Illuminate\Database\Eloquent\Casts\Attribute;
+use Carbon\Carbon;
+
+/**
+ * ERPConnection Model
+ * 
+ * FAZA B: Shop & ERP Management - ERP Systems Integration
+ * 
+ * Reprezentuje połączenie z systemem ERP (Baselinker, Subiekt GT, Microsoft Dynamics).
+ * Każde połączenie ma swoją konfigurację, uwierzytelnienie, ustawienia synchronizacji
+ * i monitoring wydajności.
+ * 
+ * Enterprise Features:
+ * - Multi-instance ERP support (wiele instancji tego samego ERP)
+ * - Encrypted connection configuration storage
+ * - Advanced authentication management (OAuth2, API Keys, DLL bridges)
+ * - Comprehensive health monitoring i retry logic
+ * - Performance metrics i bottleneck detection
+ * 
+ * @property int $id
+ * @property string $erp_type
+ * @property string $instance_name
+ * @property string $description
+ * @property bool $is_active
+ * @property int $priority
+ * @property array $connection_config (encrypted)
+ * @property string $auth_status
+ * @property Carbon $auth_expires_at
+ * @property Carbon $last_auth_at
+ * @property string $connection_status
+ * @property Carbon $last_health_check
+ * @property float $last_response_time
+ * @property int $consecutive_failures
+ * @property string $last_error_message
+ * @property int $rate_limit_per_minute
+ * @property int $current_api_usage
+ * @property Carbon $rate_limit_reset_at
+ * @property string $sync_mode
+ * @property array $sync_settings
+ * @property bool $auto_sync_products
+ * @property bool $auto_sync_stock
+ * @property bool $auto_sync_prices
+ * @property bool $auto_sync_orders
+ * @property array $field_mappings
+ * @property array $transformation_rules
+ * @property array $validation_rules
+ * @property Carbon $last_sync_at
+ * @property Carbon $next_scheduled_sync
+ * @property int $sync_success_count
+ * @property int $sync_error_count
+ * @property int $records_synced_total
+ * @property float $avg_sync_time
+ * @property float $avg_response_time
+ * @property int $data_volume_mb
+ * @property int $max_retry_attempts
+ * @property int $retry_delay_seconds
+ * @property bool $auto_disable_on_errors
+ * @property int $error_threshold
+ * @property string $webhook_url
+ * @property string $webhook_secret
+ * @property bool $webhook_enabled
+ * @property array $notification_settings
+ * @property bool $notify_on_errors
+ * @property bool $notify_on_sync_complete
+ * @property bool $notify_on_auth_expire
+ * @property Carbon $created_at
+ * @property Carbon $updated_at
+ */
+class ERPConnection extends Model
+{
+    use HasFactory, Auditable;
+
+    /**
+     * The table associated with the model.
+     */
+    protected $table = 'erp_connections';
+
+    /**
+     * The attributes that are mass assignable.
+     */
+    protected $fillable = [
+        'erp_type',
+        'instance_name',
+        'description',
+        'is_active',
+        'is_default',
+        'priority',
+        'connection_config',
+        'auth_status',
+        'auth_expires_at',
+        'last_auth_at',
+        'connection_status',
+        'last_health_check',
+        'last_response_time',
+        'consecutive_failures',
+        'last_error_message',
+        'rate_limit_per_minute',
+        'current_api_usage',
+        'rate_limit_reset_at',
+        'sync_mode',
+        'sync_frequency',  // ETAP_08 FAZA 3.1-3.2 (legacy fallback)
+        'price_sync_frequency',  // Czestotliwosc sync cen
+        'stock_sync_frequency',  // Czestotliwosc sync stanow
+        'basic_data_sync_frequency',  // Czestotliwosc sync danych podstawowych
+        'location_sync_frequency',  // Czestotliwosc sync lokalizacji magazynowych
+        'sync_settings',
+        'auto_sync_products',
+        'auto_sync_stock',
+        'auto_sync_prices',
+        'auto_sync_orders',
+        'is_price_source',  // ETAP_08 FAZA 3.1-3.2
+        'is_stock_source',  // ETAP_08 FAZA 3.1-3.2
+        'is_location_source',  // Bidirectional location sync
+        'field_mappings',
+        'transformation_rules',
+        'validation_rules',
+        'last_sync_at',
+        'last_change_time',
+        'last_stock_checksum_at',
+        'next_scheduled_sync',
+        'sync_success_count',
+        'sync_error_count',
+        'records_synced_total',
+        'avg_sync_time',
+        'avg_response_time',
+        'data_volume_mb',
+        'max_retry_attempts',
+        'retry_delay_seconds',
+        'auto_disable_on_errors',
+        'error_threshold',
+        'webhook_url',
+        'webhook_secret',
+        'webhook_enabled',
+        'notification_settings',
+        'notify_on_errors',
+        'notify_on_sync_complete',
+        'notify_on_auth_expire',
+        'label_color',
+        'label_icon',
+    ];
+
+    /**
+     * The attributes that should be cast.
+     */
+    protected $casts = [
+        'is_active' => 'boolean',
+        'is_default' => 'boolean',
+        'auto_sync_products' => 'boolean',
+        'auto_sync_stock' => 'boolean',
+        'auto_sync_prices' => 'boolean',
+        'auto_sync_orders' => 'boolean',
+        'auto_disable_on_errors' => 'boolean',
+        'webhook_enabled' => 'boolean',
+        'notify_on_errors' => 'boolean',
+        'notify_on_sync_complete' => 'boolean',
+        'notify_on_auth_expire' => 'boolean',
+        'is_price_source' => 'boolean',  // ETAP_08 FAZA 3.1-3.2
+        'is_stock_source' => 'boolean',  // ETAP_08 FAZA 3.1-3.2
+        'is_location_source' => 'boolean',
+        'connection_config' => 'array',
+        'sync_settings' => 'array',
+        'field_mappings' => 'array',
+        'transformation_rules' => 'array',
+        'validation_rules' => 'array',
+        'notification_settings' => 'array',
+        'auth_expires_at' => 'datetime',
+        'last_auth_at' => 'datetime',
+        'last_health_check' => 'datetime',
+        'last_sync_at' => 'datetime',
+        'last_change_time' => 'datetime',
+        'last_stock_checksum_at' => 'datetime',
+        'next_scheduled_sync' => 'datetime',
+        'rate_limit_reset_at' => 'datetime',
+        'last_response_time' => 'decimal:3',
+        'avg_response_time' => 'decimal:3',
+        'avg_sync_time' => 'decimal:3',
+    ];
+
+    /**
+     * The attributes that should be hidden for serialization.
+     */
+    protected $hidden = [
+        'connection_config',
+        'webhook_secret',
+    ];
+
+    /**
+     * ERP Type Constants
+     */
+    public const ERP_BASELINKER = 'baselinker';
+    public const ERP_SUBIEKT_GT = 'subiekt_gt';
+    public const ERP_DYNAMICS = 'dynamics';
+    public const ERP_INSERT = 'insert';
+    public const ERP_CUSTOM = 'custom';
+
+    /**
+     * Authentication Status Constants
+     */
+    public const AUTH_AUTHENTICATED = 'authenticated';
+    public const AUTH_EXPIRED = 'expired';
+    public const AUTH_FAILED = 'failed';
+    public const AUTH_PENDING = 'pending';
+
+    /**
+     * Connection Status Constants
+     */
+    public const CONNECTION_CONNECTED = 'connected';
+    public const CONNECTION_DISCONNECTED = 'disconnected';
+    public const CONNECTION_ERROR = 'error';
+    public const CONNECTION_MAINTENANCE = 'maintenance';
+    public const CONNECTION_RATE_LIMITED = 'rate_limited';
+
+    /**
+     * Sync Mode Constants
+     */
+    public const SYNC_BIDIRECTIONAL = 'bidirectional';
+    public const SYNC_PUSH_ONLY = 'push_only';
+    public const SYNC_PULL_ONLY = 'pull_only';
+    public const SYNC_DISABLED = 'disabled';
+
+    /**
+     * Sync Frequency Constants (ETAP_08 FAZA 3.1-3.2)
+     */
+    public const FREQ_15_MIN = 'every_15_min';
+    public const FREQ_30_MIN = 'every_30_min';
+    public const FREQ_HOURLY = 'hourly';
+    public const FREQ_6_HOURS = '6_hours';
+    public const FREQ_DAILY = 'daily';
+
+    /**
+     * ERP Type Labels for display (ETAP_10: Integration Labels)
+     * Centralized human-readable names - use these instead of hardcoding!
+     */
+    public const ERP_TYPE_LABELS = [
+        self::ERP_BASELINKER => 'BaseLinker',
+        self::ERP_SUBIEKT_GT => 'Subiekt GT',
+        self::ERP_DYNAMICS => 'Microsoft Dynamics',
+        self::ERP_INSERT => 'InsERT',
+        self::ERP_CUSTOM => 'Customowy',
+    ];
+
+    /**
+     * Get available sync frequency options (ETAP_08 FAZA 3.1-3.2)
+     *
+     * @return array<string, string>
+     */
+    public static function getFrequencyOptions(): array
+    {
+        return [
+            self::FREQ_15_MIN => 'Co 15 minut',
+            self::FREQ_30_MIN => 'Co 30 minut',
+            self::FREQ_HOURLY => 'Co godzine',
+            self::FREQ_6_HOURS => 'Co 6 godzin',
+            self::FREQ_DAILY => 'Raz dziennie',
+        ];
+    }
+
+    /**
+     * Get frequency label for display
+     *
+     * @param string $frequency
+     * @return string
+     */
+    public static function getFrequencyLabel(string $frequency): string
+    {
+        return self::getFrequencyOptions()[$frequency] ?? $frequency;
+    }
+
+    /**
+     * Get ERP type labels for UI (ETAP_10: Integration Labels)
+     * Use this instead of hardcoding ERP names in views/services!
+     *
+     * @return array<string, string>
+     */
+    public static function getErpTypeLabels(): array
+    {
+        return self::ERP_TYPE_LABELS;
+    }
+
+    /**
+     * Get single ERP type label
+     *
+     * @param string $erpType
+     * @return string
+     */
+    public static function getErpTypeLabel(string $erpType): string
+    {
+        return self::ERP_TYPE_LABELS[$erpType] ?? ucfirst(str_replace('_', ' ', $erpType));
+    }
+
+    /**
+     * Get the integration mappings for this ERP connection.
+     */
+    public function integrationMappings(): MorphMany
+    {
+        return $this->morphMany(IntegrationMapping::class, 'mappable')
+            ->where('integration_type', $this->erp_type)
+            ->where('integration_identifier', $this->instance_name);
+    }
+
+    /**
+     * Get sync jobs for this ERP connection.
+     */
+    public function syncJobs(): HasMany
+    {
+        return $this->hasMany(SyncJob::class, 'target_id', 'id')
+            ->where('target_type', $this->erp_type);
+    }
+
+    /**
+     * Get integration logs for this ERP connection.
+     */
+    public function integrationLogs(): HasMany
+    {
+        return $this->hasMany(IntegrationLog::class, 'integration_id', 'id')
+            ->where('integration_type', $this->erp_type);
+    }
+
+    /**
+     * Get the decrypted connection config.
+     * Supports both encrypted and plain JSON formats for backwards compatibility.
+     */
+    protected function connectionConfig(): Attribute
+    {
+        return Attribute::make(
+            get: function (?string $value) {
+                if (!$value) {
+                    return null;
+                }
+
+                // Try plain JSON first (backwards compatibility)
+                $decoded = json_decode($value, true);
+                if ($decoded !== null && is_array($decoded)) {
+                    return $decoded;
+                }
+
+                // If not valid JSON, try to decrypt
+                try {
+                    return json_decode(decrypt($value), true);
+                } catch (\Illuminate\Contracts\Encryption\DecryptException $e) {
+                    // Log warning and return empty array
+                    \Log::warning('ERPConnection: Failed to decrypt connection_config', [
+                        'id' => $this->id ?? 'unknown',
+                    ]);
+                    return [];
+                }
+            },
+            set: fn (?array $value) => $value ? encrypt(json_encode($value)) : null,
+        );
+    }
+
+    /**
+     * Get connection health status with color coding.
+     */
+    public function getConnectionHealthAttribute(): string
+    {
+        return match ($this->connection_status) {
+            self::CONNECTION_CONNECTED => 'healthy',
+            self::CONNECTION_DISCONNECTED => 'warning',
+            self::CONNECTION_ERROR => 'danger',
+            self::CONNECTION_MAINTENANCE => 'info',
+            self::CONNECTION_RATE_LIMITED => 'warning',
+            default => 'unknown'
+        };
+    }
+
+    /**
+     * Get connection health badge class.
+     */
+    public function getConnectionBadgeAttribute(): string
+    {
+        return match ($this->connection_status) {
+            self::CONNECTION_CONNECTED => 'badge-success',
+            self::CONNECTION_DISCONNECTED => 'badge-warning',
+            self::CONNECTION_ERROR => 'badge-danger',
+            self::CONNECTION_MAINTENANCE => 'badge-info',
+            self::CONNECTION_RATE_LIMITED => 'badge-warning',
+            default => 'badge-secondary'
+        };
+    }
+
+    /**
+     * Get authentication status badge class.
+     */
+    public function getAuthBadgeAttribute(): string
+    {
+        return match ($this->auth_status) {
+            self::AUTH_AUTHENTICATED => 'badge-success',
+            self::AUTH_EXPIRED => 'badge-warning',
+            self::AUTH_FAILED => 'badge-danger',
+            self::AUTH_PENDING => 'badge-info',
+            default => 'badge-secondary'
+        };
+    }
+
+    /**
+     * Get sync success rate percentage.
+     */
+    public function getSyncSuccessRateAttribute(): float
+    {
+        $total = $this->sync_success_count + $this->sync_error_count;
+        
+        if ($total === 0) {
+            return 0.0;
+        }
+        
+        return round(($this->sync_success_count / $total) * 100, 2);
+    }
+
+    /**
+     * Get API usage percentage.
+     */
+    public function getApiUsagePercentageAttribute(): float
+    {
+        if (!$this->rate_limit_per_minute) {
+            return 0.0;
+        }
+
+        return round(($this->current_api_usage / $this->rate_limit_per_minute) * 100, 2);
+    }
+
+    /**
+     * Check if ERP connection is healthy.
+     */
+    public function isConnectionHealthy(): bool
+    {
+        return $this->connection_status === self::CONNECTION_CONNECTED 
+            && $this->auth_status === self::AUTH_AUTHENTICATED
+            && $this->consecutive_failures === 0;
+    }
+
+    /**
+     * Check if authentication is expired or expiring soon.
+     */
+    public function isAuthExpiring(int $hoursThreshold = 24): bool
+    {
+        if (!$this->auth_expires_at) {
+            return false;
+        }
+
+        return Carbon::now()->addHours($hoursThreshold)->gte($this->auth_expires_at);
+    }
+
+    /**
+     * Check if authentication is expired.
+     */
+    public function isAuthExpired(): bool
+    {
+        if (!$this->auth_expires_at) {
+            return $this->auth_status === self::AUTH_EXPIRED;
+        }
+
+        return Carbon::now()->gt($this->auth_expires_at);
+    }
+
+    /**
+     * Check if API is rate limited.
+     */
+    public function isRateLimited(): bool
+    {
+        return $this->connection_status === self::CONNECTION_RATE_LIMITED
+            || $this->current_api_usage >= $this->rate_limit_per_minute;
+    }
+
+    /**
+     * Check if should auto-disable due to errors.
+     */
+    public function shouldAutoDisable(): bool
+    {
+        return $this->auto_disable_on_errors 
+            && $this->consecutive_failures >= $this->error_threshold;
+    }
+
+    /**
+     * Update connection health metrics.
+     */
+    public function updateConnectionHealth(
+        string $status,
+        ?float $responseTime = null,
+        ?string $errorMessage = null
+    ): void {
+        $this->connection_status = $status;
+        $this->last_health_check = Carbon::now();
+
+        if ($responseTime !== null) {
+            $this->last_response_time = $responseTime;
+            
+            // Update average response time
+            if ($this->avg_response_time) {
+                $this->avg_response_time = ($this->avg_response_time + $responseTime) / 2;
+            } else {
+                $this->avg_response_time = $responseTime;
+            }
+        }
+
+        if ($status === self::CONNECTION_CONNECTED) {
+            $this->consecutive_failures = 0;
+            $this->last_error_message = null;
+        } else {
+            $this->consecutive_failures++;
+            $this->last_error_message = $errorMessage;
+            
+            // Auto-disable if threshold reached
+            if ($this->shouldAutoDisable()) {
+                $this->is_active = false;
+            }
+        }
+
+        $this->save();
+    }
+
+    /**
+     * Update authentication status.
+     */
+    public function updateAuthStatus(
+        string $status, 
+        ?Carbon $expiresAt = null
+    ): void {
+        $this->auth_status = $status;
+        $this->last_auth_at = Carbon::now();
+        
+        if ($expiresAt) {
+            $this->auth_expires_at = $expiresAt;
+        }
+        
+        $this->save();
+    }
+
+    /**
+     * Update sync statistics.
+     */
+    public function updateSyncStats(
+        bool $success, 
+        int $recordsProcessed = 0, 
+        ?float $syncTime = null,
+        int $dataVolumeBytes = 0
+    ): void {
+        $this->last_sync_at = Carbon::now();
+        
+        if ($success) {
+            $this->sync_success_count++;
+            $this->records_synced_total += $recordsProcessed;
+        } else {
+            $this->sync_error_count++;
+        }
+        
+        if ($syncTime !== null) {
+            // Update average sync time
+            if ($this->avg_sync_time) {
+                $this->avg_sync_time = ($this->avg_sync_time + $syncTime) / 2;
+            } else {
+                $this->avg_sync_time = $syncTime;
+            }
+        }
+        
+        // Convert bytes to MB and add to total
+        $this->data_volume_mb += round($dataVolumeBytes / 1024 / 1024, 2);
+        
+        $this->save();
+    }
+
+    /**
+     * Update API usage.
+     */
+    public function updateApiUsage(int $currentUsage, ?Carbon $resetTime = null): void
+    {
+        $this->current_api_usage = $currentUsage;
+        
+        if ($resetTime) {
+            $this->rate_limit_reset_at = $resetTime;
+        }
+        
+        // Check for rate limiting
+        if ($this->rate_limit_per_minute && $currentUsage >= $this->rate_limit_per_minute) {
+            $this->connection_status = self::CONNECTION_RATE_LIMITED;
+        }
+        
+        $this->save();
+    }
+
+    /**
+     * Reset API usage counter.
+     */
+    public function resetApiUsage(): void
+    {
+        $this->current_api_usage = 0;
+        $this->rate_limit_reset_at = Carbon::now()->addMinute();
+        
+        // Reset rate limit status if that was the issue
+        if ($this->connection_status === self::CONNECTION_RATE_LIMITED) {
+            $this->connection_status = self::CONNECTION_CONNECTED;
+        }
+        
+        $this->save();
+    }
+
+    /**
+     * Reset consecutive failures counter.
+     */
+    public function resetFailures(): void
+    {
+        $this->consecutive_failures = 0;
+        $this->last_error_message = null;
+        $this->save();
+    }
+
+    /**
+     * Scope to get only active ERP connections.
+     */
+    public function scopeActive($query)
+    {
+        return $query->where('is_active', true);
+    }
+
+    /**
+     * Scope: default ERP connection (only one can be default)
+     */
+    public function scopeDefault($query)
+    {
+        return $query->where('is_default', true);
+    }
+
+    /**
+     * Scope to get connections by ERP type.
+     */
+    public function scopeByType($query, string $erpType)
+    {
+        return $query->where('erp_type', $erpType);
+    }
+
+    /**
+     * Scope to get connections with healthy status.
+     */
+    public function scopeHealthy($query)
+    {
+        return $query->where('connection_status', self::CONNECTION_CONNECTED)
+                    ->where('auth_status', self::AUTH_AUTHENTICATED)
+                    ->where('consecutive_failures', 0);
+    }
+
+    /**
+     * Scope to get connections with authentication issues.
+     */
+    public function scopeWithAuthIssues($query)
+    {
+        return $query->where('auth_status', '!=', self::AUTH_AUTHENTICATED)
+                    ->orWhere('auth_expires_at', '<=', Carbon::now()->addDay());
+    }
+
+    /**
+     * Scope to get connections with connection issues.
+     */
+    public function scopeWithConnectionIssues($query)
+    {
+        return $query->where('connection_status', '!=', self::CONNECTION_CONNECTED)
+                    ->orWhere('consecutive_failures', '>', 0);
+    }
+
+    /**
+     * Scope to order by priority.
+     */
+    public function scopeOrderedByPriority($query)
+    {
+        return $query->orderBy('priority', 'asc');
+    }
+
+    /**
+     * Get Baselinker connections.
+     */
+    public function scopeBaselinker($query)
+    {
+        return $query->byType(self::ERP_BASELINKER);
+    }
+
+    /**
+     * Get Subiekt GT connections.
+     */
+    public function scopeSubiektGT($query)
+    {
+        return $query->byType(self::ERP_SUBIEKT_GT);
+    }
+
+    /**
+     * Get Microsoft Dynamics connections.
+     */
+    public function scopeDynamics($query)
+    {
+        return $query->byType(self::ERP_DYNAMICS);
+    }
+
+    /**
+     * Default label colors by ERP type
+     */
+    public const LABEL_COLORS = [
+        self::ERP_BASELINKER => '#f97316', // orange-500
+        self::ERP_SUBIEKT_GT => '#ea580c', // orange-600
+        self::ERP_DYNAMICS => '#c2410c',   // orange-700
+        self::ERP_INSERT => '#9a3412',     // orange-800
+        self::ERP_CUSTOM => '#78350f',     // orange-900
+    ];
+
+    /**
+     * Default label icons by ERP type
+     */
+    public const LABEL_ICONS = [
+        self::ERP_BASELINKER => 'link',
+        self::ERP_SUBIEKT_GT => 'database',
+        self::ERP_DYNAMICS => 'cloud',
+        self::ERP_INSERT => 'server',
+        self::ERP_CUSTOM => 'cog',
+    ];
+
+    /**
+     * Available label colors for selection
+     */
+    public static function getAvailableLabelColors(): array
+    {
+        return [
+            '#ef4444' => 'Czerwony',
+            '#f97316' => 'Pomaranczowy',
+            '#f59e0b' => 'Bursztynowy',
+            '#eab308' => 'Zolty',
+            '#84cc16' => 'Limonkowy',
+            '#22c55e' => 'Zielony',
+            '#14b8a6' => 'Morski',
+            '#06b6d4' => 'Cyjan',
+            '#3b82f6' => 'Niebieski',
+            '#6366f1' => 'Indygo',
+            '#8b5cf6' => 'Fioletowy',
+            '#d946ef' => 'Magenta',
+            '#ec4899' => 'Rozowy',
+            '#64748b' => 'Szary',
+        ];
+    }
+
+    /**
+     * Available label icons for selection
+     */
+    public static function getAvailableLabelIcons(): array
+    {
+        return [
+            'database' => 'Baza danych',
+            'cloud' => 'Chmura',
+            'server' => 'Serwer',
+            'link' => 'Link',
+            'cog' => 'Zebatka',
+            'cube' => 'Kostka',
+            'archive' => 'Archiwum',
+            'folder' => 'Folder',
+            'shopping-cart' => 'Koszyk',
+            'tag' => 'Etykieta',
+            'briefcase' => 'Teczka',
+            'building' => 'Budynek',
+        ];
+    }
+
+    /**
+     * Get the effective label color (custom or default)
+     */
+    public function getLabelColorAttribute(): string
+    {
+        return $this->attributes['label_color']
+            ?? self::LABEL_COLORS[$this->erp_type]
+            ?? '#f97316';
+    }
+
+    /**
+     * Get the effective label icon (custom or default)
+     */
+    public function getLabelIconAttribute(): string
+    {
+        return $this->attributes['label_icon']
+            ?? self::LABEL_ICONS[$this->erp_type]
+            ?? 'database';
+    }
+
+    /**
+     * Get CSS classes for label badge
+     */
+    public function getLabelBadgeClassesAttribute(): string
+    {
+        $color = $this->label_color;
+        return "background-color: {$color}20; color: {$color}; border-color: {$color}50;";
+    }
+
+    /**
+     * Get label data for display in other components
+     */
+    public function getLabelDataAttribute(): array
+    {
+        return [
+            'name' => $this->instance_name,
+            'color' => $this->label_color,
+            'icon' => $this->label_icon,
+            'erp_type' => $this->erp_type,
+        ];
+    }
+}

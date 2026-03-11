@@ -4,7 +4,6 @@ namespace App\Http\Livewire\Admin\Users;
 
 use Livewire\Component;
 use Livewire\WithFileUploads;
-use App\Models\AuditLog;
 use App\Models\User;
 use Spatie\Permission\Models\Role;
 use Spatie\Permission\Models\Permission;
@@ -544,39 +543,11 @@ class UserForm extends Component
                 $this->clearDraft();
             }
 
-            // Capture old roles/permissions before sync
-            $oldRoles = $this->user->roles->pluck('name')->sort()->values()->toArray();
-            $oldPermissions = $this->user->getDirectPermissions()->pluck('name')->sort()->values()->toArray();
-
             // Sync roles
             $this->user->syncRoles($this->selected_roles);
 
             // Sync direct permissions (beyond roles)
             $this->user->syncPermissions($this->custom_permissions);
-
-            // Audit log: roles changed
-            $newRoles = collect($this->selected_roles)->sort()->values()->toArray();
-            if ($oldRoles !== $newRoles) {
-                AuditLog::log(
-                    AuditLog::EVENT_UPDATED,
-                    $this->user,
-                    ['roles' => $oldRoles],
-                    ['roles' => $newRoles],
-                    'Zmiana rol uzytkownika'
-                );
-            }
-
-            // Audit log: direct permissions changed
-            $newPermissions = collect($this->custom_permissions)->sort()->values()->toArray();
-            if ($oldPermissions !== $newPermissions) {
-                AuditLog::log(
-                    AuditLog::EVENT_UPDATED,
-                    $this->user,
-                    ['direct_permissions' => $oldPermissions],
-                    ['direct_permissions' => $newPermissions],
-                    'Zmiana uprawnien bezposrednich uzytkownika'
-                );
-            }
 
             // Send credentials email if requested
             if ($this->send_credentials && !$this->isEditing) {

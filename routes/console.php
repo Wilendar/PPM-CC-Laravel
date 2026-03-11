@@ -119,47 +119,16 @@ Schedule::command('db:health-check --alert')
     ->runInBackground();
 
 // ==========================================
-// QUEUE WORKER (SHARED HOSTING) - Smart Worker Guard
+// QUEUE WORKER (SHARED HOSTING)
 // ==========================================
-// 2026-03-10: Smart scheduler with WorkerGuard anti-duplication
-// Replaces simple --once with --stop-when-empty for efficiency
-// Checks for active workers before spawning new one
+// 2026-01-19: Auto-process queue jobs every minute (shared hosting compatible)
+// On shared hosting we can't run `queue:work` as daemon, so we use scheduler
 
-Schedule::call(function () {
-    $guard = app(\App\Services\WorkerGuardService::class);
-
-    // 1. Cleanup stale heartbeats (dead > 120s)
-    $guard->cleanupStaleWorkers(120);
-
-    // 2. Check if there are pending jobs
-    $pendingCount = \Illuminate\Support\Facades\DB::table('jobs')
-        ->where('available_at', '<=', now()->timestamp)
-        ->whereNull('reserved_at')
-        ->count();
-
-    if ($pendingCount === 0) {
-        return;
-    }
-
-    // 3. Check if a worker is already active
-    if (!$guard->canSpawnManualWorker()) {
-        \Illuminate\Support\Facades\Log::debug('WorkerGuard: Active worker detected, skipping spawn');
-        return;
-    }
-
-    // 4. Spawn worker - processes ALL available jobs within 55s
-    // NOTE: --timeout removed intentionally (Worker Guard v2)
-    // Long-running jobs (BulkImportProducts) use $timeout=0 (unlimited)
-    // and are monitored via heartbeat system instead of process timeout.
-    Artisan::call('queue:work', [
-        'connection' => 'database',
-        '--queue' => 'prestashop_sync,prestashop-sync,erp-sync,erp_default,erp_high,default,sync',
-        '--stop-when-empty' => true,
-        '--max-time' => 55,
-    ]);
-})->everyMinute()
-  ->name('queue-worker-smart')
-  ->withoutOverlapping();
+Schedule::command('queue:work database --queue=prestashop_sync,prestashop-sync,erp-sync,erp_default,erp_high,default,sync --once --max-time=55')
+    ->everyMinute()
+    ->name('queue-worker-erp')
+    ->withoutOverlapping()
+    ->runInBackground();
 
 // ==========================================
 // PRESTASHOP SYNC TASKS
@@ -254,7 +223,29 @@ Schedule::call(function () {
 // ETAP: Subiekt GT Integration - Scheduled pull operations
 
 use App\Jobs\ERP\PullProductsFromSubiektGT;
+use App\Jobs\ERP\DetectSubiektGTChanges;
 use App\Models\ERPConnection;
+
+// Subiekt GT Change Detection (lightweight check every 15 minutes)
+// Dispatches incremental pull if changes detected
+Schedule::call(function () {
+    try {
+        // Get all active Subiekt GT connections with auto-sync enabled
+        $subiektConnections = ERPConnection::where('erp_type', ERPConnection::ERP_SUBIEKT_GT)
+            ->where('is_active', true)
+            ->where('auto_sync_products', true)
+            ->get();
+
+        foreach ($subiektConnections as $connection) {
+            DetectSubiektGTChanges::dispatch($connection->id);
+        }
+    } catch (\Exception $e) {
+        // Fail silently if erp_connections table doesn't exist yet
+        \Log::warning('Subiekt GT change detection scheduler failed: ' . $e->getMessage());
+    }
+})->name('subiekt-gt:change-detection')
+  ->everyFifteenMinutes()
+  ->withoutOverlapping();
 
 // ==========================================
 // ETAP_08 FAZA 6: Dynamic ERP Sync Scheduler
@@ -284,10 +275,8 @@ $shouldSyncNow = function (string $frequency): bool {
  */
 $dispatchSyncJob = function (ERPConnection $connection, string $syncType, string $frequency): void {
     // Skip if already has pending/running sync job for this type
-    // FIX: Check source_type/source_id (not target_type/target_id)
-    // SyncJob is created with source_type='subiekt_gt', target_type='ppm'
-    $existingJob = SyncJob::where('source_type', 'subiekt_gt')
-        ->where('source_id', $connection->id)
+    $existingJob = SyncJob::where('target_type', 'subiekt_gt')
+        ->where('target_id', $connection->id)
         ->where('job_type', 'pull_' . $syncType)
         ->whereIn('status', ['pending', 'running'])
         ->exists();
@@ -298,20 +287,6 @@ $dispatchSyncJob = function (ERPConnection $connection, string $syncType, string
             'connection_name' => $connection->instance_name,
             'sync_type' => $syncType,
             'frequency' => $frequency,
-        ]);
-        return;
-    }
-
-    // Safety net: if >5 pending jobs exist for this connection (any type), warn and skip
-    $pendingCount = SyncJob::where('source_type', 'subiekt_gt')
-        ->where('source_id', $connection->id)
-        ->where('status', 'pending')
-        ->count();
-
-    if ($pendingCount >= 5) {
-        \Log::warning("ERP {$syncType} sync skipped - too many pending jobs ({$pendingCount})", [
-            'connection_id' => $connection->id,
-            'pending_count' => $pendingCount,
         ]);
         return;
     }
@@ -383,12 +358,6 @@ Schedule::call(function () use ($shouldSyncNow, $dispatchSyncJob) {
             $basicFreq = $connection->basic_data_sync_frequency ?? ERPConnection::FREQ_DAILY;
             if ($shouldSyncNow($basicFreq)) {
                 $dispatchSyncJob($connection, 'basic_data', $basicFreq);
-            }
-
-            // === SYNC LOKALIZACJI MAGAZYNOWYCH ===
-            $locationFreq = $connection->location_sync_frequency ?? ERPConnection::FREQ_DAILY;
-            if ($shouldSyncNow($locationFreq)) {
-                $dispatchSyncJob($connection, 'location', $locationFreq);
             }
         }
     } catch (\Exception $e) {
@@ -492,23 +461,3 @@ Schedule::command('permission:cache-reset')
     ->sundays()
     ->at('03:00');
 */
-
-// ==========================================
-// Session Cleanup: Expire inactive sessions
-// ==========================================
-// Marks sessions as expired after 120 min of inactivity
-// and removes their Laravel session from DB
-Schedule::call(function () {
-    try {
-        $service = app(\App\Services\User\SessionManagementService::class);
-        $expired = $service->expireInactiveSessions(120);
-
-        if ($expired > 0) {
-            \Log::info("Sessions cleanup: expired {$expired} inactive sessions");
-        }
-    } catch (\Exception $e) {
-        \Log::warning('Session expiry scheduler failed: ' . $e->getMessage());
-    }
-})->everyFifteenMinutes()
-  ->name('sessions:expire-inactive')
-  ->withoutOverlapping();
