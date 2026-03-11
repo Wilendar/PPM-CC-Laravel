@@ -6251,19 +6251,6 @@ class ProductForm extends Component
                         'notes' => $this->notes,
                     ]);
 
-                    // CRITICAL FIX (Bug 2): Mark all associated shops as 'pending' after updating default data
-                    // When user edits "Dane domyślne", shops need to be re-synced to reflect new default data
-                    $shopsMarkedPending = \App\Models\ProductShopData::where('product_id', $this->product->id)
-                        ->where('sync_status', '!=', 'disabled') // Don't change disabled shops
-                        ->update(['sync_status' => 'pending']);
-
-                    if ($shopsMarkedPending > 0) {
-                        Log::info('Marked shops as pending after default data update', [
-                            'product_id' => $this->product->id,
-                            'shops_marked' => $shopsMarkedPending,
-                        ]);
-                    }
-
                     $this->successMessage = 'Produkt został zaktualizowany pomyślnie.';
                 } else {
                     // Create new product
@@ -8881,24 +8868,12 @@ class ProductForm extends Component
                 'sort_order' => $changes['sort_order'] ?? $this->product->sort_order,
             ]);
 
-            // FIX 2025-11-18 (#4): Conditionally mark shops as pending (ONLY when explicitly requested)
-            // Default behavior: Mark all shops as 'pending' when default data changes (normal edit mode)
-            // Targeted save: DON'T mark all shops when syncing single shop (prevents "all shops" bug)
+            // Shops are marked as 'pending' only when sync is explicitly triggered
+            // (via "Aktualizuj sklepy" button or savePendingChangesToShop flow)
+            // updateOnly() and saveAndClose() from default context do NOT dispatch sync jobs,
+            // so marking shops as pending here would leave them stuck forever.
             if ($markShopsAsPending) {
-                // CRITICAL FIX (Bug 2): Mark all associated shops as 'pending' after updating default data
-                // When user edits "Dane domyślne", shops need to be re-synced to reflect new default data
-                $shopsMarkedPending = \App\Models\ProductShopData::where('product_id', $this->product->id)
-                    ->where('sync_status', '!=', 'disabled') // Don't change disabled shops
-                    ->update(['sync_status' => 'pending']);
-
-                if ($shopsMarkedPending > 0) {
-                    Log::info('Marked shops as pending after default data update (pending changes)', [
-                        'product_id' => $this->product->id,
-                        'shops_marked' => $shopsMarkedPending,
-                    ]);
-                }
-            } else {
-                Log::info('Skipped marking all shops as pending (targeted save for single shop)', [
+                Log::info('markShopsAsPending=true but skipping - sync triggered separately', [
                     'product_id' => $this->product->id,
                 ]);
             }

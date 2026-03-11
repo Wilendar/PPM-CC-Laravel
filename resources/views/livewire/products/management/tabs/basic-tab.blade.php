@@ -122,12 +122,12 @@
 
             {{-- Error Message Display --}}
             @if($syncDisplay['status'] === 'error' && isset($syncDisplay['error_message']))
-                <div class="mt-3 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded">
-                    <p class="text-sm text-red-700 dark:text-red-400">
+                <div class="mt-3 p-3 bg-red-900/20 border border-red-800 rounded">
+                    <p class="text-sm text-red-400">
                         <strong>Błąd:</strong> {{ $syncDisplay['error_message'] }}
                     </p>
                     @if(isset($syncDisplay['retry_count']))
-                        <p class="text-xs text-red-600 dark:text-red-500 mt-1">
+                        <p class="text-xs text-red-500 mt-1">
                             Liczba prób: {{ $syncDisplay['retry_count'] }} / 3
                         </p>
                     @endif
@@ -711,7 +711,7 @@
                                 Aktywny
                             </span>
                         @else
-                            <span class="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800 dark:bg-red-800 dark:text-red-100">
+                            <span class="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-900/50 text-red-300 border border-red-700">
                                 Nieaktywny
                             </span>
                         @endif

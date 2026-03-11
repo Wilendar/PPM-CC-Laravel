@@ -107,7 +107,7 @@
                             <button type="button"
                                     wire:click="toggleShopVisibility({{ $shop['id'] }})"
                                     title="{{ $this->getShopVisibility($shop['id']) ? 'Ukryj w sklepie' : 'Pokaż w sklepie' }}"
-                                    class="px-3 py-2 text-xs transition-colors duration-200 flex items-center {{ $this->getShopVisibility($shop['id']) ? 'bg-green-500 hover:bg-green-600 text-white' : 'bg-gray-300 hover:bg-gray-400 text-gray-700' }}">
+                                    class="px-3 py-2 text-xs transition-colors duration-200 flex items-center {{ $this->getShopVisibility($shop['id']) ? 'bg-green-500 hover:bg-green-600 text-white' : 'bg-gray-600 hover:bg-gray-500 text-gray-300' }}">
                                 @if($this->getShopVisibility($shop['id']))
                                     <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
                                         <path d="M10 12a2 2 0 100-4 2 2 0 000 4z"/>

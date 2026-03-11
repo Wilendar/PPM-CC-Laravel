@@ -579,10 +579,6 @@ class ProductSyncStrategy implements ISyncStrategy
             $errors[] = 'Product name is required';
         }
 
-        if (!$model->is_active) {
-            $errors[] = 'Product must be active to sync';
-        }
-
         return $errors;
     }
 
