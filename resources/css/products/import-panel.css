@@ -15,7 +15,6 @@
 
 [data-resizable-table] .enterprise-table {
     table-layout: fixed;
-    min-width: 1800px;
 }
 
 [data-resizable-table] .enterprise-table th.resizable-column {
@@ -28,99 +27,6 @@
     text-overflow: ellipsis;
 }
 
-/* ========================================================================
-   STICKY COLUMNS: Left (Checkbox, Image, SKU, Name) + Right (Status, Actions)
-   ======================================================================== */
-
-.import-table-sticky-left,
-.import-table-sticky-right {
-    position: sticky;
-    z-index: 10;
-}
-
-/* LEFT STICKY OFFSETS */
-.import-sticky-col-0 { left: 0; width: 40px; }
-.import-sticky-col-1 { left: 40px; width: 56px; }
-.import-sticky-col-2 { left: 96px; width: 130px; }
-.import-sticky-col-3 { left: 226px; width: 230px; }
-
-/* RIGHT STICKY OFFSETS */
-.import-sticky-col-r1 { right: 120px; width: 70px; }
-.import-sticky-col-r0 { right: 0; width: 120px; }
-
-/* Solid backgrounds for sticky cells (cover scrolled content underneath) */
-thead .import-table-sticky-left,
-thead .import-table-sticky-right {
-    z-index: 12;
-    background-color: #1f2937;
-}
-
-tbody .import-table-sticky-left,
-tbody .import-table-sticky-right {
-    background-color: #111827;
-}
-
-tbody tr:hover .import-table-sticky-left,
-tbody tr:hover .import-table-sticky-right {
-    background-color: #1a2332;
-}
-
-tbody tr.import-row-frozen .import-table-sticky-left,
-tbody tr.import-row-frozen .import-table-sticky-right {
-    background-color: #0d1912;
-}
-
-/* SHADOW: visible only when content is scrolled behind sticky columns */
-.import-table-scroll-container.has-scroll-left .import-sticky-shadow-left {
-    box-shadow: 6px 0 8px -2px rgba(0, 0, 0, 0.4);
-}
-
-.import-table-scroll-container.has-scroll-right .import-sticky-shadow-right {
-    box-shadow: -6px 0 8px -2px rgba(0, 0, 0, 0.4);
-}
-
-/* Sticky cells must not clip content (override table td overflow:hidden) */
-[data-resizable-table] .enterprise-table td.import-table-sticky-left,
-[data-resizable-table] .enterprise-table td.import-table-sticky-right,
-[data-resizable-table] .enterprise-table th.import-table-sticky-left,
-[data-resizable-table] .enterprise-table th.import-table-sticky-right {
-    overflow: visible;
-}
-
-/* SKU & Nazwa columns: clip overflow + wrap text inside cell */
-[data-resizable-table] .enterprise-table td.import-sticky-col-2,
-[data-resizable-table] .enterprise-table td.import-sticky-col-3 {
-    overflow: hidden;
-    white-space: normal;
-}
-
-[data-resizable-table] .enterprise-table td.import-sticky-col-2 {
-    word-break: break-all;
-}
-
-[data-resizable-table] .enterprise-table td.import-sticky-col-3 {
-    word-break: break-word;
-}
-
-/* Override Tailwind truncate on buttons inside SKU/Nazwa cells */
-td.import-sticky-col-2 > button,
-td.import-sticky-col-3 > button {
-    white-space: normal !important;
-    overflow: visible !important;
-    text-overflow: clip !important;
-    display: block;
-    max-width: 100%;
-}
-
-/* Quick Actions wrap to multiple rows when column is narrow */
-.import-actions-wrap {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: flex-end;
-    gap: 1px;
-    max-width: 120px;
-}
-
 /* Override: Category cells need overflow visible for dropdown menus */
 [data-resizable-table] .enterprise-table td.import-cell-category {
     overflow: visible;
@@ -131,9 +37,9 @@ td.import-sticky-col-3 > button {
     overflow: visible;
 }
 
-/* Publish button cell: clip content to prevent overlap with sticky Status */
+/* Override: Publish button cell needs overflow visible */
 [data-resizable-table] .enterprise-table td.import-cell-publish {
-    overflow: hidden;
+    overflow: visible;
 }
 
 /* ========================================================================

@@ -119,7 +119,7 @@ class BulkSyncDescriptionsJob implements ShouldQueue
 
             foreach ($chunks as $chunkIndex => $chunkProductIds) {
                 $products = Product::whereIn('id', $chunkProductIds)
-                    ->with(['shopData.shop:id,name,label_color,label_icon'])
+                    ->with(['shopData'])
                     ->get();
 
                 foreach ($products as $product) {

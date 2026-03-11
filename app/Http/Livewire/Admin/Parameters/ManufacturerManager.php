@@ -2,6 +2,7 @@
 
 namespace App\Http\Livewire\Admin\Parameters;
 
+use App\Models\AuditLog;
 use App\Models\Manufacturer;
 use App\Models\PrestaShopShop;
 use App\Services\PrestaShop\PrestaShopClientFactory;
@@ -74,6 +75,11 @@ class ManufacturerManager extends Component
     // Delete confirmation
     public ?int $deleteId = null;
     public string $deleteName = '';
+    public int $deleteProductsCount = 0;
+
+    // Bulk selection
+    public array $selectedIds = [];
+    public bool $selectAll = false;
 
     protected $listeners = ['refreshManufacturers' => '$refresh'];
 
@@ -252,6 +258,8 @@ class ManufacturerManager extends Component
         $manufacturer = Manufacturer::findOrFail($id);
         $this->deleteId = $id;
         $this->deleteName = $manufacturer->name;
+        $this->deleteProductsCount = $manufacturer->products()->count()
+            + $manufacturer->pendingProducts()->count();
         $this->showDeleteModal = true;
     }
 
@@ -262,21 +270,143 @@ class ManufacturerManager extends Component
         }
 
         $manufacturer = Manufacturer::findOrFail($this->deleteId);
+        $name = $manufacturer->name;
 
-        if (!$manufacturer->canDelete()) {
-            $this->dispatch('flash-message', type: 'error', message: 'Nie mozna usunac marki - przypisane produkty');
-            $this->showDeleteModal = false;
-            return;
+        // Capture pivot state before deletion for audit
+        $shopIdsBefore = $manufacturer->shops()->pluck('prestashop_shops.id')->toArray();
+
+        // Detach manufacturer from all products
+        $detachedProducts = $manufacturer->products()->update(['manufacturer_id' => null]);
+        $detachedPending = $manufacturer->pendingProducts()->update(['manufacturer_id' => null]);
+
+        // Delete logo from storage
+        if ($manufacturer->logo_path && Storage::disk('public')->exists($manufacturer->logo_path)) {
+            Storage::disk('public')->delete($manufacturer->logo_path);
         }
 
-        $name = $manufacturer->name;
+        // Detach shop assignments
+        $manufacturer->shops()->detach();
+
+        // Audit log: manufacturer deleted with shop detach info
+        AuditLog::log(
+            AuditLog::EVENT_DELETED,
+            $manufacturer,
+            [
+                'name' => $name,
+                'shops' => $shopIdsBefore,
+                'detached_products' => $detachedProducts,
+                'detached_pending' => $detachedPending,
+            ],
+            null,
+            "Usuniecie marki '{$name}' (odlaczono sklepy: " . count($shopIdsBefore) . ", produkty: " . ($detachedProducts + $detachedPending) . ")"
+        );
+
         $manufacturer->delete();
 
         $this->showDeleteModal = false;
         $this->deleteId = null;
         $this->deleteName = '';
+        $this->deleteProductsCount = 0;
 
-        $this->dispatch('flash-message', type: 'success', message: "Marka '{$name}' zostala usunieta");
+        $totalDetached = $detachedProducts + $detachedPending;
+        $message = "Marka '{$name}' zostala usunieta";
+        if ($totalDetached > 0) {
+            $message .= " (odlaczono od {$totalDetached} produktow)";
+        }
+
+        $this->dispatch('flash-message', type: 'success', message: $message);
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | BULK ACTIONS
+    |--------------------------------------------------------------------------
+    */
+
+    public function updatedSelectAll(): void
+    {
+        if ($this->selectAll) {
+            $this->selectedIds = $this->manufacturers->pluck('id')->map(fn($id) => (string) $id)->toArray();
+        } else {
+            $this->selectedIds = [];
+        }
+    }
+
+    public function updatedSelectedIds(): void
+    {
+        $this->selectAll = count($this->selectedIds) === $this->manufacturers->count()
+            && $this->manufacturers->count() > 0;
+    }
+
+    public function bulkDelete(): void
+    {
+        if (empty($this->selectedIds)) {
+            return;
+        }
+
+        $manufacturers = Manufacturer::whereIn('id', $this->selectedIds)->get();
+        $totalDetached = 0;
+        $deleted = 0;
+
+        foreach ($manufacturers as $manufacturer) {
+            // Capture pivot state before deletion for audit
+            $shopIdsBefore = $manufacturer->shops()->pluck('prestashop_shops.id')->toArray();
+
+            // Detach from products
+            $detachedCount = $manufacturer->products()->update(['manufacturer_id' => null]);
+            $detachedCount += $manufacturer->pendingProducts()->update(['manufacturer_id' => null]);
+            $totalDetached += $detachedCount;
+
+            // Delete logo
+            if ($manufacturer->logo_path && Storage::disk('public')->exists($manufacturer->logo_path)) {
+                Storage::disk('public')->delete($manufacturer->logo_path);
+            }
+
+            // Detach shops and delete
+            $manufacturer->shops()->detach();
+
+            // Audit log per manufacturer
+            AuditLog::log(
+                AuditLog::EVENT_DELETED,
+                $manufacturer,
+                [
+                    'name' => $manufacturer->name,
+                    'shops' => $shopIdsBefore,
+                    'detached_products' => $detachedCount,
+                ],
+                null,
+                "Masowe usuwanie - marka '{$manufacturer->name}'"
+            );
+
+            $manufacturer->delete();
+            $deleted++;
+        }
+
+        $this->selectedIds = [];
+        $this->selectAll = false;
+
+        $message = "Usunieto {$deleted} marek";
+        if ($totalDetached > 0) {
+            $message .= " (odlaczono od {$totalDetached} produktow)";
+        }
+
+        $this->dispatch('flash-message', type: 'success', message: $message);
+    }
+
+    public function bulkToggleActive(bool $active): void
+    {
+        if (empty($this->selectedIds)) {
+            return;
+        }
+
+        $count = Manufacturer::whereIn('id', $this->selectedIds)
+            ->update(['is_active' => $active]);
+
+        $this->selectedIds = [];
+        $this->selectAll = false;
+
+        $status = $active ? 'aktywowane' : 'dezaktywowane';
+        $this->dispatch('flash-message', type: 'success', message: "Zaktualizowano {$count} marek ({$status})");
     }
 
     /*
@@ -313,17 +443,33 @@ class ManufacturerManager extends Component
 
         // Get current shop IDs
         $currentShopIds = $manufacturer->shops->pluck('id')->toArray();
+        $newShopIds = $this->selectedShopIds;
 
         // Shops to add (sync as pending)
-        $toAdd = array_diff($this->selectedShopIds, $currentShopIds);
+        $toAdd = array_diff($newShopIds, $currentShopIds);
         foreach ($toAdd as $shopId) {
             $manufacturer->assignToShop($shopId);
         }
 
         // Shops to remove
-        $toRemove = array_diff($currentShopIds, $this->selectedShopIds);
+        $toRemove = array_diff($currentShopIds, $newShopIds);
         foreach ($toRemove as $shopId) {
             $manufacturer->removeFromShop($shopId);
+        }
+
+        // Audit log: shop assignments changed
+        $sortedOld = $currentShopIds;
+        $sortedNew = $newShopIds;
+        sort($sortedOld);
+        sort($sortedNew);
+        if ($sortedOld !== $sortedNew) {
+            AuditLog::log(
+                AuditLog::EVENT_UPDATED,
+                $manufacturer,
+                ['shops' => $currentShopIds],
+                ['shops' => $newShopIds],
+                'Zmiana przypisania marki do sklepow'
+            );
         }
 
         $this->showShopsModal = false;
@@ -654,6 +800,15 @@ class ManufacturerManager extends Component
             // Ensure shop assignment
             if (!$existing->shops()->where('prestashop_shop_id', $shop->id)->exists()) {
                 $existing->assignToShop($shop->id);
+
+                AuditLog::log(
+                    AuditLog::EVENT_UPDATED,
+                    $existing,
+                    null,
+                    ['shops_added' => [$shop->id]],
+                    "Import PS: przypisano marke do sklepu '{$shop->name}'",
+                    AuditLog::SOURCE_IMPORT
+                );
             }
 
             return 'updated';
@@ -667,6 +822,15 @@ class ManufacturerManager extends Component
                 'sync_status' => 'synced',
                 'synced_at' => now(),
             ]);
+
+            AuditLog::log(
+                AuditLog::EVENT_CREATED,
+                $manufacturer,
+                null,
+                ['name' => $name, 'shops' => [$shop->id]],
+                "Import PS: utworzono marke '{$name}' z przypisaniem do '{$shop->name}'",
+                AuditLog::SOURCE_IMPORT
+            );
 
             return 'imported';
         }
@@ -724,6 +888,7 @@ class ManufacturerManager extends Component
         $this->showDeleteModal = false;
         $this->deleteId = null;
         $this->deleteName = '';
+        $this->deleteProductsCount = 0;
     }
 
     private function resetForm(): void

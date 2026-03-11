@@ -4,11 +4,13 @@ namespace App\Jobs\PrestaShop;
 
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use App\Models\PrestaShopShop;
 use App\Models\CategoryPreview;
 use App\Models\ShopMapping;
@@ -53,9 +55,14 @@ use App\Events\PrestaShop\CategoryPreviewReady;
  * @version 1.0
  * @since ETAP_07 FAZA 3D
  */
-class AnalyzeMissingCategories implements ShouldQueue
+class AnalyzeMissingCategories implements ShouldQueue, ShouldBeUnique
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+
+    /**
+     * Unique lock timeout (30 minutes)
+     */
+    public int $uniqueFor = 1800;
 
     /**
      * Array of PrestaShop product IDs to analyze
@@ -127,6 +134,14 @@ class AnalyzeMissingCategories implements ShouldQueue
     }
 
     /**
+     * Unique ID for ShouldBeUnique - per shop
+     */
+    public function uniqueId(): string
+    {
+        return 'analyze-cats-shop-' . $this->shop->id;
+    }
+
+    /**
      * Execute the job
      *
      * @param JobProgressService $progressService
@@ -150,12 +165,13 @@ class AnalyzeMissingCategories implements ShouldQueue
         $progress = \App\Models\JobProgress::where('job_id', $this->jobId)->first();
         $progressId = $progress?->id;
 
-        // Update status to running
+        // Update status to running with descriptive phase
+        $totalProducts = count($this->productIds);
         if ($progressId) {
-            $progressService->updateProgress($progressId, 0);
+            $progressService->updateProgress($progressId, (int)($totalProducts * 0.02));
             $progressService->updateMetadata($progressId, [
                 'phase' => 'extracting_categories',
-                'phase_label' => 'Pobieranie kategorii z produktow',
+                'phase_label' => "Pobieranie produktow ({$totalProducts} szt.)...",
             ]);
         }
 
@@ -163,7 +179,8 @@ class AnalyzeMissingCategories implements ShouldQueue
             $client = $clientFactory->create($this->shop);
 
             // STEP 1: Fetch products from PrestaShop API (lightweight - only IDs + categories)
-            $categoryIds = $this->extractCategoryIdsFromProducts($client);
+            // Pass progress callback to report chunked fetching progress
+            $categoryIds = $this->extractCategoryIdsFromProducts($client, $progressId, $progressService);
 
             Log::info('Category IDs extracted from products', [
                 'total_categories' => count($categoryIds),
@@ -172,10 +189,10 @@ class AnalyzeMissingCategories implements ShouldQueue
 
             // ETAP_07c: Update progress - categories extracted
             if ($progressId) {
-                $progressService->updateProgress($progressId, (int)(count($this->productIds) * 0.3));
+                $progressService->updateProgress($progressId, (int)($totalProducts * 0.45));
                 $progressService->updateMetadata($progressId, [
                     'phase' => 'checking_existing',
-                    'phase_label' => 'Sprawdzanie istniejacych kategorii',
+                    'phase_label' => 'Sprawdzanie istniejacych kategorii w PPM...',
                     'total_categories_found' => count($categoryIds),
                 ]);
             }
@@ -198,10 +215,12 @@ class AnalyzeMissingCategories implements ShouldQueue
 
             // ETAP_07c: Update progress - missing categories found
             if ($progressId) {
-                $progressService->updateProgress($progressId, (int)(count($this->productIds) * 0.5));
+                $progressService->updateProgress($progressId, (int)($totalProducts * 0.5));
                 $progressService->updateMetadata($progressId, [
                     'phase' => 'analyzing_missing',
-                    'phase_label' => 'Analiza brakujacych kategorii',
+                    'phase_label' => count($missingCategoryIds) > 0
+                        ? 'Znaleziono ' . count($missingCategoryIds) . ' brakujacych kategorii...'
+                        : 'Wszystkie kategorie istnieja w PPM',
                     'existing_count' => count($existingCategoryIds),
                     'missing_count' => count($missingCategoryIds),
                 ]);
@@ -219,6 +238,16 @@ class AnalyzeMissingCategories implements ShouldQueue
                 $this->enrichAnalyzedProductsWithCategoryNames([]);
 
                 // Create EMPTY preview with info message + import context
+                // FIX: Store analyzed_products in file to avoid DB max_allowed_packet limit
+                $analyzedProductsFile = $this->storeAnalyzedProductsToFile();
+
+                $emptyImportCtx = array_merge($this->originalImportOptions, [
+                    'product_ids' => $this->productIds,
+                    'analyzed_products_file' => $analyzedProductsFile,
+                ]);
+                // Sanitize JSON for MariaDB json_valid() CHECK constraint
+                $emptyImportCtx = json_decode(json_encode($emptyImportCtx, JSON_INVALID_UTF8_SUBSTITUTE), true) ?? $emptyImportCtx;
+
                 $preview = CategoryPreview::create([
                     'job_id' => $this->jobId,
                     'shop_id' => $this->shop->id,
@@ -229,10 +258,7 @@ class AnalyzeMissingCategories implements ShouldQueue
                         'message' => 'Wszystkie kategorie już istnieją w PPM. Możesz kontynuować import produktów.',
                     ],
                     'total_categories' => 0,
-                    'import_context_json' => array_merge($this->originalImportOptions, [
-                        'product_ids' => $this->productIds,
-                        'analyzed_products' => $this->analyzedProducts,
-                    ]),
+                    'import_context_json' => $emptyImportCtx,
                     'status' => CategoryPreview::STATUS_PENDING,
                 ]);
 
@@ -265,11 +291,12 @@ class AnalyzeMissingCategories implements ShouldQueue
             }
 
             // ETAP_07c: Update progress - fetching category details
+            $missingCount = count($missingCategoryIds);
             if ($progressId) {
-                $progressService->updateProgress($progressId, (int)(count($this->productIds) * 0.6));
+                $progressService->updateProgress($progressId, (int)($totalProducts * 0.55));
                 $progressService->updateMetadata($progressId, [
                     'phase' => 'fetching_details',
-                    'phase_label' => 'Pobieranie szczegolowych danych kategorii',
+                    'phase_label' => "Pobieranie danych {$missingCount} brakujacych kategorii...",
                 ]);
             }
 
@@ -290,10 +317,10 @@ class AnalyzeMissingCategories implements ShouldQueue
 
             // ETAP_07c: Update progress - building tree
             if ($progressId) {
-                $progressService->updateProgress($progressId, (int)(count($this->productIds) * 0.8));
+                $progressService->updateProgress($progressId, (int)($totalProducts * 0.8));
                 $progressService->updateMetadata($progressId, [
                     'phase' => 'building_tree',
-                    'phase_label' => 'Budowanie drzewa kategorii',
+                    'phase_label' => 'Budowanie drzewa ' . count($categories) . ' kategorii...',
                     'categories_to_process' => count($categories),
                 ]);
             }
@@ -303,10 +330,10 @@ class AnalyzeMissingCategories implements ShouldQueue
 
             // ETAP_07c: Update progress - storing preview
             if ($progressId) {
-                $progressService->updateProgress($progressId, (int)(count($this->productIds) * 0.95));
+                $progressService->updateProgress($progressId, (int)($totalProducts * 0.9));
                 $progressService->updateMetadata($progressId, [
                     'phase' => 'storing_preview',
-                    'phase_label' => 'Zapisywanie podgladu',
+                    'phase_label' => 'Zapisywanie podgladu kategorii...',
                 ]);
             }
 
@@ -393,25 +420,27 @@ class AnalyzeMissingCategories implements ShouldQueue
      * @param mixed $client PrestaShop client
      * @return array Unique category IDs
      */
-    protected function extractCategoryIdsFromProducts($client): array
+    protected function extractCategoryIdsFromProducts($client, ?int $progressId = null, ?JobProgressService $progressService = null): array
     {
         $categoryIds = [];
+        $totalProducts = count($this->productIds);
 
-        // PrestaShop API: Filter by product IDs using OR filter
-        // Format: filter[id]=[1|2|3|4]
-        $idsFilter = '[' . implode('|', $this->productIds) . ']';
-
-        $params = [
-            'display' => 'full',  // PrestaShop API doesn't support associations in display param
-            'filter[id]' => $idsFilter,
-        ];
-
+        // Use chunked ID fetching to avoid HTTP 414 "URI Too Long"
         Log::debug('Fetching products for category analysis', [
-            'product_ids_count' => count($this->productIds),
-            'filter' => $idsFilter,
+            'product_ids_count' => $totalProducts,
         ]);
 
-        $response = $client->getProducts($params);
+        // FIX 2026-03-10: Report progress during chunked fetching
+        $chunkSize = config('prestashop.api_filter_chunk_size', 100);
+        $totalChunks = (int) ceil($totalProducts / $chunkSize);
+        if ($progressId && $progressService && $totalChunks > 1) {
+            $progressService->updateMetadata($progressId, [
+                'phase' => 'fetching_products',
+                'phase_label' => "Pobieranie produktow (0/{$totalChunks} chunkow)...",
+            ]);
+        }
+
+        $response = $client->getProductsByIds($this->productIds);
 
         // Parse response structure
         $products = [];
@@ -506,11 +535,21 @@ class AnalyzeMissingCategories implements ShouldQueue
     }
 
     /**
+     * Known root category names that should only exist at depth <= 1
+     * If found at depth > 1, they indicate data corruption (duplicate root trees)
+     */
+    protected const FAKE_ROOT_NAMES = ['wszystko', 'home', 'accueil', 'inicio', 'startseite'];
+
+    /**
      * Fetch category details from PrestaShop API
+     *
+     * FIX 2026-03-10: Filters out duplicate root categories ("Wszystko"/"Home" at depth > 1)
+     * and their entire subtrees. These indicate PrestaShop data corruption where modules
+     * create copies of the entire category tree as children of leaf categories.
      *
      * @param mixed $client PrestaShop client
      * @param array $categoryIds Missing category IDs
-     * @return array Category details
+     * @return array Category details (filtered)
      */
     protected function fetchCategoryDetails($client, array $categoryIds): array
     {
@@ -543,11 +582,80 @@ class AnalyzeMissingCategories implements ShouldQueue
                     'category_id' => $categoryId,
                     'error' => $e->getMessage(),
                 ]);
-                // Continue with other categories
             }
         }
 
-        return $categories;
+        // FIX 2026-03-10: Filter out duplicate root categories and their subtrees
+        return $this->filterDuplicateRootCategories($categories);
+    }
+
+    /**
+     * Filter out duplicate root categories and their entire subtrees
+     *
+     * Detects categories named "Wszystko"/"Home"/etc. at depth > 1,
+     * then removes them AND all their descendants from the list.
+     *
+     * @param array $categories All fetched categories
+     * @return array Filtered categories (without fake roots and their subtrees)
+     */
+    protected function filterDuplicateRootCategories(array $categories): array
+    {
+        // Step 1: Identify fake root category IDs
+        $fakeRootIds = [];
+        foreach ($categories as $cat) {
+            $name = mb_strtolower(trim($cat['name'] ?? ''));
+            $depth = (int) ($cat['level_depth'] ?? 0);
+
+            if ($depth > 1 && in_array($name, self::FAKE_ROOT_NAMES)) {
+                $fakeRootIds[] = $cat['prestashop_id'];
+                Log::warning('[CATEGORY ANALYSIS] Duplicate root category detected', [
+                    'prestashop_id' => $cat['prestashop_id'],
+                    'name' => $cat['name'],
+                    'level_depth' => $depth,
+                ]);
+            }
+        }
+
+        if (empty($fakeRootIds)) {
+            return $categories;
+        }
+
+        // Step 2: Build parent->children index to find all descendants of fake roots
+        $parentIndex = [];
+        foreach ($categories as $cat) {
+            $parentId = $cat['id_parent'] ?? 0;
+            $parentIndex[$parentId][] = $cat['prestashop_id'];
+        }
+
+        // Step 3: Collect all descendant IDs of fake roots (BFS)
+        $idsToRemove = [];
+        $queue = $fakeRootIds;
+        while (!empty($queue)) {
+            $currentId = array_shift($queue);
+            $idsToRemove[$currentId] = true;
+            if (isset($parentIndex[$currentId])) {
+                foreach ($parentIndex[$currentId] as $childId) {
+                    if (!isset($idsToRemove[$childId])) {
+                        $queue[] = $childId;
+                    }
+                }
+            }
+        }
+
+        // Step 4: Filter
+        $filtered = array_filter($categories, function ($cat) use ($idsToRemove) {
+            return !isset($idsToRemove[$cat['prestashop_id']]);
+        });
+
+        $removedCount = count($categories) - count($filtered);
+        Log::info('[CATEGORY ANALYSIS] Duplicate root categories filtered', [
+            'fake_roots_found' => count($fakeRootIds),
+            'total_removed' => $removedCount,
+            'remaining' => count($filtered),
+            'fake_root_ids' => $fakeRootIds,
+        ]);
+
+        return array_values($filtered);
     }
 
     /**
@@ -661,21 +769,71 @@ class AnalyzeMissingCategories implements ShouldQueue
         $depths = array_column($flattened, 'level_depth');
         $maxDepth = !empty($depths) ? max($depths) : 0;
 
+        // FIX: Store analyzed_products in file to avoid DB max_allowed_packet limit
+        $analyzedProductsFile = $this->storeAnalyzedProductsToFile();
+
+        $categoryTreeData = [
+            'categories' => $tree,
+            'total_count' => $totalCount,
+            'max_depth' => $maxDepth,
+        ];
+
+        // FIX: Sanitize JSON to avoid MariaDB json_valid() CHECK constraint failures
+        // Pre-encode to clean invalid UTF-8, then decode back to array for Eloquent cast
+        $sanitizedJson = json_encode($categoryTreeData, JSON_INVALID_UTF8_SUBSTITUTE | JSON_UNESCAPED_UNICODE);
+        $categoryTreeData = json_decode($sanitizedJson, true) ?? $categoryTreeData;
+
+        $importContextData = array_merge($this->originalImportOptions, [
+            'product_ids' => $this->productIds,
+            'analyzed_products_file' => $analyzedProductsFile,
+        ]);
+
+        // Same sanitization for import_context_json (product_ids may be very large array)
+        $sanitizedCtx = json_encode($importContextData, JSON_INVALID_UTF8_SUBSTITUTE | JSON_UNESCAPED_UNICODE);
+        $importContextData = json_decode($sanitizedCtx, true) ?? $importContextData;
+
+        Log::debug('[AnalyzeMissingCategories] storePreview JSON sizes', [
+            'category_tree_json_bytes' => strlen($sanitizedJson),
+            'import_context_json_bytes' => strlen($sanitizedCtx),
+            'total_categories' => $totalCount,
+        ]);
+
         return CategoryPreview::create([
             'job_id' => $this->jobId,
             'shop_id' => $this->shop->id,
-            'category_tree_json' => [
-                'categories' => $tree,
-                'total_count' => $totalCount,
-                'max_depth' => $maxDepth,
-            ],
+            'category_tree_json' => $categoryTreeData,
             'total_categories' => $totalCount,
-            'import_context_json' => array_merge($this->originalImportOptions, [
-                'product_ids' => $this->productIds,
-                'analyzed_products' => $this->analyzedProducts,
-            ]),
+            'import_context_json' => $importContextData,
             'status' => CategoryPreview::STATUS_PENDING,
         ]);
+    }
+
+    /**
+     * Store analyzed products data to a JSON file in storage
+     *
+     * FIX: With 9554+ products, storing analyzed_products directly in DB
+     * exceeds max_allowed_packet (MariaDB shared hosting limit).
+     * Solution: Write to file, store only file path in DB.
+     *
+     * @return string|null File path relative to storage, or null if empty
+     */
+    protected function storeAnalyzedProductsToFile(): ?string
+    {
+        if (empty($this->analyzedProducts)) {
+            return null;
+        }
+
+        $filename = "import-previews/{$this->jobId}_analyzed_products.json";
+
+        Storage::disk('local')->put($filename, json_encode($this->analyzedProducts, JSON_UNESCAPED_UNICODE));
+
+        Log::info('[AnalyzeMissingCategories] Analyzed products stored to file', [
+            'file' => $filename,
+            'products_count' => count($this->analyzedProducts),
+            'file_size_kb' => round(Storage::disk('local')->size($filename) / 1024, 1),
+        ]);
+
+        return $filename;
     }
 
     /**

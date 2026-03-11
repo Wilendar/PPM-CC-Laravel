@@ -29,6 +29,7 @@
              @case('running') job-progress-bar--running @break
              @case('completed') job-progress-bar--completed @break
              @case('failed') job-progress-bar--failed @break
+             @case('interrupted') job-progress-bar--interrupted @break
              @case('awaiting_user')
                  {{-- ETAP_07c: Blue border when user took action, yellow when awaiting --}}
                  @if($this->isUserActionTaken) job-progress-bar--running @else job-progress-bar--awaiting @endif
@@ -58,6 +59,27 @@
                     @endswitch">
                     {{ $this->jobTypeLabel }}
                 </span>
+
+                {{-- Heartbeat Indicator Dot with Sonar Ping --}}
+                {{-- Worker Guard v2: Show for 'running' AND 'interrupted' status --}}
+                @if(in_array($this->status, ['running', 'interrupted']) && $this->heartbeatStatus !== 'unknown')
+                    <span class="heartbeat-dot-wrapper"
+                          x-data="{ pinging: false }"
+                          x-effect="
+                              let tick = $wire.heartbeatTick;
+                              if (tick > 0) {
+                                  pinging = true;
+                                  setTimeout(() => pinging = false, 900);
+                              }
+                          "
+                          title="{{ $this->status === 'interrupted' ? 'Worker restartuje sie...' : ($this->heartbeatStatus === 'alive' ? 'Worker aktywny' : ($this->heartbeatStatus === 'stale' ? 'Worker nie odpowiada' : 'Worker nie zyje')) }}">
+                        {{-- Sonar ring (expands outward on ping) --}}
+                        <span class="heartbeat-sonar {{ $this->status === 'interrupted' ? 'heartbeat-sonar--interrupted' : 'heartbeat-sonar--' . $this->heartbeatStatus }}"
+                              :class="{ 'heartbeat-sonar--ping': pinging }"></span>
+                        {{-- Core dot (static glow) --}}
+                        <span class="heartbeat-dot {{ $this->status === 'interrupted' ? 'heartbeat-dot--interrupted' : 'heartbeat-dot--' . $this->heartbeatStatus }}"></span>
+                    </span>
+                @endif
             </div>
 
             <!-- Progress Info -->
@@ -98,7 +120,8 @@
                                  'bg-green-500': '{{ $this->status }}' === 'completed',
                                  'bg-red-500': '{{ $this->status }}' === 'failed',
                                  'bg-gray-500': '{{ $this->status }}' === 'pending',
-                                 'bg-yellow-500': '{{ $this->status }}' === 'awaiting_user' && !{{ $this->isUserActionTaken ? 'true' : 'false' }}
+                                 'bg-yellow-500': '{{ $this->status }}' === 'awaiting_user' && !{{ $this->isUserActionTaken ? 'true' : 'false' }},
+                                 'bg-orange-400': '{{ $this->status }}' === 'interrupted'
                              }"
                              style="width: {{ $this->percentage }}%"></div>
                     </div>

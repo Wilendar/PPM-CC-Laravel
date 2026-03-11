@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Support\Str;
 
 // ETAP_05a SEKCJA 0 - Product.php Refactoring ✅
+use App\Models\Concerns\Auditable;
 use App\Models\Concerns\Product\HasPricing;
 use App\Models\Concerns\Product\HasStock;
 use App\Models\Concerns\Product\HasCategories;
@@ -80,7 +81,7 @@ use App\Models\Concerns\Product\HasSyncStatus;
  */
 class Product extends Model
 {
-    use HasFactory, SoftDeletes;
+    use HasFactory, SoftDeletes, Auditable;
 
     // ETAP_05a SEKCJA 0 - Refactoring Traits ✅
     use HasPricing;          // Pricing system (145 lines)
@@ -91,6 +92,8 @@ class Product extends Model
     use HasCompatibility;    // Vehicle compatibility stub (117 lines - ETAP_05a ready)
     use HasMultiStore;       // Multi-store sync (229 lines)
     use HasSyncStatus;       // Integration sync (192 lines)
+
+    protected array $auditExclude = ['sort_order'];
 
     /**
      * The attributes that are mass assignable.

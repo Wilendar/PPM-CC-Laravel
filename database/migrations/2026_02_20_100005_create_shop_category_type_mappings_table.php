@@ -13,9 +13,9 @@ return new class extends Migration
             $table->foreignId('shop_id')
                 ->constrained('prestashop_shops')
                 ->cascadeOnDelete();
-            // Stores PrestaShop category ID (NOT PPM category ID)
-            // No FK constraint - references external PS system
-            $table->unsignedBigInteger('category_id');
+            $table->foreignId('category_id')
+                ->constrained('categories')
+                ->cascadeOnDelete();
             $table->foreignId('product_type_id')
                 ->constrained('product_types')
                 ->cascadeOnDelete();

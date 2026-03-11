@@ -142,6 +142,15 @@ tmpclaude-*-cwd
 /dotnet-install.ps1
 /upload_*.sh
 
+# Dropbox/cloud sync conflicted copies
+*[conflicted]*
+*(conflicted)*
+
+# Backup files
+*.backup
+*.backup-*
+*.php.backup*
+
 # ============================================
 # KEEP ONLY LARAVEL SOURCE CODE:
 # - app/

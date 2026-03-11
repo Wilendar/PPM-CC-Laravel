@@ -147,22 +147,22 @@
             
             <div>
                 <label class="block text-xs font-medium text-gray-300 mb-1">Akcja</label>
-                <select wire:model.live="actionFilter" 
+                <select wire:model.live="actionFilter"
                         class="w-full px-3 py-2 text-sm border border-gray-600 rounded focus:ring-2 focus:ring-blue-500 bg-gray-700 text-white">
                     <option value="all">Wszystkie</option>
                     @foreach($actions as $action)
-                        <option value="{{ $action }}">{{ ucfirst(str_replace('_', ' ', $action)) }}</option>
+                        <option value="{{ $action }}">{{ $this->getEventLabel($action) }}</option>
                     @endforeach
                 </select>
             </div>
             
             <div>
-                <label class="block text-xs font-medium text-gray-300 mb-1">Model</label>
-                <select wire:model.live="modelFilter" 
+                <label class="block text-xs font-medium text-gray-300 mb-1">Typ obiektu</label>
+                <select wire:model.live="modelFilter"
                         class="w-full px-3 py-2 text-sm border border-gray-600 rounded focus:ring-2 focus:ring-blue-500 bg-gray-700 text-white">
                     <option value="all">Wszystkie</option>
                     @foreach($models as $model)
-                        <option value="{{ $model['short'] }}">{{ $model['short'] }}</option>
+                        <option value="{{ $model['short'] }}">{{ $this->getModelLabel($model['full']) }}</option>
                     @endforeach
                 </select>
             </div>
@@ -181,9 +181,15 @@
                        class="w-full px-3 py-2 text-sm border border-gray-600 rounded focus:ring-2 focus:ring-blue-500 bg-gray-700 text-white">
             </div>
             
-            <div class="flex items-end">
+            <div class="flex flex-col items-start gap-2">
                 <label class="flex items-center">
-                    <input type="checkbox" 
+                    <input type="checkbox"
+                           wire:model.live="hideSystemEvents"
+                           class="h-4 w-4 text-emerald-600 focus:ring-emerald-500 border-gray-300 rounded">
+                    <span class="ml-2 text-sm text-gray-300">Ukryj systemowe</span>
+                </label>
+                <label class="flex items-center">
+                    <input type="checkbox"
                            wire:model.live="suspiciousOnly"
                            class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
                     <span class="ml-2 text-sm text-gray-300">Tylko podejrzane</span>
@@ -191,13 +197,14 @@
             </div>
         </div>
         
-        @if($search || $userFilter !== 'all' || $actionFilter !== 'all' || $modelFilter !== 'all' || $suspiciousOnly)
+        @if($search || $userFilter !== 'all' || $actionFilter !== 'all' || $modelFilter !== 'all' || $suspiciousOnly || $hideSystemEvents)
         <div class="mt-4 pt-4 border-t border-gray-600 flex items-center justify-between">
             <div class="text-sm text-gray-400">
                 Zastosowane filtry: 
                 @if($search) <span class="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-900/50 text-blue-200 ml-1">Szukaj: {{ $search }}</span> @endif
                 @if($userFilter !== 'all') <span class="inline-flex items-center px-2 py-1 rounded-full text-xs bg-green-900/50 text-green-200 ml-1">Użytkownik</span> @endif
                 @if($actionFilter !== 'all') <span class="inline-flex items-center px-2 py-1 rounded-full text-xs bg-purple-900/50 text-purple-200 ml-1">Akcja</span> @endif
+                @if($hideSystemEvents) <span class="inline-flex items-center px-2 py-1 rounded-full text-xs bg-emerald-900/50 text-emerald-200 ml-1">Bez systemowych</span> @endif
                 @if($suspiciousOnly) <span class="inline-flex items-center px-2 py-1 rounded-full text-xs bg-red-900/50 text-red-200 ml-1">Podejrzane</span> @endif
             </div>
             <button wire:click="clearFilters" 
@@ -287,19 +294,13 @@
                                 @endif
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap">
-                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
-                                    {{ str_contains($log->action, 'create') ? 'bg-green-900/50 text-green-200' : '' }}
-                                    {{ str_contains($log->action, 'update') ? 'bg-blue-900/50 text-blue-200' : '' }}
-                                    {{ str_contains($log->action, 'delete') ? 'bg-red-900/50 text-red-200' : '' }}
-                                    {{ str_contains($log->action, 'login') ? 'bg-purple-900/50 text-purple-200' : '' }}
-                                    {{ str_contains($log->action, 'failed') ? 'bg-red-900/50 text-red-200' : '' }}
-                                    {{ !str_contains($log->action, 'create') && !str_contains($log->action, 'update') && !str_contains($log->action, 'delete') && !str_contains($log->action, 'login') && !str_contains($log->action, 'failed') ? 'bg-gray-700 text-gray-200' : '' }}">
-                                    {{ ucfirst(str_replace('_', ' ', $log->action)) }}
+                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium {{ $this->getEventBadgeClasses($log->action) }}">
+                                    {{ $this->getEventLabel($log->action) }}
                                 </span>
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-100">
                                 @if($log->model_type && $log->model_id)
-                                    <div>{{ class_basename($log->model_type) }}</div>
+                                    <div>{{ $this->getModelLabel($log->model_type) }}</div>
                                     <div class="text-xs text-gray-400">ID: {{ $log->model_id }}</div>
                                 @else
                                     <span class="text-gray-500">-</span>
@@ -373,16 +374,159 @@
             </div>
         @endif
     </div>
+    @elseif($viewMode === 'timeline')
+    <!-- Timeline view -->
+    <div class="space-y-6">
+        @forelse($this->timelineData as $dayData)
+        <div>
+            <div class="flex items-center mb-3">
+                <div class="bg-gray-700 px-3 py-1 rounded-full text-sm font-medium text-gray-200">
+                    {{ $dayData['date'] }}
+                </div>
+                <div class="flex-1 h-px bg-gray-700 ml-3"></div>
+                <span class="text-xs text-gray-500 ml-3">{{ $dayData['logs']->count() }} zdarzen</span>
+            </div>
+            <div class="ml-4 border-l-2 border-gray-700 pl-6 space-y-3">
+                @foreach($dayData['logs'] as $log)
+                <div class="relative">
+                    <div class="absolute -left-8 top-1 w-3 h-3 rounded-full border-2 border-gray-700
+                        @if($log->action === 'created') bg-emerald-500
+                        @elseif($log->action === 'deleted') bg-red-500
+                        @elseif(in_array($log->action, ['login', 'logout'])) bg-indigo-500
+                        @else bg-blue-500
+                        @endif"></div>
+                    <div class="bg-gray-800 rounded-lg border border-gray-700 p-3 hover:bg-gray-750 transition-colors">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center gap-3">
+                                <span class="text-xs text-gray-400">{{ $log->created_at->format('H:i:s') }}</span>
+                                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium {{ $this->getEventBadgeClasses($log->action) }}">
+                                    {{ $this->getEventLabel($log->action) }}
+                                </span>
+                                @if($log->model_type)
+                                <span class="text-sm text-gray-300">{{ $this->getModelLabel($log->model_type) }}
+                                    @if($log->model_id) <span class="text-gray-500">#{{ $log->model_id }}</span> @endif
+                                </span>
+                                @endif
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <span class="text-xs text-gray-400">{{ $log->user?->full_name ?? 'System' }}</span>
+                                <button wire:click="showLogDetails({{ $log->id }})" class="text-blue-400 hover:text-blue-200">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                        @if($log->old_values || $log->new_values)
+                            @php $changes = $this->getFormattedChanges($log); @endphp
+                            @if(count($changes) > 0)
+                            <div class="mt-2 text-xs text-gray-400">
+                                @foreach(array_slice($changes, 0, 2) as $change)
+                                    <span class="font-medium">{{ $change['field'] }}:</span>
+                                    <span class="text-red-400">{{ Str::limit($change['old'], 15) }}</span> →
+                                    <span class="text-green-400">{{ Str::limit($change['new'], 15) }}</span>
+                                    @if(!$loop->last) · @endif
+                                @endforeach
+                                @if(count($changes) > 2) <span class="text-gray-500">+{{ count($changes) - 2 }}</span> @endif
+                            </div>
+                            @endif
+                        @endif
+                    </div>
+                </div>
+                @endforeach
+            </div>
+        </div>
+        @empty
+        <div class="bg-gray-800 rounded-lg border border-gray-700 p-12 text-center">
+            <p class="text-gray-400">Brak zdarzen w wybranym okresie.</p>
+        </div>
+        @endforelse
+    </div>
+
+    @elseif($viewMode === 'chart')
+    <!-- Chart view -->
+    <div class="space-y-6">
+        <!-- Period selector -->
+        <div class="bg-gray-800 rounded-lg border border-gray-700 p-4">
+            <div class="flex items-center gap-3 mb-4">
+                <span class="text-sm text-gray-400">Okres:</span>
+                <button wire:click="$set('chartPeriod', 'day')" @class(['px-3 py-1 text-xs rounded-full', 'bg-blue-600 text-white' => $chartPeriod === 'day', 'bg-gray-700 text-gray-300' => $chartPeriod !== 'day'])>Dzisiaj</button>
+                <button wire:click="$set('chartPeriod', 'week')" @class(['px-3 py-1 text-xs rounded-full', 'bg-blue-600 text-white' => $chartPeriod === 'week', 'bg-gray-700 text-gray-300' => $chartPeriod !== 'week'])>Tydzien</button>
+                <button wire:click="$set('chartPeriod', 'month')" @class(['px-3 py-1 text-xs rounded-full', 'bg-blue-600 text-white' => $chartPeriod === 'month', 'bg-gray-700 text-gray-300' => $chartPeriod !== 'month'])>Miesiac</button>
+            </div>
+
+            @if(!empty($chartData))
+            @php
+                $maxTotal = max(array_column($chartData, 'total')) ?: 1;
+            @endphp
+            <div class="space-y-2">
+                @foreach($chartData as $day)
+                <div class="flex items-center gap-3">
+                    <span class="text-xs text-gray-400 w-20 shrink-0">{{ \Carbon\Carbon::parse($day['date'])->format('d.m') }}</span>
+                    <div class="flex-1 flex h-6 rounded overflow-hidden bg-gray-900">
+                        @if($day['created_count'] > 0)
+                        <div class="bg-emerald-600 h-full" style="width: {{ ($day['created_count'] / $maxTotal) * 100 }}%" title="Utworzono: {{ $day['created_count'] }}"></div>
+                        @endif
+                        @if($day['updated_count'] > 0)
+                        <div class="bg-blue-600 h-full" style="width: {{ ($day['updated_count'] / $maxTotal) * 100 }}%" title="Zaktualizowano: {{ $day['updated_count'] }}"></div>
+                        @endif
+                        @if($day['deleted_count'] > 0)
+                        <div class="bg-red-600 h-full" style="width: {{ ($day['deleted_count'] / $maxTotal) * 100 }}%" title="Usunieto: {{ $day['deleted_count'] }}"></div>
+                        @endif
+                        @if($day['auth_count'] > 0)
+                        <div class="bg-indigo-600 h-full" style="width: {{ ($day['auth_count'] / $maxTotal) * 100 }}%" title="Auth: {{ $day['auth_count'] }}"></div>
+                        @endif
+                    </div>
+                    <span class="text-xs text-gray-400 w-10 text-right">{{ $day['total'] }}</span>
+                </div>
+                @endforeach
+            </div>
+            <div class="flex items-center gap-4 mt-4 text-xs text-gray-400">
+                <span class="flex items-center gap-1"><span class="w-3 h-3 rounded bg-emerald-600"></span> Utworzono</span>
+                <span class="flex items-center gap-1"><span class="w-3 h-3 rounded bg-blue-600"></span> Zaktualizowano</span>
+                <span class="flex items-center gap-1"><span class="w-3 h-3 rounded bg-red-600"></span> Usunieto</span>
+                <span class="flex items-center gap-1"><span class="w-3 h-3 rounded bg-indigo-600"></span> Logowanie</span>
+            </div>
+            @else
+            <p class="text-gray-400 text-center py-8">Brak danych dla wybranego okresu.</p>
+            @endif
+        </div>
+
+        <!-- Top users & top actions -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div class="bg-gray-800 rounded-lg border border-gray-700 p-4">
+                <h3 class="text-sm font-medium text-white mb-3">Najaktywniejszi uzytkownicy</h3>
+                @forelse($topUsers as $item)
+                <div class="flex items-center justify-between py-1.5">
+                    <span class="text-sm text-gray-300">{{ $item['user']->full_name }}</span>
+                    <span class="text-xs bg-gray-700 px-2 py-0.5 rounded-full text-gray-300">{{ $item['count'] }}</span>
+                </div>
+                @empty
+                <p class="text-gray-500 text-sm">Brak danych</p>
+                @endforelse
+            </div>
+            <div class="bg-gray-800 rounded-lg border border-gray-700 p-4">
+                <h3 class="text-sm font-medium text-white mb-3">Najczestsze akcje</h3>
+                @forelse($topActions as $item)
+                <div class="flex items-center justify-between py-1.5">
+                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium {{ $this->getEventBadgeClasses($item['action']) }}">
+                        {{ $this->getEventLabel($item['action']) }}
+                    </span>
+                    <span class="text-xs bg-gray-700 px-2 py-0.5 rounded-full text-gray-300">{{ $item['count'] }}</span>
+                </div>
+                @empty
+                <p class="text-gray-500 text-sm">Brak danych</p>
+                @endforelse
+            </div>
+        </div>
+    </div>
     @endif
 
     <!-- Log Details Modal -->
     @if($showDetailsModal && $selectedLog)
-    <div class="fixed inset-0 z-50 overflow-y-auto">
-        <div class="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
-            <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" 
-                 wire:click="closeDetailsModal"></div>
-            
-            <div class="inline-block align-bottom bg-gray-800 rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-4xl sm:w-full">
+    <div class="modal-overlay show" wire:click.self="closeDetailsModal">
+        <div class="audit-modal-dialog max-w-4xl">
                 <div class="bg-gray-800 px-6 pt-6 pb-4">
                     <div class="flex items-center justify-between mb-4">
                         <h3 class="text-lg leading-6 font-medium text-white">
@@ -411,11 +555,15 @@
                                 </div>
                                 <div class="flex justify-between">
                                     <dt class="text-sm text-gray-400">Akcja:</dt>
-                                    <dd class="text-sm text-gray-100">{{ $selectedLog->action }}</dd>
+                                    <dd class="text-sm text-gray-100">
+                                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium {{ $this->getEventBadgeClasses($selectedLog->action) }}">
+                                            {{ $this->getEventLabel($selectedLog->action) }}
+                                        </span>
+                                    </dd>
                                 </div>
                                 <div class="flex justify-between">
-                                    <dt class="text-sm text-gray-400">Model:</dt>
-                                    <dd class="text-sm text-gray-100">{{ class_basename($selectedLog->model_type) }}</dd>
+                                    <dt class="text-sm text-gray-400">Typ obiektu:</dt>
+                                    <dd class="text-sm text-gray-100">{{ $this->getModelLabel($selectedLog->model_type) }}</dd>
                                 </div>
                                 <div class="flex justify-between">
                                     <dt class="text-sm text-gray-400">ID Modelu:</dt>
@@ -469,24 +617,86 @@
                 </div>
                 
                 <div class="bg-gray-700 px-6 py-3 flex justify-end">
-                    <button wire:click="closeDetailsModal" 
+                    <button wire:click="closeDetailsModal"
                             class="btn-enterprise-secondary">
                         Zamknij
                     </button>
                 </div>
-            </div>
+        </div>
+    </div>
+    @endif
+
+    <!-- Diff Modal -->
+    @if($showDiffModal && $selectedLog)
+    <div class="modal-overlay show" wire:click.self="closeDiffModal">
+        <div class="audit-modal-dialog max-w-4xl">
+                <div class="bg-gray-800 px-6 pt-6 pb-4">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-lg leading-6 font-medium text-white">
+                            Porownanie zmian
+                            <span class="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium {{ $this->getEventBadgeClasses($selectedLog->action) }}">
+                                {{ $this->getEventLabel($selectedLog->action) }}
+                            </span>
+                        </h3>
+                        <button wire:click="closeDiffModal"
+                                class="text-gray-400 hover:text-gray-200">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                            </svg>
+                        </button>
+                    </div>
+
+                    <div class="text-sm text-gray-400 mb-4">
+                        {{ $this->getModelLabel($selectedLog->model_type) }} #{{ $selectedLog->model_id }}
+                        · {{ $selectedLog->created_at->format('d.m.Y H:i:s') }}
+                        · {{ $selectedLog->user?->full_name ?? 'System' }}
+                    </div>
+
+                    @php $changes = $this->getFormattedChanges($selectedLog); @endphp
+                    @if(count($changes) > 0)
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm">
+                            <thead>
+                                <tr class="bg-gray-900">
+                                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-400 uppercase w-1/4">Pole</th>
+                                    <th class="px-4 py-2 text-left text-xs font-medium text-red-400 uppercase w-[37.5%]">Poprzednia wartosc</th>
+                                    <th class="px-4 py-2 text-left text-xs font-medium text-green-400 uppercase w-[37.5%]">Nowa wartosc</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-gray-700">
+                                @foreach($changes as $field => $change)
+                                <tr class="hover:bg-gray-700/50">
+                                    <td class="px-4 py-3 font-medium text-gray-200">{{ $change['field'] }}</td>
+                                    <td class="px-4 py-3 font-mono text-xs">
+                                        <div class="bg-red-900/20 rounded p-2 text-red-300 break-all">{{ $change['old'] ?? 'NULL' }}</div>
+                                    </td>
+                                    <td class="px-4 py-3 font-mono text-xs">
+                                        <div class="bg-green-900/20 rounded p-2 text-green-300 break-all">{{ $change['new'] ?? 'NULL' }}</div>
+                                    </td>
+                                </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                    @else
+                    <div class="text-center py-8 text-gray-400">Brak szczegolowych zmian do wyswietlenia.</div>
+                    @endif
+                </div>
+
+                <div class="bg-gray-700 px-6 py-3 flex justify-end">
+                    <button wire:click="closeDiffModal"
+                            class="btn-enterprise-secondary">
+                        Zamknij
+                    </button>
+                </div>
         </div>
     </div>
     @endif
 
     <!-- Export Modal -->
     @if($showExportModal)
-    <div class="fixed inset-0 z-50 overflow-y-auto">
-        <div class="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
-            <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" 
-                 wire:click="closeExportModal"></div>
-            
-            <div class="inline-block align-bottom bg-gray-800 rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+    <div class="modal-overlay show" wire:click.self="closeExportModal">
+        <div class="audit-modal-dialog max-w-lg">
                 <div class="bg-gray-800 px-6 pt-6 pb-4">
                     <h3 class="text-lg leading-6 font-medium text-white mb-4">
                         Eksport logów audytu
@@ -538,16 +748,15 @@
                 </div>
                 
                 <div class="bg-gray-700 px-6 py-3 flex justify-between">
-                    <button wire:click="closeExportModal" 
+                    <button wire:click="closeExportModal"
                             class="btn-enterprise-secondary">
                         Anuluj
                     </button>
-                    <button wire:click="exportLogs" 
+                    <button wire:click="exportLogs"
                             class="btn-enterprise-primary">
                         Eksportuj
                     </button>
                 </div>
-            </div>
         </div>
     </div>
     @endif

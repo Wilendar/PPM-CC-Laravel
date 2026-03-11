@@ -24,21 +24,48 @@ return new class extends Migration
      */
     public function up(): void
     {
+        // SAFE DROP: Check if columns exist before dropping
+        if (Schema::hasColumn('variant_attributes', 'value')) {
+            Schema::table('variant_attributes', function (Blueprint $table) {
+                $table->dropColumn('value');
+            });
+        }
+
+        if (Schema::hasColumn('variant_attributes', 'value_code')) {
+            Schema::table('variant_attributes', function (Blueprint $table) {
+                $table->dropColumn('value_code');
+            });
+        }
+
+        // Add new value_id foreign key (only if doesn't exist)
+        if (!Schema::hasColumn('variant_attributes', 'value_id')) {
+            Schema::table('variant_attributes', function (Blueprint $table) {
+                $table->foreignId('value_id')
+                      ->after('attribute_type_id')
+                      ->constrained('attribute_values')
+                      ->cascadeOnDelete();
+            });
+        }
+
+        // Drop old index (try-catch if doesn't exist)
+        try {
+            Schema::table('variant_attributes', function (Blueprint $table) {
+                $table->dropIndex('idx_variant_attr_value');
+            });
+        } catch (\Exception $e) {
+            // Index doesn't exist - that's OK
+        }
+
+        // Add new index for value_id (idempotent)
         Schema::table('variant_attributes', function (Blueprint $table) {
-            // Drop old columns (string-based values)
-            $table->dropColumn(['value', 'value_code']);
-
-            // Add new value_id foreign key
-            $table->foreignId('value_id')
-                  ->after('attribute_type_id')
-                  ->constrained('attribute_values')
-                  ->cascadeOnDelete();
-
-            // Drop old index (no longer needed)
-            $table->dropIndex('idx_variant_attr_value');
-
-            // Add new index for value_id
-            $table->index('value_id', 'idx_variant_value_id');
+            // Only add if column exists and index doesn't
+            if (Schema::hasColumn('variant_attributes', 'value_id')) {
+                try {
+                    $table->index('value_id', 'idx_variant_value_id');
+                } catch (\Exception $e) {
+                    // Index already exists - that's OK
+                }
+            }
         });
     }
 

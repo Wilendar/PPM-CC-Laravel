@@ -65,6 +65,24 @@
                 </button>
                 @endif
 
+                {{-- Category Panel Toggle Buttons --}}
+                <button @click="$dispatch('toggle-category-panel', {side: 'left'})"
+                        class="category-panel-toggle-btn"
+                        title="Panel kategorii (lewa strona)">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                    </svg>
+                    <span class="hidden xl:inline">Kategorie</span>
+                </button>
+                <button @click="$dispatch('toggle-category-panel', {side: 'right'})"
+                        class="category-panel-toggle-btn"
+                        title="Panel kategorii (prawa strona)">
+                    <span class="hidden xl:inline">Kategorie</span>
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                    </svg>
+                </button>
+
                 {{-- View Mode Toggle --}}
                 <div class="flex bg-card rounded-lg p-1">
                     <button wire:click="changeViewMode('table')"

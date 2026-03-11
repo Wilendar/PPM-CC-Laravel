@@ -81,14 +81,15 @@ trait VariantShopContextTrait
         }
 
         $variants = ProductVariant::where('product_id', $this->product->id)
-            ->with(['attributes'])
+            ->with(['attributes', 'images'])
             ->orderBy('position')
             ->get();
 
         $this->defaultVariantsSnapshot = $variants->mapWithKeys(function ($variant) {
-            // FIX 2026-02-11: Include image count for comparison with PS variants
-            $imageCount = $variant->images()->count();
-            $imageIds = $variant->images()->orderBy('position')->pluck('id')->toArray();
+            // Use eager-loaded images to avoid N+1 queries per variant
+            $sortedImages = $variant->images->sortBy('position');
+            $imageCount = $sortedImages->count();
+            $imageIds = $sortedImages->pluck('id')->toArray();
 
             return [$variant->id => [
                 'id' => $variant->id,

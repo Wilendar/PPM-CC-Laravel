@@ -169,14 +169,22 @@
                                     </div>
                                 </td>
 
-                                <!-- Type (using dynamic label_color from model) -->
+                                <!-- Type -->
                                 <td class="py-2 px-3">
                                     @php
-                                        $labelColor = $connection->label_color;
+                                        $typeColors = [
+                                            'baselinker' => 'bg-blue-600/20 text-blue-400 border-blue-500/30',
+                                            'subiekt_gt' => 'bg-purple-600/20 text-purple-400 border-purple-500/30',
+                                            'dynamics' => 'bg-green-600/20 text-green-400 border-green-500/30',
+                                        ];
+                                        $typeLabels = [
+                                            'baselinker' => 'BaseLinker',
+                                            'subiekt_gt' => 'Subiekt GT',
+                                            'dynamics' => 'Dynamics',
+                                        ];
                                     @endphp
-                                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium border"
-                                          style="background-color: {{ $labelColor }}20; color: {{ $labelColor }}; border-color: {{ $labelColor }}50;">
-                                        {{ \App\Models\ERPConnection::getErpTypeLabel($connection->erp_type) }}
+                                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium border {{ $typeColors[$connection->erp_type] ?? 'bg-gray-700 text-gray-300' }}">
+                                        {{ $typeLabels[$connection->erp_type] ?? $connection->erp_type }}
                                     </span>
                                 </td>
 

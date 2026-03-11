@@ -33,6 +33,16 @@ class FeatureLibraryTab extends Component
      */
     public string $searchQuery = '';
 
+    /**
+     * Selected feature type IDs for bulk operations
+     */
+    public array $selectedFeatureTypeIds = [];
+
+    /**
+     * Select all features toggle
+     */
+    public bool $selectAllFeatures = false;
+
     // ========================================
     // FEATURE TYPE CRUD
     // ========================================
@@ -245,21 +255,24 @@ class FeatureLibraryTab extends Component
     }
 
     /**
-     * Delete feature type
+     * Delete feature type (detach from products, then delete)
      */
     public function deleteFeatureType(int $featureTypeId): void
     {
         try {
             $featureType = FeatureType::findOrFail($featureTypeId);
+            $name = $featureType->name;
 
-            $usageCount = $featureType->productFeatures()->count();
-            if ($usageCount > 0) {
-                $this->dispatch('notify', type: 'error', message: "Nie mozna usunac - cecha uzywana przez {$usageCount} produktow.");
-                return;
-            }
-
+            $detachedCount = $featureType->productFeatures()->count();
+            $featureType->productFeatures()->delete();
+            $featureType->featureValues()->delete();
             $featureType->delete();
-            $this->dispatch('notify', type: 'success', message: 'Cecha usunieta.');
+
+            $message = "Cecha '{$name}' usunieta";
+            if ($detachedCount > 0) {
+                $message .= " (odlaczono od {$detachedCount} produktow)";
+            }
+            $this->dispatch('notify', type: 'success', message: $message);
 
         } catch (\Exception $e) {
             Log::error('FeatureType delete failed', ['error' => $e->getMessage()]);
@@ -379,27 +392,34 @@ class FeatureLibraryTab extends Component
     }
 
     /**
-     * Delete feature group
+     * Delete feature group (cascade: detach products, delete features, then group)
      */
     public function deleteFeatureGroup(int $groupId): void
     {
         try {
             $group = FeatureGroup::findOrFail($groupId);
+            $name = $group->getDisplayName();
+            $totalDetached = 0;
 
-            $featureCount = $group->featureTypes()->count();
-            if ($featureCount > 0) {
-                $this->dispatch('notify', type: 'error', message: "Nie mozna usunac - grupa zawiera {$featureCount} cech.");
-                return;
-            }
+            DB::transaction(function () use ($group, &$totalDetached) {
+                foreach ($group->featureTypes as $featureType) {
+                    $totalDetached += $featureType->productFeatures()->count();
+                    $featureType->productFeatures()->delete();
+                    $featureType->featureValues()->delete();
+                    $featureType->delete();
+                }
+                $group->delete();
+            });
 
-            $group->delete();
-
-            // Remove from expanded groups if was expanded
             if (in_array($groupId, $this->expandedGroups)) {
                 $this->expandedGroups = array_values(array_diff($this->expandedGroups, [$groupId]));
             }
 
-            $this->dispatch('notify', type: 'success', message: 'Grupa usunieta.');
+            $message = "Grupa '{$name}' usunieta";
+            if ($totalDetached > 0) {
+                $message .= " (odlaczono {$totalDetached} cech od produktow)";
+            }
+            $this->dispatch('notify', type: 'success', message: $message);
 
         } catch (\Exception $e) {
             Log::error('FeatureGroup delete failed', ['error' => $e->getMessage()]);
@@ -438,6 +458,98 @@ class FeatureLibraryTab extends Component
     public function allGroups(): Collection
     {
         return FeatureGroup::active()->ordered()->get();
+    }
+
+    // ========================================
+    // BULK FEATURE TYPE OPERATIONS
+    // ========================================
+
+    public function updatedSelectAllFeatures(): void
+    {
+        if ($this->selectAllFeatures) {
+            $ids = [];
+            foreach ($this->groups as $group) {
+                if (in_array($group['id'], $this->expandedGroups)) {
+                    foreach ($group['features'] as $feature) {
+                        $ids[] = (string) $feature['id'];
+                    }
+                }
+            }
+            $this->selectedFeatureTypeIds = $ids;
+        } else {
+            $this->selectedFeatureTypeIds = [];
+        }
+    }
+
+    public function updatedSelectedFeatureTypeIds(): void
+    {
+        // Sync selectAll state
+        $visibleCount = 0;
+        foreach ($this->groups as $group) {
+            if (in_array($group['id'], $this->expandedGroups)) {
+                $visibleCount += count($group['features']);
+            }
+        }
+        $this->selectAllFeatures = $visibleCount > 0
+            && count($this->selectedFeatureTypeIds) === $visibleCount;
+    }
+
+    public function bulkDeleteFeatureTypes(): void
+    {
+        if (empty($this->selectedFeatureTypeIds)) {
+            return;
+        }
+
+        try {
+            $totalDetached = 0;
+            $deleted = 0;
+
+            DB::transaction(function () use (&$totalDetached, &$deleted) {
+                $featureTypes = FeatureType::whereIn('id', $this->selectedFeatureTypeIds)->get();
+                foreach ($featureTypes as $featureType) {
+                    $totalDetached += $featureType->productFeatures()->count();
+                    $featureType->productFeatures()->delete();
+                    $featureType->featureValues()->delete();
+                    $featureType->delete();
+                    $deleted++;
+                }
+            });
+
+            $this->selectedFeatureTypeIds = [];
+            $this->selectAllFeatures = false;
+
+            $message = "Usunieto {$deleted} cech";
+            if ($totalDetached > 0) {
+                $message .= " (odlaczono od {$totalDetached} produktow)";
+            }
+            $this->dispatch('notify', type: 'success', message: $message);
+
+        } catch (\Exception $e) {
+            Log::error('Bulk delete feature types failed', ['error' => $e->getMessage()]);
+            $this->addError('general', 'Blad usuwania: ' . $e->getMessage());
+        }
+    }
+
+    public function bulkMoveToGroup(int $targetGroupId): void
+    {
+        if (empty($this->selectedFeatureTypeIds)) {
+            return;
+        }
+
+        try {
+            $count = FeatureType::whereIn('id', $this->selectedFeatureTypeIds)
+                ->update(['feature_group_id' => $targetGroupId]);
+
+            $this->selectedFeatureTypeIds = [];
+            $this->selectAllFeatures = false;
+
+            $groupName = FeatureGroup::find($targetGroupId)?->getDisplayName() ?? 'Nieznana';
+            $this->dispatch('notify', type: 'success', message: "Przeniesiono {$count} cech do grupy '{$groupName}'");
+
+        } catch (\Exception $e) {
+            Log::error('Bulk move feature types failed', ['error' => $e->getMessage()]);
+            $this->addError('general', 'Blad przenoszenia: ' . $e->getMessage());
+        }
     }
 
     // ========================================

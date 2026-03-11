@@ -38,7 +38,12 @@ return [
             'driver' => 'database',
             'table' => 'jobs',
             'queue' => 'default',
-            'retry_after' => 90,
+            // Worker Guard v2: retry_after = 600s (10min)
+            // With $timeout=0 (unlimited) on long jobs, heartbeat monitors liveness.
+            // If worker dies, cleanupStaleWorkers() detects it in 120s and
+            // forceReleaseReservedJobs() makes job available immediately.
+            // 600s is a safety net for edge cases where cleanup doesn't fire.
+            'retry_after' => 600,
             'after_commit' => false,
         ],
 

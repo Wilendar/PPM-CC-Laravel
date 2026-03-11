@@ -10,24 +10,19 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | ERP Connections (GRUPA D)
+    | ERP Glowny (Primary)
     |--------------------------------------------------------------------------
     |
-    | ERP connections are now managed via ERPConnection model (erp_connections table).
-    | The default ERP connection is marked with is_default=true in the database.
+    | Konfigurowalny per instalacja. Definiuje domyslny system docelowy
+    | przy publikacji produktow z panelu importu.
     |
-    | Legacy 'erp_primary' config is DEPRECATED - kept only for backward compatibility.
-    | All new code should use ERPConnection::default()->active()->first().
-    |
-    | @see App\Models\ERPConnection
-    | @see App\Services\Import\PublicationTargetService
+    | Typy: ppm, subiekt_gt, baselinker, dynamics
     |
     */
     'erp_primary' => [
         'enabled' => true,
         'name' => env('IMPORT_ERP_PRIMARY_NAME', 'PPM'),
         'type' => env('IMPORT_ERP_PRIMARY_TYPE', 'ppm'),
-        'deprecated' => true, // GRUPA D: Use ERPConnection model instead
     ],
 
     /*
@@ -35,18 +30,18 @@ return [
     | Publication Targets
     |--------------------------------------------------------------------------
     |
-    | ERP targets are loaded from erp_connections table (ERPConnection model).
-    | PrestaShop shops are loaded dynamically from prestashop_shops table.
-    |
-    | publication_targets format in PendingProduct:
-    |   { "erp_connections": [5, 8], "prestashop_shops": [1, 3] }
-    |
-    | Legacy format (backward compatible):
-    |   { "erp_primary": true, "prestashop_shops": [1] }
+    | Konfiguracja dodatkowych targetow publikacji.
+    | PrestaShop shops sa ladowane dynamicznie z bazy danych.
     |
     */
     'publication_targets' => [
         'prestashop_enabled' => true,
+        'erp_exports' => [
+            // Dodatkowe systemy ERP do eksportu
+            // 'subiekt_gt' => ['enabled' => true, 'name' => 'Subiekt GT'],
+            // 'baselinker' => ['enabled' => true, 'name' => 'BaseLinker'],
+            // 'dynamics' => ['enabled' => false, 'name' => 'Microsoft Dynamics'],
+        ],
     ],
 
     /*

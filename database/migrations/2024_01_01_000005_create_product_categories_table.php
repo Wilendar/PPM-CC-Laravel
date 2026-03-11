@@ -10,13 +10,13 @@ return new class extends Migration
      * Run the migrations.
      *
      * Product Categories Pivot Table - Many-to-Many Relationship
-     * ObsÅ‚uguje: Przypisanie produktu do wielu kategorii, kategoria domyÅ›lna,
+     * Obs³uguje: Przypisanie produktu do wielu kategorii, kategoria domyœlna,
      * sortowanie w kategoriach, audit trail dla zmian kategorii
      * 
      * Business Logic:
-     * - is_primary=true -> kategoria domyÅ›lna dla PrestaShop export
-     * - Jeden produkt moÅ¼e byÄ‡ w max 10 kategoriach (business rule)
-     * - sort_order -> kolejnoÅ›Ä‡ w obrÄ™bie kategorii
+     * - is_primary=true -> kategoria domyœlna dla PrestaShop export
+     * - Jeden produkt mo¿e byæ w max 10 kategoriach (business rule)
+     * - sort_order -> kolejnoœæ w obrêbie kategorii
      */
     public function up(): void
     {
@@ -29,21 +29,21 @@ return new class extends Migration
             $table->unsignedBigInteger('category_id');
             
             // === RELATIONSHIP METADATA ===
-            $table->boolean('is_primary')->default(false); // Kategoria domyÅ›lna (jedna na produkt)
-            $table->integer('sort_order')->default(0); // KolejnoÅ›Ä‡ w kategorii
+            $table->boolean('is_primary')->default(false); // Kategoria domyœlna (jedna na produkt)
+            $table->integer('sort_order')->default(0); // Kolejnoœæ w kategorii
             
             // === AUDIT TRAIL ===
-            $table->timestamps(); // created_at, updated_at dla Å›ledzenia zmian kategorii
+            $table->timestamps(); // created_at, updated_at dla œledzenia zmian kategorii
             
             // === FOREIGN KEY CONSTRAINTS Z PROPER CASCADE ===
             $table->foreign('product_id')
                   ->references('id')->on('products')
-                  ->onDelete('cascade') // Usuwa przypisania gdy produkt usuniÄ™ty
+                  ->onDelete('cascade') // Usuwa przypisania gdy produkt usuniêty
                   ->onUpdate('cascade');
             
             $table->foreign('category_id')
                   ->references('id')->on('categories')
-                  ->onDelete('cascade') // Usuwa przypisania gdy kategoria usuniÄ™ta
+                  ->onDelete('cascade') // Usuwa przypisania gdy kategoria usuniêta
                   ->onUpdate('cascade');
             
             // === UNIQUE CONSTRAINTS ===
@@ -51,15 +51,15 @@ return new class extends Migration
             
             // === PERFORMANCE INDEXES ===
             $table->index(['product_id']); // Szybkie lookup kategorii dla produktu
-            $table->index(['category_id']); // Szybkie lookup produktÃ³w w kategorii
-            $table->index(['category_id', 'sort_order']); // Sortowanie produktÃ³w w kategorii
-            $table->index(['is_primary']); // Lookup kategorii domyÅ›lnych
-            $table->index(['product_id', 'is_primary']); // Kategoria domyÅ›lna produktu
+            $table->index(['category_id']); // Szybkie lookup produktów w kategorii
+            $table->index(['category_id', 'sort_order']); // Sortowanie produktów w kategorii
+            $table->index(['is_primary']); // Lookup kategorii domyœlnych
+            $table->index(['product_id', 'is_primary']); // Kategoria domyœlna produktu
             $table->index(['created_at']); // Chronological changes tracking
         });
 
         // === BUSINESS LOGIC CONSTRAINTS ===
-        // Tylko jedna kategoria domyÅ›lna na produkt
+        // Tylko jedna kategoria domyœlna na produkt
         DB::statement('
             CREATE TRIGGER tr_product_categories_primary_check 
             BEFORE INSERT ON product_categories
@@ -85,39 +85,12 @@ return new class extends Migration
                 END IF;
             END
         ');
-
-        // Constraint na maksymalnÄ… iloÅ›Ä‡ kategorii na produkt (business rule)
-        // To bÄ™dzie sprawdzane w aplikacji, ale dodajemy backup constraint
-        try {
-            DB::statement('
-                CREATE FUNCTION fn_check_max_categories_per_product(p_product_id BIGINT UNSIGNED) 
-                RETURNS BOOLEAN 
-                READS SQL DATA 
-                DETERMINISTIC 
-                BEGIN 
-                    DECLARE category_count INT;
-                    SELECT COUNT(*) INTO category_count 
-                    FROM product_categories 
-                    WHERE product_id = p_product_id;
-                    RETURN category_count <= 10;
-                END
-            ');
-            
-            DB::statement('
-                ALTER TABLE product_categories 
-                ADD CONSTRAINT chk_max_categories 
-                CHECK (fn_check_max_categories_per_product(product_id))
-            ');
-        } catch (Exception $e) {
-            // Fallback - ten constraint moÅ¼e nie dziaÅ‚aÄ‡ na wszystkich wersjach MySQL
-            // BÄ™dzie sprawdzany w aplikacji Laravel
-        }
     }
 
     /**
      * Reverse the migrations.
      * 
-     * Rollback support - usuwa tabelÄ™, triggery i funkcje
+     * Rollback support - usuwa tabelê, triggery i funkcje
      */
     public function down(): void
     {
@@ -125,7 +98,6 @@ return new class extends Migration
         try {
             DB::statement('DROP TRIGGER IF EXISTS tr_product_categories_primary_check');
             DB::statement('DROP TRIGGER IF EXISTS tr_product_categories_primary_update');
-            DB::statement('DROP FUNCTION IF EXISTS fn_check_max_categories_per_product');
         } catch (Exception $e) {
             // Ignore errors during rollback
         }

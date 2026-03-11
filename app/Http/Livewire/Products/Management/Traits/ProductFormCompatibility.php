@@ -161,8 +161,8 @@ trait ProductFormCompatibility
                 $this->defaultCompatibilityZamiennik = $this->compatibilityZamiennik;
             }
 
-            // Load available vehicles
-            $this->loadAvailableVehicles($shopId);
+            // Vehicles loaded lazily - only when user opens Compatibility tab
+            // See loadVehiclesIfNeeded()
 
             $this->compatibilityPendingChanges = [];
 
@@ -221,6 +221,20 @@ trait ProductFormCompatibility
             ]);
             $this->vehiclesByBrand = [];
         }
+    }
+
+    /**
+     * Load vehicles lazily - called when user opens Compatibility tab.
+     * Prevents heavy vehicle query from running on every mount().
+     */
+    public function loadVehiclesIfNeeded(): void
+    {
+        if (!empty($this->vehiclesByBrand)) {
+            return; // Already loaded
+        }
+
+        $shopId = $this->selectedShop ?? null;
+        $this->loadAvailableVehicles($shopId);
     }
 
     /**

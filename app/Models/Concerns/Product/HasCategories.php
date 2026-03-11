@@ -3,7 +3,7 @@
 namespace App\Models\Concerns\Product;
 
 use App\Models\Category;
-
+// use App\Models\ProductShopCategory; // DEPRECATED 2025-11-19: Use product_categories pivot table
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Collection;
@@ -206,7 +206,25 @@ trait HasCategories
                     ->limit(1);
     }
 
-
+    /**
+     * Shop-specific categories relationship - ⚠️ DEPRECATED 2025-11-19
+     *
+     * MIGRATION: product_shop_categories table removed, use product_categories pivot with shop_id column instead
+     *
+     * OLD: $product->shopCategories() (ProductShopCategory model)
+     * NEW: DB::table('product_categories')->where('product_id', $id)->whereNotNull('shop_id')->get()
+     *
+     * See: database/migrations/2025_11_19_000001_consolidate_product_categories_tables.php
+     *
+     * @deprecated 2025-11-19 Use product_categories pivot table with shop_id column
+     * @return \Illuminate\Database\Eloquent\Relations\HasMany
+     */
+    // public function shopCategories(): HasMany
+    // {
+    //     return $this->hasMany(ProductShopCategory::class, 'product_id', 'id')
+    //                 ->orderBy('shop_id', 'asc')
+    //                 ->orderBy('sort_order', 'asc');
+    // }
 
     /*
     |--------------------------------------------------------------------------

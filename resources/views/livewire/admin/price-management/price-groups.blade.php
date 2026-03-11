@@ -3,7 +3,7 @@
     <div class="mb-6">
         <div class="flex justify-between items-center">
             <div>
-                <h1 class="text-h1 font-bold" style="color: #e0ac7e;">
+                <h1 class="text-h1 font-bold text-mpp-primary">
                     Grupy Cenowe
                 </h1>
                 <p class="text-gray-400 mt-2">
@@ -39,7 +39,7 @@
                         </div>
                     </div>
                     <div class="ml-6 flex-1">
-                        <p class="text-4xl font-black mb-1" style="color: #60a5fa !important;">
+                        <p class="text-4xl font-black mb-1 text-blue-400">
                             {{ number_format($totalGroups) }}
                         </p>
                         <p class="text-sm font-bold tracking-wide uppercase text-white">
@@ -67,7 +67,7 @@
                         </div>
                     </div>
                     <div class="ml-6 flex-1">
-                        <p class="text-4xl font-black mb-1" style="color: #34d399 !important;">
+                        <p class="text-4xl font-black mb-1 text-green-400">
                             {{ number_format($activeGroups) }}
                         </p>
                         <p class="text-sm font-bold tracking-wide uppercase text-white">
@@ -95,7 +95,7 @@
                         </div>
                     </div>
                     <div class="ml-6 flex-1">
-                        <p class="text-4xl font-black mb-1 truncate" style="color: #a78bfa !important;">
+                        <p class="text-4xl font-black mb-1 truncate text-purple-400">
                             {{ $defaultGroup ? $defaultGroup->name : 'Brak' }}
                         </p>
                         <p class="text-sm font-bold tracking-wide uppercase text-white">
@@ -123,7 +123,7 @@
                         </div>
                     </div>
                     <div class="ml-6 flex-1">
-                        <p class="text-4xl font-black mb-1" style="color: #fb923c !important;">
+                        <p class="text-4xl font-black mb-1 text-orange-400">
                             {{ $defaultGroup ? number_format($defaultGroup->margin_percentage, 1) . '%' : 'N/A' }}
                         </p>
                         <p class="text-sm font-bold tracking-wide uppercase text-white">
@@ -382,7 +382,7 @@
     <div x-data="{ isOpen: @entangle('showForm') }"
          x-show="isOpen"
          x-cloak
-         class="fixed inset-0 z-[9999] flex items-center justify-center"
+         class="fixed inset-0 layer-modal flex items-center justify-center"
          aria-modal="true"
          role="dialog">
 
@@ -583,7 +583,7 @@
     <div x-data="{ isOpen: @entangle('deleteConfirmation') }"
          x-show="isOpen"
          x-cloak
-         class="fixed inset-0 z-[9999] flex items-center justify-center"
+         class="fixed inset-0 layer-modal flex items-center justify-center"
          aria-modal="true"
          role="dialog">
 
@@ -675,32 +675,61 @@
     </div>
     @endif
 
-    {{-- Flash Messages --}}
-    @if(session('message'))
-        <div class="position-fixed top-0 end-0 p-3" style="z-index: 9999;">
-            <div class="toast show" role="alert">
-                <div class="toast-header bg-success text-white">
-                    <i class="fas fa-check-circle me-2"></i>
-                    <strong class="me-auto">Sukces</strong>
-                </div>
-                <div class="toast-body">
-                    {{ session('message') }}
-                </div>
+    {{-- Enterprise Flash Notifications --}}
+    <div x-data="{
+        showSuccess: {{ session('message') ? 'true' : 'false' }},
+        showError: {{ session('error') ? 'true' : 'false' }}
+    }"
+    x-init="
+        if (showSuccess) setTimeout(() => showSuccess = false, 4000);
+        if (showError) setTimeout(() => showError = false, 6000);
+    ">
+        {{-- Success Notification --}}
+        @if(session('message'))
+        <div x-show="showSuccess"
+             x-transition:enter="transition ease-out duration-300"
+             x-transition:enter-start="opacity-0 translate-y-2"
+             x-transition:enter-end="opacity-100 translate-y-0"
+             x-transition:leave="transition ease-in duration-200"
+             x-transition:leave-start="opacity-100 translate-y-0"
+             x-transition:leave-end="opacity-0 translate-y-2"
+             class="fixed top-4 right-4 layer-overlay max-w-sm">
+            <div class="bg-gradient-to-r from-green-600 to-green-700 text-white px-4 py-3 rounded-lg shadow-xl border border-green-500/50 flex items-center gap-3">
+                <svg class="w-5 h-5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                </svg>
+                <span class="text-sm font-medium">{{ session('message') }}</span>
+                <button @click="showSuccess = false" class="ml-auto text-white/80 hover:text-white">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
             </div>
         </div>
-    @endif
+        @endif
 
-    @if(session('error'))
-        <div class="position-fixed top-0 end-0 p-3" style="z-index: 9999;">
-            <div class="toast show" role="alert">
-                <div class="toast-header bg-danger text-white">
-                    <i class="fas fa-exclamation-circle me-2"></i>
-                    <strong class="me-auto">Błąd</strong>
-                </div>
-                <div class="toast-body">
-                    {{ session('error') }}
-                </div>
+        {{-- Error Notification --}}
+        @if(session('error'))
+        <div x-show="showError"
+             x-transition:enter="transition ease-out duration-300"
+             x-transition:enter-start="opacity-0 translate-y-2"
+             x-transition:enter-end="opacity-100 translate-y-0"
+             x-transition:leave="transition ease-in duration-200"
+             x-transition:leave-start="opacity-100 translate-y-0"
+             x-transition:leave-end="opacity-0 translate-y-2"
+             class="fixed top-4 right-4 layer-overlay max-w-sm">
+            <div class="bg-gradient-to-r from-red-600 to-red-700 text-white px-4 py-3 rounded-lg shadow-xl border border-red-500/50 flex items-center gap-3">
+                <svg class="w-5 h-5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"/>
+                </svg>
+                <span class="text-sm font-medium">{{ session('error') }}</span>
+                <button @click="showError = false" class="ml-auto text-white/80 hover:text-white">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
             </div>
         </div>
-    @endif
+        @endif
+    </div>
 </div>

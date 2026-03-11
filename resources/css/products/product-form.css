@@ -1,91 +1,19 @@
 ﻿/* PPM Enterprise UI - Product Form Styling */
 
 /* ========================================
-   LAYOUT CONTAINERS (FORM + SIDEPANEL)
-   ======================================== */
-
-.category-form-container {
-    background: transparent;
-    color: #fff;
-    width: 100%;
-    max-width: 100%;
-    padding: 0;
-    margin: 0 auto;
-}
-
-.category-form-main-container {
-    display: flex;
-    flex-direction: row;
-    gap: 2rem;
-    padding: 0 2rem;
-    max-width: 1600px;
-    width: 100%;
-    margin: 0 auto;
-    position: relative;
-    overflow: visible;
-    min-height: calc(100vh - 200px);
-}
-
-.category-form-left-column {
-    flex: 1 1 auto;
-    min-width: 600px;
-    max-width: calc(100% - 370px - 2rem);
-    overflow: visible;
-}
-
-.category-form-right-column {
-    width: 350px;
-    min-width: 350px;
-    flex: 0 0 350px;
-    flex-shrink: 0;
-    position: sticky;
-    top: 20px;
-    align-self: flex-start;
-    height: fit-content;
-    max-height: calc(100vh - 40px);
-    display: flex;
-    flex-direction: column;
-    gap: 1.5rem;
-}
-
-@media (max-width: 1280px) {
-    .category-form-main-container {
-        flex-direction: column;
-        padding: 0 1rem;
-    }
-
-    .category-form-left-column {
-        flex: 1 1 100%;
-        max-width: 100%;
-    }
-
-    .category-form-right-column {
-        width: 100%;
-        min-width: 100%;
-        max-width: 100%;
-        flex: 1 1 100%;
-        margin-top: 1.5rem;
-        position: relative;
-        top: 0;
-    }
-}
-
-/* ========================================
    PENDING SYNC VISUAL INDICATORS
    ======================================== */
 
-/* Field with pending sync - orange/yellow border + visible background */
-/* ETAP_08.7: Increased intensity for better visibility on dark theme */
+/* Field with pending sync - orange border + subtle background */
 .field-pending-sync {
-    border-color: #f59e0b !important;
-    border-width: 2px !important;
-    background-color: rgba(251, 191, 36, 0.15) !important;
-    box-shadow: 0 0 0 2px rgba(251, 191, 36, 0.25), inset 0 0 0 1px rgba(251, 191, 36, 0.1) !important;
+    border-color: var(--color-warning, #f59e0b) !important;
+    background-color: rgba(251, 191, 36, 0.08) !important;
+    box-shadow: 0 0 0 1px rgba(251, 191, 36, 0.15) !important;
 }
 
 .field-pending-sync:focus {
-    border-color: #f59e0b !important;
-    box-shadow: 0 0 0 3px rgba(251, 191, 36, 0.35) !important;
+    border-color: var(--color-warning, #f59e0b) !important;
+    box-shadow: 0 0 0 3px rgba(251, 191, 36, 0.2) !important;
 }
 
 /* Pending sync badge */
@@ -121,26 +49,62 @@
 }
 
 /* ========================================
-   FIELD STATUS CLASSES
+   FIELD STATUS CLASSES (EXISTING)
    ======================================== */
 
-/* NOTE: Field status classes (.field-status-inherited, .field-status-same, .field-status-different)
-   are defined in resources/css/admin/components.css with correct purple/orange colors.
-   DO NOT duplicate them here to avoid CSS conflicts! */
+/* Inherited field - green tint (same data from default) */
+.field-status-inherited {
+    border-color: rgba(5, 150, 105, 0.4);
+    background: linear-gradient(145deg, rgba(5, 150, 105, 0.05), rgba(5, 150, 105, 0.02));
+}
+
+.field-status-inherited:focus {
+    border-color: rgba(5, 150, 105, 0.6);
+    box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.15);
+}
+
+/* Same as default - green tint (explicitly same) */
+.field-status-same {
+    border-color: rgba(5, 150, 105, 0.5);
+    background: linear-gradient(145deg, rgba(5, 150, 105, 0.08), rgba(5, 150, 105, 0.04));
+}
+
+.field-status-same:focus {
+    border-color: rgba(5, 150, 105, 0.7);
+    box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.2);
+}
+
+/* Different from default - orange tint (shop-specific) */
+.field-status-different {
+    border-color: rgba(224, 172, 126, 0.5);
+    background: linear-gradient(145deg, rgba(224, 172, 126, 0.08), rgba(224, 172, 126, 0.04));
+}
+
+.field-status-different:focus {
+    border-color: rgba(224, 172, 126, 0.7);
+    box-shadow: 0 0 0 3px rgba(224, 172, 126, 0.2);
+}
 
 /* ========================================
-   STATUS LABEL BADGES
+   STATUS LABEL BADGES (EXISTING)
    ======================================== */
 
-/* NOTE: Standard status label classes (.status-label-inherited, .status-label-same, .status-label-different)
-   are defined in resources/css/admin/components.css with correct purple/green/orange colors.
-   DO NOT duplicate them here to avoid CSS conflicts! */
+.status-label-inherited {
+    background: rgba(5, 150, 105, 0.15);
+    border: 1px solid rgba(5, 150, 105, 0.3);
+    color: #10b981;
+}
 
-/* Unmapped status - specific to Tax Rate field (no PrestaShop mapping) */
-.status-label-unmapped {
-    background: rgba(251, 191, 36, 0.15);
-    border: 1px solid rgba(251, 191, 36, 0.3);
-    color: #fbbf24;
+.status-label-same {
+    background: rgba(5, 150, 105, 0.15);
+    border: 1px solid rgba(5, 150, 105, 0.3);
+    color: #10b981;
+}
+
+.status-label-different {
+    background: rgba(224, 172, 126, 0.15);
+    border: 1px solid rgba(224, 172, 126, 0.3);
+    color: #e0ac7e;
 }
 
 /* ========================================
@@ -160,15 +124,6 @@
 .category-status-different {
     border-color: rgba(224, 172, 126, 0.5);
     background: linear-gradient(145deg, rgba(224, 172, 126, 0.08), rgba(224, 172, 126, 0.04));
-}
-
-.category-status-pending {
-    border-color: rgba(251, 191, 36, 0.6);
-    background: linear-gradient(145deg, rgba(251, 191, 36, 0.12), rgba(251, 191, 36, 0.06));
-    box-shadow:
-        0 0 0 1px rgba(251, 191, 36, 0.35),
-        inset 0 1px 0 rgba(251, 191, 36, 0.25),
-        0 2px 12px rgba(251, 191, 36, 0.25);
 }
 
 /* ========================================
@@ -803,16 +758,6 @@
     box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
 }
 
-.btn-compact-success {
-    background: var(--color-success, #10b981);
-    color: white;
-}
-
-.btn-compact-success:hover:not(:disabled) {
-    background: #059669;
-    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
-}
-
 .btn-compact-outline {
     background: transparent;
     border: 1px solid var(--color-border, #334155);
@@ -953,447 +898,36 @@
 
 /* ========================================
    TAX RATE DROPDOWN - DYNAMIC VALIDATION COLORS (FAZA 5.2 UI Fix - 2025-11-14)
-   Dropdown <select> element (collapsed state) - Uses Tailwind utility classes
-
-   REMOVED hardcoded CSS rules (2025-11-14) - violated NO HARDCODING principle
-   Now relies on dynamic Tailwind classes added by getTaxRateFieldClass():
-   - border-green-600 focus:border-green-500 focus:ring-green-500 (matched)
-   - border-yellow-600 focus:border-yellow-500 focus:ring-yellow-500 (override)
+   Dropdown <select> element (collapsed state) - Dynamic border color based on validation
    ======================================== */
 
-/* ========================================
-   ETAP_08 FAZA 8: WAREHOUSE LOCATION LABELS
-   Klickable labels for stock locations with edit/remove/copy actions
-   ======================================== */
-
-/* Location label base style - orange brand theme */
-.location-label {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.25rem;
-    padding: 0.25rem 0.5rem;
-    background: rgba(224, 172, 126, 0.15);
-    border: 1px solid rgba(224, 172, 126, 0.3);
-    border-radius: 0.375rem;
-    font-size: 0.75rem;
-    font-weight: 500;
-    color: var(--mpp-primary);
-    transition: all 0.15s ease;
-    max-width: 100%;
+/* Green border - tax rate zgodne z default/mapping (success) */
+select.border-green-600 {
+    border-color: #059669 !important; /* Emerald-600 */
+    background-color: rgba(5, 150, 105, 0.08) !important; /* Light green tint */
 }
 
-.location-label:hover {
-    background: rgba(224, 172, 126, 0.25);
-    border-color: rgba(224, 172, 126, 0.5);
+select.border-green-600:focus {
+    border-color: #047857 !important; /* Emerald-700 (darker green) */
+    box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.2) !important; /* Green glow */
 }
 
-/* Location text - clickable for copy */
-.location-label__text {
-    cursor: pointer;
-    user-select: none;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    max-width: 120px;
+/* Yellow border - tax rate unmapped/override (warning) */
+select.border-yellow-600 {
+    border-color: #d97706 !important; /* Amber-600 */
+    background-color: rgba(217, 119, 6, 0.08) !important; /* Light yellow tint */
 }
 
-.location-label__text:hover {
-    text-decoration: underline;
+select.border-yellow-600:focus {
+    border-color: #b45309 !important; /* Amber-700 (darker yellow) */
+    box-shadow: 0 0 0 3px rgba(217, 119, 6, 0.2) !important; /* Yellow glow */
 }
 
-/* Copy feedback animation */
-.location-label__text.copied {
-    color: #10b981; /* green-500 */
+/* Hover states - slightly darker borders */
+select.border-green-600:hover {
+    border-color: #047857 !important; /* Emerald-700 */
 }
 
-/* Edit button */
-.location-label__edit {
-    padding: 0.125rem;
-    border-radius: 0.25rem;
-    opacity: 0.6;
-    transition: opacity 0.15s, background-color 0.15s;
-    cursor: pointer;
-    background: transparent;
-    border: none;
-    color: inherit;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-.location-label__edit:hover {
-    opacity: 1;
-    background: rgba(224, 172, 126, 0.2);
-}
-
-.location-label__edit svg {
-    width: 0.75rem;
-    height: 0.75rem;
-}
-
-/* Remove button */
-.location-label__remove {
-    padding: 0.125rem;
-    border-radius: 0.25rem;
-    opacity: 0.6;
-    transition: opacity 0.15s, background-color 0.15s, color 0.15s;
-    cursor: pointer;
-    background: transparent;
-    border: none;
-    color: inherit;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-.location-label__remove:hover {
-    opacity: 1;
-    background: rgba(239, 68, 68, 0.2); /* red-500 with opacity */
-    color: #ef4444; /* red-500 */
-}
-
-.location-label__remove svg {
-    width: 0.75rem;
-    height: 0.75rem;
-}
-
-/* Location input field (add new) */
-.location-input {
-    padding: 0.25rem 0.5rem;
-    font-size: 0.75rem;
-    background: rgba(55, 65, 81, 0.5); /* gray-700/50 */
-    border: 1px solid rgba(75, 85, 99, 0.5); /* gray-600/50 */
-    border-radius: 0.375rem;
-    color: white;
-    width: 100%;
-    transition: border-color 0.15s, background-color 0.15s;
-}
-
-.location-input:focus {
-    outline: none;
-    border-color: var(--mpp-primary);
-    background: rgba(55, 65, 81, 0.8);
-}
-
-.location-input::placeholder {
-    color: rgba(156, 163, 175, 0.6); /* gray-400/60 */
-}
-
-/* Location container wrapper */
-.location-labels-container {
-    display: flex;
-    flex-direction: column;
-    gap: 0.25rem;
-    min-height: 2.25rem;
-}
-
-/* Location labels edited state - yellow border */
-.location-labels-edited .location-label {
-    border-color: #eab308;
-    background: rgba(234, 179, 8, 0.2);
-}
-
-.location-labels-edited .location-input {
-    border-color: #eab308;
-    background: rgba(234, 179, 8, 0.15);
-}
-
-/* Empty state */
-.location-empty {
-    font-size: 0.75rem;
-    color: rgba(156, 163, 175, 0.6); /* gray-400/60 */
-    font-style: italic;
-}
-
-/* Copy all button in header */
-.location-copy-all-btn {
-    padding: 0.25rem 0.5rem;
-    font-size: 0.625rem;
-    font-weight: 500;
-    background: rgba(224, 172, 126, 0.15);
-    border: 1px solid rgba(224, 172, 126, 0.3);
-    border-radius: 0.25rem;
-    color: var(--mpp-primary);
-    cursor: pointer;
-    transition: all 0.15s ease;
-    display: inline-flex;
-    align-items: center;
-    gap: 0.25rem;
-}
-
-.location-copy-all-btn:hover {
-    background: rgba(224, 172, 126, 0.25);
-    border-color: rgba(224, 172, 126, 0.5);
-}
-
-.location-copy-all-btn svg {
-    width: 0.75rem;
-    height: 0.75rem;
-}
-
-/* =========================================
-   ETAP_14: VARIANT MODALS - PRICES & STOCK
-   ========================================= */
-
-/* Clickable price/stock buttons in variants table */
-.variant-price-btn,
-.variant-stock-btn {
-    display: inline-flex;
-    align-items: center;
-    cursor: pointer;
-    border: none;
-    background: transparent;
-    padding: 0.25rem 0.5rem;
-    border-radius: 0.25rem;
-    transition: all 0.15s ease;
-}
-
-.variant-price-btn:hover,
-.variant-stock-btn:hover {
-    background: rgba(55, 65, 81, 0.5);
-}
-
-.variant-price-btn:hover svg,
-.variant-stock-btn:hover svg {
-    opacity: 1;
-}
-
-/* Modal table styling */
-.variant-modal-table {
-    width: 100%;
-    border-collapse: collapse;
-}
-
-.variant-modal-table th,
-.variant-modal-table td {
-    padding: 0.75rem 1rem;
-    text-align: left;
-    border-bottom: 1px solid rgba(75, 85, 99, 0.5);
-}
-
-.variant-modal-table th {
-    font-size: 0.75rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    color: rgba(156, 163, 175, 1);
-    background: rgba(17, 24, 39, 0.5);
-}
-
-.variant-modal-table tbody tr:hover {
-    background: rgba(55, 65, 81, 0.3);
-}
-
-/* Price inputs in modal */
-.variant-modal-price-input {
-    width: 100%;
-    padding: 0.5rem 0.75rem;
-    background: rgba(55, 65, 81, 0.8);
-    border: 1px solid rgba(75, 85, 99, 0.5);
-    border-radius: 0.375rem;
-    color: white;
-    font-size: 0.875rem;
-    text-align: right;
-    transition: border-color 0.15s, box-shadow 0.15s;
-}
-
-.variant-modal-price-input:focus {
-    outline: none;
-    border-color: var(--mpp-primary);
-    box-shadow: 0 0 0 2px rgba(224, 172, 126, 0.25);
-}
-
-/* Stock inputs in modal */
-.variant-modal-stock-input {
-    width: 100%;
-    padding: 0.5rem 0.75rem;
-    background: rgba(55, 65, 81, 0.8);
-    border: 1px solid rgba(75, 85, 99, 0.5);
-    border-radius: 0.375rem;
-    color: white;
-    font-size: 0.875rem;
-    text-align: right;
-    transition: border-color 0.15s, box-shadow 0.15s;
-}
-
-.variant-modal-stock-input:focus {
-    outline: none;
-    border-color: #8b5cf6; /* purple for stock */
-    box-shadow: 0 0 0 2px rgba(139, 92, 246, 0.25);
-}
-
-/* Location input in modal */
-.variant-modal-location-input {
-    width: 100%;
-    padding: 0.5rem 0.75rem;
-    background: rgba(55, 65, 81, 0.8);
-    border: 1px solid rgba(75, 85, 99, 0.5);
-    border-radius: 0.375rem;
-    color: white;
-    font-size: 0.875rem;
-    transition: border-color 0.15s, box-shadow 0.15s;
-}
-
-.variant-modal-location-input:focus {
-    outline: none;
-    border-color: #10b981; /* green for location */
-    box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.25);
-}
-
-/* ============================================
- * READ-ONLY MODE - Permission-based lockdown
- * Applied when user lacks update/create perms
- * ============================================ */
-
-.product-form-readonly input:not([type="hidden"]),
-.product-form-readonly select,
-.product-form-readonly textarea,
-.product-form-readonly [type="checkbox"],
-.product-form-readonly [type="radio"],
-.product-form-readonly .checkbox-enterprise {
-    pointer-events: none !important;
-    opacity: 0.6 !important;
-    cursor: not-allowed !important;
-}
-
-.product-form-readonly button:not(.tab-enterprise) {
-    pointer-events: none !important;
-    opacity: 0.45 !important;
-    cursor: not-allowed !important;
-}
-
-.product-form-readonly a.btn-enterprise-primary,
-.product-form-readonly a.btn-enterprise-secondary {
-    pointer-events: none !important;
-    opacity: 0.5 !important;
-}
-
-/* Block gallery upload zones, drag-drop areas, clickable divs */
-.product-form-readonly .media-upload-zone,
-.product-form-readonly .media-card,
-.product-form-readonly .compatibility-tile,
-.product-form-readonly [x-on\:drop] {
-    pointer-events: none !important;
-    opacity: 0.6 !important;
-    cursor: not-allowed !important;
-}
-
-/* Gallery tab full lockdown in readonly mode */
-.product-form-readonly .gallery-tab .media-gallery-item,
-.product-form-readonly .gallery-tab .media-gallery-item-checkbox,
-.product-form-readonly .gallery-tab .media-gallery-item-actions,
-.product-form-readonly .gallery-tab .media-gallery-controls,
-.product-form-readonly .gallery-tab .media-btn,
-.product-form-readonly .gallery-tab .media-gallery-item-overlay {
-    pointer-events: none !important;
-    cursor: not-allowed !important;
-}
-
-.product-form-readonly .gallery-tab .media-gallery-item-checkbox,
-.product-form-readonly .gallery-tab .media-gallery-item-actions,
-.product-form-readonly .gallery-tab .media-gallery-controls,
-.product-form-readonly .gallery-tab .media-upload-zone {
-    opacity: 0.4 !important;
-}
-
-/* Ensure tab navigation remains fully interactive in readonly mode */
-.product-form-readonly .tab-enterprise,
-.product-form-readonly .tabs-enterprise .tab-enterprise,
-.product-form-readonly .shop-tab-active,
-.product-form-readonly .shop-tab-inactive,
-.product-form-readonly .erp-tab-active,
-.product-form-readonly .erp-tab-inactive {
-    pointer-events: auto !important;
-    opacity: 1 !important;
-    cursor: pointer !important;
-}
-
-/* ============================================
- * CENSORED VALUES - Permission-based data masking
- * Used when user lacks prices.read / stock.read
- * ============================================ */
-
-.censored-value {
-    font-family: monospace;
-    letter-spacing: 0.15em;
-    color: var(--text-muted, #6b7280);
-    cursor: not-allowed;
-    user-select: none;
-}
-
-.censored-value--price {
-    color: rgba(251, 146, 60, 0.35);
-}
-
-.censored-value--stock {
-    color: rgba(156, 163, 175, 0.35);
-}
-
-/* Permission denied placeholder - full tab replacement */
-.permission-denied-placeholder {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    padding: 4rem 2rem;
-    text-align: center;
-}
-
-.permission-denied-placeholder__icon {
-    width: 4rem;
-    height: 4rem;
-    color: var(--text-muted, #6b7280);
-    margin-bottom: 1.5rem;
-    opacity: 0.5;
-}
-
-.permission-denied-placeholder__title {
-    font-size: 1.125rem;
-    font-weight: 600;
-    color: var(--color-text-primary, #f8fafc);
-    margin: 0 0 0.5rem 0;
-}
-
-.permission-denied-placeholder__text {
-    font-size: 0.875rem;
-    color: var(--color-text-secondary, #94a3b8);
-    margin: 0;
-    max-width: 28rem;
-}
-
-.permission-denied-placeholder__text code {
-    padding: 0.125rem 0.375rem;
-    background: rgba(55, 65, 81, 0.5);
-    border-radius: 0.25rem;
-    font-size: 0.8125rem;
-    color: var(--mpp-primary, #e0ac7e);
-}
-
-.readonly-banner {
-    display: flex;
-    align-items: center;
-    padding: 0.75rem 1rem;
-    background: rgba(245, 158, 11, 0.12);
-    border: 1px solid rgba(245, 158, 11, 0.3);
-    border-radius: 0.5rem;
-    margin-bottom: 1rem;
-}
-
-.readonly-banner__icon {
-    width: 1.25rem;
-    height: 1.25rem;
-    color: #f59e0b;
-    margin-right: 0.75rem;
-    flex-shrink: 0;
-}
-
-.readonly-banner__text {
-    color: #fbbf24;
-    font-weight: 500;
-    font-size: 0.875rem;
-}
-
-.readonly-banner__subtext {
-    color: #d97706;
-    font-size: 0.75rem;
-    margin-left: 0.5rem;
+select.border-yellow-600:hover {
+    border-color: #b45309 !important; /* Amber-700 */
 }

@@ -28,6 +28,7 @@ use App\Http\Livewire\Products\Management\Traits\VariantShopContextTrait;
 use App\Http\Livewire\Products\Management\Traits\VariantModalsTrait;
 use App\Http\Livewire\Products\Management\Traits\ProductFormCompatibility;
 use App\Http\Livewire\Products\Management\Traits\ProductFormVisualDescription;
+use App\Http\Livewire\Products\Management\Traits\ProductFormLocationSuggestions;
 use App\Http\Livewire\Products\Management\Services\ProductMultiStoreManager;
 use App\Http\Livewire\Products\Management\Services\ProductCategoryManager;
 use App\Http\Livewire\Products\Management\Services\ProductFormSaver;
@@ -69,6 +70,7 @@ class ProductForm extends Component
     use VariantModalsTrait;
     use ProductFormCompatibility;
     use ProductFormVisualDescription;
+    use ProductFormLocationSuggestions;
 
     protected function getPermissionModule(): string
     {
@@ -269,6 +271,9 @@ class ProductForm extends Component
     public array $validationErrors = [];
     public string $successMessage = '';
     public bool $showSlugField = false;
+
+    /** Lazy render: category tree is NOT rendered until user clicks "Show categories" */
+    public bool $categoriesLoaded = false;
     public int $shortDescriptionCount = 0;
     public int $longDescriptionCount = 0;
 
@@ -557,22 +562,18 @@ class ProductForm extends Component
             return;
         }
 
+        // Batch pre-load all PrestaShopShop models to avoid N+1 queries
+        $shopIds = $this->product->shopData->pluck('shop_id')->toArray();
+        $prestaShops = \App\Models\PrestaShopShop::whereIn('id', $shopIds)->get()->keyBy('id');
+
         foreach ($this->product->shopData as $shopData) {
             $shopId = $shopData->shop_id;
 
             // Load tax rate override
             $this->shopTaxRateOverrides[$shopId] = $shopData->tax_rate_override;
 
-            // ✅ FIX: Load PrestaShop tax rules for this shop
-            $this->loadTaxRuleGroupsForShop($shopId);
-
-            // [FAZA 5.2 DEBUG 2025-11-14] Check if loadTaxRuleGroupsForShop is called
-            Log::debug('[FAZA 5.2 DEBUG] loadShopTaxRateOverrides - shop iteration', [
-                'shop_id' => $shopId,
-                'tax_rate_override' => $shopData->tax_rate_override,
-                'availableTaxRuleGroups_isset' => isset($this->availableTaxRuleGroups[$shopId]),
-                'availableTaxRuleGroups_count' => count($this->availableTaxRuleGroups[$shopId] ?? []),
-            ]);
+            // Load PrestaShop tax rules for this shop (using pre-loaded model)
+            $this->loadTaxRuleGroupsForShopBatch($shopId, $prestaShops->get($shopId));
         }
 
         Log::debug('[ProductForm FAZA 5.2] Loaded shop tax rate overrides', [
@@ -678,6 +679,39 @@ class ProductForm extends Component
             ]);
 
             // Fallback: Empty array
+            $this->availableTaxRuleGroups[$shopId] = [];
+        }
+    }
+
+    /**
+     * Load tax rule groups for a shop using pre-loaded model (avoids N+1).
+     * Used by loadShopTaxRateOverrides() during mount().
+     */
+    protected function loadTaxRuleGroupsForShopBatch(int $shopId, ?\App\Models\PrestaShopShop $shopModel): void
+    {
+        $now = time();
+        $cacheValid = isset($this->taxRuleGroupsCacheTimestamp[$shopId])
+            && ($now - $this->taxRuleGroupsCacheTimestamp[$shopId]) < 900;
+
+        if ($cacheValid && isset($this->availableTaxRuleGroups[$shopId])) {
+            return;
+        }
+
+        if (!$shopModel) {
+            Log::warning('[ProductForm] PrestaShopShop model not found for batch tax load', ['shop_id' => $shopId]);
+            $this->availableTaxRuleGroups[$shopId] = [];
+            return;
+        }
+
+        try {
+            $taxRateService = app(\App\Services\TaxRateService::class);
+            $this->availableTaxRuleGroups[$shopId] = $taxRateService->getAvailableTaxRatesForShop($shopModel);
+            $this->taxRuleGroupsCacheTimestamp[$shopId] = $now;
+        } catch (\Exception $e) {
+            Log::error('[ProductForm] Failed to load tax rule groups (batch)', [
+                'shop_id' => $shopId,
+                'error' => $e->getMessage(),
+            ]);
             $this->availableTaxRuleGroups[$shopId] = [];
         }
     }
@@ -1393,10 +1427,12 @@ class ProductForm extends Component
             return;
         }
 
-        // Load all shop data for this product
-        $productShopData = \App\Models\ProductShopData::where('product_id', $this->product->id)
-            ->with('shop')
-            ->get();
+        // Use eager-loaded shopData relation if available, otherwise query DB
+        $productShopData = $this->product->relationLoaded('shopData')
+            ? $this->product->shopData
+            : \App\Models\ProductShopData::where('product_id', $this->product->id)
+                ->with('shop')
+                ->get();
 
         foreach ($productShopData as $shopData) {
             // Store shop data with ID for management
@@ -1714,7 +1750,115 @@ class ProductForm extends Component
         }
 
         $this->activeTab = $tab;
+
+        // Lazy load vehicles when user opens Compatibility tab (avoid loading on mount)
+        if ($tab === 'compatibility') {
+            $this->loadVehiclesIfNeeded();
+        }
+
         $this->dispatch('tab-switched', ['tab' => $tab]);
+    }
+
+    /**
+     * Lazy load category tree - called when user clicks "Show categories" button.
+     * Prevents rendering 772 categories (8.8MB HTML) on initial page load.
+     */
+    public function loadCategoryTree(): void
+    {
+        $this->categoriesLoaded = true;
+    }
+
+    /**
+     * Lazy load children of a category node (called by Alpine on chevron click).
+     * #[Renderless] = Livewire does NOT re-render the component = zero HTML overhead.
+     *
+     * @param int $parentId Parent category ID whose children to fetch
+     * @param string $context 'default' or shop_id
+     * @return array Children data for Alpine rendering
+     */
+    #[Renderless]
+    public function fetchChildCategories(int $parentId, string $context = 'default'): array
+    {
+        if ($context === 'default' || $context === '') {
+            $children = Category::where('parent_id', $parentId)
+                ->withCount('children as children_count')
+                ->orderBy('sort_order')
+                ->orderBy('name')
+                ->get(['id', 'name', 'parent_id', 'sort_order']);
+        } else {
+            $children = collect($this->findChildrenInShopTree((int) $context, $parentId));
+        }
+
+        $selectedIds = $this->getPrestaShopCategoryIdsForContext(
+            $context === 'default' ? null : (int) $context
+        );
+        $primaryId = $this->getPrimaryPrestaShopCategoryIdForContext(
+            $context === 'default' ? null : (int) $context
+        );
+        $deletedIds = $this->pendingDeleteCategories[$context] ?? [];
+
+        return $children->map(function ($c) use ($selectedIds, $primaryId, $deletedIds) {
+            $id = $c->id ?? ($c['id'] ?? null);
+            $hasChildren = ($c->children_count ?? $c['children_count'] ?? 0) > 0;
+            return [
+                'id' => $id,
+                'name' => $c->name ?? ($c['name'] ?? ''),
+                'hasChildren' => $hasChildren,
+                'isSelected' => in_array($id, $selectedIds),
+                'isPrimary' => $id == $primaryId,
+                'isDeleted' => in_array($id, $deletedIds),
+            ];
+        })->toArray();
+    }
+
+    /**
+     * Find children of parentId in cached PrestaShop shop category tree.
+     *
+     * @param int $shopId
+     * @param int $parentId
+     * @return array
+     */
+    private function findChildrenInShopTree(int $shopId, int $parentId): array
+    {
+        $tree = $this->getShopCategories();
+        return $this->searchTreeForChildren($tree, $parentId);
+    }
+
+    /**
+     * Recursively search tree for children of given parentId.
+     */
+    private function searchTreeForChildren(array $categories, int $parentId): array
+    {
+        foreach ($categories as $cat) {
+            if (($cat->id ?? null) == $parentId) {
+                $children = $cat->children ?? collect([]);
+                if ($children instanceof \Illuminate\Support\Collection) {
+                    $children = $children->toArray();
+                }
+                return array_map(function ($child) {
+                    $childChildren = $child->children ?? ($child['children'] ?? []);
+                    if ($childChildren instanceof \Illuminate\Support\Collection) {
+                        $count = $childChildren->count();
+                    } else {
+                        $count = is_array($childChildren) ? count($childChildren) : 0;
+                    }
+                    return (object) [
+                        'id' => $child->id ?? ($child['id'] ?? null),
+                        'name' => $child->name ?? ($child['name'] ?? ''),
+                        'children_count' => $count,
+                    ];
+                }, is_array($children) ? $children : []);
+            }
+            $childrenProp = $cat->children ?? collect([]);
+            if ($childrenProp instanceof \Illuminate\Support\Collection && $childrenProp->count() > 0) {
+                $result = $this->searchTreeForChildren($childrenProp->toArray(), $parentId);
+                if (!empty($result)) return $result;
+            } elseif (is_array($childrenProp) && count($childrenProp) > 0) {
+                $result = $this->searchTreeForChildren($childrenProp, $parentId);
+                if (!empty($result)) return $result;
+            }
+        }
+        return [];
     }
 
     /**

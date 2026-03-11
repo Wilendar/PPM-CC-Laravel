@@ -166,8 +166,43 @@ class PrestaShopImportService
                         'sku' => $productData['sku'],
                     ]);
 
-                    // CREATE new product
-                    $product = Product::create($productData);
+                    // CREATE new product (with race condition protection)
+                    // Multiple queue workers may simultaneously check SKU=null
+                    // and both try to create - catch duplicate key and fallback to update
+                    // FIX 2026-03-10: Use lockForUpdate() in fallback to bypass REPEATABLE_READ
+                    // snapshot isolation - without it, first() returns NULL because the
+                    // other worker's INSERT is not yet visible in the consistent read snapshot
+                    try {
+                        $product = Product::create($productData);
+                    } catch (\Illuminate\Database\QueryException $e) {
+                        if ($e->errorInfo[1] == 1062) {
+                            // Race condition: another worker created this product
+                            Log::info('Race condition detected - falling back to update with lockForUpdate', [
+                                'sku' => $productData['sku'],
+                            ]);
+                            // lockForUpdate() bypasses REPEATABLE_READ consistent read snapshot
+                            // and sees the latest committed data (or waits for pending TX to commit)
+                            $existingProduct = Product::where('sku', $productData['sku'])->lockForUpdate()->first();
+                            if ($existingProduct) {
+                                $existingProduct->update($productData);
+                                $product = $existingProduct;
+                                $isNewProduct = false;
+                            } else {
+                                // Other TX may not have committed yet - wait and retry
+                                usleep(random_int(50000, 150000)); // 50-150ms
+                                $existingProduct = Product::where('sku', $productData['sku'])->lockForUpdate()->first();
+                                if ($existingProduct) {
+                                    $existingProduct->update($productData);
+                                    $product = $existingProduct;
+                                    $isNewProduct = false;
+                                } else {
+                                    throw $e;
+                                }
+                            }
+                        } else {
+                            throw $e;
+                        }
+                    }
                 }
 
                 // 6. Sync prices (ProductPrice model)
@@ -272,13 +307,8 @@ class PrestaShopImportService
                     'purpose' => 'conflict_detection_baseline',
                 ]);
 
-                // 10. Sync categories from PrestaShop associations
-                // CRITICAL FIX: Products MUST have categories assigned!
-                $this->syncProductCategories($product, $prestashopData, $shop);
-
-                // 11. FIX 2025-11-25: Build category_mappings from product_categories
-                // CRITICAL: ProductForm reads from category_mappings, not product_categories!
-                $this->buildCategoryMappingsFromProductCategories($product, $shop);
+                // 10. Category sync MOVED OUTSIDE transaction (see below)
+                // Reduces deadlock risk on product_categories pivot table
 
                 // 11b. Resolve ProductType via CategoryTypeMapper cascade
                 // Runs for: new products OR existing products with fallback 'inne' type
@@ -351,6 +381,22 @@ class PrestaShopImportService
 
                 return $product;
             });
+
+            // 9a. Sync categories OUTSIDE transaction to reduce deadlock risk
+            // Category pivot operations use gap locks that conflict between workers
+            try {
+                $this->syncProductCategories($product, $prestashopData, $shop);
+                $this->buildCategoryMappingsFromProductCategories($product, $shop);
+                $this->ensureBaseCategoryAssigned($product, $shop);
+            } catch (\Exception $catEx) {
+                // Non-fatal: product is saved, only categories not assigned
+                // Next import retry will fix categories
+                Log::error('Category sync failed (non-fatal, product saved)', [
+                    'product_id' => $product->id,
+                    'sku' => $product->sku,
+                    'error' => $catEx->getMessage(),
+                ]);
+            }
 
             // 9. Calculate execution time
             $executionTime = (int) ((microtime(true) - $startTime) * 1000);
@@ -449,15 +495,58 @@ class PrestaShopImportService
     public function importCategoryFromPrestaShop(
         int $prestashopCategoryId,
         PrestaShopShop $shop,
-        bool $recursive = true
+        bool $recursive = true,
+        int $depth = 0
     ): Category
     {
+        // EARLY RETURN FIRST: PrestaShop root categories (id 1 = Root, id 2 = Home/Wszystko)
+        // Must be BEFORE depth guard - deep trees legitimately reach root at high depth
+        if ($prestashopCategoryId <= 2) {
+            $ppmCategory = null;
+            if ($prestashopCategoryId === 1) {
+                $ppmCategory = Category::where('name', 'Baza')->where('level', 0)->first();
+            } elseif ($prestashopCategoryId === 2) {
+                $ppmCategory = Category::where('name', 'Wszystko')->where('level', 1)->first();
+            }
+
+            if ($ppmCategory) {
+                // Create mapping if it doesn't exist
+                ShopMapping::firstOrCreate(
+                    [
+                        'shop_id' => $shop->id,
+                        'mapping_type' => ShopMapping::TYPE_CATEGORY,
+                        'prestashop_id' => $prestashopCategoryId,
+                    ],
+                    [
+                        'ppm_value' => $ppmCategory->id,
+                        'prestashop_value' => $ppmCategory->name,
+                        'is_active' => true,
+                    ]
+                );
+
+                Log::info("PrestaShop root category PS#{$prestashopCategoryId} mapped to PPM '{$ppmCategory->name}' (id={$ppmCategory->id})");
+
+                return $ppmCategory;
+            }
+        }
+
+        // DEPTH GUARD: Prevent infinite recursion (circular references in PS category tree)
+        // PS e-commerce trees can be 10-15 levels deep, so allow generous limit
+        $maxRecursionDepth = 25;
+        if ($depth > $maxRecursionDepth) {
+            throw new \InvalidArgumentException(
+                "Max recursion depth ({$maxRecursionDepth}) for category PS#{$prestashopCategoryId}. " .
+                "Possible circular reference in PrestaShop category tree."
+            );
+        }
+
         $startTime = microtime(true);
 
         Log::info('Starting category import from PrestaShop', [
             'prestashop_category_id' => $prestashopCategoryId,
             'shop_id' => $shop->id,
             'recursive' => $recursive,
+            'depth' => $depth,
         ]);
 
         try {
@@ -479,7 +568,7 @@ class PrestaShopImportService
             if ($parentId > 2) {
                 if ($recursive) {
                     // Recursive import parent first
-                    $parentCategory = $this->importCategoryFromPrestaShop($parentId, $shop, true);
+                    $parentCategory = $this->importCategoryFromPrestaShop($parentId, $shop, true, $depth + 1);
                 } else {
                     // Non-recursive mode: check if parent mapping exists
                     $parentMapping = ShopMapping::where('shop_id', $shop->id)
@@ -738,6 +827,9 @@ class PrestaShopImportService
         ]);
 
         try {
+            // 0. Ensure base PPM categories exist before importing
+            $this->ensureBaseCategoriesExist();
+
             // 1. Create API client
             $client = $this->clientFactory::create($shop);
 
@@ -902,6 +994,59 @@ class PrestaShopImportService
                 0,
                 $e
             );
+        }
+    }
+
+    /**
+     * Ensure base PPM categories (Baza, Wszystko) exist.
+     * Must be called before any category import.
+     */
+    public function ensureBaseCategoriesExist(): void
+    {
+        // Baza (id=1, level=0) - root category
+        $baza = Category::find(1);
+        if (!$baza) {
+            DB::statement('SET SESSION sql_mode = "NO_AUTO_VALUE_ON_ZERO"');
+
+            DB::table('categories')->insert([
+                'id' => 1,
+                'name' => 'Baza',
+                'slug' => 'baza',
+                'parent_id' => null,
+                'level' => 0,
+                'path' => null,
+                'sort_order' => 0,
+                'is_active' => true,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+            DB::statement('SET SESSION sql_mode = ""');
+
+            Log::info('Created base category: Baza (id=1, level=0)');
+        }
+
+        // Wszystko (id=2, level=1) - main category under Baza
+        $wszystko = Category::find(2);
+        if (!$wszystko) {
+            DB::statement('SET SESSION sql_mode = "NO_AUTO_VALUE_ON_ZERO"');
+
+            DB::table('categories')->insert([
+                'id' => 2,
+                'name' => 'Wszystko',
+                'slug' => 'wszystko',
+                'parent_id' => 1,
+                'level' => 1,
+                'path' => '/1',
+                'sort_order' => 0,
+                'is_active' => true,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+            DB::statement('SET SESSION sql_mode = ""');
+
+            Log::info('Created base category: Wszystko (id=2, level=1, path=/1)');
         }
     }
 
@@ -1184,13 +1329,8 @@ class PrestaShopImportService
                 // Modal only decides: "Update DEFAULT categories or keep them?"
 
                 // STEP 1: ALWAYS save per-shop categories (shop_id=X)
-                // Reset is_primary for this product + shop
-                DB::table('product_categories')
-                    ->where('product_id', $product->id)
-                    ->where('shop_id', $shop->id)
-                    ->update(['is_primary' => false]);
-
-                // Remove existing per-shop categories
+                // FIX 2026-03-10: Removed redundant UPDATE is_primary=0 before DELETE
+                // The UPDATE + DELETE pattern caused deadlocks under concurrent workers
                 DB::table('product_categories')
                     ->where('product_id', $product->id)
                     ->where('shop_id', $shop->id)
@@ -1296,9 +1436,8 @@ class PrestaShopImportService
             }
         }
 
-        // FIX 2025-11-25: Ensure PPM base category "Baza" (id=1) is always assigned
-        // "Baza" is PPM-only category (not in PrestaShop) required for category tree visibility
-        $this->ensureBaseCategoryAssigned($product, $shop);
+        // FIX 2026-03-10: ensureBaseCategoryAssigned() now called outside TX
+        // from importProductFromPrestaShop() to reduce deadlock risk
     }
 
     /**
@@ -1319,6 +1458,9 @@ class PrestaShopImportService
             2, // Wszystko - child of Baza, parent of all product categories
         ];
 
+        // FIX 2026-03-10: Use try/catch to handle race conditions
+        // insertOrIgnore won't work for shop_id=NULL (MariaDB treats NULLs as distinct in unique index)
+        $now = now();
         foreach ($rootCategoryIds as $categoryId) {
             $category = Category::find($categoryId);
             if (!$category) {
@@ -1329,7 +1471,7 @@ class PrestaShopImportService
                 continue;
             }
 
-            // Check and add to DEFAULT categories (shop_id=NULL)
+            // Insert DEFAULT categories (shop_id=NULL)
             $hasDefault = DB::table('product_categories')
                 ->where('product_id', $product->id)
                 ->where('category_id', $categoryId)
@@ -1337,48 +1479,34 @@ class PrestaShopImportService
                 ->exists();
 
             if (!$hasDefault) {
-                DB::table('product_categories')->insert([
-                    'product_id' => $product->id,
-                    'category_id' => $categoryId,
-                    'shop_id' => null,
-                    'is_primary' => false,
-                    'sort_order' => 0,
-                    'created_at' => now(),
-                    'updated_at' => now(),
-                ]);
-
-                Log::info('PPM root category assigned (default)', [
-                    'product_id' => $product->id,
-                    'category_id' => $categoryId,
-                    'category_name' => $category->name,
-                ]);
+                try {
+                    DB::table('product_categories')->insert([
+                        'product_id' => $product->id,
+                        'category_id' => $categoryId,
+                        'shop_id' => null,
+                        'is_primary' => false,
+                        'sort_order' => 0,
+                        'created_at' => $now,
+                        'updated_at' => $now,
+                    ]);
+                } catch (\Illuminate\Database\QueryException $e) {
+                    // Race condition: another worker inserted between check and insert
+                    if ($e->errorInfo[1] != 1062) {
+                        throw $e;
+                    }
+                }
             }
 
-            // Check and add to PER-SHOP categories
-            $hasPerShop = DB::table('product_categories')
-                ->where('product_id', $product->id)
-                ->where('category_id', $categoryId)
-                ->where('shop_id', $shop->id)
-                ->exists();
-
-            if (!$hasPerShop) {
-                DB::table('product_categories')->insert([
-                    'product_id' => $product->id,
-                    'category_id' => $categoryId,
-                    'shop_id' => $shop->id,
-                    'is_primary' => false,
-                    'sort_order' => 0,
-                    'created_at' => now(),
-                    'updated_at' => now(),
-                ]);
-
-                Log::info('PPM root category assigned (per-shop)', [
-                    'product_id' => $product->id,
-                    'shop_id' => $shop->id,
-                    'category_id' => $categoryId,
-                    'category_name' => $category->name,
-                ]);
-            }
+            // Insert PER-SHOP categories - insertOrIgnore works here (shop_id NOT NULL)
+            DB::table('product_categories')->insertOrIgnore([
+                'product_id' => $product->id,
+                'category_id' => $categoryId,
+                'shop_id' => $shop->id,
+                'is_primary' => false,
+                'sort_order' => 0,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ]);
         }
 
         // FIX 2025-11-25 v3: ALSO update ProductShopData.category_mappings.ui.selected
@@ -1828,6 +1956,7 @@ class PrestaShopImportService
                 ->first();
 
             // FIX 2025-12-03: Auto-create FeatureType if not found
+            // FIX 2026-03-10: Use firstOrCreate + try/catch for race condition safety
             if (!$featureType) {
                 // Generate code from name (lowercase, underscores, no special chars)
                 $code = $this->generateFeatureTypeCode($featureName);
@@ -1835,16 +1964,31 @@ class PrestaShopImportService
                 // FIX 2025-12-03 v2: Get or create "Importowane z PrestaShop" FeatureGroup
                 $importedGroup = $this->getOrCreateImportedFeatureGroup();
 
-                // Create new FeatureType with feature_group_id for UI display
-                $featureType = FeatureType::create([
-                    'code' => $code,
-                    'name' => $featureName,
-                    'value_type' => FeatureType::VALUE_TYPE_TEXT, // Default to text
-                    'prestashop_name' => $featureName,
-                    'is_active' => true,
-                    'feature_group_id' => $importedGroup->id, // CRITICAL: UI filters by this!
-                    'group' => 'Importowane z PrestaShop', // Legacy field
-                ]);
+                // FIX 2026-03-10: firstOrCreate + try/catch instead of create()
+                // Multiple workers may try to create the same FeatureType simultaneously
+                try {
+                    $featureType = FeatureType::firstOrCreate(
+                        ['code' => $code],
+                        [
+                            'name' => $featureName,
+                            'value_type' => FeatureType::VALUE_TYPE_TEXT,
+                            'prestashop_name' => $featureName,
+                            'is_active' => true,
+                            'feature_group_id' => $importedGroup->id,
+                            'group' => 'Importowane z PrestaShop',
+                        ]
+                    );
+                } catch (\Illuminate\Database\QueryException $e) {
+                    if ($e->errorInfo[1] == 1062) {
+                        // Race condition: another worker created this FeatureType
+                        $featureType = FeatureType::where('code', $code)->first();
+                        if (!$featureType) {
+                            throw $e;
+                        }
+                    } else {
+                        throw $e;
+                    }
+                }
 
                 Log::info('[FEATURE IMPORT] Auto-created FeatureType', [
                     'feature_type_id' => $featureType->id,
@@ -1855,16 +1999,34 @@ class PrestaShopImportService
                 ]);
             }
 
-            // Create mapping
-            $mapping = PrestashopFeatureMapping::create([
-                'feature_type_id' => $featureType->id,
-                'shop_id' => $shop->id,
-                'prestashop_feature_id' => $psFeatureId,
-                'prestashop_feature_name' => $featureName,
-                'sync_direction' => PrestashopFeatureMapping::SYNC_BOTH,
-                'auto_create_values' => true,
-                'is_active' => true,
-            ]);
+            // Create mapping (race-condition safe)
+            // FIX 2026-03-10: firstOrCreate + try/catch for concurrent workers
+            try {
+                $mapping = PrestashopFeatureMapping::firstOrCreate(
+                    [
+                        'feature_type_id' => $featureType->id,
+                        'shop_id' => $shop->id,
+                    ],
+                    [
+                        'prestashop_feature_id' => $psFeatureId,
+                        'prestashop_feature_name' => $featureName,
+                        'sync_direction' => PrestashopFeatureMapping::SYNC_BOTH,
+                        'auto_create_values' => true,
+                        'is_active' => true,
+                    ]
+                );
+            } catch (\Illuminate\Database\QueryException $e) {
+                if ($e->errorInfo[1] == 1062) {
+                    $mapping = PrestashopFeatureMapping::where('feature_type_id', $featureType->id)
+                        ->where('shop_id', $shop->id)
+                        ->first();
+                    if (!$mapping) {
+                        throw $e;
+                    }
+                } else {
+                    throw $e;
+                }
+            }
 
             Log::info('[FEATURE IMPORT] Auto-created feature mapping', [
                 'mapping_id' => $mapping->id,
@@ -1899,6 +2061,10 @@ class PrestaShopImportService
         $code = preg_replace('/[^a-z0-9_\s]/', '', $code);
         $code = preg_replace('/\s+/', '_', $code);
         $code = trim($code, '_');
+
+        // FIX 2026-03-10: Truncate to max 255 chars (DB column limit)
+        // Leave room for "_N" suffix (max 4 chars) in uniqueness check
+        $code = substr($code, 0, 250);
 
         // Ensure unique code
         $baseCode = $code;

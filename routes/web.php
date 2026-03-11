@@ -34,14 +34,13 @@ Route::get('/thumbnail/variant/{variantImageId}', [ThumbnailController::class, '
     ->middleware('throttle:60,1');
 
 // Public Feed Access (token-based, no auth)
-// Rate limiting per-token (not per-IP) - see AppServiceProvider::registerFeedRateLimiters()
 Route::prefix('feed')->group(function () {
     Route::get('/{token}', [\App\Http\Controllers\FeedController::class, 'show'])
         ->name('feed.show')
-        ->middleware('throttle:feed-access');
+        ->middleware('throttle:60,1');
     Route::get('/{token}/download', [\App\Http\Controllers\FeedController::class, 'download'])
         ->name('feed.download')
-        ->middleware('throttle:feed-download');
+        ->middleware('throttle:30,1');
 });
 
 Route::get('/', function () {
@@ -430,7 +429,16 @@ Route::prefix('admin')->name('admin.')->middleware($adminMiddleware)->group(func
 
         // Product editing - Blade wrapper with admin layout
         Route::get('/{product}/edit', function ($product) {
-            $productModel = \App\Models\Product::find($product);
+            $productModel = \App\Models\Product::with([
+                'shopData.shop',
+                'erpData',
+                'features.featureType',
+                'features.featureValue',
+                'variants',
+                'categories',
+                'productType',
+                'stocks',
+            ])->find($product);
             return view('pages.product-form-edit', compact('product', 'productModel'));
         })->name('edit')->middleware('permission:products.read');
 
@@ -555,6 +563,10 @@ Route::prefix('admin')->name('admin.')->middleware($adminMiddleware)->group(func
     // Unified panel with tabs - replaces old /variants route
     Route::get('/product-parameters', fn() => view('admin.product-parameters'))
         ->name('product-parameters')->middleware('permission:parameters.read');
+
+    // Location Management Panel - Warehouse location browser
+    Route::get('/locations', \App\Http\Livewire\Admin\Parameters\LocationManager::class)
+        ->name('locations.index')->middleware('permission:stock.locations');
 
     // Supplier Management Panel (ETAP_15)
     Route::get('/suppliers', \App\Http\Livewire\Admin\Suppliers\BusinessPartnerPanel::class)

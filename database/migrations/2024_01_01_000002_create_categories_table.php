@@ -10,7 +10,7 @@ return new class extends Migration
      * Run the migrations.
      *
      * Categories Table - Self-Referencing Tree Structure
-     * Obs≈Çuguje: 5 poziom√≥w zagnie≈ºd≈ºenia, path optimization, breadcrumbs
+     * Obs≥uguje: 5 poziomÛw zagnieødøenia, path optimization, breadcrumbs
      * Format path: '/1/2/5' dla szybkich ancestor/descendant queries
      * 
      * Performance: Index na path dla tree queries <50ms
@@ -29,7 +29,7 @@ return new class extends Migration
             $table->text('description')->nullable(); // Opis kategorii
             
             // === TREE STRUCTURE OPTIMIZATION ===
-            $table->tinyInteger('level')->default(0); // Poziom zagnie≈ºd≈ºenia (0-4)
+            $table->tinyInteger('level')->default(0); // Poziom zagnieødøenia (0-4)
             $table->string('path', 500)->nullable(); // '/1/2/5' - szybkie tree queries
             
             // === CATEGORY STATUS & ORDERING ===
@@ -62,16 +62,12 @@ return new class extends Migration
 
         // === ADDITIONAL CONSTRAINTS ===
         // Prevent circular references and deep nesting
-        DB::statement('ALTER TABLE categories ADD CONSTRAINT chk_max_level CHECK (level >= 0 AND level <= 4)');
-        // TEMPORARY DISABLED: MySQL 8+ doesn't allow check constraints on FK columns with CASCADE
-        // TODO: Move to application-level validation or use BEFORE INSERT trigger
-        // DB::statement('ALTER TABLE categories ADD CONSTRAINT chk_no_self_parent CHECK (id != parent_id)');
     }
 
     /**
      * Reverse the migrations.
      * 
-     * Rollback support - usuwa tabelƒô categories z wszystkimi constraintami
+     * Rollback support - usuwa tabelÍ categories z wszystkimi constraintami
      */
     public function down(): void
     {

@@ -1445,7 +1445,7 @@ class CategoryPreviewModal extends Component
             return ['ppm_ids' => [], 'ps_ids' => []];
         }
 
-        $products = $preview->import_context_json['analyzed_products'] ?? [];
+        $products = $preview->getAnalyzedProducts();
         if (empty($products)) {
             return ['ppm_ids' => [], 'ps_ids' => []];
         }
@@ -1978,8 +1978,7 @@ class CategoryPreviewModal extends Component
                 return $emptyResult;
             }
 
-            $importContext = $preview->import_context_json ?? [];
-            $products = $importContext['analyzed_products'] ?? $importContext['products'] ?? [];
+            $products = $preview->getAnalyzedProducts();
 
             if (empty($products)) {
                 return $emptyResult;
@@ -2433,267 +2432,148 @@ class CategoryPreviewModal extends Component
         $conflicts = [];
         $importContext = $preview->import_context_json;
 
-        Log::info('🔍 CategoryPreviewModal: detectCategoryConflicts() CALLED', [
-            'preview_id' => $preview->id,
-            'has_import_context' => !empty($importContext),
-            'import_context' => $importContext,
-        ]);
-
         if (empty($importContext)) {
-            Log::warning('CategoryPreviewModal: No import context - skipping conflict detection');
-            return $conflicts; // No context = no conflicts to detect
+            return $conflicts;
+        }
+
+        // FIX 2026-03-10: Use analyzed_products from file instead of N API calls
+        // Old code made individual getProduct() HTTP call per product (9554 calls = 5+ min timeout!)
+        // New code uses pre-fetched data from AnalyzeMissingCategories job
+        $analyzedProducts = $preview->getAnalyzedProducts();
+
+        // Performance guard: skip conflict detection for very large imports
+        // Conflict checking requires DB lookups per product - limit to reasonable batch
+        $maxConflictCheck = 500;
+        if (count($analyzedProducts) > $maxConflictCheck) {
+            Log::info('CategoryPreviewModal: Skipping detailed conflict detection (too many products)', [
+                'preview_id' => $preview->id,
+                'product_count' => count($analyzedProducts),
+                'max_check' => $maxConflictCheck,
+            ]);
+            return $conflicts;
+        }
+
+        if (empty($analyzedProducts)) {
+            return $conflicts;
         }
 
         try {
-            // Get products to import based on mode
-            $mode = $importContext['mode'] ?? 'individual';
-            $options = $importContext['options'] ?? [];
+            // Build PS category ID → PPM category ID mapping (single query)
+            $allPsCatIds = [];
+            foreach ($analyzedProducts as $p) {
+                foreach ($p['categories'] ?? [] as $cat) {
+                    $id = is_array($cat) ? (int) ($cat['id'] ?? 0) : (int) $cat;
+                    if ($id > 0) $allPsCatIds[] = $id;
+                }
+            }
+            $allPsCatIds = array_unique($allPsCatIds);
 
-            Log::info('CategoryPreviewModal: Fetching products to check', [
-                'mode' => $mode,
-                'options' => $options,
-            ]);
-
-            $productIds = $this->getProductIdsToImport($preview->shop, $mode, $options);
-
-            if (empty($productIds)) {
-                Log::warning('CategoryPreviewModal: No products to check for conflicts', [
-                    'mode' => $mode,
-                    'options_keys' => array_keys($options),
-                ]);
-                return $conflicts;
+            $categoryMapping = [];
+            if (!empty($allPsCatIds) && $preview->shop_id) {
+                $categoryMapping = ShopMapping::where('shop_id', $preview->shop_id)
+                    ->where('mapping_type', ShopMapping::TYPE_CATEGORY)
+                    ->whereIn('prestashop_id', $allPsCatIds)
+                    ->pluck('ppm_value', 'prestashop_id')
+                    ->toArray();
             }
 
-            Log::info('CategoryPreviewModal: Checking conflicts for products', [
-                'shop_id' => $preview->shop_id,
-                'mode' => $mode,
-                'product_count' => count($productIds),
-            ]);
+            // Batch-fetch existing products by SKU (single query)
+            $skus = array_filter(array_column($analyzedProducts, 'reference'));
+            $existingProducts = [];
+            if (!empty($skus)) {
+                $existingProducts = \App\Models\Product::whereIn('sku', $skus)
+                    ->get(['id', 'sku', 'name'])
+                    ->keyBy('sku');
+            }
 
-            // Fetch PrestaShop category data for these products
-            $clientFactory = app(\App\Services\PrestaShop\PrestaShopClientFactory::class);
-            $client = $clientFactory->create($preview->shop);
+            // Batch-fetch product categories for existing products (2 queries)
+            $existingProductIds = $existingProducts->pluck('id')->toArray();
+            $defaultCategoriesMap = [];
+            $shopCategoriesMap = [];
+            if (!empty($existingProductIds)) {
+                $defaultCategoriesMap = \DB::table('product_categories')
+                    ->whereIn('product_id', $existingProductIds)
+                    ->whereNull('shop_id')
+                    ->get(['product_id', 'category_id'])
+                    ->groupBy('product_id')
+                    ->map(fn($g) => $g->pluck('category_id')->toArray())
+                    ->toArray();
 
-            foreach ($productIds as $prestashopProductId) {
-                try {
-                    // Get product from PrestaShop
-                    $prestashopData = $client->getProduct($prestashopProductId);
+                $shopCategoriesMap = \DB::table('product_categories')
+                    ->whereIn('product_id', $existingProductIds)
+                    ->where('shop_id', $preview->shop_id)
+                    ->get(['product_id', 'category_id'])
+                    ->groupBy('product_id')
+                    ->map(fn($g) => $g->pluck('category_id')->toArray())
+                    ->toArray();
+            }
 
-                    // 🔧 FIX 2025-10-13: Unwrap nested 'product' key (same as import)
-                    // PrestaShop API returns: {product: {id: 123, associations: {...}}}
-                    if (isset($prestashopData['product']) && is_array($prestashopData['product'])) {
-                        $psProduct = $prestashopData['product'];
-                    } else {
-                        $psProduct = $prestashopData;
+            foreach ($analyzedProducts as $productData) {
+                $sku = $productData['reference'] ?? '';
+                if (empty($sku) || !isset($existingProducts[$sku])) {
+                    continue; // First import, no conflict possible
+                }
+
+                $product = $existingProducts[$sku];
+                $ppmProductId = $product->id;
+
+                // Map PS category IDs → PPM IDs using pre-built mapping
+                $ppmCategoryIds = [];
+                foreach ($productData['categories'] ?? [] as $cat) {
+                    $psId = is_array($cat) ? (int) ($cat['id'] ?? 0) : (int) $cat;
+                    if ($psId > 0 && isset($categoryMapping[$psId])) {
+                        $ppmCategoryIds[] = (int) $categoryMapping[$psId];
                     }
+                }
+                $ppmCategoryIds = array_unique($ppmCategoryIds);
 
-                    // 🔧 FIX 2025-10-13 ETAP 1: Use same category mapping logic as import
-                    // Extract and MAP categories (PrestaShop → PPM IDs)
-                    // This matches the logic in PrestaShopImportService::syncProductCategories()
-                    $ppmCategoryIds = $this->extractAndMapCategories($psProduct, $preview->shop);
+                $defaultCategories = $defaultCategoriesMap[$ppmProductId] ?? [];
+                $shopCategories = $shopCategoriesMap[$ppmProductId] ?? [];
 
-                    Log::info('📦 CategoryPreviewModal: Product categories after mapping', [
-                        'prestashop_product_id' => $prestashopProductId,
-                        'raw_ps_categories' => $this->extractPrestaShopCategoryIds($psProduct),
-                        'mapped_ppm_categories' => $ppmCategoryIds,
-                    ]);
+                sort($ppmCategoryIds);
+                sort($defaultCategories);
+                sort($shopCategories);
 
-                    // 🔧 FIX 2025-10-13 ETAP 1.5: UNIVERSAL RE-IMPORT detection
-                    // Product może istnieć w PPM jako:
-                    // 1. Ręcznie dodany (bez ProductShopData, ma DEFAULT categories)
-                    // 2. Z innego sklepu (ProductShopData z innym shop_id)
-                    // 3. Ten sam sklep (ProductShopData z tym samym shop_id)
-                    //
-                    // KLUCZOWE: Szukaj PO SKU (reference), nie po prestashop_product_id!
-                    // SKU jest uniwersalnym identyfikatorem produktu w PPM
+                $hasDefaultConflict = ($ppmCategoryIds !== $defaultCategories);
+                $hasShopConflict = ($ppmCategoryIds !== $shopCategories);
 
-                    $product = null;
-                    $ppmProductId = null;
-                    $existingShopId = null;
-                    $foundBy = null;
+                $rawPsCatIds = [];
+                foreach ($productData['categories'] ?? [] as $cat) {
+                    $id = is_array($cat) ? (int) ($cat['id'] ?? 0) : (int) $cat;
+                    if ($id > 0) $rawPsCatIds[] = $id;
+                }
+                $hasUnmappedCategories = (empty($ppmCategoryIds) && !empty($rawPsCatIds));
 
-                    // METODA 1 (PRIMARY): Search by SKU from PrestaShop reference
-                    // To pokrywa WSZYSTKIE scenariusze: ręczne, cross-shop, same-shop
-                    $sku = $psProduct['reference'] ?? null;
+                if ($hasDefaultConflict || $hasShopConflict || $hasUnmappedCategories) {
+                    $importWillAssign = !empty($ppmCategoryIds)
+                        ? $this->mapCategoryIdsToNames($ppmCategoryIds)
+                        : array_map(fn($id) => "PS#$id", $rawPsCatIds);
 
-                    if ($sku) {
-                        $product = \App\Models\Product::where('sku', $sku)->first();
-
-                        if ($product) {
-                            $ppmProductId = $product->id;
-                            $foundBy = 'SKU';
-
-                            // Check if product has ProductShopData for ANY shop
-                            $existingShopData = \App\Models\ProductShopData::where('product_id', $ppmProductId)->first();
-                            $existingShopId = $existingShopData->shop_id ?? null;
-
-                            Log::info('✅ CategoryPreviewModal: Product found by SKU', [
-                                'prestashop_product_id' => $prestashopProductId,
-                                'sku' => $sku,
-                                'ppm_product_id' => $ppmProductId,
-                                'existing_shop_id' => $existingShopId,
-                                'importing_to_shop_id' => $preview->shop_id,
-                                'scenario' => $existingShopId
-                                    ? ($existingShopId === $preview->shop_id ? 'SAME_SHOP_REIMPORT' : 'CROSS_SHOP_IMPORT')
-                                    : 'MANUAL_PRODUCT_IMPORT',
-                            ]);
-                        }
-                    }
-
-                    // METODA 2 (FALLBACK): Search by prestashop_product_id
-                    // Tylko jeśli produkt nie ma SKU (bardzo rzadkie)
-                    if (!$product) {
-                        $anyProductShopData = \App\Models\ProductShopData::where('prestashop_product_id', $prestashopProductId)
-                            ->first();
-
-                        if ($anyProductShopData) {
-                            $ppmProductId = $anyProductShopData->product_id;
-                            $product = \App\Models\Product::find($ppmProductId);
-                            $existingShopId = $anyProductShopData->shop_id;
-                            $foundBy = 'ProductShopData';
-
-                            Log::info('✅ CategoryPreviewModal: Product found by ProductShopData (no SKU)', [
-                                'prestashop_product_id' => $prestashopProductId,
-                                'ppm_product_id' => $ppmProductId,
-                                'existing_shop_id' => $existingShopId,
-                                'importing_to_shop_id' => $preview->shop_id,
-                            ]);
-                        }
-                    }
-
-                    // If product NOT found by either method → TRUE first import
-                    if (!$product || !$ppmProductId) {
-                        Log::debug('CategoryPreviewModal: Product NOT FOUND - first import', [
-                            'prestashop_product_id' => $prestashopProductId,
-                            'sku' => $sku ?? 'N/A',
-                            'checked_methods' => ['SKU', 'ProductShopData'],
-                        ]);
-                        continue; // TRUE first import, no conflict
-                    }
-
-                    // Skip conflict check if no mapped categories (import będzie auto-create categories)
-                    if (empty($ppmCategoryIds)) {
-                        Log::debug('CategoryPreviewModal: No categories mapped - will check default categories for conflicts', [
-                            'prestashop_product_id' => $prestashopProductId,
-                            'ppm_product_id' => $ppmProductId,
-                            'existing_shop_id' => $existingShopId,
-                        ]);
-                        // KONTYNUUJ sprawdzanie konfliktów nawet bez mappingu - może istnieć konflikt w default categories
-                    }
-
-                    // At this point: $product and $ppmProductId are guaranteed to exist (validated above)
-                    // Get DEFAULT categories (shop_id=NULL)
-                    $defaultCategories = \DB::table('product_categories')
-                        ->where('product_id', $ppmProductId)
-                        ->whereNull('shop_id')
-                        ->pluck('category_id')
-                        ->toArray();
-
-                    // Get SHOP-SPECIFIC categories (shop_id=X)
-                    $shopCategories = \DB::table('product_categories')
-                        ->where('product_id', $ppmProductId)
-                        ->where('shop_id', $preview->shop_id)
-                        ->pluck('category_id')
-                        ->toArray();
-
-                    // NOTE: $ppmCategoryIds already contains mapped PPM category IDs from extractAndMapCategories()
-                    // No need for additional conversion - this is the same data as import would use!
-
-                    Log::info('🔍 CategoryPreviewModal: Comparing categories (using mapped PPM IDs)', [
+                    $conflicts[] = [
                         'product_id' => $ppmProductId,
-                        'sku' => $product->sku,
-                        'mapped_ppm_categories' => $ppmCategoryIds,
-                        'ppm_default_categories' => $defaultCategories,
-                        'ppm_shop_categories' => $shopCategories,
-                    ]);
-
-                    // Check if categories differ (now using PPM IDs directly)
-                    // Sort arrays to ensure order doesn't matter
-                    sort($ppmCategoryIds);
-                    sort($defaultCategories);
-                    sort($shopCategories);
-
-                    // 🔧 FIX 2025-10-13: Correct conflict detection logic
-                    // Conflict istnieje gdy tablice SĄ RÓŻNE (niezależnie która większa)
-                    // array_diff() TYLKO pokazuje elementy z PIERWSZEJ tablicy których NIE MA w drugiej
-                    // ALE konflikt to różnica w KTÓRYMKOLWIEK kierunku!
-
-                    $hasDefaultConflict = ($ppmCategoryIds !== $defaultCategories);
-                    $hasShopConflict = ($ppmCategoryIds !== $shopCategories);
-
-                    // Special case: unmapped categories (will be auto-imported with unknown PPM IDs)
-                    $rawPsCategories = $this->extractPrestaShopCategoryIds($psProduct);
-                    $hasUnmappedCategories = (empty($ppmCategoryIds) && !empty($rawPsCategories));
-
-                    $hasConflict = $hasDefaultConflict || $hasShopConflict || $hasUnmappedCategories;
-
-                    Log::info('🔍 CategoryPreviewModal: Category comparison results', [
-                        'product_id' => $ppmProductId,
-                        'mapped_ppm_categories' => $ppmCategoryIds,
-                        'default_categories' => $defaultCategories,
-                        'shop_categories' => $shopCategories,
-                        'raw_ps_categories' => $rawPsCategories,
+                        'prestashop_product_id' => $productData['ps_id'] ?? 0,
+                        'sku' => $sku,
+                        'name' => $product->name,
+                        'import_will_assign_categories' => $importWillAssign,
+                        'ppm_default_categories' => $this->mapCategoryIdsToNames($defaultCategories),
+                        'shop_categories' => $this->mapCategoryIdsToNames($shopCategories),
+                        'raw_ps_categories' => $rawPsCatIds,
                         'has_default_conflict' => $hasDefaultConflict,
                         'has_shop_conflict' => $hasShopConflict,
                         'has_unmapped_categories' => $hasUnmappedCategories,
-                        'has_conflict' => $hasConflict,
-                    ]);
-
-                    if ($hasConflict) {
-                        // CONFLICT DETECTED!
-                        // 🔧 FIX 2025-10-14: Map category IDs to NAMES for UI display
-                        // If mapped categories are empty but raw PrestaShop categories exist,
-                        // fetch actual category names from PrestaShop API instead of showing IDs
-                        $importWillAssign = !empty($ppmCategoryIds)
-                            ? $this->mapCategoryIdsToNames($ppmCategoryIds)
-                            : $this->mapPrestaShopCategoryIdsToNames($rawPsCategories, $preview->shop);
-
-                        $conflicts[] = [
-                            'product_id' => $ppmProductId,
-                            'prestashop_product_id' => $prestashopProductId,
-                            'sku' => $product->sku,
-                            'name' => $product->name,
-                            'import_will_assign_categories' => $importWillAssign, // Mapped names OR raw PS IDs
-                            'ppm_default_categories' => $this->mapCategoryIdsToNames($defaultCategories), // Mapped names
-                            'shop_categories' => $this->mapCategoryIdsToNames($shopCategories), // Mapped names
-                            'raw_ps_categories' => $rawPsCategories, // Raw PrestaShop categories (not mapped)
-                            'has_default_conflict' => $hasDefaultConflict,
-                            'has_shop_conflict' => $hasShopConflict,
-                            'has_unmapped_categories' => $hasUnmappedCategories,
-                        ];
-
-                        Log::warning('🚨 CategoryPreviewModal: CONFLICT DETECTED!', [
-                            'product_id' => $ppmProductId,
-                            'sku' => $product->sku,
-                            'name' => $product->name,
-                            'import_will_assign' => $ppmCategoryIds,
-                            'current_default' => $defaultCategories,
-                            'current_shop' => $shopCategories,
-                            'raw_ps_categories' => $rawPsCategories,
-                            'has_default_conflict' => $hasDefaultConflict,
-                            'has_shop_conflict' => $hasShopConflict,
-                            'has_unmapped_categories' => $hasUnmappedCategories,
-                        ]);
-                    }
-
-                } catch (\Exception $e) {
-                    Log::warning('CategoryPreviewModal: Failed to check product conflict', [
-                        'prestashop_product_id' => $prestashopProductId,
-                        'error' => $e->getMessage(),
-                    ]);
-                    continue;
+                    ];
                 }
             }
 
             Log::info('CategoryPreviewModal: Conflict detection complete', [
                 'conflicts_found' => count($conflicts),
+                'products_checked' => count($analyzedProducts),
             ]);
 
         } catch (\Exception $e) {
             Log::error('CategoryPreviewModal: Conflict detection failed', [
                 'preview_id' => $preview->id,
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
             ]);
         }
 
@@ -3166,85 +3046,70 @@ class CategoryPreviewModal extends Component
      */
     protected function getExistingProductCategories(CategoryPreview $preview): array
     {
-        $importContext = $preview->import_context_json ?? [];
-        $productIds = $importContext['options']['product_ids'] ?? $importContext['product_ids'] ?? [];
+        // FIX 2026-03-10: Use analyzed_products from file instead of N API calls
+        // Old code made getProduct() HTTP call per product (9554 calls = timeout!)
+        // New code extracts category IDs from pre-fetched analyzed_products data
+        $analyzedProducts = $preview->getAnalyzedProducts();
 
-        if (empty($productIds)) {
-            Log::debug('[CategoryPreviewModal] No product_ids in import_context_json');
-            return [];
-        }
-
-        // Fetch categories from PrestaShop API for these products
-        try {
-            $shop = PrestaShopShop::find($this->shopId);
-            if (!$shop) {
+        if (empty($analyzedProducts)) {
+            // Fallback: try product_ids from import context
+            $importContext = $preview->import_context_json ?? [];
+            $productIds = $importContext['options']['product_ids'] ?? $importContext['product_ids'] ?? [];
+            if (empty($productIds)) {
                 return [];
             }
-
-            $client = app(\App\Services\PrestaShop\PrestaShopClientFactory::class)->create($shop);
-
-            // Get all category IDs used by products
-            $allCategoryIds = [];
-            foreach ($productIds as $productId) {
-                try {
-                    $product = $client->getProduct($productId);
-                    $productData = $product['product'] ?? $product;
-
-                    // Default category
-                    if (isset($productData['id_category_default'])) {
-                        $allCategoryIds[] = (int) $productData['id_category_default'];
-                    }
-
-                    // Associated categories
-                    if (isset($productData['associations']['categories'])) {
-                        foreach ($productData['associations']['categories'] as $cat) {
-                            if (isset($cat['id'])) {
-                                $allCategoryIds[] = (int) $cat['id'];
-                            }
-                        }
-                    }
-                } catch (\Exception $e) {
-                    Log::debug('[CategoryPreviewModal] Failed to fetch product categories', [
-                        'product_id' => $productId,
-                        'error' => $e->getMessage(),
-                    ]);
-                }
-            }
-
-            $allCategoryIds = array_unique($allCategoryIds);
-
-            // Filter only existing (mapped) categories
-            $mappings = ShopMapping::where('shop_id', $this->shopId)
-                ->where('mapping_type', ShopMapping::TYPE_CATEGORY)
-                ->whereIn('prestashop_id', $allCategoryIds)
-                ->get();
-
-            $existingCategories = [];
-            foreach ($mappings as $mapping) {
-                $ppmCategory = Category::find($mapping->ppm_value);
-                if ($ppmCategory) {
-                    $existingCategories[] = [
-                        'prestashop_id' => (int) $mapping->prestashop_id,
-                        'id' => $ppmCategory->id,
-                        'name' => $ppmCategory->name,
-                        'level_depth' => $this->calculateCategoryLevel($ppmCategory),
-                    ];
-                }
-            }
-
-            Log::debug('[CategoryPreviewModal] Existing categories found', [
-                'total_category_ids' => count($allCategoryIds),
-                'existing_count' => count($existingCategories),
-            ]);
-
-            return $existingCategories;
-
-        } catch (\Exception $e) {
-            Log::error('[CategoryPreviewModal] Failed to get existing product categories', [
-                'error' => $e->getMessage(),
-            ]);
+            // Without analyzed_products, we can only use categoryTree PS IDs
+            // which are already handled by buildProductCategoriesTree()
             return [];
         }
+
+        // Collect all PS category IDs from analyzed products (already fetched)
+        $allCategoryIds = [];
+        foreach ($analyzedProducts as $p) {
+            foreach ($p['categories'] ?? [] as $cat) {
+                $id = is_array($cat) ? (int) ($cat['id'] ?? 0) : (int) $cat;
+                if ($id > 0) {
+                    $allCategoryIds[] = $id;
+                }
+            }
+        }
+        $allCategoryIds = array_unique($allCategoryIds);
+
+        if (empty($allCategoryIds)) {
+            return [];
+        }
+
+        // Filter only existing (mapped) categories - single DB query
+        $mappings = ShopMapping::where('shop_id', $this->shopId)
+            ->where('mapping_type', ShopMapping::TYPE_CATEGORY)
+            ->whereIn('prestashop_id', $allCategoryIds)
+            ->get();
+
+        // Batch-fetch PPM categories
+        $ppmIds = $mappings->pluck('ppm_value')->unique()->toArray();
+        $ppmCategories = !empty($ppmIds)
+            ? Category::whereIn('id', $ppmIds)->get()->keyBy('id')
+            : collect();
+
+        $existingCategories = [];
+        foreach ($mappings as $mapping) {
+            $ppmCategory = $ppmCategories->get($mapping->ppm_value);
+            if ($ppmCategory) {
+                $existingCategories[] = [
+                    'prestashop_id' => (int) $mapping->prestashop_id,
+                    'id' => $ppmCategory->id,
+                    'name' => $ppmCategory->name,
+                    'level_depth' => $this->calculateCategoryLevel($ppmCategory),
+                ];
+            }
+        }
+
+        Log::debug('[CategoryPreviewModal] Existing categories found (from analyzed_products)', [
+            'total_category_ids' => count($allCategoryIds),
+            'existing_count' => count($existingCategories),
+        ]);
+
+        return $existingCategories;
     }
 
     /**

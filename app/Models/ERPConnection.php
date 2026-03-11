@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\Auditable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -76,7 +77,7 @@ use Carbon\Carbon;
  */
 class ERPConnection extends Model
 {
-    use HasFactory;
+    use HasFactory, Auditable;
 
     /**
      * The table associated with the model.
@@ -110,6 +111,7 @@ class ERPConnection extends Model
         'price_sync_frequency',  // Czestotliwosc sync cen
         'stock_sync_frequency',  // Czestotliwosc sync stanow
         'basic_data_sync_frequency',  // Czestotliwosc sync danych podstawowych
+        'location_sync_frequency',  // Czestotliwosc sync lokalizacji magazynowych
         'sync_settings',
         'auto_sync_products',
         'auto_sync_stock',
@@ -117,10 +119,13 @@ class ERPConnection extends Model
         'auto_sync_orders',
         'is_price_source',  // ETAP_08 FAZA 3.1-3.2
         'is_stock_source',  // ETAP_08 FAZA 3.1-3.2
+        'is_location_source',  // Bidirectional location sync
         'field_mappings',
         'transformation_rules',
         'validation_rules',
         'last_sync_at',
+        'last_change_time',
+        'last_stock_checksum_at',
         'next_scheduled_sync',
         'sync_success_count',
         'sync_error_count',
@@ -160,6 +165,7 @@ class ERPConnection extends Model
         'notify_on_auth_expire' => 'boolean',
         'is_price_source' => 'boolean',  // ETAP_08 FAZA 3.1-3.2
         'is_stock_source' => 'boolean',  // ETAP_08 FAZA 3.1-3.2
+        'is_location_source' => 'boolean',
         'connection_config' => 'array',
         'sync_settings' => 'array',
         'field_mappings' => 'array',
@@ -170,6 +176,8 @@ class ERPConnection extends Model
         'last_auth_at' => 'datetime',
         'last_health_check' => 'datetime',
         'last_sync_at' => 'datetime',
+        'last_change_time' => 'datetime',
+        'last_stock_checksum_at' => 'datetime',
         'next_scheduled_sync' => 'datetime',
         'rate_limit_reset_at' => 'datetime',
         'last_response_time' => 'decimal:3',

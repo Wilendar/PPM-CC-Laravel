@@ -171,8 +171,7 @@ class ProcessMediaUpload implements ShouldQueue
         $metadata = [];
 
         try {
-            // FIX 2025-12-01: Use 'public' disk - media files are stored there
-            $fullPath = Storage::disk('public')->path($media->file_path);
+            $fullPath = Storage::path($media->file_path);
 
             if (!file_exists($fullPath)) {
                 return $metadata;

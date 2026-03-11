@@ -77,9 +77,12 @@ trait ProductFormFeatures
         }
 
         try {
-            $features = ProductFeature::where('product_id', $this->product->id)
-                ->with('featureType')
-                ->get();
+            // Use eager-loaded features relation if available, otherwise query DB
+            $features = $this->product->relationLoaded('features')
+                ? $this->product->features
+                : ProductFeature::where('product_id', $this->product->id)
+                    ->with('featureType')
+                    ->get();
 
             $this->productFeatures = $features->map(function ($feature) {
                 return [

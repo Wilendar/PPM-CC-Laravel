@@ -4,6 +4,7 @@ namespace App\Jobs\PrestaShop;
 
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
@@ -51,9 +52,14 @@ use App\Services\JobProgressService;
  * @version 1.0
  * @since ETAP_07 FAZA 3D
  */
-class BulkCreateCategories implements ShouldQueue
+class BulkCreateCategories implements ShouldQueue, ShouldBeUnique
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+
+    /**
+     * Unique lock timeout (30 minutes)
+     */
+    public int $uniqueFor = 1800;
 
     /**
      * CategoryPreview record ID
@@ -108,6 +114,14 @@ class BulkCreateCategories implements ShouldQueue
     }
 
     /**
+     * Unique ID for ShouldBeUnique - per preview
+     */
+    public function uniqueId(): string
+    {
+        return 'bulk-create-cats-preview-' . $this->previewId;
+    }
+
+    /**
      * Execute the job
      *
      * @param PrestaShopImportService $importService
@@ -119,6 +133,8 @@ class BulkCreateCategories implements ShouldQueue
         JobProgressService $progressService
     ): void {
         $startTime = microtime(true);
+        $heartbeatId = null;
+        $guard = app(\App\Services\WorkerGuardService::class);
 
         Log::info('BulkCreateCategories job started', [
             'preview_id' => $this->previewId,
@@ -129,6 +145,24 @@ class BulkCreateCategories implements ShouldQueue
         try {
             // STEP 1: Load CategoryPreview record
             $preview = CategoryPreview::findOrFail($this->previewId);
+
+            // WorkerGuard: Check if another worker is already processing this job
+            if ($preview->job_id && $guard->hasActiveWorker($preview->job_id)) {
+                Log::warning('BulkCreateCategories: Active worker detected, aborting', [
+                    'job_id' => $preview->job_id,
+                    'preview_id' => $this->previewId,
+                ]);
+                return;
+            }
+
+            // WorkerGuard: Register this worker
+            if ($preview->job_id) {
+                $heartbeatId = $guard->registerWorker($preview->job_id, 'scheduler', [
+                    'job_class' => 'BulkCreateCategories',
+                    'preview_id' => $this->previewId,
+                    'shop_id' => $preview->shop_id,
+                ]);
+            }
 
             Log::info('CategoryPreview loaded', [
                 'preview_id' => $preview->id,
@@ -163,12 +197,26 @@ class BulkCreateCategories implements ShouldQueue
             $progressId = null;
             if ($preview->job_id) {
                 $progressId = $progressService->startPendingJob($preview->job_id, $total);
+
+                // Update phase metadata so progress bar shows "Tworzenie kategorii"
+                // instead of leftover "Importowanie produktow" from AnalyzeMissingCategories
+                if ($progressId) {
+                    $progressService->updateMetadata($progressId, [
+                        'phase' => 'creating_categories',
+                        'phase_label' => 'Tworzenie kategorii',
+                        'job_type_override' => 'Tworzenie kategorii',
+                    ]);
+                }
             }
 
-            // STEP 4.5: Ensure ancestor category mappings exist for this shop
+            // STEP 4.5: Ensure base PPM categories (Baza, Wszystko) exist before import
+            $importService->ensureBaseCategoriesExist();
+
+            // STEP 4.6: Ensure ancestor category mappings exist for this shop
             // For shops without prior imports (0 mappings), we need to create mappings
             // for existing PPM categories that match PS ancestors by name.
-            $this->ensureAncestorMappings($categoriesToImport, $shop);
+            // If no PPM match found, import the ancestor category from PrestaShop.
+            $this->ensureAncestorMappings($categoriesToImport, $shop, $importService);
 
             // STEP 5: Import each category (non-recursive - already sorted by level_depth)
             $imported = 0;
@@ -185,16 +233,17 @@ class BulkCreateCategories implements ShouldQueue
                         $errors = []; // Reset errors after batch update
                     }
 
-                    // Import category using PrestaShopImportService
-                    // Use recursive mode if shop has no prior mappings (safe fallback)
-                    $hasShopMappings = \App\Models\ShopMapping::where('shop_id', $shop->id)
-                        ->where('mapping_type', \App\Models\ShopMapping::TYPE_CATEGORY)
-                        ->exists();
+                    // WorkerGuard: Send heartbeat every 5 categories
+                    if ($heartbeatId && $index % 5 === 0) {
+                        $guard->sendHeartbeat($heartbeatId);
+                    }
 
+                    // Import category using PrestaShopImportService
+                    // ALWAYS recursive=true to auto-create missing parent chains
                     $category = $importService->importCategoryFromPrestaShop(
                         $prestashopCategoryId,
                         $shop,
-                        !$hasShopMappings // recursive if no mappings exist yet
+                        true // always recursive - handles missing parents automatically
                     );
 
                     $imported++;
@@ -209,9 +258,8 @@ class BulkCreateCategories implements ShouldQueue
                     $skipped++;
 
                     $errors[] = [
-                        'prestashop_id' => $categoryData['prestashop_id'],
-                        'name' => $categoryData['name'],
-                        'error' => $e->getMessage(),
+                        'sku' => $categoryData['name'] ?? 'PS#' . $categoryData['prestashop_id'],
+                        'message' => $e->getMessage(),
                     ];
 
                     Log::error('Failed to import category', [
@@ -251,13 +299,34 @@ class BulkCreateCategories implements ShouldQueue
                 throw new \Exception('Failed to import any categories');
             }
 
-            // STEP 8: Dispatch BulkImportProducts (original import)
-            if (!empty($this->originalImportOptions)) {
+            // STEP 8: Finalize category progress and dispatch product import
+            $willDispatchProducts = !empty($this->originalImportOptions);
+
+            if ($willDispatchProducts) {
+                // CRITICAL: Finalize category progress BEFORE dispatching BulkImportProducts
+                // to avoid race condition where both jobs update the same progress record
+                if ($progressId) {
+                    // Final category count update
+                    $progressService->updateProgress($progressId, $total, []);
+
+                    $progressService->updateMetadata($progressId, [
+                        'phase' => 'transitioning_to_products',
+                        'phase_label' => 'Przygotowanie importu produktow...',
+                        'categories_imported' => $imported,
+                        'categories_skipped' => $skipped,
+                    ]);
+                }
+
+                Log::info('BulkCreateCategories: All updates done, dispatching BulkImportProducts', [
+                    'preview_id' => $preview->id,
+                    'categories_imported' => $imported,
+                ]);
+
                 $this->dispatchProductImport($preview);
             }
 
-            // STEP 9: Mark job progress as completed
-            if ($progressId) {
+            // STEP 9: Mark job progress as completed ONLY if no product import follows
+            if ($progressId && !$willDispatchProducts) {
                 $progressService->markCompleted($progressId, [
                     'imported' => $imported,
                     'skipped' => $skipped,
@@ -298,6 +367,11 @@ class BulkCreateCategories implements ShouldQueue
             }
 
             throw $e;
+        } finally {
+            // WorkerGuard: Always unregister worker on exit
+            if ($heartbeatId) {
+                $guard->unregisterWorker($heartbeatId);
+            }
         }
     }
 
@@ -317,7 +391,8 @@ class BulkCreateCategories implements ShouldQueue
      */
     protected function ensureAncestorMappings(
         array $categoriesToImport,
-        PrestaShopShop $shop
+        PrestaShopShop $shop,
+        ?PrestaShopImportService $importService = null
     ): void {
         // Collect all unique parent PS IDs that we'll need mappings for
         $neededParentPsIds = [];
@@ -428,15 +503,41 @@ class BulkCreateCategories implements ShouldQueue
                     if ($ancestorParentPsId > 2) {
                         $this->ensureAncestorMappings(
                             [['prestashop_id' => $psId, 'parent_id' => $ancestorParentPsId]],
-                            $shop
+                            $shop,
+                            $importService
                         );
                     }
                 } else {
-                    Log::info('BulkCreateCategories: No PPM match for ancestor', [
-                        'ps_id' => $psId,
-                        'ps_name' => $psName,
-                        'shop_id' => $shop->id,
-                    ]);
+                    // No PPM match - CREATE the ancestor category via import service
+                    if ($importService) {
+                        try {
+                            $newCategory = $importService->importCategoryFromPrestaShop(
+                                (int) $psId,
+                                $shop,
+                                true // recursive - import parent chain too
+                            );
+
+                            Log::info('BulkCreateCategories: Ancestor created via import', [
+                                'ps_id' => $psId,
+                                'ps_name' => $psName,
+                                'ppm_id' => $newCategory->id,
+                                'shop_id' => $shop->id,
+                            ]);
+                        } catch (\Exception $createError) {
+                            Log::warning('BulkCreateCategories: Failed to create ancestor', [
+                                'ps_id' => $psId,
+                                'ps_name' => $psName,
+                                'error' => $createError->getMessage(),
+                                'shop_id' => $shop->id,
+                            ]);
+                        }
+                    } else {
+                        Log::info('BulkCreateCategories: No PPM match for ancestor (no import service)', [
+                            'ps_id' => $psId,
+                            'ps_name' => $psName,
+                            'shop_id' => $shop->id,
+                        ]);
+                    }
                 }
             } catch (\Exception $e) {
                 Log::warning('BulkCreateCategories: Failed to resolve ancestor', [
@@ -511,6 +612,25 @@ class BulkCreateCategories implements ShouldQueue
     {
         $shop = $preview->shop;
         $jobId = $preview->job_id;
+
+        // FIX: Atomic phase label update BEFORE dispatch
+        // So UI shows "Dodawanie produktow" immediately, not stale "Tworzenie kategorii"
+        if ($jobId) {
+            DB::table('job_progress')
+                ->where('job_id', $jobId)
+                ->update([
+                    'status' => 'running',
+                    'current_count' => 0,
+                    'total_count' => 0,
+                    'metadata' => DB::raw("JSON_SET(
+                        COALESCE(metadata, '{}'),
+                        '$.phase', 'importing_products',
+                        '$.phase_label', 'Dodawanie produktow - uruchamianie...',
+                        '$.job_type_override', 'Importowanie produktow'
+                    )"),
+                    'updated_at' => now(),
+                ]);
+        }
 
         // 🔧 FIX: Flatten nested options structure + prevent infinite loop
         // originalImportOptions has: ['mode' => 'category', 'options' => ['category_id' => 12, ...]]

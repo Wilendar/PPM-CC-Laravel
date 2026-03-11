@@ -1137,30 +1137,29 @@ trait UVE_PropertyPanel
             ]);
         }
 
-        // FIX #12 + FIX #14d: ALWAYS dispatch uve-background-updated when selecting ANY element
+        // FIX #12: Dispatch uve-background-updated when selecting element with CSS background
         // This updates Alpine background control which has wire:ignore.self
-        // FIX #14d: MUST dispatch even with empty values to RESET previous element's gradient!
         // NOTE: Background control shows ONLY CSS background-image/background-color
         // Nested <img> elements are handled by image-settings control (via uve-image-url-updated above)
         // IMG ≠ Background Image - these are conceptually different!
         $backgroundImage = $this->elementStyles['backgroundImage'] ?? null;
         $backgroundColor = $this->elementStyles['backgroundColor'] ?? null;
 
-        // FIX #14d: ALWAYS dispatch - empty values will reset the controls
-        $this->dispatch('uve-background-updated',
-            backgroundImage: $backgroundImage, // ONLY CSS background-image, NOT nested img src (may be null/empty)
-            backgroundColor: $backgroundColor, // May be null/empty - this RESETS the control
-            backgroundSize: $this->elementStyles['backgroundSize'] ?? 'cover',
-            backgroundPosition: $this->elementStyles['backgroundPosition'] ?? 'center center',
-            backgroundRepeat: $this->elementStyles['backgroundRepeat'] ?? 'no-repeat',
-            backgroundAttachment: $this->elementStyles['backgroundAttachment'] ?? 'scroll',
-        );
-        Log::debug('[UVE_PropertyPanel] Dispatched uve-background-updated for element', [
-            'elementId' => $elementId,
-            'backgroundImage' => $backgroundImage,
-            'backgroundColor' => $backgroundColor,
-            'hasBackground' => (bool)($backgroundImage || $backgroundColor),
-        ]);
+        if ($backgroundImage || $backgroundColor) {
+            $this->dispatch('uve-background-updated',
+                backgroundImage: $backgroundImage, // ONLY CSS background-image, NOT nested img src
+                backgroundColor: $backgroundColor,
+                backgroundSize: $this->elementStyles['backgroundSize'] ?? 'cover',
+                backgroundPosition: $this->elementStyles['backgroundPosition'] ?? 'center center',
+                backgroundRepeat: $this->elementStyles['backgroundRepeat'] ?? 'no-repeat',
+                backgroundAttachment: $this->elementStyles['backgroundAttachment'] ?? 'scroll',
+            );
+            Log::debug('[UVE_PropertyPanel] Dispatched uve-background-updated for element', [
+                'elementId' => $elementId,
+                'backgroundImage' => $backgroundImage,
+                'backgroundColor' => $backgroundColor,
+            ]);
+        }
 
         // FIX #14: Dispatch uve-slider-config-updated for slider elements
         // This updates Alpine slider-settings control which has wire:ignore.self
@@ -1347,14 +1346,16 @@ trait UVE_PropertyPanel
     // =====================
 
     /**
-     * Open gradient editor - FIX #14: Now inline editor is available
-     * This method is kept for backward compatibility but gradient editing
-     * is now done inline within the Background control's Gradient tab.
+     * Open gradient editor modal (placeholder for future feature)
+     * FIX #13b: Currently shows notification, full editor TBD
      */
     public function openGradientEditor(): void
     {
-        // FIX #14: Gradient editor is now inline in the Background control
-        // This dispatch tells Alpine to switch to the gradient tab
-        $this->dispatch('uve-switch-background-tab', tab: 'gradient');
+        // For now, dispatch notification that user should use textarea
+        // Full gradient picker UI will be implemented in future
+        $this->dispatch('notify', [
+            'type' => 'info',
+            'message' => 'Edytor gradientów jest w trakcie rozwoju. Użyj pola tekstowego powyżej do edycji gradientu.',
+        ]);
     }
 }

@@ -3,16 +3,12 @@
  * PPM-CC-Laravel Enterprise
  */
 
-/* Main category preview modal - MUST be above admin header (z-index: 100) */
+/* Main category preview modal */
 .modal-category-preview-root {
     position: fixed;
     inset: 0;
     overflow-y: auto;
-    z-index: 150;
-    display: flex;
-    align-items: flex-start;
-    justify-content: center;
-    padding-top: 2rem;
+    z-index: 60; /* FIX 2025-10-15: Increased from 10 to 60 (standard modal level) */
 }
 
 /* Conflict resolution modal - must appear above main modal */
@@ -20,18 +16,14 @@
     position: fixed;
     inset: 0;
     overflow-y: auto;
-    z-index: 160;
-    display: flex;
-    align-items: flex-start;
-    justify-content: center;
-    padding-top: 2rem;
+    z-index: 70; /* FIX 2025-10-15: Increased from 11 to 70 (overlay modal level) */
 }
 
 /* Create category form overlay - must appear above conflict modal */
 .modal-create-category-form-overlay {
     position: fixed;
     inset: 0;
-    z-index: 170;
+    z-index: 80; /* FIX 2025-10-15: Above conflict modal (70) for create form triggered from CategoryPicker */
     display: flex;
     align-items: center;
     justify-content: center;
@@ -89,172 +81,9 @@
     /* Node container for recursive tree */
 }
 
-/* ---- Indentation spacers (replacing inline style) ---- */
-.category-preview-indent {
-    display: inline-block;
-    flex-shrink: 0;
-}
-
-.category-preview-indent[data-level="1"] { width: 20px; }
-.category-preview-indent[data-level="2"] { width: 40px; }
-.category-preview-indent[data-level="3"] { width: 60px; }
-.category-preview-indent[data-level="4"] { width: 80px; }
-.category-preview-indent[data-level="5"] { width: 100px; }
-
-/* ---- Expand/Collapse chevron ---- */
-.category-preview-chevron {
-    flex-shrink: 0;
-    width: 20px;
-    height: 20px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 4px;
-    cursor: pointer;
-    transition: transform 0.2s ease, background 0.15s ease;
-    background: transparent;
-    border: none;
-    padding: 0;
-}
-
-.category-preview-chevron:hover {
-    background: rgba(100, 116, 139, 0.3);
-}
-
-.category-preview-chevron--expanded {
-    transform: rotate(90deg);
-}
-
-/* ---- Leaf dot (no children) ---- */
-.category-preview-leaf-dot {
-    flex-shrink: 0;
-    width: 20px;
-    height: 20px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-/* ---- Level-colored folder icons ---- */
-.category-preview-folder-icon {
-    width: 24px;
-    height: 24px;
-    border-radius: 6px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-    transition: transform 0.2s ease;
-}
-
-.category-preview-row:hover .category-preview-folder-icon {
-    transform: scale(1.05);
-}
-
-/* Level 0 - Blue */
-.category-preview-folder-icon--level-0 {
-    background: linear-gradient(135deg, rgba(59, 130, 246, 0.2), rgba(37, 99, 235, 0.1));
-    border: 1px solid rgba(59, 130, 246, 0.3);
-    color: #60a5fa;
-}
-
-/* Level 1 - Green */
-.category-preview-folder-icon--level-1 {
-    background: linear-gradient(135deg, rgba(34, 197, 94, 0.2), rgba(22, 163, 74, 0.1));
-    border: 1px solid rgba(34, 197, 94, 0.3);
-    color: #4ade80;
-}
-
-/* Level 2 - Purple */
-.category-preview-folder-icon--level-2 {
-    background: linear-gradient(135deg, rgba(168, 85, 247, 0.2), rgba(147, 51, 234, 0.1));
-    border: 1px solid rgba(168, 85, 247, 0.3);
-    color: #c084fc;
-}
-
-/* Level 3 - Orange */
-.category-preview-folder-icon--level-3 {
-    background: linear-gradient(135deg, rgba(249, 115, 22, 0.2), rgba(234, 88, 12, 0.1));
-    border: 1px solid rgba(249, 115, 22, 0.3);
-    color: #fb923c;
-}
-
-/* Level 4 - Pink */
-.category-preview-folder-icon--level-4 {
-    background: linear-gradient(135deg, rgba(236, 72, 153, 0.2), rgba(219, 39, 119, 0.1));
-    border: 1px solid rgba(236, 72, 153, 0.3);
-    color: #f472b6;
-}
-
-/* Level 5+ - Teal */
-.category-preview-folder-icon--level-5 {
-    background: linear-gradient(135deg, rgba(20, 184, 166, 0.2), rgba(13, 148, 136, 0.1));
-    border: 1px solid rgba(20, 184, 166, 0.3);
-    color: #2dd4bf;
-}
-
-/* ---- File icon (leaf node) ---- */
-.category-preview-file-icon {
-    flex-shrink: 0;
-    width: 24px;
-    height: 24px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-/* ---- Status badges ---- */
-.category-preview-badge {
-    padding: 0.125rem 0.375rem;
-    font-size: 0.6875rem;
-    font-weight: 500;
-    border-radius: 0.25rem;
-}
-
-.category-preview-badge--new {
-    background: rgba(16, 185, 129, 0.15);
-    color: #6ee7b7;
-    border: 1px solid rgba(16, 185, 129, 0.3);
-}
-
-.category-preview-badge--has-new {
-    background: rgba(245, 158, 11, 0.1);
-    color: #fbbf24;
-    border: 1px solid rgba(245, 158, 11, 0.25);
-}
-
-.category-preview-badge--product {
-    background: rgba(59, 130, 246, 0.15);
-    color: #60a5fa;
-    border: 1px solid rgba(59, 130, 246, 0.3);
-}
-
-/* ---- Children container ---- */
-.category-preview-children {
-    margin-left: 4px;
-    border-left: 1px solid rgba(75, 85, 99, 0.3);
-    padding-left: 4px;
-}
-
-/* ---- Connector lines ---- */
-.category-tree-connector[data-level="0"] > .category-preview-children {
-    border-left-color: rgba(59, 130, 246, 0.2);
-}
-
-.category-tree-connector[data-level="1"] > .category-preview-children {
-    border-left-color: rgba(34, 197, 94, 0.2);
-}
-
-.category-tree-connector[data-level="2"] > .category-preview-children {
-    border-left-color: rgba(168, 85, 247, 0.2);
-}
-
-.category-tree-connector[data-level="3"] > .category-preview-children {
-    border-left-color: rgba(249, 115, 22, 0.2);
-}
-
-.category-tree-connector[data-level="4"] > .category-preview-children {
-    border-left-color: rgba(236, 72, 153, 0.2);
+.category-tree-ppm-node .category-tree-ppm-node {
+    /* Nested nodes */
+    margin-left: 0;
 }
 
 /* ========================================================================
@@ -264,7 +93,7 @@
 .category-preview-warning-overlay {
     position: fixed;
     inset: 0;
-    z-index: 165;
+    z-index: 75;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -297,9 +126,6 @@
 .category-preview-types-table tr:hover td {
     background: rgba(255, 255, 255, 0.03);
 }
-
-/* DEPRECATED - replaced by <x-product-type-badge> component with dynamic colors from DB */
-/* These classes are kept for backward compatibility but are no longer used */
 
 /* Product type badge - base */
 .category-preview-type-badge {

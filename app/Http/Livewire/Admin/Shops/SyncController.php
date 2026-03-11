@@ -129,8 +129,10 @@ class SyncController extends Component
     public string $erpPriceSyncFrequency = '6_hours';
     public string $erpStockSyncFrequency = '6_hours';
     public string $erpBasicDataSyncFrequency = 'daily';
+    public string $erpLocationSyncFrequency = 'daily';
     public bool $erpIsPriceSource = false;
     public bool $erpIsStockSource = false;
+    public bool $erpIsLocationSource = false;
 
     // Listeners for real-time updates
     protected $listeners = [
@@ -421,9 +423,11 @@ class SyncController extends Component
             $query->where('target_id', $this->filterShopId);
         }
 
-        // Order by created_at (BUG #9 FIX #7)
+        // Order: active jobs (pending/running) first, then by created_at
+        // FIX: ensures active ERP sync jobs are always visible on page 1
         $orderDirection = $this->filterOrderBy === 'asc' ? 'asc' : 'desc';
-        $query->orderBy('created_at', $orderDirection);
+        $query->orderByRaw("CASE WHEN status IN ('pending', 'running') THEN 0 ELSE 1 END")
+              ->orderBy('created_at', $orderDirection);
 
         // Debug logging (temporary - remove after confirmation)
         Log::debug('getRecentSyncJobs FILTERS', [
@@ -506,6 +510,14 @@ class SyncController extends Component
     }
 
     /**
+     * Refresh active sync jobs (called by wire:poll.5s for heartbeat updates).
+     */
+    public function refreshActiveSyncJobs(): void
+    {
+        $this->loadActiveSyncJobs();
+    }
+
+    /**
      * Load active sync jobs for real-time monitoring.
      */
     protected function loadActiveSyncJobs()
@@ -513,6 +525,11 @@ class SyncController extends Component
         $this->activeSyncJobs = SyncJob::whereIn('status', [SyncJob::STATUS_PENDING, SyncJob::STATUS_RUNNING])
                                       ->with('prestashopShop')
                                       ->get()
+                                      ->map(function ($job) {
+                                          $arr = $job->toArray();
+                                          $arr['heartbeat_status'] = $job->getHeartbeatStatus();
+                                          return $arr;
+                                      })
                                       ->keyBy('id')
                                       ->toArray();
     }
@@ -1301,22 +1318,118 @@ class SyncController extends Component
     /**
      * Cancel running sync job.
      */
+    /**
+     * Dispatch ERP sync job manually for a specific connection and sync type.
+     *
+     * @param int $connectionId ERP connection ID
+     * @param string $syncType 'stock', 'prices', 'basic_data'
+     */
+    public function dispatchErpSync(int $connectionId, string $syncType): void
+    {
+        $this->authorize('shops.sync');
+
+        $validTypes = ['stock', 'prices', 'basic_data', 'location'];
+        if (!in_array($syncType, $validTypes)) {
+            $this->dispatch('error', ['message' => "Nieprawidlowy typ synchronizacji: {$syncType}"]);
+            return;
+        }
+
+        try {
+            $connection = \App\Models\ERPConnection::findOrFail($connectionId);
+
+            // Check for existing pending/running job of this type
+            $existing = SyncJob::where('source_type', 'subiekt_gt')
+                ->where('source_id', $connectionId)
+                ->where('job_type', 'pull_' . $syncType)
+                ->whereIn('status', ['pending', 'running'])
+                ->exists();
+
+            if ($existing) {
+                $this->dispatch('warning', [
+                    'message' => "Job {$syncType} jest juz w kolejce dla {$connection->instance_name}."
+                ]);
+                return;
+            }
+
+            // Create SyncJob
+            $syncJob = SyncJob::create([
+                'job_id' => \Str::uuid()->toString(),
+                'job_type' => 'pull_' . $syncType,
+                'job_name' => "ERP {$syncType} sync: {$connection->instance_name}",
+                'source_type' => 'subiekt_gt',
+                'source_id' => $connection->id,
+                'target_type' => 'ppm',
+                'target_id' => null,
+                'status' => 'pending',
+                'trigger_type' => 'manual',
+                'user_id' => auth()->id(),
+                'queue_name' => 'erp-sync',
+                'metadata' => [
+                    'mode' => $syncType,
+                    'triggered_by' => 'manual_button',
+                    'optimized' => true,
+                ],
+            ]);
+
+            // Dispatch job
+            \App\Jobs\ERP\PullProductsFromSubiektGT::dispatch(
+                $connection->id,
+                $syncType,
+                null,
+                5000,
+                100,
+                $syncJob->id
+            );
+
+            $this->loadActiveSyncJobs();
+
+            $typeLabels = ['stock' => 'stanow', 'prices' => 'cen', 'basic_data' => 'danych', 'location' => 'lokalizacji'];
+            $this->dispatch('success', [
+                'message' => "Sync {$typeLabels[$syncType]} uruchomiony dla {$connection->instance_name}. Kliknij 'Uruchom Worker' aby przetworzyc."
+            ]);
+
+            Log::info("Manual ERP sync dispatched", [
+                'connection_id' => $connectionId,
+                'sync_type' => $syncType,
+                'sync_job_id' => $syncJob->id,
+                'user_id' => auth()->id(),
+            ]);
+
+        } catch (\Exception $e) {
+            $this->dispatch('error', ['message' => 'Blad: ' . $e->getMessage()]);
+            Log::error('dispatchErpSync failed', ['error' => $e->getMessage()]);
+        }
+    }
+
     public function cancelSyncJob($jobId)
     {
         try {
             $syncJob = SyncJob::where('job_id', $jobId)->firstOrFail();
-            
+
             if (in_array($syncJob->status, [SyncJob::STATUS_PENDING, SyncJob::STATUS_RUNNING])) {
                 $syncJob->update([
                     'status' => SyncJob::STATUS_CANCELLED,
                     'error_message' => 'Cancelled by user',
                     'completed_at' => now(),
                 ]);
-                
+
+                // Remove matching job from queue table (jobs)
+                // Search by sync_job UUID (SyncProductsJob serializes SyncJob model)
+                // AND by integer sync_job.id (PullProductsFromSubiektGT uses syncJobId param)
+                $deletedFromQueue = \DB::table('jobs')
+                    ->where(function ($q) use ($jobId, $syncJob) {
+                        $q->where('payload', 'like', '%' . $jobId . '%')
+                          ->orWhere('payload', 'like', '%' . $syncJob->id . '%');
+                    })
+                    ->delete();
+
                 $this->loadActiveSyncJobs();
                 session()->flash('success', "Synchronizacja została anulowana.");
-                
-                Log::info("Sync job cancelled", ['job_id' => $jobId]);
+
+                Log::info("Sync job cancelled", [
+                    'job_id' => $jobId,
+                    'removed_from_queue' => $deletedFromQueue,
+                ]);
             }
 
         } catch (\Exception $e) {
@@ -2337,13 +2450,23 @@ class SyncController extends Component
             // Get failed jobs count
             $failedJobsCount = DB::table('failed_jobs')->count();
 
-            // Estimate worker status - account for delayed jobs
+            // Check for active heartbeat in sync_jobs (reliable worker signal)
+            $activeHeartbeat = SyncJob::where('status', SyncJob::STATUS_RUNNING)
+                ->whereNotNull('last_heartbeat_at')
+                ->where('last_heartbeat_at', '>=', now()->subSeconds(120))
+                ->exists();
+
+            // Estimate worker status - account for delayed jobs + heartbeat
             $workerStatus = 'unknown';
             $workerStatusColor = 'gray';
 
             if ($totalPending === 0 && $failedJobsCount === 0) {
-                $workerStatus = 'idle';
-                $workerStatusColor = 'green';
+                $workerStatus = $activeHeartbeat ? 'processing' : 'idle';
+                $workerStatusColor = $activeHeartbeat ? 'blue' : 'green';
+            } elseif ($activeHeartbeat) {
+                // Active heartbeat = worker is definitely processing
+                $workerStatus = 'processing';
+                $workerStatusColor = 'blue';
             } elseif ($readyCount === 0 && $delayedCount > 0) {
                 // Only delayed jobs - worker is idle, waiting for scheduled time
                 $workerStatus = 'scheduled';
@@ -2418,6 +2541,15 @@ class SyncController extends Component
     public function runQueueWorker(int $maxJobs = 10): void
     {
         try {
+            // WorkerGuard: Check if a worker is already active
+            $guard = app(\App\Services\WorkerGuardService::class);
+            if (!$guard->canSpawnManualWorker()) {
+                $this->dispatch('warning', [
+                    'message' => 'Queue worker jest juz aktywny i przetwarza zadania. Poczekaj na zakonczenie.'
+                ]);
+                return;
+            }
+
             // Get pending jobs count before with details
             $pendingBefore = DB::table('jobs')->count();
             $jobsByQueueBefore = DB::table('jobs')
@@ -2443,7 +2575,7 @@ class SyncController extends Component
             $output = new \Symfony\Component\Console\Output\BufferedOutput();
             $exitCode = \Artisan::call('queue:work', [
                 'connection' => 'database',
-                '--queue' => 'erp_default,prestashop,default',
+                '--queue' => 'prestashop_sync,prestashop-sync,erp-sync,erp_default,erp_high,default,sync',
                 '--max-jobs' => $maxJobs,
                 '--timeout' => 120,
                 '--stop-when-empty' => true,
@@ -2642,16 +2774,20 @@ class SyncController extends Component
                 $this->erpPriceSyncFrequency = $connection->price_sync_frequency ?? $legacyFreq;
                 $this->erpStockSyncFrequency = $connection->stock_sync_frequency ?? $legacyFreq;
                 $this->erpBasicDataSyncFrequency = $connection->basic_data_sync_frequency ?? 'daily';
+                $this->erpLocationSyncFrequency = $connection->location_sync_frequency ?? 'daily';
                 $this->erpIsPriceSource = $connection->is_price_source ?? false;
                 $this->erpIsStockSource = $connection->is_stock_source ?? false;
+                $this->erpIsLocationSource = $connection->is_location_source ?? false;
 
                 Log::debug('ERP config loaded', [
                     'connection_id' => $this->selectedErpConnectionId,
                     'price_sync_frequency' => $this->erpPriceSyncFrequency,
                     'stock_sync_frequency' => $this->erpStockSyncFrequency,
                     'basic_data_sync_frequency' => $this->erpBasicDataSyncFrequency,
+                    'location_sync_frequency' => $this->erpLocationSyncFrequency,
                     'is_price_source' => $this->erpIsPriceSource,
                     'is_stock_source' => $this->erpIsStockSource,
+                    'is_location_source' => $this->erpIsLocationSource,
                 ]);
             }
         } else {
@@ -2660,8 +2796,10 @@ class SyncController extends Component
             $this->erpPriceSyncFrequency = '6_hours';
             $this->erpStockSyncFrequency = '6_hours';
             $this->erpBasicDataSyncFrequency = 'daily';
+            $this->erpLocationSyncFrequency = 'daily';
             $this->erpIsPriceSource = false;
             $this->erpIsStockSource = false;
+            $this->erpIsLocationSource = false;
         }
     }
 
@@ -2685,8 +2823,10 @@ class SyncController extends Component
                 'price_sync_frequency' => $this->erpPriceSyncFrequency,
                 'stock_sync_frequency' => $this->erpStockSyncFrequency,
                 'basic_data_sync_frequency' => $this->erpBasicDataSyncFrequency,
+                'location_sync_frequency' => $this->erpLocationSyncFrequency,
                 'is_price_source' => $this->erpIsPriceSource,
                 'is_stock_source' => $this->erpIsStockSource,
+                'is_location_source' => $this->erpIsLocationSource,
             ]);
 
             Log::info('ERP sync config saved', [
@@ -2695,13 +2835,14 @@ class SyncController extends Component
                 'price_sync_frequency' => $this->erpPriceSyncFrequency,
                 'stock_sync_frequency' => $this->erpStockSyncFrequency,
                 'basic_data_sync_frequency' => $this->erpBasicDataSyncFrequency,
+                'location_sync_frequency' => $this->erpLocationSyncFrequency,
                 'is_price_source' => $this->erpIsPriceSource,
                 'is_stock_source' => $this->erpIsStockSource,
+                'is_location_source' => $this->erpIsLocationSource,
                 'user_id' => auth()->id(),
             ]);
 
-            $this->dispatch('notification', [
-                'type' => 'success',
+            $this->dispatch('success', [
                 'message' => 'Konfiguracja ERP zapisana pomyslnie',
             ]);
         } catch (\Exception $e) {
@@ -2710,8 +2851,7 @@ class SyncController extends Component
                 'error' => $e->getMessage(),
             ]);
 
-            $this->dispatch('notification', [
-                'type' => 'error',
+            $this->dispatch('error', [
                 'message' => 'Blad zapisu konfiguracji: ' . $e->getMessage(),
             ]);
         }

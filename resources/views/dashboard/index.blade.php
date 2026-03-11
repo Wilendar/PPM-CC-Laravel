@@ -126,7 +126,7 @@
                     </div>
                     <div class="bg-gray-50 dark:bg-gray-700 px-5 py-3">
                         <div class="text-sm">
-                            <a href="{{ route('categories.index') }}" class="font-medium text-blue-700 dark:text-blue-400 hover:text-blue-900 dark:hover:text-blue-300">
+                            <a href="{{ route('admin.products.categories.index') }}" class="font-medium text-blue-700 dark:text-blue-400 hover:text-blue-900 dark:hover:text-blue-300">
                                 Zarządzaj kategoriami
                             </a>
                         </div>

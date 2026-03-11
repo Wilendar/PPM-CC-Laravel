@@ -171,9 +171,12 @@ class BugReportDetail extends Component
             Gate::authorize('addInternalComment', $this->report);
         }
 
+        // Get user ID - fallback to admin ID 8 in dev mode when auth is disabled
+        $userId = Auth::id() ?? 8;
+
         BugReportComment::create([
             'bug_report_id' => $this->report->id,
-            'user_id' => Auth::id(),
+            'user_id' => $userId,
             'content' => $this->newComment,
             'is_internal' => $this->isInternalComment,
         ]);

@@ -93,33 +93,9 @@
     @apply bg-gray-700/30;
 }
 
-/* Indentation Spacers (NO inline styles) - Separate flex items for proper spacing */
-.category-indent-spacer {
+/* Indentation */
+.category-picker-node-indent {
     @apply flex-shrink-0;
-}
-
-.category-indent-spacer-0 {
-    @apply w-0;
-}
-
-.category-indent-spacer-1 {
-    @apply w-6;
-}
-
-.category-indent-spacer-2 {
-    @apply w-12;
-}
-
-.category-indent-spacer-3 {
-    @apply w-16;
-}
-
-.category-indent-spacer-4 {
-    @apply w-20;
-}
-
-.category-indent-spacer-5 {
-    @apply w-24;
 }
 
 /* Expand/Collapse Toggle */

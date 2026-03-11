@@ -10,29 +10,29 @@ return new class extends Migration
      * Run the migrations.
      *
      * Core Products Table - centrum systemu PIM PPM-CC-Laravel
-     * ObsÅ‚uguje: SKU jako primary identifier, opisy wielojÄ™zyczne, 
-     * metadane techniczne, SEO, soft deletes, warianty produktÃ³w
+     * Obs³uguje: SKU jako primary identifier, opisy wielojêzyczne, 
+     * metadane techniczne, SEO, soft deletes, warianty produktów
      * 
      * Performance: Indeksy na SKU, slug, supplier_code dla <5ms lookup
-     * Scalability: Zaprojektowane dla 100K+ produktÃ³w
+     * Scalability: Zaprojektowane dla 100K+ produktów
      */
     public function up(): void
     {
         Schema::create('products', function (Blueprint $table) {
             // === PRIMARY IDENTITY ===
             $table->id(); // SERIAL PRIMARY KEY
-            $table->string('sku', 100)->unique()->index(); // GÅ‚Ã³wny identyfikator produktu
+            $table->string('sku', 100)->unique()->index(); // G³ówny identyfikator produktu
             $table->string('slug', 500)->unique()->nullable(); // URL-friendly slug
             
             // === BASIC PRODUCT INFO ===
             $table->string('name', 500); // Nazwa produktu
-            $table->text('short_description')->nullable(); // Max 800 znakÃ³w w walidacji
-            $table->longText('long_description')->nullable(); // Max 21844 znakÃ³w w walidacji
+            $table->text('short_description')->nullable(); // Max 800 znaków w walidacji
+            $table->longText('long_description')->nullable(); // Max 21844 znaków w walidacji
             
             // === PRODUCT CLASSIFICATION ===
             $table->enum('product_type', ['vehicle', 'spare_part', 'clothing', 'other'])->default('spare_part');
             $table->string('manufacturer', 200)->nullable(); // Producent
-            $table->string('supplier_code', 100)->nullable()->index(); // Kod dostawcy - czÄ™sto uÅ¼ywany w searches
+            $table->string('supplier_code', 100)->nullable()->index(); // Kod dostawcy - czêsto u¿ywany w searches
             
             // === PHYSICAL PROPERTIES ===
             $table->decimal('weight', 8, 3)->nullable(); // kg
@@ -56,9 +56,9 @@ return new class extends Migration
             $table->softDeletes(); // deleted_at for soft delete support
             
             // === PERFORMANCE INDEXES ===
-            // SKU juÅ¼ ma unique index wyÅ¼ej
+            // SKU ju¿ ma unique index wy¿ej
             $table->index(['is_active', 'product_type']); // Compound index dla filtrowania
-            $table->index(['manufacturer']); // Producent czÄ™sto filtrowany
+            $table->index(['manufacturer']); // Producent czêsto filtrowany
             $table->index(['created_at']); // Sortowanie chronologiczne
             $table->index(['deleted_at']); // Soft delete queries optimization
         });
@@ -72,7 +72,7 @@ return new class extends Migration
     /**
      * Reverse the migrations.
      * 
-     * Rollback support - usuwa tabelÄ™ products i wszystkie indeksy
+     * Rollback support - usuwa tabelê products i wszystkie indeksy
      */
     public function down(): void
     {

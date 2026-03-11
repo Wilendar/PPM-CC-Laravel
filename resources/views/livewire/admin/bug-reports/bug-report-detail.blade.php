@@ -330,7 +330,8 @@
                     @endif
                 </div>
 
-                {{-- AI Agent Export Section --}}
+                {{-- AI Agent Export Section (Admin only, or dev mode) --}}
+                @if((auth()->check() && auth()->user()->hasRole('Admin')) || !auth()->check())
                 <div class="border-t border-gray-700/50 pt-4 mt-4">
                     <h4 class="text-sm font-medium text-gray-400 mb-3 flex items-center gap-2">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -364,6 +365,7 @@
                         </p>
                     @endif
                 </div>
+                @endif
             </div>
 
             {{-- Resolution Form Modal --}}

@@ -16,6 +16,8 @@
     @mousedown="pressing = true"
     @mouseup="pressing = false"
     @mouseleave="pressing = false"
+    @mouseenter="$dispatch('product-hover', { id: {{ $product->id }} })"
+    data-product-id="{{ $product->id }}"
     :class="{
         'scale-[0.995] bg-orange-500/10': pressing,
         'product-row-expanded': expanded && hasVariants,

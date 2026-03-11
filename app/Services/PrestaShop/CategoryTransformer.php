@@ -198,10 +198,11 @@ class CategoryTransformer
         }
 
         // Validate category level (PrestaShop supports deep hierarchies)
-        if ($category->level > 10) {
+        if ($category->level > Category::MAX_LEVEL) {
             Log::warning('Category level exceeds recommended depth', [
                 'category_id' => $category->id,
                 'level' => $category->level,
+                'max_level' => Category::MAX_LEVEL,
             ]);
         }
     }

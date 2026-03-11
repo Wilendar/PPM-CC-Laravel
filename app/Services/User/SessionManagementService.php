@@ -7,6 +7,9 @@ use App\Models\UserSession;
 use App\Models\SecurityAlert;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Collection;
 use Jenssegers\Agent\Agent;
 
@@ -332,19 +335,59 @@ class SessionManagementService
     }
 
     /**
-     * Get geolocation from IP address.
-     * Placeholder - implement with actual GeoIP service.
+     * Get geolocation from IP address using ip-api.com (free, no key required).
+     * Results cached for 24h per IP to minimize API calls.
      */
     protected function getGeoLocation(string $ip): array
     {
-        // TODO: Implement with MaxMind GeoIP or similar service
-        // For now, return empty data
-        return [
-            'country' => null,
-            'country_code' => null,
-            'city' => null,
-            'region' => null,
-        ];
+        $empty = ['country' => null, 'country_code' => null, 'city' => null, 'region' => null];
+
+        // Skip private/local IPs
+        if ($this->isPrivateIp($ip)) {
+            return $empty;
+        }
+
+        $cacheKey = 'geoip:' . md5($ip);
+
+        return Cache::remember($cacheKey, now()->addHours(24), function () use ($ip, $empty) {
+            try {
+                $response = Http::timeout(3)
+                    ->connectTimeout(2)
+                    ->get("http://ip-api.com/json/{$ip}", [
+                        'fields' => 'status,country,countryCode,regionName,city',
+                        'lang' => 'pl',
+                    ]);
+
+                if ($response->successful()) {
+                    $data = $response->json();
+
+                    if (($data['status'] ?? '') === 'success') {
+                        return [
+                            'country' => $data['country'] ?? null,
+                            'country_code' => $data['countryCode'] ?? null,
+                            'city' => $data['city'] ?? null,
+                            'region' => $data['regionName'] ?? null,
+                        ];
+                    }
+                }
+            } catch (\Exception $e) {
+                Log::warning('GeoIP lookup failed', ['ip' => $ip, 'error' => $e->getMessage()]);
+            }
+
+            return $empty;
+        });
+    }
+
+    /**
+     * Check if IP is private/local (not geolocatable).
+     */
+    protected function isPrivateIp(string $ip): bool
+    {
+        return $ip === '127.0.0.1'
+            || $ip === '::1'
+            || str_starts_with($ip, '10.')
+            || str_starts_with($ip, '192.168.')
+            || preg_match('/^172\.(1[6-9]|2\d|3[01])\./', $ip);
     }
 
     /**

@@ -19,6 +19,56 @@
         </div>
     </div>
 
+    {{-- BULK ACTIONS BAR --}}
+    @if(count($selectedFeatureTypeIds) > 0)
+        <div class="flex items-center justify-between bg-gray-800 border border-gray-600 rounded-lg p-3 mb-4"
+             x-data="{ showMoveDropdown: false }">
+            <div class="flex items-center gap-3">
+                <span class="text-sm text-gray-300">
+                    Zaznaczono: <strong class="text-white">{{ count($selectedFeatureTypeIds) }}</strong> cech
+                </span>
+                <label class="flex items-center gap-2 text-xs text-gray-400 hover:text-white cursor-pointer">
+                    <input type="checkbox"
+                           wire:model.live="selectAllFeatures"
+                           class="rounded border-gray-600 bg-gray-700 text-[#e0ac7e] focus:ring-[#e0ac7e]">
+                    {{ $selectAllFeatures ? 'Odznacz wszystko' : 'Zaznacz wszystkie widoczne' }}
+                </label>
+            </div>
+            <div class="flex items-center gap-2">
+                {{-- Move to group --}}
+                <div class="relative">
+                    <button @click="showMoveDropdown = !showMoveDropdown"
+                            class="inline-flex items-center px-3 py-1.5 text-xs font-medium text-gray-300 bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors">
+                        Przenies do grupy
+                        <svg class="w-3 h-3 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                        </svg>
+                    </button>
+                    <div x-show="showMoveDropdown" @click.away="showMoveDropdown = false"
+                         x-transition
+                         class="absolute right-0 mt-1 w-48 bg-gray-800 border border-gray-700 rounded-lg shadow-lg z-50">
+                        @foreach($this->groups as $group)
+                            <button wire:click="bulkMoveToGroup({{ $group['id'] }})"
+                                    @click="showMoveDropdown = false"
+                                    class="w-full text-left px-3 py-2 text-sm text-gray-300 hover:bg-gray-700 first:rounded-t-lg last:rounded-b-lg">
+                                {{ $group['name'] }}
+                            </button>
+                        @endforeach
+                    </div>
+                </div>
+                {{-- Bulk delete --}}
+                <button wire:click="bulkDeleteFeatureTypes"
+                        wire:confirm="Usunac {{ count($selectedFeatureTypeIds) }} zaznaczonych cech? Produkty zostana odlaczone."
+                        class="inline-flex items-center px-3 py-1.5 text-xs font-medium text-red-400 bg-red-900/30 hover:bg-red-900/50 rounded-lg transition-colors">
+                    <svg class="w-3.5 h-3.5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                    </svg>
+                    Usun zaznaczone
+                </button>
+            </div>
+        </div>
+    @endif
+
     {{-- EXPANDABLE TREE with Drag & Drop --}}
     <div class="feature-tree"
          x-data="{
@@ -167,7 +217,7 @@
                     >
                         @forelse($group['features'] as $feature)
                             <div wire:key="feature-{{ $feature['id'] }}"
-                                 class="feature-tree__feature-item"
+                                 class="feature-tree__feature-item {{ in_array((string)$feature['id'], $selectedFeatureTypeIds) ? 'feature-tree__feature-item--selected' : '' }}"
                                  draggable="true"
                                  data-feature-id="{{ $feature['id'] }}"
                                  @dragstart="startDrag($event, {{ $feature['id'] }}, {{ $group['id'] }})"
@@ -177,6 +227,13 @@
                                  @drop.prevent="dropOnFeature($event, {{ $feature['id'] }}, {{ $group['id'] }})"
                                  :class="{ 'feature-tree__feature-item--dragging': draggedFeatureId === {{ $feature['id'] }} }"
                             >
+                                <input type="checkbox"
+                                       wire:model.live="selectedFeatureTypeIds"
+                                       wire:key="select-feat-{{ $feature['id'] }}"
+                                       value="{{ $feature['id'] }}"
+                                       class="rounded border-gray-600 bg-gray-700 text-[#e0ac7e] focus:ring-[#e0ac7e] flex-shrink-0"
+                                       title="Zaznacz ceche"
+                                       @click.stop>
                                 <span class="feature-drag-handle">&#9776;</span>
                                 <span class="feature-tree__feature-name">{{ $feature['name'] }}</span>
                                 <span class="feature-tree__feature-code text-gray-500">{{ $feature['code'] }}</span>
