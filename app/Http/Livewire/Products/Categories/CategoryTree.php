@@ -10,6 +10,7 @@ use App\Models\Category;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Cache;
 use App\Http\Livewire\Concerns\AuthorizesWithSpatie;
 
 /**
@@ -638,6 +639,8 @@ class CategoryTree extends Component
                 session()->flash('message', "Kategoria \"{$name}\" została utworzona.");
             });
 
+            $this->clearCategoryPanelCaches();
+
         } catch (\Exception $e) {
             Log::error('saveInlineCategory error', [
                 'name' => $name,
@@ -767,6 +770,7 @@ class CategoryTree extends Component
                 }
             });
 
+            $this->clearCategoryPanelCaches();
             $this->closeModal();
 
         } catch (\Exception $e) {
@@ -817,6 +821,8 @@ class CategoryTree extends Component
             $this->expandedNodes = array_diff($this->expandedNodes, [$categoryId]);
 
             session()->flash('message', 'Kategoria została usunięta pomyślnie.');
+
+            $this->clearCategoryPanelCaches();
 
         } catch (\Exception $e) {
             Log::error('CategoryTree: Error deleting category', [
@@ -980,6 +986,8 @@ class CategoryTree extends Component
             });
 
             session()->flash('message', 'Kolejność kategorii została zaktualizowana.');
+
+            $this->clearCategoryPanelCaches();
 
         } catch (\Exception $e) {
             Log::error('CategoryTree: Error reordering category', [
@@ -1913,6 +1921,24 @@ class CategoryTree extends Component
             $prefix = str_repeat('— ', $category->level);
             return [$category->id => $prefix . $category->name];
         })->toArray();
+    }
+
+    /**
+     * Clear category panel caches when tree structure changes.
+     *
+     * Invalidates:
+     * - category_panel_tree: Main tree cache
+     * - cat_descendants_{id}: Descendant caches for all categories
+     */
+    private function clearCategoryPanelCaches(): void
+    {
+        Cache::forget('category_panel_tree');
+
+        // Clear all descendant caches
+        $categoryIds = Category::pluck('id');
+        foreach ($categoryIds as $id) {
+            Cache::forget("cat_descendants_{$id}");
+        }
     }
 
     // ==========================================
