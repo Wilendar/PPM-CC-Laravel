@@ -254,29 +254,7 @@ Schedule::call(function () {
 // ETAP: Subiekt GT Integration - Scheduled pull operations
 
 use App\Jobs\ERP\PullProductsFromSubiektGT;
-use App\Jobs\ERP\DetectSubiektGTChanges;
 use App\Models\ERPConnection;
-
-// Subiekt GT Change Detection (lightweight check every 15 minutes)
-// Dispatches incremental pull if changes detected
-Schedule::call(function () {
-    try {
-        // Get all active Subiekt GT connections with auto-sync enabled
-        $subiektConnections = ERPConnection::where('erp_type', ERPConnection::ERP_SUBIEKT_GT)
-            ->where('is_active', true)
-            ->where('auto_sync_products', true)
-            ->get();
-
-        foreach ($subiektConnections as $connection) {
-            DetectSubiektGTChanges::dispatch($connection->id);
-        }
-    } catch (\Exception $e) {
-        // Fail silently if erp_connections table doesn't exist yet
-        \Log::warning('Subiekt GT change detection scheduler failed: ' . $e->getMessage());
-    }
-})->name('subiekt-gt:change-detection')
-  ->everyFifteenMinutes()
-  ->withoutOverlapping();
 
 // ==========================================
 // ETAP_08 FAZA 6: Dynamic ERP Sync Scheduler
