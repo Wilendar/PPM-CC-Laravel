@@ -150,13 +150,14 @@ class DetectSubiektGTChanges implements ShouldQueue
                 // Use source_type/source_id consistently (subiekt_gt is the SOURCE)
                 $syncJob = SyncJob::create([
                     'job_id' => \Str::uuid()->toString(),
+                    'job_name' => "Delta sync: Subiekt GT #{$this->connectionId}",
                     'source_type' => 'subiekt_gt',
                     'source_id' => $this->connectionId,
                     'target_type' => 'ppm',
                     'target_id' => null,
                     'job_type' => 'pull_products',
                     'status' => 'pending',
-                    'trigger_type' => 'change_detection',
+                    'trigger_type' => 'scheduled',
                     'metadata' => [
                         'mode' => 'incremental',
                         'since' => $since,
