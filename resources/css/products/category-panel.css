@@ -22,9 +22,9 @@
     border: 1px solid rgba(75, 85, 99, 0.3);
     display: flex;
     flex-direction: column;
-    height: calc(100vh - 180px);
+    height: calc(100vh - 90px);
     position: sticky;
-    top: 180px;
+    top: 90px;
     overflow: hidden;
     transition: width 0.3s ease;
     z-index: 10;
