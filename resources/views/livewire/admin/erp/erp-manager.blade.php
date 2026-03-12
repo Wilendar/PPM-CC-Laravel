@@ -987,8 +987,8 @@
                                             <div class="space-y-2 max-h-40 overflow-y-auto">
                                                 @foreach($availableErpWarehouses as $erpWarehouse)
                                                     <div class="flex items-center gap-2 p-2 bg-gray-800/50 rounded">
-                                                        <span class="text-xs text-gray-300 w-32 truncate" title="{{ $erpWarehouse['name'] }}">
-                                                            {{ $erpWarehouse['symbol'] ?: $erpWarehouse['name'] }}
+                                                        <span class="text-xs text-gray-300 w-32 truncate" title="{{ $erpWarehouse['name'] }} ({{ $erpWarehouse['symbol'] }})">
+                                                            {{ $erpWarehouse['name'] }}
                                                         </span>
                                                         <span class="text-gray-500">→</span>
                                                         <select wire:model="warehouseMappings.{{ $erpWarehouse['id'] }}"

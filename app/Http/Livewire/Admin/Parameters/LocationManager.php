@@ -2,6 +2,7 @@
 
 namespace App\Http\Livewire\Admin\Parameters;
 
+use App\Http\Livewire\Admin\Parameters\Traits\LocationFiltersTrait;
 use App\Models\Location;
 use App\Models\Warehouse;
 use App\Services\Location\LocationLibraryService;
@@ -29,6 +30,7 @@ use Livewire\WithPagination;
 class LocationManager extends Component
 {
     use WithPagination;
+    use LocationFiltersTrait;
 
     protected $paginationTheme = 'tailwind';
 
@@ -51,6 +53,24 @@ class LocationManager extends Component
     public string $editDescription = '';
     public string $editNotes = '';
     public bool $editIsActive = true;
+
+    // Create location modal
+    public bool $showCreateModal = false;
+    public string $createCode = '';
+    public string $createDescription = '';
+    public string $createNotes = '';
+
+    // Zone management modal
+    public bool $showZoneModal = false;
+    public ?string $editingZone = null;
+    public string $zoneName = '';
+    public string $zoneDescription = '';
+
+    // Zone config modal
+    public bool $showZoneConfigModal = false;
+    public string $zonePrefix = 'Strefa';
+    public string $zoneSeparator = ' ';
+    public bool $zoneAutoUppercase = true;
 
     /*
     |--------------------------------------------------------------------------
@@ -84,7 +104,7 @@ class LocationManager extends Component
      */
     private function getWarehouses()
     {
-        return Warehouse::active()->ordered()->get();
+        return Warehouse::active()->ordered()->withCount('locations')->get();
     }
 
     /**
@@ -99,7 +119,8 @@ class LocationManager extends Component
             return [];
         }
 
-        $tree = $this->getLocationService()->buildHierarchyForWarehouse($this->selectedWarehouseId);
+        $zoneConfig = $this->getZoneNamingConfig();
+        $tree = $this->getLocationService()->buildHierarchyForWarehouse($this->selectedWarehouseId, $zoneConfig);
 
         // Apply pattern filter
         if ($this->patternFilter !== 'all') {
@@ -236,6 +257,9 @@ class LocationManager extends Component
         try {
             $count = $this->getLocationService()
                 ->populateFromProductStock($this->selectedWarehouseId);
+
+            // Auto-refresh product counts after populating
+            $this->getLocationService()->refreshProductCounts($this->selectedWarehouseId);
 
             Cache::forget("location_stats_{$this->selectedWarehouseId}");
 
@@ -397,6 +421,264 @@ class LocationManager extends Component
 
     /*
     |--------------------------------------------------------------------------
+    | CREATE LOCATION
+    |--------------------------------------------------------------------------
+    */
+
+    /**
+     * Open create location modal
+     */
+    public function openCreateModal(): void
+    {
+        $this->createCode = '';
+        $this->createDescription = '';
+        $this->createNotes = '';
+        $this->showCreateModal = true;
+    }
+
+    /**
+     * Create new location
+     */
+    public function createLocation(): void
+    {
+        $this->validate([
+            'createCode' => 'required|string|max:100',
+            'createDescription' => 'nullable|string|max:500',
+            'createNotes' => 'nullable|string|max:1000',
+        ]);
+
+        if ($this->selectedWarehouseId === null) {
+            return;
+        }
+
+        // Check uniqueness within warehouse
+        $exists = Location::where('warehouse_id', $this->selectedWarehouseId)
+            ->where('code', $this->createCode)
+            ->exists();
+
+        if ($exists) {
+            $this->addError('createCode', 'Taki kod lokalizacji juz istnieje w tym magazynie.');
+            return;
+        }
+
+        try {
+            $this->getLocationService()->upsertLocation(
+                $this->selectedWarehouseId,
+                $this->createCode
+            );
+
+            // Update description/notes after creation
+            $location = Location::where('warehouse_id', $this->selectedWarehouseId)
+                ->where('code', trim($this->createCode))
+                ->first();
+
+            if ($location && ($this->createDescription || $this->createNotes)) {
+                $location->update([
+                    'description' => $this->createDescription ?: null,
+                    'notes' => $this->createNotes ?: null,
+                ]);
+            }
+
+            Cache::forget("location_stats_{$this->selectedWarehouseId}");
+            $this->showCreateModal = false;
+
+            $this->dispatch('flash-message',
+                type: 'success',
+                message: "Lokalizacja '{$this->createCode}' zostala utworzona."
+            );
+        } catch (\Exception $e) {
+            $this->addError('createCode', 'Blad tworzenia lokalizacji: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Close create modal
+     */
+    public function closeCreateModal(): void
+    {
+        $this->showCreateModal = false;
+        $this->resetValidation();
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | ZONE MANAGEMENT
+    |--------------------------------------------------------------------------
+    */
+
+    /**
+     * Open zone management modal
+     */
+    public function openZoneModal(?string $zone = null): void
+    {
+        $this->editingZone = $zone;
+        $this->zoneName = $zone ?? '';
+        $this->zoneDescription = '';
+        $this->showZoneModal = true;
+    }
+
+    /**
+     * Save zone (rename)
+     */
+    public function saveZone(): void
+    {
+        $this->validate([
+            'zoneName' => 'required|string|max:50',
+        ]);
+
+        if ($this->selectedWarehouseId === null) {
+            return;
+        }
+
+        if ($this->editingZone !== null && $this->editingZone !== $this->zoneName) {
+            // Rename zone: update all locations in this zone
+            Location::where('warehouse_id', $this->selectedWarehouseId)
+                ->where('zone', $this->editingZone)
+                ->update(['zone' => $this->zoneName]);
+
+            Cache::forget("location_stats_{$this->selectedWarehouseId}");
+
+            $this->dispatch('flash-message',
+                type: 'success',
+                message: "Strefa '{$this->editingZone}' zmieniona na '{$this->zoneName}'."
+            );
+        }
+
+        $this->showZoneModal = false;
+    }
+
+    /**
+     * Delete zone and all its locations
+     */
+    public function deleteZone(string $zone): void
+    {
+        if ($this->selectedWarehouseId === null) {
+            return;
+        }
+
+        $count = Location::where('warehouse_id', $this->selectedWarehouseId)
+            ->where('zone', $zone)
+            ->count();
+
+        Location::where('warehouse_id', $this->selectedWarehouseId)
+            ->where('zone', $zone)
+            ->delete();
+
+        // Reset selection if deleted zone contained selected location
+        if ($this->selectedLocationId !== null) {
+            $location = Location::find($this->selectedLocationId);
+            if (!$location) {
+                $this->selectedLocationId = null;
+            }
+        }
+
+        Cache::forget("location_stats_{$this->selectedWarehouseId}");
+
+        $this->dispatch('flash-message',
+            type: 'success',
+            message: "Strefa '{$zone}' i {$count} lokalizacji zostaly usuniete."
+        );
+    }
+
+    /**
+     * Close zone modal
+     */
+    public function closeZoneModal(): void
+    {
+        $this->showZoneModal = false;
+        $this->resetValidation();
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | ZONE NAMING CONFIGURATION
+    |--------------------------------------------------------------------------
+    */
+
+    /**
+     * Open zone naming configuration modal
+     */
+    public function openZoneConfigModal(): void
+    {
+        $config = $this->getZoneNamingConfig();
+        $this->zonePrefix = $config['prefix'];
+        $this->zoneSeparator = $config['separator'];
+        $this->zoneAutoUppercase = $config['auto_uppercase'];
+        $this->showZoneConfigModal = true;
+    }
+
+    /**
+     * Save zone naming configuration to warehouse settings
+     */
+    public function saveZoneConfig(): void
+    {
+        $this->validate([
+            'zonePrefix' => 'nullable|string|max:50',
+            'zoneSeparator' => 'nullable|string|max:5',
+            'zoneAutoUppercase' => 'boolean',
+        ]);
+
+        if ($this->selectedWarehouseId === null) {
+            return;
+        }
+
+        $warehouse = Warehouse::find($this->selectedWarehouseId);
+        if (!$warehouse) {
+            return;
+        }
+
+        $settings = $warehouse->erp_mapping ?? [];
+        $settings['zone_naming'] = [
+            'prefix' => $this->zonePrefix,
+            'separator' => $this->zoneSeparator,
+            'auto_uppercase' => $this->zoneAutoUppercase,
+        ];
+        $warehouse->update(['erp_mapping' => $settings]);
+
+        $this->showZoneConfigModal = false;
+
+        Cache::forget("location_stats_{$this->selectedWarehouseId}");
+
+        $this->dispatch('flash-message',
+            type: 'success',
+            message: 'Konfiguracja nazewnictwa stref zostala zapisana.'
+        );
+    }
+
+    /**
+     * Close zone config modal
+     */
+    public function closeZoneConfigModal(): void
+    {
+        $this->showZoneConfigModal = false;
+    }
+
+    /**
+     * Get zone naming configuration for current warehouse
+     */
+    private function getZoneNamingConfig(): array
+    {
+        $defaults = [
+            'prefix' => 'Strefa',
+            'separator' => ' ',
+            'auto_uppercase' => true,
+        ];
+
+        if ($this->selectedWarehouseId === null) {
+            return $defaults;
+        }
+
+        $warehouse = Warehouse::find($this->selectedWarehouseId);
+        if (!$warehouse) {
+            return $defaults;
+        }
+
+        $settings = $warehouse->erp_mapping ?? [];
+        return array_merge($defaults, $settings['zone_naming'] ?? []);
+    }
+
+    /*
+    |--------------------------------------------------------------------------
     | UPDATED HOOKS
     |--------------------------------------------------------------------------
     */
@@ -455,143 +737,4 @@ class LocationManager extends Component
         return app(LocationLibraryService::class);
     }
 
-    /**
-     * Filter hierarchy tree by pattern_type
-     */
-    private function filterTreeByPattern(array $tree, string $pattern): array
-    {
-        return array_values(array_filter(
-            array_map(function (array $zone) use ($pattern) {
-                if (isset($zone['pattern_type']) && $zone['pattern_type'] === $pattern) {
-                    return $zone;
-                }
-
-                // Filter children recursively
-                $zone['children'] = $this->filterChildrenByPattern($zone['children'] ?? [], $pattern);
-
-                if (!empty($zone['children']) || (isset($zone['pattern_type']) && $zone['pattern_type'] === $pattern)) {
-                    return $zone;
-                }
-
-                return null;
-            }, $tree)
-        ));
-    }
-
-    /**
-     * Recursively filter children nodes by pattern_type
-     */
-    private function filterChildrenByPattern(array $children, string $pattern): array
-    {
-        return array_values(array_filter(
-            array_map(function (array $child) use ($pattern) {
-                // Leaf node with id
-                if (isset($child['id'])) {
-                    return (isset($child['pattern_type']) && $child['pattern_type'] === $pattern)
-                        ? $child
-                        : null;
-                }
-
-                // Intermediate node - filter its children
-                $child['children'] = $this->filterChildrenByPattern($child['children'] ?? [], $pattern);
-
-                return !empty($child['children']) ? $child : null;
-            }, $children)
-        ));
-    }
-
-    /**
-     * Filter hierarchy tree by occupancy (occupied/empty)
-     */
-    private function filterTreeByOccupancy(array $tree, string $occupancy): array
-    {
-        $showOccupied = ($occupancy === 'occupied');
-
-        return array_values(array_filter(
-            array_map(function (array $zone) use ($showOccupied) {
-                $zone['children'] = $this->filterChildrenByOccupancy($zone['children'] ?? [], $showOccupied);
-
-                // Keep zone if it has matching children or matching product_count
-                $zoneMatch = $showOccupied
-                    ? ($zone['product_count'] ?? 0) > 0
-                    : ($zone['product_count'] ?? 0) === 0;
-
-                if (!empty($zone['children']) || $zoneMatch) {
-                    return $zone;
-                }
-
-                return null;
-            }, $tree)
-        ));
-    }
-
-    /**
-     * Recursively filter children by occupancy
-     */
-    private function filterChildrenByOccupancy(array $children, bool $showOccupied): array
-    {
-        return array_values(array_filter(
-            array_map(function (array $child) use ($showOccupied) {
-                if (isset($child['id'])) {
-                    $occupied = ($child['product_count'] ?? 0) > 0;
-                    return ($occupied === $showOccupied) ? $child : null;
-                }
-
-                $child['children'] = $this->filterChildrenByOccupancy($child['children'] ?? [], $showOccupied);
-                return !empty($child['children']) ? $child : null;
-            }, $children)
-        ));
-    }
-
-    /**
-     * Filter hierarchy tree by search term (matches code)
-     */
-    private function filterTreeBySearch(array $tree, string $searchTerm): array
-    {
-        $term = mb_strtolower($searchTerm);
-
-        return array_values(array_filter(
-            array_map(function (array $zone) use ($term) {
-                // Check if zone label matches
-                $zoneMatch = str_contains(mb_strtolower($zone['label'] ?? ''), $term)
-                    || str_contains(mb_strtolower($zone['zone'] ?? ''), $term);
-
-                $zone['children'] = $this->filterChildrenBySearch($zone['children'] ?? [], $term);
-
-                if ($zoneMatch || !empty($zone['children'])) {
-                    return $zone;
-                }
-
-                return null;
-            }, $tree)
-        ));
-    }
-
-    /**
-     * Recursively filter children by search term
-     */
-    private function filterChildrenBySearch(array $children, string $term): array
-    {
-        return array_values(array_filter(
-            array_map(function (array $child) use ($term) {
-                if (isset($child['id'])) {
-                    return str_contains(mb_strtolower($child['code'] ?? ''), $term)
-                        ? $child
-                        : null;
-                }
-
-                // Check label/row_code match
-                $labelMatch = str_contains(mb_strtolower($child['label'] ?? ''), $term)
-                    || str_contains(mb_strtolower($child['row_code'] ?? ''), $term);
-
-                $child['children'] = $this->filterChildrenBySearch($child['children'] ?? [], $term);
-
-                if ($labelMatch || !empty($child['children'])) {
-                    return $child;
-                }
-
-                return null;
-            }, $children)
-        ));
-    }
 }

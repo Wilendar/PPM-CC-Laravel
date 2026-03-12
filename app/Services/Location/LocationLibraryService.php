@@ -61,9 +61,10 @@ class LocationLibraryService
      * Build a hierarchical tree (Zone > Row > Shelf > Bin) for a warehouse.
      *
      * @param int $warehouseId
+     * @param array $zoneConfig Zone naming config (prefix, separator, auto_uppercase)
      * @return array Nested hierarchy array
      */
-    public function buildHierarchyForWarehouse(int $warehouseId): array
+    public function buildHierarchyForWarehouse(int $warehouseId, array $zoneConfig = []): array
     {
         $locations = Location::byWarehouse($warehouseId)
             ->active()
@@ -81,7 +82,7 @@ class LocationLibraryService
             if (!isset($zones[$zone])) {
                 $zones[$zone] = [
                     'zone' => $zone,
-                    'label' => $this->buildZoneLabel($zone, $location->pattern_type),
+                    'label' => $this->buildZoneLabel($zone, $location->pattern_type, $zoneConfig),
                     'product_count' => 0,
                     'pattern_type' => $location->pattern_type,
                     'children' => [],
@@ -91,8 +92,14 @@ class LocationLibraryService
 
             $zones[$zone]['product_count'] += $location->product_count;
 
-            // Named/other locations have no deeper hierarchy
+            // Named/other locations - add as direct zone-level bins (clickable leaves)
             if (in_array($location->pattern_type, ['named', 'other']) || $location->row_code === null) {
+                $zones[$zone]['children'][] = [
+                    'id' => $location->id,
+                    'code' => $location->code,
+                    'product_count' => $location->product_count,
+                    'pattern_type' => $location->pattern_type,
+                ];
                 continue;
             }
 
@@ -217,7 +224,7 @@ class LocationLibraryService
                   ->orWhere('location', 'LIKE', '%,' . $code)
                   ->orWhere('location', 'LIKE', '%,' . $code . ',%');
             })
-            ->with(['product', 'product.category'])
+            ->with(['product', 'product.manufacturerRelation'])
             ->orderByDesc('quantity')
             ->paginate($perPage);
     }
@@ -292,8 +299,12 @@ class LocationLibraryService
 
     /**
      * Build a human-readable label for a zone.
+     *
+     * @param string $zone Raw zone identifier
+     * @param string|null $patternType Location pattern type
+     * @param array $zoneConfig Zone naming config (prefix, separator, auto_uppercase)
      */
-    private function buildZoneLabel(string $zone, ?string $patternType): string
+    private function buildZoneLabel(string $zone, ?string $patternType, array $zoneConfig = []): string
     {
         if ($zone === '__ungrouped__') {
             return 'Niesklasyfikowane';
@@ -303,8 +314,13 @@ class LocationLibraryService
             return $zone;
         }
 
-        if (mb_strlen($zone) === 1 && ctype_alpha($zone)) {
-            return "Strefa {$zone}";
+        $prefix = $zoneConfig['prefix'] ?? 'Strefa';
+        $separator = $zoneConfig['separator'] ?? ' ';
+        $autoUppercase = $zoneConfig['auto_uppercase'] ?? true;
+
+        if (mb_strlen($zone) <= 2 && ctype_alpha($zone)) {
+            $zoneLabel = $autoUppercase ? mb_strtoupper($zone) : $zone;
+            return $prefix . $separator . $zoneLabel;
         }
 
         return $zone;
@@ -324,18 +340,25 @@ class LocationLibraryService
                 $shelves = [];
 
                 foreach ($rowData['_shelves'] as $shelfData) {
-                    unset($shelfData['product_count']); // leaf level keeps children only
                     $shelves[] = $shelfData;
                 }
 
+                $directBins = $rowData['children'];
                 unset($rowData['_shelves']);
-                $rowData['children'] = array_merge($rowData['children'], $shelves);
-                unset($rowData['product_count']); // intermediate node
+
+                // FIX BUG 1.1: Separate leaf bins from shelf containers
+                $rowData['children'] = $shelves;
+                $rowData['bins'] = $directBins;
+
                 $rows[] = $rowData;
             }
 
+            // Zone-level: separate direct bins (named/other) from row containers
+            $zoneBins = $zoneData['children'];
             unset($zoneData['_rows']);
-            $zoneData['children'] = array_merge($zoneData['children'], $rows);
+            $zoneData['children'] = $rows;
+            $zoneData['bins'] = $zoneBins;
+
             $result[] = $zoneData;
         }
 

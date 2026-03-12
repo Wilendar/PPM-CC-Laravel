@@ -225,6 +225,22 @@ class PullProductsFromSubiektGT implements ShouldQueue, ShouldBeUnique
 
             $duration = $startTime->diffInSeconds(Carbon::now());
 
+            // ETAP_08 FAZA 8: After location sync, populate locations library table
+            if ($this->mode === 'location' && ($results['updated'] ?? 0) > 0) {
+                try {
+                    $locationsCount = app(\App\Services\Location\LocationLibraryService::class)
+                        ->populateFromProductStock();
+                    Log::info('PullProductsFromSubiektGT: Populated locations library', [
+                        'mode' => $this->mode,
+                        'locations_upserted' => $locationsCount,
+                    ]);
+                } catch (\Exception $e) {
+                    Log::warning('PullProductsFromSubiektGT: Failed to populate locations library', [
+                        'error' => $e->getMessage(),
+                    ]);
+                }
+            }
+
             // Log results
             Log::info('PullProductsFromSubiektGT: Job completed', [
                 'connection_id' => $this->connectionId,
@@ -233,11 +249,20 @@ class PullProductsFromSubiektGT implements ShouldQueue, ShouldBeUnique
                 'duration_seconds' => $duration,
             ]);
 
-            // Update connection timestamps
+            // Update connection timestamps and reset health status on success
             $connection->update([
                 'last_sync_at' => Carbon::now(),
                 'next_scheduled_sync' => $this->calculateNextSync($connection),
             ]);
+
+            // Auto-reset connection status after successful sync
+            if ($connection->connection_status !== 'connected') {
+                $connection->updateConnectionHealth('connected');
+                $connection->save();
+                Log::info('PullProductsFromSubiektGT: Connection status auto-reset to connected after successful sync', [
+                    'connection_id' => $this->connectionId,
+                ]);
+            }
 
             // Update sync job status
             if ($results['success']) {

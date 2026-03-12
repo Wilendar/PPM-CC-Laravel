@@ -1120,7 +1120,7 @@ class SubiektGTService implements ERPSyncServiceInterface
             if ($connectionMode === 'rest_api' && $this->restApiClient !== null) {
                 try {
                     // Delta detection for prices/basic_data: use tw_ZmianaTw.twz_CzasModyf (timestamp)
-                    if (in_array($syncType, ['prices', 'basic_data', 'linked_only'])) {
+                    if (in_array($syncType, ['prices', 'basic_data', 'linked_only', 'location'])) {
                         $lastChangeTime = $connection->last_change_time;
 
                         if ($lastChangeTime !== null) {
@@ -1367,7 +1367,7 @@ class SubiektGTService implements ERPSyncServiceInterface
                 // skip timestamp check because tw_DataMod is global for ALL changes.
                 // E.g., name change updates tw_DataMod but doesn't mean prices changed.
                 $subiektModified = $subiektData['date_modified'] ?? $subiektData['tw_DataMod'] ?? null;
-                $isSelectiveSyncType = in_array($syncType, ['prices', 'stock', 'basic_data']);
+                $isSelectiveSyncType = in_array($syncType, ['prices', 'stock', 'basic_data', 'location']);
 
                 if (!$isSelectiveSyncType && $erpData && $erpData->last_pull_at && $subiektModified) {
                     $subiektTimestamp = is_numeric($subiektModified)
@@ -1439,6 +1439,39 @@ class SubiektGTService implements ERPSyncServiceInterface
                             $updateDetails = [
                                 'type' => 'basic_data',
                                 'fields_updated' => $basicResult['fields'] ?? [],
+                            ];
+                            break;
+
+                        case 'location':
+                            // ETAP_08 FAZA 8: Only update stock locations from tw_Pole2
+                            $pole2Value = $subiektProduct->Pole2 ?? $subiektProduct->pole2
+                                ?? $subiektData['Pole2'] ?? $subiektData['pole2'] ?? null;
+                            $config = $connection->connection_config ?? [];
+                            $warehouseMappings = $config['warehouse_mappings'] ?? [];
+                            $rawDefaultWhId = $config['default_warehouse_id'] ?? null;
+                            $copyToAll = $config['copy_location_to_all'] ?? false;
+
+                            // Resolve default_warehouse_id: config stores Subiekt mag_Id,
+                            // but we need PPM warehouse ID for FK constraint
+                            $defaultWarehouseId = null;
+                            if ($rawDefaultWhId !== null && !empty($warehouseMappings)) {
+                                $ppmId = $warehouseMappings[$rawDefaultWhId]
+                                    ?? $warehouseMappings[(string) $rawDefaultWhId] ?? null;
+                                $defaultWarehouseId = $ppmId ? (int) $ppmId : null;
+                            }
+
+                            $updatedWarehouses = $this->updateStockLocationsFromErp(
+                                $ppmProduct,
+                                $pole2Value,
+                                $warehouseMappings,
+                                $defaultWarehouseId,
+                                $copyToAll
+                            );
+                            $wasUpdated = !empty($updatedWarehouses);
+                            $updateDetails = [
+                                'type' => 'location',
+                                'warehouses_updated' => count($updatedWarehouses),
+                                'pole2' => $pole2Value,
                             ];
                             break;
 
@@ -2489,8 +2522,17 @@ class SubiektGTService implements ERPSyncServiceInterface
         $pole2Value = $subiektProduct->Pole2 ?? $subiektProduct->pole2 ?? null;
         if (!empty($pole2Value)) {
             $warehouseMappings = $config['warehouse_mappings'] ?? [];
-            $defaultWarehouseId = $config['default_warehouse_id'] ?? null;
+            $rawDefaultWhId = $config['default_warehouse_id'] ?? null;
             $copyLocationToAll = $config['copy_location_to_all'] ?? false;
+
+            // Resolve default_warehouse_id: config stores Subiekt mag_Id,
+            // but we need PPM warehouse ID for FK constraint
+            $defaultWarehouseId = null;
+            if ($rawDefaultWhId !== null && !empty($warehouseMappings)) {
+                $ppmId = $warehouseMappings[$rawDefaultWhId]
+                    ?? $warehouseMappings[(string) $rawDefaultWhId] ?? null;
+                $defaultWarehouseId = $ppmId ? (int) $ppmId : null;
+            }
 
             $updatedWarehouses = $this->updateStockLocationsFromErp(
                 $product,
