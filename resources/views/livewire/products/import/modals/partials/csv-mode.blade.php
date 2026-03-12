@@ -361,6 +361,20 @@
                 </button>
             </div>
 
+            {{-- Duplicate SKU Warning --}}
+            @if(!empty($duplicateSkuResults))
+            <div class="import-sku-duplicate-toolbar">
+                <div class="import-sku-duplicate-toolbar-info">
+                    <svg class="w-5 h-5 text-red-400 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
+                    </svg>
+                    <span class="text-sm text-red-300">
+                        Znaleziono <strong class="text-red-200">{{ count($duplicateSkuResults) }}</strong> zduplikowanych SKU. Import zablokowany.
+                    </span>
+                </div>
+            </div>
+            @endif
+
             {{-- Preview Table --}}
             <div class="overflow-x-auto rounded-lg border border-gray-700/50">
                 <table class="w-full text-sm">
@@ -376,11 +390,18 @@
                     </thead>
                     <tbody class="divide-y divide-gray-700/50">
                         @foreach(($csvPreviewRows ?? []) as $rowIndex => $row)
-                            <tr class="hover:bg-gray-700/20 transition-colors">
+                            @php
+                                $previewSku = strtoupper(trim($row['sku'] ?? ''));
+                                $isPreviewDuplicate = !empty($previewSku) && isset($duplicateSkuResults[$previewSku]);
+                            @endphp
+                            <tr class="hover:bg-gray-700/20 transition-colors {{ $isPreviewDuplicate ? 'import-row-duplicate' : '' }}">
                                 <td class="px-3 py-2 text-gray-500 font-mono text-xs">{{ $rowIndex + 1 }}</td>
                                 @foreach(($csvPreviewHeaders ?? []) as $fieldKey => $fieldLabel)
                                     <td class="px-3 py-2 text-gray-300 truncate max-w-[200px]">
                                         {{ $row[$fieldKey] ?? '-' }}
+                                        @if($fieldKey === 'sku' && $isPreviewDuplicate)
+                                            <span class="import-sku-duplicate-inline-badge ml-1">DUPLIKAT</span>
+                                        @endif
                                     </td>
                                 @endforeach
                             </tr>

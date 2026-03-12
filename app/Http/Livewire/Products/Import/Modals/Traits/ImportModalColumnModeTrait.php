@@ -133,7 +133,7 @@ trait ImportModalColumnModeTrait
      *
      * Each line of text fills one row in the specified column.
      */
-    public function pasteToColumn(string $columnKey, string $text): void
+    public function pasteToColumn(string $columnKey, string $text, int $startRow = 0): void
     {
         $lines = preg_split('/\r?\n/', trim($text));
         $lines = array_values(array_filter($lines, fn($l) => trim($l) !== ''));
@@ -142,8 +142,9 @@ trait ImportModalColumnModeTrait
             return;
         }
 
-        // Clear rows if first row is empty placeholder
-        if (count($this->rows) === 1
+        // Clear rows if first row is empty placeholder (only when pasting from row 0)
+        if ($startRow === 0
+            && count($this->rows) === 1
             && empty(trim($this->rows[0]['sku'] ?? ''))
             && empty(trim($this->rows[0]['name'] ?? ''))
         ) {
@@ -152,17 +153,24 @@ trait ImportModalColumnModeTrait
 
         foreach ($lines as $i => $value) {
             $value = trim($value);
-            if (!isset($this->rows[$i])) {
-                $this->rows[$i] = $this->createEmptyRow();
+            $targetRow = $startRow + $i;
+            if (!isset($this->rows[$targetRow])) {
+                $this->rows[$targetRow] = $this->createEmptyRow();
             }
-            $this->rows[$i][$columnKey] = $value;
+            $this->rows[$targetRow][$columnKey] = $value;
         }
 
         Log::debug('ImportModalColumnModeTrait: pasteToColumn', [
             'column' => $columnKey,
+            'startRow' => $startRow,
             'lines' => count($lines),
             'total_rows' => count($this->rows),
         ]);
+
+        // Validate SKUs if pasting into SKU column
+        if ($columnKey === 'sku') {
+            $this->validateSkus();
+        }
     }
 
     /**
@@ -199,6 +207,11 @@ trait ImportModalColumnModeTrait
             if (isset($this->rows[$i])) {
                 $this->rows[$i][$colKey] = $value;
             }
+        }
+
+        // Validate SKUs if filling SKU column
+        if ($colKey === 'sku') {
+            $this->validateSkus();
         }
     }
 
@@ -376,6 +389,9 @@ trait ImportModalColumnModeTrait
             'removed_index' => $index,
             'remaining_rows' => count($this->rows),
         ]);
+
+        // Re-validate SKUs after row removal
+        $this->validateSkus();
     }
 
     /**
@@ -388,7 +404,7 @@ trait ImportModalColumnModeTrait
      *
      * Called from Alpine.js paste event handler.
      */
-    public function pasteFromClipboard(string $pastedText): void
+    public function pasteFromClipboard(string $pastedText, int $startRow = 0): void
     {
         if (empty(trim($pastedText))) {
             return;
@@ -396,10 +412,12 @@ trait ImportModalColumnModeTrait
 
         Log::debug('ImportModalColumnModeTrait: pasteFromClipboard CALLED', [
             'text_length' => strlen($pastedText),
+            'startRow' => $startRow,
         ]);
 
         $lines = preg_split('/\r?\n/', trim($pastedText));
         $lines = array_filter($lines, fn(string $line) => trim($line) !== '');
+        $lines = array_values($lines);
 
         if (empty($lines)) {
             return;
@@ -429,15 +447,16 @@ trait ImportModalColumnModeTrait
         // Get ordered column keys (updated after adding)
         $columnOrder = $this->getColumnOrder();
 
-        // Clear existing rows if first row is empty
-        if (count($this->rows) === 1
+        // Clear existing rows if first row is empty (only when pasting from row 0)
+        if ($startRow === 0
+            && count($this->rows) === 1
             && empty(trim($this->rows[0]['sku'] ?? ''))
             && empty(trim($this->rows[0]['name'] ?? ''))
         ) {
             $this->rows = [];
         }
 
-        foreach ($lines as $line) {
+        foreach ($lines as $lineIndex => $line) {
             $values = array_map('trim', explode($separator, $line));
 
             $row = $this->createEmptyRow();
@@ -448,15 +467,20 @@ trait ImportModalColumnModeTrait
                 }
             }
 
-            $this->rows[] = $row;
+            $targetRow = $startRow + $lineIndex;
+            $this->rows[$targetRow] = $row;
         }
 
         Log::debug('ImportModalColumnModeTrait: pasteFromClipboard COMPLETED', [
             'lines_parsed' => count($lines),
+            'startRow' => $startRow,
             'separator' => $separator === "\t" ? 'tab' : 'semicolon',
             'total_rows' => count($this->rows),
             'active_columns' => $this->activeColumns,
         ]);
+
+        // Validate SKUs after paste
+        $this->validateSkus();
     }
 
     /**
@@ -480,6 +504,12 @@ trait ImportModalColumnModeTrait
      */
     public function importColumnRows(): void
     {
+        // Block import if duplicates exist
+        if ($this->hasDuplicates()) {
+            $this->addError('columnImport', 'Usun zduplikowane SKU przed importem.');
+            return;
+        }
+
         // Validate rows
         $validRows = [];
         $validationErrors = [];
@@ -831,6 +861,9 @@ trait ImportModalColumnModeTrait
         $this->suppliers = [];
         $this->manufacturers = [];
         $this->importers = [];
+
+        // Reset SKU validation state
+        $this->resetSkuValidationState();
     }
 
     /**

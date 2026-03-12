@@ -27,19 +27,42 @@
             const isInTable = activeEl && activeEl.closest('[data-import-table]');
             if (!isInTable) return;
 
-            const cell = activeEl.closest('td');
-            const colKey = cell?.dataset?.colKey || null;
             const lines = text.split(/\r?\n/).filter(l => l.trim());
             const firstLine = lines[0] || '';
-            const isSingleColumn = !firstLine.includes('\t') && !firstLine.includes(';');
+            const isMultiColumn = firstLine.includes('\t') || firstLine.includes(';');
 
-            if (isSingleColumn && colKey) {
-                event.preventDefault();
-                $wire.pasteToColumn(colKey, text);
-            } else if (lines.length > 0) {
-                event.preventDefault();
-                $wire.pasteFromClipboard(text);
+            // Single line, single value -> native browser paste (no preventDefault)
+            if (lines.length <= 1 && !isMultiColumn) {
+                return;
             }
+
+            // Get cursor position (row + column)
+            const row = activeEl.closest('tr');
+            const cell = activeEl.closest('td');
+            const rowIndex = row ? parseInt(row.dataset.rowIndex) : 0;
+            const colKey = cell?.dataset?.colKey || null;
+
+            // Multi-line, single column -> fill column from cursor row
+            if (!isMultiColumn && colKey) {
+                event.preventDefault();
+                $wire.pasteToColumn(colKey, text, rowIndex);
+            }
+            // Multi-column data -> fill grid from cursor row
+            else if (lines.length > 0) {
+                event.preventDefault();
+                $wire.pasteFromClipboard(text, rowIndex);
+            }
+        },
+        openSelectedDuplicates() {
+            const duplicates = $wire.duplicateSkuResults || {};
+            const selected = $wire.selectedDuplicateRows || [];
+            const rows = $wire.rows || [];
+            selected.forEach(idx => {
+                const sku = (rows[idx]?.sku || '').toUpperCase().trim();
+                if (duplicates[sku]?.url) {
+                    window.open(duplicates[sku].url, '_blank');
+                }
+            });
         },
         startDragFill(event, rowIndex, colKey) {
             this.dragSource = { row: rowIndex, col: colKey };
@@ -191,6 +214,40 @@
     </div>
 
     {{-- ================================================================
+         DUPLICATE SKU TOOLBAR
+         ================================================================ --}}
+    @if(!empty($duplicateSkuResults))
+    <div class="import-sku-duplicate-toolbar">
+        <div class="import-sku-duplicate-toolbar-info">
+            <svg class="w-5 h-5 text-red-400 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
+            </svg>
+            <span class="text-sm text-red-300">
+                Znaleziono <strong class="text-red-200">{{ count($duplicateSkuResults) }}</strong> zduplikowanych SKU. Import zablokowany.
+            </span>
+        </div>
+        <div class="import-sku-duplicate-toolbar-actions">
+            <label class="import-sku-duplicate-toolbar-checkbox">
+                <input type="checkbox"
+                       wire:model.live="selectAllDuplicatesFlag"
+                       class="rounded border-gray-600 bg-gray-700 text-red-500 focus:ring-red-500/50">
+                <span class="text-xs text-gray-300">Zaznacz wszystkie duplikaty</span>
+            </label>
+            @if(count($selectedDuplicateRows) > 0)
+                <button wire:click="removeDuplicateRows({{ json_encode($selectedDuplicateRows) }})"
+                        class="import-sku-duplicate-btn-remove">
+                    Usun zaznaczone ({{ count($selectedDuplicateRows) }})
+                </button>
+            @endif
+            <button wire:click="removeAllDuplicateRows"
+                    class="import-sku-duplicate-btn-remove-all">
+                Usun wszystkie duplikaty
+            </button>
+        </div>
+    </div>
+    @endif
+
+    {{-- ================================================================
          DATA TABLE
          ================================================================ --}}
     <div class="overflow-x-auto rounded-lg border border-gray-700/50" data-import-table>
@@ -245,7 +302,12 @@
             </thead>
             <tbody class="divide-y divide-gray-700/30">
                 @foreach($rows as $rowIndex => $row)
-                    <tr class="hover:bg-gray-700/20 transition-colors group"
+                    @php
+                        $rowSku = strtoupper(trim($rows[$rowIndex]['sku'] ?? ''));
+                        $isDuplicate = !empty($rowSku) && isset($duplicateSkuResults[$rowSku]);
+                        $dupInfo = $isDuplicate ? ($duplicateSkuResults[$rowSku] ?? null) : null;
+                    @endphp
+                    <tr class="hover:bg-gray-700/20 transition-colors group {{ $isDuplicate ? 'import-row-duplicate' : '' }}"
                         :class="{
                             'import-drag-fill-row-highlight': isDragging && dragSource && dragTargetRow !== null && (
                                 {{ $rowIndex }} >= Math.min(dragSource.row, dragTargetRow) &&
@@ -257,7 +319,7 @@
                         {{-- Row number --}}
                         <td class="px-2 py-1.5 text-gray-500 text-xs font-mono">{{ $rowIndex + 1 }}</td>
 
-                        {{-- SKU input --}}
+                        {{-- SKU input with duplicate validation --}}
                         <td class="px-2 py-1.5 relative group/cell" data-col-key="sku"
                             :class="{
                                 'import-drag-fill-highlight': isDragging && dragSource?.col === 'sku' && dragTargetRow !== null && (
@@ -266,11 +328,37 @@
                                 ),
                                 'import-drag-fill-source': isDragging && dragSource?.row === {{ $rowIndex }} && dragSource?.col === 'sku'
                             }">
-                            <input type="text"
-                                   wire:model.blur="rows.{{ $rowIndex }}.sku"
-                                   class="form-input-dark-sm w-full font-mono"
-                                   placeholder="SKU"
-                                   autocomplete="off">
+                            <div class="flex items-center gap-1">
+                                @if($isDuplicate)
+                                    <input type="checkbox"
+                                           wire:key="dup-select-{{ $rowIndex }}"
+                                           wire:model.live="selectedDuplicateRows"
+                                           value="{{ $rowIndex }}"
+                                           class="rounded border-gray-600 bg-gray-700 text-red-500 focus:ring-red-500/50 flex-shrink-0 w-3.5 h-3.5">
+                                @endif
+                                <input type="text"
+                                       wire:model.blur="rows.{{ $rowIndex }}.sku"
+                                       x-on:blur.debounce.150ms="$wire.validateSingleSku({{ $rowIndex }})"
+                                       class="form-input-dark-sm w-full font-mono {{ $isDuplicate ? 'import-sku-duplicate-input' : '' }}"
+                                       placeholder="SKU"
+                                       autocomplete="off">
+                                @if($isDuplicate)
+                                    <svg class="w-4 h-4 text-red-400 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
+                                    </svg>
+                                @endif
+                            </div>
+                            @if($isDuplicate && $dupInfo)
+                                <div class="import-sku-duplicate-info">
+                                    <span class="import-sku-duplicate-inline-badge">{{ $dupInfo['source'] === 'batch' ? 'DUPLIKAT WEWN.' : 'DUPLIKAT' }}</span>
+                                    <span class="text-gray-400">{{ $dupInfo['label'] }}</span>
+                                    @if($dupInfo['url'])
+                                        <a href="{{ $dupInfo['url'] }}" target="_blank" class="import-sku-duplicate-link">Otworz</a>
+                                    @endif
+                                    <button wire:click="removeDuplicateRows([{{ $rowIndex }}])"
+                                            class="import-sku-duplicate-link text-red-400 hover:text-red-300">Usun</button>
+                                </div>
+                            @endif
                             <div class="import-drag-handle"
                                  x-on:mousedown.prevent="startDragFill($event, {{ $rowIndex }}, 'sku')"></div>
                         </td>

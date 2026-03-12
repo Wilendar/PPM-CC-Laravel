@@ -220,6 +220,9 @@ trait ImportModalCsvModeTrait
             $this->csvMappingStep = true;
             $this->csvPreviewStep = false;
 
+            // Validate SKUs after parsing
+            $this->validateCsvSkus();
+
             Log::debug('ImportModalCsvModeTrait: parseCsvInput COMPLETED', [
                 'headers_count' => count($this->csvParsedHeaders),
                 'rows_count' => $this->csvTotalRows,
@@ -471,6 +474,9 @@ trait ImportModalCsvModeTrait
 
         $this->csvPreviewStep = true;
 
+        // Re-validate SKUs after mapping confirmation (mapping may have changed SKU column)
+        $this->validateCsvSkus();
+
         Log::debug('ImportModalCsvModeTrait: confirmCsvMapping - moving to preview', [
             'mapping' => $this->csvManualMapping,
             'preview_headers' => $this->csvPreviewHeaders,
@@ -488,6 +494,12 @@ trait ImportModalCsvModeTrait
     {
         if (empty($this->csvParsedRows)) {
             $this->addError('csvImport', 'Brak danych do zaimportowania');
+            return;
+        }
+
+        // Block import if duplicates exist
+        if ($this->hasDuplicates()) {
+            $this->addError('csvImport', 'Usun zduplikowane SKU przed importem.');
             return;
         }
 
@@ -710,6 +722,48 @@ trait ImportModalCsvModeTrait
     }
 
     /**
+     * Validate SKUs from parsed CSV data
+     *
+     * Finds the SKU column from csvManualMapping, extracts SKUs,
+     * runs batch DB check + internal duplicate detection.
+     */
+    public function validateCsvSkus(): void
+    {
+        $skuColumnIndex = array_search('sku', $this->csvManualMapping ?? []);
+
+        if ($skuColumnIndex === false) {
+            $this->duplicateSkuResults = [];
+            return;
+        }
+
+        $skus = [];
+        foreach ($this->csvParsedRows as $row) {
+            $sku = strtoupper(trim($row[$skuColumnIndex] ?? ''));
+            if (!empty($sku)) {
+                $skus[] = $sku;
+            }
+        }
+
+        if (empty($skus)) {
+            $this->duplicateSkuResults = [];
+            return;
+        }
+
+        $dbDuplicates = $this->batchCheckSkus($skus);
+        $internalDuplicates = $this->detectInternalDuplicates($skus);
+
+        // Merge: DB duplicates take priority over internal batch duplicates
+        $this->duplicateSkuResults = array_merge($internalDuplicates, $dbDuplicates);
+
+        Log::debug('ImportModalCsvModeTrait: validateCsvSkus COMPLETED', [
+            'total_skus' => count($skus),
+            'db_duplicates' => count($dbDuplicates),
+            'internal_duplicates' => count($internalDuplicates),
+            'total_duplicates' => count($this->duplicateSkuResults),
+        ]);
+    }
+
+    /**
      * Reset all CSV mode state
      */
     protected function resetCsvState(): void
@@ -726,5 +780,8 @@ trait ImportModalCsvModeTrait
         $this->csvSampleValues = [];
         $this->csvPreviewHeaders = [];
         $this->csvPreviewRows = [];
+
+        // Reset SKU validation state
+        $this->resetSkuValidationState();
     }
 }

@@ -43,6 +43,7 @@ class ProductImportModal extends Component
     use Traits\ImportModalCsvModeTrait;
     use Traits\ImportModalColumnModeTrait;
     use Traits\ImportModalSwitchesTrait;
+    use Traits\ImportModalSkuValidationTrait;
 
     /*
     |--------------------------------------------------------------------------
@@ -191,6 +192,9 @@ class ProductImportModal extends Component
 
         $this->activeMode = $mode;
 
+        // Reset SKU validation state on mode switch
+        $this->resetSkuValidationState();
+
         // Reset mode-specific state
         if ($mode === 'column') {
             $this->resetCsvState();
@@ -220,6 +224,7 @@ class ProductImportModal extends Component
         $this->resetCsvState();
         $this->resetColumnState();
         $this->resetSwitches();
+        $this->resetSkuValidationState();
         $this->resetErrorBag();
     }
 
@@ -315,6 +320,8 @@ class ProductImportModal extends Component
             'modalTitle' => $this->getModalTitle(),
             'validRowCount' => $this->getValidRowCount(),
             'isEditMode' => $this->isEditMode(),
+            'hasDuplicates' => $this->hasDuplicates(),
+            'duplicateCount' => count($this->duplicateSkuResults),
         ]);
     }
 }

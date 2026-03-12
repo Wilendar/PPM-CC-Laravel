@@ -222,7 +222,8 @@
                                     <button wire:click="importColumnRows"
                                             wire:loading.attr="disabled"
                                             wire:target="importColumnRows"
-                                            class="btn-enterprise-primary">
+                                            @if($hasDuplicates ?? false) disabled @endif
+                                            class="btn-enterprise-primary {{ ($hasDuplicates ?? false) ? 'import-btn-blocked' : '' }}">
                                         <span wire:loading.remove wire:target="importColumnRows">
                                             {{ $editingPendingProductId ? 'Zapisz zmiany' : 'Importuj' }}
                                         </span>
@@ -238,7 +239,8 @@
                                     <button wire:click="importCsvRows"
                                             wire:loading.attr="disabled"
                                             wire:target="importCsvRows"
-                                            class="btn-enterprise-primary">
+                                            @if($hasDuplicates ?? false) disabled @endif
+                                            class="btn-enterprise-primary {{ ($hasDuplicates ?? false) ? 'import-btn-blocked' : '' }}">
                                         <span wire:loading.remove wire:target="importCsvRows">
                                             Importuj
                                         </span>
