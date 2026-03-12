@@ -72,21 +72,6 @@ class BulkStockModal extends Component
 
     /*
     |--------------------------------------------------------------------------
-    | LIFECYCLE HOOKS
-    |--------------------------------------------------------------------------
-    */
-
-    /**
-     * Component mount (no parameters - DI safe)
-     */
-    public function mount(): void
-    {
-        // Initialize component without parameters
-        // Modal opens via event dispatch
-    }
-
-    /*
-    |--------------------------------------------------------------------------
     | EVENT LISTENERS
     |--------------------------------------------------------------------------
     */
@@ -95,9 +80,9 @@ class BulkStockModal extends Component
      * Open modal with selected variant IDs
      */
     #[On('open-bulk-stock-modal')]
-    public function openModal($variantIds): void
+    public function openModal(array $variantIds): void
     {
-        $this->selectedVariantIds = (array) $variantIds;
+        $this->selectedVariantIds = $variantIds;
         $this->warehouseId = Warehouse::getDefault()?->id ?? 1;
         $this->changeType = 'set';
         $this->amount = 0;
