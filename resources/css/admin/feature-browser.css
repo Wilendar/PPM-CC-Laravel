@@ -265,6 +265,24 @@
     padding: 2rem;
 }
 
+.feature-browser__empty-state-icon {
+    margin-bottom: 0.75rem;
+    font-size: 2rem;
+    color: var(--gray-600, #4b5563);
+}
+
+.feature-browser__empty-state-text {
+    font-size: 0.875rem;
+    line-height: 1.5;
+    color: #6b7280;
+}
+
+.feature-browser__empty-state-hint {
+    font-size: 0.75rem;
+    color: #4b5563;
+    margin-top: 0.25rem;
+}
+
 /* ----------------------------------------
    TAB NAVIGATION (For Main Panel)
    ---------------------------------------- */

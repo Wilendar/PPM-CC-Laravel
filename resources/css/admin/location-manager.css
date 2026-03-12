@@ -267,44 +267,131 @@
 }
 
 /* ------------------------------------------
-   7. STATS GRID (header overview)
+   7. LOCATION BROWSER
+   Reuses .feature-browser__* classes from feature-browser.css.
+   Only location-specific overrides below.
    ------------------------------------------ */
 
-.location-stats-grid {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 1rem;
-    background: rgba(31, 41, 55, 0.5);
-    border: 1px solid var(--gray-700, #374151);
-    border-radius: 0.5rem;
-    padding: 1.25rem;
+/* Full-height override: columns fill available viewport */
+.location-browser--fullheight .feature-browser__column {
+    max-height: calc(100vh - 250px);
 }
 
-.location-stat-card {
+/* Header icon (identical to feature-browser but with SVG instead of emoji) */
+.location-browser__header-icon {
     display: flex;
-    flex-direction: column;
     align-items: center;
-    text-align: center;
-    gap: 0.25rem;
+    justify-content: center;
+    width: 3rem;
+    height: 3rem;
+    border-radius: 0.75rem;
+    background: rgba(var(--mpp-primary-rgb, 224, 172, 126), 0.18);
+    color: var(--mpp-primary, #e0ac7e);
+    font-size: 1.25rem;
+    flex-shrink: 0;
 }
 
-.location-stat-value {
-    font-size: 1.5rem;
-    font-weight: 700;
-    color: var(--color-white, #f8fafc);
-    line-height: 1.2;
+/* Stats pills in header */
+.location-browser__stat-pill {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.375rem 0.75rem;
+    border-radius: 0.5rem;
+    background: rgba(31, 41, 55, 0.5);
+    border: 1px solid var(--border-color, #374151);
 }
 
-.location-stat-label {
-    font-size: 0.6875rem;
-    font-weight: 500;
-    color: var(--gray-400, #9ca3af);
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
+.location-browser__stat-pill__label {
+    font-size: 0.75rem;
+    color: #9ca3af;
+}
+
+.location-browser__stat-pill__value {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: white;
 }
 
 /* ------------------------------------------
-   8. THREE-COLUMN PANEL LAYOUT
+   7e. LOCATION BROWSER - SEARCH
+   ------------------------------------------ */
+
+.location-browser__search {
+    position: relative;
+    padding: 0.5rem;
+    border-bottom: 1px solid var(--border-color, #374151);
+    flex-shrink: 0;
+}
+
+.location-browser__search-dot {
+    position: absolute;
+    left: 1rem;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: 50%;
+    background: var(--mpp-primary, #e0ac7e);
+}
+
+.location-browser__search input {
+    width: 100%;
+    padding: 0.5rem 0.75rem 0.5rem 1.75rem;
+    background: transparent;
+    border: none;
+    color: white;
+    font-size: 0.875rem;
+    outline: none;
+}
+
+.location-browser__search input::placeholder {
+    color: #6b7280;
+}
+
+/* ------------------------------------------
+   7f. LOCATION BROWSER - FILTER SELECTS
+   ------------------------------------------ */
+
+.location-browser__filters {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem;
+    border-bottom: 1px solid var(--border-color, #374151);
+    flex-shrink: 0;
+}
+
+/* 7g. Product items -> reuses .feature-browser__product-item */
+
+/* Product icon (location-specific, SVG-based) */
+.location-browser__product-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.25rem;
+    height: 2.25rem;
+    border-radius: 0.5rem;
+    background: rgba(var(--mpp-primary-rgb, 224, 172, 126), 0.12);
+    color: var(--mpp-primary, #e0ac7e);
+    flex-shrink: 0;
+    font-size: 0.875rem;
+}
+
+/* ------------------------------------------
+   7h. LOCATION BROWSER - DETAIL HEADER
+   ------------------------------------------ */
+
+.location-browser__detail-header {
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid var(--border-color, #374151);
+    flex-shrink: 0;
+}
+
+/* ------------------------------------------
+   8. THREE-COLUMN PANEL LAYOUT (LEGACY)
+   Kept for backward compatibility - prefer
+   .location-browser__columns grid above.
    ------------------------------------------ */
 
 .location-panel {
@@ -326,29 +413,11 @@
     padding: 0.75rem 0.5rem;
 }
 
-.location-panel-left::-webkit-scrollbar {
-    width: 5px;
-}
-
-.location-panel-left::-webkit-scrollbar-thumb {
-    background: var(--gray-600, #4b5563);
-    border-radius: 3px;
-}
-
 .location-panel-center {
     flex: 1;
     overflow-y: auto;
     background: var(--color-gray-900, #111827);
     padding: 1rem;
-}
-
-.location-panel-center::-webkit-scrollbar {
-    width: 6px;
-}
-
-.location-panel-center::-webkit-scrollbar-thumb {
-    background: var(--gray-600, #4b5563);
-    border-radius: 3px;
 }
 
 .location-panel-right {
@@ -360,30 +429,192 @@
     padding: 1rem;
 }
 
-.location-panel-right::-webkit-scrollbar {
-    width: 5px;
+/* ------------------------------------------
+   8b. BRAND-VARIABLE CLASSES
+   (replaces hardcoded hex in Blade)
+   ------------------------------------------ */
+
+.location-warehouse--active {
+    background: rgba(224, 172, 126, 0.15);
+    background: rgba(var(--mpp-primary-rgb, 224, 172, 126), 0.15);
+    color: var(--mpp-primary, #e0ac7e);
+    border: 1px solid rgba(224, 172, 126, 0.3);
+    border: 1px solid rgba(var(--mpp-primary-rgb, 224, 172, 126), 0.3);
 }
 
-.location-panel-right::-webkit-scrollbar-thumb {
-    background: var(--gray-600, #4b5563);
-    border-radius: 3px;
+.location-link-brand {
+    color: var(--mpp-primary, #e0ac7e);
+    text-decoration: none;
+    transition: color 0.15s ease;
+}
+
+.location-link-brand:hover {
+    color: var(--mpp-primary-dark, #d1975a);
+}
+
+.location-input-enterprise {
+    width: 100%;
+    background: rgba(31, 41, 55, 0.8);
+    border: 1px solid var(--gray-600, #4b5563);
+    color: var(--color-white, #f8fafc);
+    font-size: 0.875rem;
+    border-radius: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.location-input-enterprise:focus {
+    outline: none;
+    border-color: var(--mpp-primary, #e0ac7e);
+    box-shadow: 0 0 0 2px rgba(224, 172, 126, 0.25);
+}
+
+.location-input-enterprise::placeholder {
+    color: var(--gray-500, #6b7280);
+}
+
+.location-select-enterprise {
+    background: rgba(31, 41, 55, 0.8);
+    border: 1px solid var(--gray-600, #4b5563);
+    color: var(--color-white, #f8fafc);
+    font-size: 0.875rem;
+    border-radius: 0.5rem;
+    padding: 0.5rem 0.5rem;
+    transition: border-color 0.15s ease;
+}
+
+.location-select-enterprise:focus {
+    outline: none;
+    border-color: var(--mpp-primary, #e0ac7e);
+    box-shadow: 0 0 0 2px rgba(224, 172, 126, 0.25);
+}
+
+/* Compact stats bar (replaces full-width stats grid) */
+.location-stats-bar {
+    display: flex;
+    align-items: center;
+    gap: 1.25rem;
+    padding: 0.5rem 1rem;
+    background: rgba(31, 41, 55, 0.5);
+    border: 1px solid var(--gray-700, #374151);
+    border-radius: 0.375rem;
+    font-size: 0.75rem;
+}
+
+.location-stats-bar__item {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    color: var(--gray-400, #9ca3af);
+    white-space: nowrap;
+}
+
+.location-stats-bar__value {
+    font-weight: 700;
+    color: var(--color-white, #f8fafc);
+}
+
+/* Right panel placeholder */
+.location-panel-placeholder {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    color: var(--gray-500, #6b7280);
+    text-align: center;
+    padding: 2rem;
+}
+
+.location-panel-placeholder__icon {
+    width: 3rem;
+    height: 3rem;
+    margin-bottom: 0.75rem;
+    color: var(--gray-600, #4b5563);
+}
+
+.location-panel-placeholder__text {
+    font-size: 0.875rem;
+    line-height: 1.5;
+}
+
+/* CRUD action buttons */
+.location-action-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.5rem;
+    height: 1.5rem;
+    border-radius: 0.25rem;
+    color: var(--gray-500, #6b7280);
+    transition: color 0.15s ease, background 0.15s ease;
+    cursor: pointer;
+    border: none;
+    background: transparent;
+    padding: 0;
+}
+
+.location-action-btn:hover {
+    color: var(--color-white, #f8fafc);
+    background: rgba(55, 65, 81, 0.5);
+}
+
+.location-action-btn--danger:hover {
+    color: #ef4444;
+    background: rgba(239, 68, 68, 0.1);
+}
+
+.location-action-btn--add {
+    color: var(--mpp-primary, #e0ac7e);
+}
+
+.location-action-btn--add:hover {
+    color: var(--color-white, #f8fafc);
+    background: rgba(224, 172, 126, 0.2);
+}
+
+/* Tree item hover actions (show on hover, no layout shift) */
+.location-tree-item .location-tree-actions {
+    display: flex;
+    margin-left: auto;
+    gap: 0.125rem;
+    opacity: 0;
+    transition: opacity 0.15s ease;
+}
+
+.location-tree-item:hover .location-tree-actions {
+    opacity: 1;
 }
 
 /* ------------------------------------------
    9. RESPONSIVE
    ------------------------------------------ */
 
+/* ------------------------------------------
+   9. RESPONSIVE
+   Main layout responsive handled by feature-browser.css.
+   Only legacy panel responsive below.
+   ------------------------------------------ */
+
 @media (max-width: 1280px) {
-    .location-panel-right {
-        width: 16rem;
+    .location-browser__header {
+        flex-wrap: wrap;
     }
 
-    .location-stats-grid {
-        grid-template-columns: repeat(2, 1fr);
+    /* Legacy panel */
+    .location-panel-right {
+        width: 16rem;
     }
 }
 
 @media (max-width: 1024px) {
+    .location-browser__header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.75rem;
+    }
+
+    /* Legacy panel */
     .location-panel {
         flex-direction: column;
         height: auto;
