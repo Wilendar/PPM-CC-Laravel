@@ -66,8 +66,15 @@
             </template>
 
             <div>
-                <div class="text-sm font-medium text-primary">
+                <div class="text-sm font-medium text-primary flex items-center gap-1">
                     {{ $product->sku }}
+                    <button @click.stop="navigator.clipboard.writeText($el.dataset.copy); $el.querySelector('svg').classList.add('text-green-400'); setTimeout(() => $el.querySelector('svg').classList.remove('text-green-400'), 1000)"
+                            data-copy="{{ $product->sku }}"
+                            class="copy-to-clipboard-btn" title="Kopiuj SKU">
+                        <svg class="w-3.5 h-3.5 transition-colors duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+                        </svg>
+                    </button>
                 </div>
                 @if($product->supplier_code)
                     <div class="text-xs text-muted">
@@ -81,11 +88,18 @@
     {{-- Name + Variants Badge --}}
     <td class="px-6 py-4">
         <div class="flex items-center">
-            <div class="text-sm text-primary">
+            <div class="text-sm text-primary flex items-center gap-1">
                 <a href="{{ route('products.edit', $product) }}"
                    class="hover:text-orange-500 transition-colors duration-300">
                     {{ Str::limit($product->name, 50) }}
                 </a>
+                <button @click.stop="navigator.clipboard.writeText($el.dataset.copy); $el.querySelector('svg').classList.add('text-green-400'); setTimeout(() => $el.querySelector('svg').classList.remove('text-green-400'), 1000)"
+                        data-copy="{{ $product->name }}"
+                        class="copy-to-clipboard-btn" title="Kopiuj nazwe">
+                    <svg class="w-3.5 h-3.5 transition-colors duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+                    </svg>
+                </button>
             </div>
 
             {{-- Variants Count Badge --}}

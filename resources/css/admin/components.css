@@ -7324,6 +7324,31 @@ hex-color-picker {
     border-color: rgba(var(--ppm-primary-rgb, 37, 99, 235), 0.5);
 }
 
+/* Copy to clipboard button (SKU, Name columns) */
+.copy-to-clipboard-btn {
+    opacity: 0;
+    color: var(--text-muted, #9ca3af);
+    padding: 4px;
+    border-radius: 4px;
+    flex-shrink: 0;
+    cursor: pointer;
+    min-width: 24px;
+    min-height: 24px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: opacity 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+
+.product-list-row:hover .copy-to-clipboard-btn {
+    opacity: 1;
+}
+
+.copy-to-clipboard-btn:hover {
+    color: var(--mpp-primary, #e0ac7e);
+    background: rgba(224, 172, 126, 0.1);
+}
+
 /* Variant subrow styling */
 .variant-subrow {
     background: #151a238c;
