@@ -634,3 +634,88 @@
         min-height: 400px;
     }
 }
+
+/* ------------------------------------------------------------------
+ * Pagination Compact - ciemna paginacja z numerami stron
+ * ------------------------------------------------------------------ */
+.pagination-compact {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.25rem;
+    padding: 0.5rem 0.75rem;
+    font-size: 0.75rem;
+}
+
+.pagination-compact__btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.375rem;
+    color: var(--text-secondary, #d1d5db);
+    background: transparent;
+    border: 1px solid var(--border-color, #374151);
+    cursor: pointer;
+    transition: all 0.15s ease;
+    font-size: 0.7rem;
+    white-space: nowrap;
+}
+
+.pagination-compact__btn:hover {
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--text-primary, #fff);
+    border-color: var(--mpp-primary, #e0ac7e);
+}
+
+.pagination-compact__btn--disabled {
+    opacity: 0.4;
+    cursor: default;
+    pointer-events: none;
+}
+
+.pagination-compact__pages {
+    display: flex;
+    align-items: center;
+    gap: 0.125rem;
+}
+
+.pagination-compact__page {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 1.5rem;
+    height: 1.5rem;
+    padding: 0 0.25rem;
+    border-radius: 0.25rem;
+    color: var(--text-secondary, #d1d5db);
+    background: transparent;
+    border: 1px solid transparent;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    font-size: 0.7rem;
+}
+
+.pagination-compact__page:hover {
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--text-primary, #fff);
+}
+
+.pagination-compact__page--active {
+    background: var(--mpp-primary, #e0ac7e);
+    color: #1a1a2e;
+    font-weight: 600;
+    cursor: default;
+    border-color: var(--mpp-primary, #e0ac7e);
+}
+
+.pagination-compact__page--active:hover {
+    background: var(--mpp-primary, #e0ac7e);
+    color: #1a1a2e;
+}
+
+.pagination-compact__dots {
+    color: var(--text-muted, #6b7280);
+    padding: 0 0.125rem;
+    font-size: 0.7rem;
+}

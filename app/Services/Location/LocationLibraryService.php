@@ -226,7 +226,7 @@ class LocationLibraryService
             })
             ->with(['product', 'product.manufacturerRelation'])
             ->orderByDesc('quantity')
-            ->paginate($perPage);
+            ->paginate($perPage, ['*'], 'productsPage');
     }
 
     /**

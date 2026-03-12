@@ -95,7 +95,7 @@
         {{-- Pagination --}}
         @if($products->hasPages())
             <div class="feature-browser__column-footer">
-                {{ $products->links('livewire::simple-tailwind') }}
+                {{ $products->links('components.pagination-compact') }}
             </div>
         @else
             <div class="feature-browser__column-footer">
