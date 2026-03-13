@@ -62,6 +62,11 @@ trait ProfileFormFilters
             $config['shop_ids'] = array_map('intval', $this->filterShopIds);
         }
 
+        // Search query (from ProfileFormProductTable trait)
+        if (property_exists($this, 'exportSearch') && !empty($this->exportSearch)) {
+            $config['search_query'] = $this->exportSearch;
+        }
+
         // Merge with advanced filters (from ProfileFormAdvancedFilters trait)
         if (method_exists($this, 'getAdvancedFilterConfig')) {
             $config = array_merge($config, $this->getAdvancedFilterConfig());
@@ -111,6 +116,11 @@ trait ProfileFormFilters
             'strval',
             (array) ($filterConfig['shop_ids'] ?? [])
         );
+
+        // Load search query (from ProfileFormProductTable trait)
+        if (property_exists($this, 'exportSearch') && isset($filterConfig['search_query'])) {
+            $this->exportSearch = (string) $filterConfig['search_query'];
+        }
 
         // Load advanced filters from profile (if trait is used)
         if (method_exists($this, 'loadAdvancedFiltersFromProfile')) {

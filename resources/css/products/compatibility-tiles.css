@@ -1749,6 +1749,11 @@
     color: var(--color-text-secondary, #9ca3af);
 }
 
+.compat-legend-suggestion {
+    border-color: var(--compat-suggestion);
+    background: var(--compat-suggestion-bg);
+}
+
 /* ==========================================================================
    Ghost Tiles - AI Smart Suggestions
    Uses existing --compat-suggestion variables
@@ -1895,6 +1900,66 @@
 
 .vehicle-tile--ghost:hover {
     animation: none;
+}
+
+/* ==========================================================================
+   Ghost Hover Overlay - Full-tile 50/50 split (accept/dismiss)
+   ========================================================================== */
+
+.ghost-hover-overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+    z-index: 4;
+    border-radius: inherit;
+    overflow: hidden;
+}
+
+.vehicle-tile--ghost:hover .ghost-hover-overlay {
+    opacity: 1;
+}
+
+.ghost-hover-overlay__accept,
+.ghost-hover-overlay__dismiss {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    cursor: pointer;
+    transition: background-color 0.15s ease;
+}
+
+.ghost-hover-overlay__accept {
+    background: rgba(16, 185, 129, 0.45);
+}
+
+.ghost-hover-overlay__accept:hover {
+    background: rgba(16, 185, 129, 0.65);
+}
+
+.ghost-hover-overlay__accept span {
+    color: white;
+    font-size: 1.25rem;
+    font-weight: 700;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+}
+
+.ghost-hover-overlay__dismiss {
+    background: rgba(239, 68, 68, 0.45);
+}
+
+.ghost-hover-overlay__dismiss:hover {
+    background: rgba(239, 68, 68, 0.65);
+}
+
+.ghost-hover-overlay__dismiss span {
+    color: white;
+    font-size: 1.25rem;
+    font-weight: 700;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
 }
 
 /* Ghost Tiles Separator */

@@ -37,6 +37,21 @@ class PrestaShopXmlGenerator implements FeedGeneratorInterface
     ];
 
     /**
+     * PrestaShop Feature IDs for vehicle compatibility.
+     * Matches VehicleCompatibilitySyncService constants.
+     */
+    private const PS_FEATURE_ORYGINAL = 431;
+    private const PS_FEATURE_MODEL = 432;
+    private const PS_FEATURE_ZAMIENNIK = 433;
+
+    /** Feature ID => human-readable name for XML output. */
+    private const PS_FEATURE_NAMES = [
+        self::PS_FEATURE_ORYGINAL => 'Oryginał',
+        self::PS_FEATURE_MODEL => 'Model',
+        self::PS_FEATURE_ZAMIENNIK => 'Zamiennik',
+    ];
+
+    /**
      * Mapping: PrestaShop XML element => PPM product array key.
      */
     private const FIELD_MAP = [
@@ -160,7 +175,143 @@ class PrestaShopXmlGenerator implements FeedGeneratorInterface
         $active = $this->resolveActive($product);
         $this->writeElement($xml, 'active', $active);
 
+        // Vehicle compatibility as <associations><product_features>
+        // Mirrors VehicleCompatibilitySyncService::transformToPrestaShopFeatures()
+        $this->writeCompatibilityFeatures($xml, $product);
+
         $xml->endElement(); // </product>
+    }
+
+    /**
+     * Write vehicle compatibility as PrestaShop <associations><product_features>.
+     *
+     * Parses compatibility_full JSON from ProductExportService and groups
+     * vehicles by type (Oryginal/Zamiennik), then outputs PS feature
+     * associations with IDs 431/432/433 - same logic as
+     * VehicleCompatibilitySyncService::transformToPrestaShopFeatures().
+     */
+    private function writeCompatibilityFeatures(XMLWriter $xml, array $product): void
+    {
+        $vehicles = [];
+
+        // Primary: parse structured compatibility_full JSON
+        $compatJson = $product['compatibility_full'] ?? null;
+        if (!empty($compatJson)) {
+            $entries = json_decode($compatJson, true);
+            if (is_array($entries) && !empty($entries)) {
+                $vehicles = $this->parseCompatibilityEntries($entries);
+            }
+        }
+
+        // Fallback: parse compatible_vehicles (pipe-separated names, default to Oryginal)
+        if (empty($vehicles) && !empty($product['compatible_vehicles'])) {
+            $names = array_map('trim', explode('|', $product['compatible_vehicles']));
+            foreach (array_filter($names) as $name) {
+                $vehicles[] = ['name' => $name, 'type' => 'Oryginal'];
+            }
+        }
+
+        if (empty($vehicles)) {
+            return;
+        }
+
+        // Group by type (matching VehicleCompatibilitySyncService logic)
+        $originalVehicles = [];
+        $zamiennikVehicles = [];
+
+        foreach ($vehicles as $v) {
+            $type = strtolower($v['type']);
+            if (str_contains($type, 'zamiennik') || str_contains($type, 'replacement')) {
+                $zamiennikVehicles[] = $v['name'];
+            } else {
+                $originalVehicles[] = $v['name'];
+            }
+        }
+
+        // Model = union of Original + Zamiennik (same as sync service)
+        $modelVehicles = array_unique(array_merge($originalVehicles, $zamiennikVehicles));
+
+        $xml->startElement('associations');
+        $xml->startElement('product_features');
+
+        // Oryginal (feature 431)
+        foreach ($originalVehicles as $name) {
+            $this->writeFeatureEntry($xml, self::PS_FEATURE_ORYGINAL, $name);
+        }
+
+        // Zamiennik (feature 433)
+        foreach ($zamiennikVehicles as $name) {
+            $this->writeFeatureEntry($xml, self::PS_FEATURE_ZAMIENNIK, $name);
+        }
+
+        // Model (feature 432) - union of all
+        foreach ($modelVehicles as $name) {
+            $this->writeFeatureEntry($xml, self::PS_FEATURE_MODEL, $name);
+        }
+
+        $xml->endElement(); // </product_features>
+        $xml->endElement(); // </associations>
+    }
+
+    /**
+     * Parse compatibility_full entries into [{name, type}] array.
+     *
+     * Input format from getCompatibilityExportFormat():
+     *   [{feature:"Model", value:"KAYO AU150"}, {feature:"Typ", value:"Oryginal"}, ...]
+     *
+     * Each "Model" entry is followed by an optional "Typ" entry.
+     * If no Typ follows, defaults to "Oryginal".
+     *
+     * @return array<array{name: string, type: string}>
+     */
+    private function parseCompatibilityEntries(array $entries): array
+    {
+        $vehicles = [];
+        $currentVehicle = null;
+
+        foreach ($entries as $entry) {
+            $feature = $entry['feature'] ?? '';
+            $value = $entry['value'] ?? '';
+
+            if ($feature === 'Model') {
+                // Flush previous vehicle (if no Typ followed, default to Oryginal)
+                if ($currentVehicle !== null) {
+                    $vehicles[] = $currentVehicle;
+                }
+                $currentVehicle = ['name' => $value, 'type' => 'Oryginal'];
+            } elseif ($feature === 'Typ' && $currentVehicle !== null) {
+                $currentVehicle['type'] = $value;
+            }
+        }
+
+        // Flush last vehicle
+        if ($currentVehicle !== null) {
+            $vehicles[] = $currentVehicle;
+        }
+
+        return $vehicles;
+    }
+
+    /**
+     * Write a single <product_feature> entry.
+     */
+    private function writeFeatureEntry(XMLWriter $xml, int $featureId, string $valueName): void
+    {
+        $xml->startElement('product_feature');
+        $xml->writeElement('id', (string) $featureId);
+
+        // Feature name (Oryginał / Model / Zamiennik)
+        $featureName = self::PS_FEATURE_NAMES[$featureId] ?? null;
+        if ($featureName !== null) {
+            $xml->startElement('name');
+            $xml->writeCdata($featureName);
+            $xml->endElement(); // </name>
+        }
+
+        $xml->startElement('value');
+        $xml->writeCdata($valueName);
+        $xml->endElement(); // </value>
+        $xml->endElement(); // </product_feature>
     }
 
     /**

@@ -1,0 +1,671 @@
+/* ========================================
+   EXPORT FILTER BROWSER - 2-Column Layout
+   Step 3: Filtry w ExportProfileForm
+   ======================================== */
+
+/* Main Container */
+.export-filter-browser {
+    background: var(--bg-card, #1a1f2e);
+    border: 1px solid var(--border-color, #374151);
+    border-radius: 0.75rem;
+    overflow: hidden;
+}
+
+/* Header */
+.export-filter__header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+}
+
+/* Filter Toolbar (above 2-column layout) */
+.export-filter__bar {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 0.75rem;
+    padding: 1rem 1.25rem;
+    background: rgba(0, 0, 0, 0.15);
+    border: 1px solid var(--border-color, #374151);
+    border-radius: 0.75rem;
+    position: relative;
+    z-index: 10;
+}
+
+.export-filter__bar-label {
+    display: block;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #6b7280;
+    margin-bottom: 0.25rem;
+}
+
+/* Advanced filters toggle */
+.export-filter__advanced-toggle {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    width: 100%;
+    padding: 0.75rem 1rem;
+    background: transparent;
+    border: 1px solid var(--border-color, #374151);
+    border-radius: 0.5rem;
+    color: #9ca3af;
+    font-size: 0.875rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.export-filter__advanced-toggle:hover {
+    color: #d1d5db;
+    background: rgba(55, 65, 81, 0.3);
+    border-color: rgba(75, 85, 99, 0.5);
+}
+
+.export-filter__advanced-content {
+    padding: 1rem 1.25rem;
+    background: rgba(0, 0, 0, 0.1);
+    border: 1px solid var(--border-color, #374151);
+    border-radius: 0.75rem;
+}
+
+/* 2-Column Grid (3 kolumny: sidebar + resizer + main) */
+.export-filter-browser__columns {
+    display: grid;
+    grid-template-columns: 280px auto 1fr;
+    min-height: 500px;
+}
+
+@media (max-width: 1024px) {
+    .export-filter-browser__columns {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Resize handle */
+.export-filter-browser__resizer {
+    width: 6px;
+    cursor: col-resize;
+    background: transparent;
+    border-left: 1px solid var(--border-color, #374151);
+    transition: background 0.15s ease;
+    position: relative;
+    z-index: 3;
+    user-select: none;
+}
+
+.export-filter-browser__resizer:hover,
+.export-filter-browser__resizer:active {
+    background: rgba(224, 172, 126, 0.25);
+    border-left-color: var(--mpp-primary, #e0ac7e);
+}
+
+.export-filter-browser__resizer--dragging {
+    background: rgba(224, 172, 126, 0.35);
+    border-left-color: var(--mpp-primary, #e0ac7e);
+}
+
+@media (max-width: 1024px) {
+    .export-filter-browser__resizer {
+        display: none;
+    }
+}
+
+/* Sidebar (left column) - border-right usuniety, resizer ma border-left */
+.export-filter-browser__sidebar {
+    display: flex;
+    flex-direction: column;
+    max-height: 650px;
+    overflow: hidden;
+}
+
+@media (max-width: 1024px) {
+    .export-filter-browser__sidebar {
+        border-bottom: 1px solid var(--border-color, #374151);
+        max-height: 350px;
+    }
+}
+
+.export-filter-browser__sidebar-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem 1rem;
+    background: rgba(0, 0, 0, 0.3);
+    border-bottom: 1px solid var(--border-color, #374151);
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #9ca3af;
+}
+
+.export-filter-browser__sidebar-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0.5rem;
+}
+
+/* Main area (right column) */
+.export-filter-browser__main {
+    display: flex;
+    flex-direction: column;
+    max-height: 650px;
+    overflow: hidden;
+}
+
+/* Table Toolbar (search + buttons) */
+.export-filter-browser__toolbar {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem 1rem;
+    background: rgba(0, 0, 0, 0.3);
+    border-bottom: 1px solid var(--border-color, #374151);
+    flex-wrap: wrap;
+}
+
+.export-filter-browser__search {
+    flex: 1;
+    min-width: 180px;
+}
+
+.export-filter-browser__search input {
+    width: 100%;
+    padding: 0.5rem 0.75rem 0.5rem 2.25rem;
+    background: rgba(55, 65, 81, 0.5);
+    border: 1px solid var(--border-color, #374151);
+    border-radius: 0.5rem;
+    color: #e5e7eb;
+    font-size: 0.8125rem;
+    transition: border-color 0.15s ease;
+}
+
+.export-filter-browser__search input:focus {
+    outline: none;
+    border-color: var(--mpp-primary, #e0ac7e);
+    box-shadow: 0 0 0 2px rgba(224, 172, 126, 0.15);
+}
+
+.export-filter-browser__search input::placeholder {
+    color: #6b7280;
+}
+
+.export-filter-browser__toolbar-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.export-filter-browser__toolbar-btn {
+    padding: 0.4375rem 0.75rem;
+    font-size: 0.75rem;
+    font-weight: 500;
+    border-radius: 0.375rem;
+    border: 1px solid var(--border-color, #374151);
+    background: transparent;
+    color: #9ca3af;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.export-filter-browser__toolbar-btn:hover {
+    background: rgba(55, 65, 81, 0.5);
+    color: #e5e7eb;
+    border-color: rgba(75, 85, 99, 0.5);
+}
+
+.export-filter-browser__toolbar-btn--danger {
+    color: #f87171;
+    border-color: rgba(239, 68, 68, 0.3);
+}
+
+.export-filter-browser__toolbar-btn--danger:hover {
+    background: rgba(239, 68, 68, 0.15);
+    border-color: rgba(239, 68, 68, 0.5);
+}
+
+.export-filter-browser__toolbar-btn--success {
+    color: #34d399;
+    border-color: rgba(52, 211, 153, 0.3);
+}
+
+.export-filter-browser__toolbar-btn--success:hover {
+    background: rgba(52, 211, 153, 0.15);
+    border-color: rgba(52, 211, 153, 0.5);
+}
+
+/* Per-page select */
+.export-filter-browser__per-page select {
+    padding: 0.375rem 1.75rem 0.375rem 0.5rem;
+    background: rgba(55, 65, 81, 0.5);
+    border: 1px solid var(--border-color, #374151);
+    border-radius: 0.375rem;
+    color: #d1d5db;
+    font-size: 0.75rem;
+    cursor: pointer;
+}
+
+/* ----------------------------------------
+   TABLE
+   ---------------------------------------- */
+.export-filter-browser__table-wrap {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: auto;
+}
+
+.export-filter-browser__table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.8125rem;
+}
+
+.export-filter-browser__table thead {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background: rgba(17, 24, 39, 0.95);
+}
+
+.export-filter-browser__table th {
+    padding: 0.625rem 0.75rem;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #6b7280;
+    text-align: left;
+    border-bottom: 1px solid var(--border-color, #374151);
+    white-space: nowrap;
+    user-select: none;
+}
+
+.export-filter-browser__table th.sortable {
+    cursor: pointer;
+    transition: color 0.15s ease;
+}
+
+.export-filter-browser__table th.sortable:hover {
+    color: #d1d5db;
+}
+
+.export-filter-browser__table th.sorted {
+    color: var(--mpp-primary, #e0ac7e);
+}
+
+.export-filter-browser__table th .sort-icon {
+    display: inline-block;
+    margin-left: 0.25rem;
+    font-size: 0.625rem;
+    opacity: 0.5;
+}
+
+.export-filter-browser__table th.sorted .sort-icon {
+    opacity: 1;
+    color: var(--mpp-primary, #e0ac7e);
+}
+
+/* Table rows */
+.export-filter-browser__table td {
+    padding: 0.5rem 0.75rem;
+    border-bottom: 1px solid rgba(55, 65, 81, 0.3);
+    color: #d1d5db;
+    vertical-align: middle;
+}
+
+.export-filter-browser__table tbody tr {
+    transition: background-color 0.1s ease;
+}
+
+.export-filter-browser__table tbody tr:hover {
+    background: rgba(55, 65, 81, 0.3);
+}
+
+/* Row - excluded state */
+.export-filter-browser__row--excluded {
+    opacity: 0.45;
+}
+
+.export-filter-browser__row--excluded td {
+    color: #6b7280;
+}
+
+.export-filter-browser__row--excluded .export-filter-browser__name {
+    text-decoration: line-through;
+}
+
+/* Cell types */
+.export-filter-browser__checkbox-cell {
+    width: 2.5rem;
+    text-align: center;
+}
+
+.export-filter-browser__mini-cell {
+    width: 2.75rem;
+    text-align: center;
+}
+
+.export-filter-browser__mini-img {
+    width: 2rem;
+    height: 2rem;
+    object-fit: cover;
+    border-radius: 0.25rem;
+    border: 1px solid rgba(55, 65, 81, 0.5);
+}
+
+.export-filter-browser__mini-placeholder {
+    width: 2rem;
+    height: 2rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(55, 65, 81, 0.3);
+    border-radius: 0.25rem;
+    color: #4b5563;
+    font-size: 0.75rem;
+}
+
+.export-filter-browser__sku {
+    font-family: ui-monospace, monospace;
+    font-size: 0.75rem;
+    color: #9ca3af;
+    white-space: nowrap;
+}
+
+.export-filter-browser__name {
+    max-width: 300px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.export-filter-browser__price {
+    font-family: ui-monospace, monospace;
+    font-size: 0.75rem;
+    white-space: nowrap;
+}
+
+.export-filter-browser__stock {
+    font-family: ui-monospace, monospace;
+    font-size: 0.75rem;
+    white-space: nowrap;
+    text-align: center;
+}
+
+.export-filter-browser__stock--zero {
+    color: #ef4444;
+}
+
+.export-filter-browser__stock--low {
+    color: #f59e0b;
+}
+
+.export-filter-browser__stock--ok {
+    color: #34d399;
+}
+
+/* Status dot */
+.export-filter-browser__status {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    font-size: 0.75rem;
+    white-space: nowrap;
+}
+
+.export-filter-browser__status-dot {
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.export-filter-browser__status-dot--active {
+    background: #34d399;
+}
+
+.export-filter-browser__status-dot--inactive {
+    background: #6b7280;
+}
+
+/* ----------------------------------------
+   PAGINATION FOOTER
+   ---------------------------------------- */
+.export-filter-browser__pagination {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.625rem 1rem;
+    background: rgba(0, 0, 0, 0.2);
+    border-top: 1px solid var(--border-color, #374151);
+    font-size: 0.75rem;
+    color: #6b7280;
+}
+
+/* ----------------------------------------
+   SUMMARY BAR
+   ---------------------------------------- */
+.export-filter-browser__summary {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 2rem;
+    padding: 0.75rem 1rem;
+    background: rgba(0, 0, 0, 0.25);
+    border-top: 1px solid var(--border-color, #374151);
+    font-size: 0.75rem;
+    color: #9ca3af;
+}
+
+.export-filter-browser__summary-item {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+}
+
+.export-filter-browser__summary-value {
+    font-weight: 600;
+    color: #e5e7eb;
+}
+
+.export-filter-browser__summary-value--excluded {
+    color: #f87171;
+}
+
+.export-filter-browser__summary-value--export {
+    color: var(--mpp-primary, #e0ac7e);
+}
+
+/* ----------------------------------------
+   EMPTY STATE
+   ---------------------------------------- */
+.export-filter-browser__empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 3rem 2rem;
+    color: #6b7280;
+    text-align: center;
+}
+
+.export-filter-browser__empty-icon {
+    margin-bottom: 0.75rem;
+    font-size: 2rem;
+    color: #4b5563;
+}
+
+.export-filter-browser__empty-text {
+    font-size: 0.875rem;
+    color: #6b7280;
+}
+
+.export-filter-browser__empty-hint {
+    font-size: 0.75rem;
+    color: #4b5563;
+    margin-top: 0.25rem;
+}
+
+/* ----------------------------------------
+   SCROLLBAR STYLING
+   ---------------------------------------- */
+.export-filter-browser__sidebar-content::-webkit-scrollbar,
+.export-filter-browser__table-wrap::-webkit-scrollbar {
+    width: 6px;
+}
+
+.export-filter-browser__sidebar-content::-webkit-scrollbar-track,
+.export-filter-browser__table-wrap::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.2);
+}
+
+.export-filter-browser__sidebar-content::-webkit-scrollbar-thumb,
+.export-filter-browser__table-wrap::-webkit-scrollbar-thumb {
+    background: rgba(75, 85, 99, 0.5);
+    border-radius: 3px;
+}
+
+.export-filter-browser__sidebar-content::-webkit-scrollbar-thumb:hover,
+.export-filter-browser__table-wrap::-webkit-scrollbar-thumb:hover {
+    background: rgba(75, 85, 99, 0.7);
+}
+
+/* ----------------------------------------
+   RESPONSIVE
+   ---------------------------------------- */
+@media (max-width: 1024px) {
+    .export-filter__bar {
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    }
+
+    .export-filter-browser__toolbar {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .export-filter-browser__search {
+        min-width: 100%;
+    }
+
+    .export-filter-browser__toolbar-actions {
+        justify-content: flex-end;
+    }
+}
+
+@media (max-width: 768px) {
+    .export-filter__bar {
+        grid-template-columns: 1fr;
+    }
+
+    .export-filter-browser__name {
+        max-width: 150px;
+    }
+}
+
+/* ----------------------------------------
+   COMPACT CATEGORY PICKER IN SIDEBAR
+   Context-scoped overrides (NIE modyfikujemy category-picker.css)
+   ---------------------------------------- */
+
+/* Kontener - mniejszy padding */
+.export-filter-browser__sidebar-content .category-picker-container {
+    padding: 0.5rem;
+}
+
+/* Header - kolumnowy uklad zamiast row */
+.export-filter-browser__sidebar-content .category-picker-header {
+    margin-bottom: 0.5rem;
+}
+
+/* Search + buttons row -> kolumnowy */
+.export-filter-browser__sidebar-content .category-picker-header > .flex.items-center.justify-between.gap-4.mb-4 {
+    flex-direction: column;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+}
+
+/* Search input container - pelna szerokosc */
+.export-filter-browser__sidebar-content .category-picker-header > .flex.items-center.justify-between.gap-4.mb-4 > .flex-1 {
+    width: 100%;
+}
+
+/* Search input - kompaktowy */
+.export-filter-browser__sidebar-content .category-picker-search {
+    padding: 0.375rem 2rem 0.375rem 2rem;
+    font-size: 0.75rem;
+}
+
+/* Action buttons row - kompaktowe, pelna szerokosc */
+.export-filter-browser__sidebar-content .category-picker-header > .flex.items-center.justify-between.gap-4.mb-4 > .flex.items-center.gap-2 {
+    width: 100%;
+    justify-content: stretch;
+}
+
+/* Przyciski Wszystkie/Wyczysc - kompaktowe */
+.export-filter-browser__sidebar-content .category-picker-btn-secondary {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.6875rem;
+    flex: 1;
+    justify-content: center;
+}
+
+.export-filter-browser__sidebar-content .category-picker-btn-secondary svg {
+    width: 0.75rem;
+    height: 0.75rem;
+    margin-right: 0.125rem;
+}
+
+/* Filter toggle + stats row - UKRYTY w sidebarze (przeniesiony do stopki) */
+.export-filter-browser__sidebar-content .category-picker-header > .flex.items-center.justify-between.gap-4.pb-3 {
+    display: none;
+}
+
+/* Sidebar footer - statystyki kategorii */
+.export-filter-browser__sidebar-footer {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    padding: 0.5rem 0.75rem;
+    background: rgba(0, 0, 0, 0.3);
+    border-top: 1px solid var(--border-color, #374151);
+    font-size: 0.6875rem;
+    color: #6b7280;
+}
+
+.export-filter-browser__sidebar-footer strong {
+    color: var(--mpp-primary, #e0ac7e);
+}
+
+@media (max-width: 1024px) {
+    .export-filter-browser__sidebar-footer {
+        border-top: none;
+        border-bottom: 1px solid var(--border-color, #374151);
+    }
+}
+
+/* Drzewko - lepsze wykorzystanie przestrzeni */
+.export-filter-browser__sidebar-content .category-picker-tree {
+    max-height: none;
+    padding: 0.375rem;
+}
+
+/* Node rows - kompaktowe */
+.export-filter-browser__sidebar-content .category-picker-node-row {
+    padding: 0.25rem 0.375rem;
+    gap: 0.25rem;
+}
+
+/* Node label - mniejszy font */
+.export-filter-browser__sidebar-content .category-picker-node-name {
+    font-size: 0.75rem;
+}
+
+.export-filter-browser__sidebar-content .category-picker-node-count {
+    font-size: 0.625rem;
+}

@@ -24,6 +24,7 @@ export default defineConfig({
                 'resources/css/visual-editor/editor.css',
                 'resources/css/visual-editor/preview.css',
                 'resources/css/admin/location-manager.css',
+                'resources/css/admin/export-filter-browser.css',
                 'resources/css/auth/landing-animations.css',
                 'resources/js/app.js',
             ],

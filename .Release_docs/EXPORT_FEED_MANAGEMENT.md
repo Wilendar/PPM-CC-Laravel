@@ -1,9 +1,9 @@
 # PPM - Export & Feed Management Documentation
 
-> **Wersja:** 1.1.0
-> **Data:** 2026-03-08
+> **Wersja:** 1.2.0
+> **Data:** 2026-03-13
 > **Status:** Production Ready
-> **Changelog:** Rozszerzony tracking feedow - bot detection, response time, served_from, referer, mini-statystyki per profil
+> **Changelog:** Vehicle Compatibility we wszystkich formatach eksportu (PS XML features, CSV czytelny format, Google/Ceneo atrybuty)
 
 ---
 
@@ -291,6 +291,33 @@ Kazdy generator implementuje `FeedGeneratorInterface`:
 - `getContentType(): string` - MIME type dla HTTP response
 - `getFileExtension(): string` - rozszerzenie pliku
 
+### 5.4 Dopasowania pojazdow (Vehicle Compatibility) w feedach
+
+System eksportuje dane z tabeli `vehicle_compatibility` (37K+ rekordow) do wszystkich formatow.
+Eager loading: `vehicleCompatibility.vehicleModel` + `vehicleCompatibility.compatibilityAttribute`.
+
+**Chunked loading:** Profile z polami compatibility uzywaja chunked query (50 produktow/chunk) aby uniknac memory exhaustion.
+
+| Format | Pole | Wynik w feedzie |
+|--------|------|----------------|
+| **XML PrestaShop** | `compatibility_full` (auto-injected) | `<associations><product_features>` z `<id>`, `<name>` (Oryginal/Model/Zamiennik), `<value>` (nazwa pojazdu) |
+| **CSV** | `compatibility_full` | Czytelny format: `KAYO AU150 (Oryginal) \| MRF E150 (Zamiennik)` |
+| **JSON** | `compatibility_full` | JSON array: `[{feature:"Model", value:"..."}, {feature:"Typ", value:"..."}]` |
+| **XML Google** | `compatible_vehicles` | `<g:product_detail>` z sekcja "Dopasowania", atrybut "Kompatybilne pojazdy" |
+| **XML Ceneo** | `compatible_vehicles` | `<a name="Kompatybilne pojazdy">` w sekcji `<attrs>` |
+
+**PrestaShop Feature IDs:**
+
+| ID | Nazwa | Stala w kodzie |
+|----|-------|---------------|
+| 431 | Oryginal | `PS_FEATURE_ORYGINAL` |
+| 432 | Model | `PS_FEATURE_MODEL` |
+| 433 | Zamiennik | `PS_FEATURE_ZAMIENNIK` |
+
+**Logika grupowania (PrestaShop XML):** Pojazdy sa grupowane wg typu dopasowania.
+Feature 431 = pojazdy oryginalne, 433 = zamienniki, 432 = unia obu (wszystkie modele).
+Mapowanie identyczne z `VehicleCompatibilitySyncService::transformToPrestaShopFeatures()`.
+
 ---
 
 ## 6. Profil Eksportu - Konfiguracja
@@ -308,6 +335,7 @@ Pola sa pogrupowane i ladowane dynamicznie przez `ExportProfileService::getAvail
 | **Stany** | Dynamiczne z DB: stock_{code}, reserved_{code} per magazyn |
 | **Kategorie** | category_path, category_primary |
 | **Media** | image_url_main, image_urls_all |
+| **Dopasowania** | compatible_vehicles, compatible_vehicles_count, compatibility_types, compatibility_full |
 
 ### 6.2 Dostepne filtry
 
@@ -586,6 +614,18 @@ Kazda karta profilu zawiera:
 ---
 
 ## 13. Changelog
+
+### v1.2.0 (2026-03-13)
+
+- **Nowa funkcja:** Dopasowania pojazdow (Vehicle Compatibility) we WSZYSTKICH formatach eksportu
+- **XML PrestaShop:** `<associations><product_features>` z feature ID + `<name>` (Oryginal/Model/Zamiennik) + `<value>` (nazwa pojazdu)
+- **CSV:** `compatibility_full` konwertowany z JSON blob na czytelny format `Nazwa (Typ) | Nazwa (Typ)`
+- **XML Google Shopping:** `<g:product_detail>` z sekcja "Dopasowania" i atrybutem "Kompatybilne pojazdy"
+- **XML Ceneo:** `<a name="Kompatybilne pojazdy">` w sekcji `<attrs>`
+- **JSON:** Passthrough `compatibility_full` jako JSON array (bez zmian)
+- **Fix:** Eager loading `vehicleCompatibility.compatibilityAttribute` (wczesniej brakowalo, dzialalo przez `$with` w modelu)
+- **Fix:** Chunked product loading (50/chunk) dla profili z dopasowaniami - zapobiega memory exhaustion przy 37K+ rekordow
+- **Pliki zmienione:** ProductExportService, PrestaShopXmlGenerator, CsvFeedGenerator, XmlGoogleShoppingGenerator, XmlCeneoGenerator
 
 ### v1.1.0 (2026-03-08)
 

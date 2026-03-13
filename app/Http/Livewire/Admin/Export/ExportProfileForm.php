@@ -3,6 +3,7 @@
 namespace App\Http\Livewire\Admin\Export;
 
 use Livewire\Component;
+use Livewire\WithPagination;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Log;
@@ -27,15 +28,17 @@ use App\Services\Export\ProductExportService;
  * - ProfileFormFields trait: field selection operations
  * - ProfileFormFilters trait: basic filter management (active, categories, shops)
  * - ProfileFormAdvancedFilters trait: advanced filters (manufacturer, stock, price, etc.)
+ * - ProfileFormProductTable trait: server-side paginated product table for Step 3
  *
  * @package App\Http\Livewire\Admin\Export
  */
 class ExportProfileForm extends Component
 {
+    use WithPagination;
     use Traits\ProfileFormFields;
     use Traits\ProfileFormFilters;
     use Traits\ProfileFormAdvancedFilters;
-    use Traits\ProfileFormCategoryProducts;
+    use Traits\ProfileFormProductTable;
 
     /*
     |--------------------------------------------------------------------------
@@ -117,6 +120,14 @@ class ExportProfileForm extends Component
     }
 
     /**
+     * Use compact pagination view.
+     */
+    public function paginationView(): string
+    {
+        return 'components.pagination-compact';
+    }
+
+    /**
      * Render the component with admin layout.
      */
     public function render()
@@ -149,6 +160,8 @@ class ExportProfileForm extends Component
         if ($this->currentStep === 5) {
             $this->loadPreview();
         }
+
+        $this->js('window.scrollTo({top: 0, behavior: "smooth"})');
     }
 
     /**
@@ -159,6 +172,8 @@ class ExportProfileForm extends Component
         if ($this->currentStep > 1) {
             $this->currentStep--;
         }
+
+        $this->js('window.scrollTo({top: 0, behavior: "smooth"})');
     }
 
     /**
@@ -427,10 +442,7 @@ class ExportProfileForm extends Component
         // Load filters
         $this->loadFiltersFromProfile($profile);
 
-        // Load products for selected categories (after filters are loaded)
-        if (!empty($this->filterCategoryIds)) {
-            $this->loadCategoryProducts();
-        }
+        // Product table uses computed properties - no explicit load needed
 
         // Load price groups & warehouses
         $this->selectedPriceGroups = array_map('strval', $profile->price_groups ?? []);

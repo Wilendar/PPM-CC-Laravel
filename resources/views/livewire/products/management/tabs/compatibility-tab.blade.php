@@ -218,7 +218,7 @@
                                 @endphp
                                 <div wire:key="compat-tile-{{ $vehicleId }}"
                                      wire:click="toggleCompatibilityVehicle({{ $vehicleId }})"
-                                     class="vehicle-tile {{ $tileClass }} {{ $isAiSuggested ? 'vehicle-tile--ai-suggested' : '' }}">
+                                     class="vehicle-tile {{ $tileClass }} {{ $isAiSuggested ? 'vehicle-tile--ghost' : '' }}">
                                     <div class="vehicle-tile__content">
                                         <span class="vehicle-tile__brand">{{ $vehicle['manufacturer'] }}</span>
                                         <span class="vehicle-tile__model">{{ $vehicle['name'] }}</span>
@@ -246,13 +246,13 @@
                                     @if($isAiSuggested)
                                         <span class="vehicle-tile__ai-badge">AI</span>
                                         <span class="vehicle-tile__confidence">{{ round($aiScore * 100) }}%</span>
-                                        <div class="ai-hover-overlay">
-                                            <div class="ai-hover-overlay__accept" wire:click.stop="toggleCompatibilityVehicle({{ $vehicleId }})">
-                                                <span class="text-white text-lg">&#10003;</span>
-                                            </div>
-                                            <div class="ai-hover-overlay__dismiss" wire:click.stop="dismissGhostSuggestion({{ $vehicleId }})">
-                                                <span class="text-white text-lg">&#10005;</span>
-                                            </div>
+                                        <div class="ghost-hover-overlay">
+                                            <button type="button" class="ghost-hover-overlay__accept" wire:click.stop="toggleCompatibilityVehicle({{ $vehicleId }})">
+                                                <span>&#10003;</span>
+                                            </button>
+                                            <button type="button" class="ghost-hover-overlay__dismiss" wire:click.stop="dismissGhostSuggestion({{ $vehicleId }})">
+                                                <span>&#10005;</span>
+                                            </button>
                                         </div>
                                     @endif
                                 </div>

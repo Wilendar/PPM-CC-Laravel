@@ -107,9 +107,55 @@ class CsvFeedGenerator implements FeedGeneratorInterface
         $row = [];
         foreach ($headers as $key) {
             $value = $product[$key] ?? '';
+
+            // compatibility_full JSON -> human-readable format for CSV/Excel
+            if ($key === 'compatibility_full' && is_string($value) && str_starts_with($value, '[{')) {
+                $value = $this->formatCompatibilityForCsv($value);
+            }
+
             $row[] = is_array($value) ? implode(', ', $value) : (string) $value;
         }
 
         return $row;
+    }
+
+    /**
+     * Convert compatibility_full JSON to human-readable pipe-separated format.
+     *
+     * Input:  [{"feature":"Model","value":"KAYO AU150"},{"feature":"Typ","value":"Oryginal"},...]
+     * Output: "KAYO AU150 (Oryginal) | MRF E150 (Zamiennik)"
+     */
+    private function formatCompatibilityForCsv(string $json): string
+    {
+        $entries = json_decode($json, true);
+        if (!is_array($entries)) {
+            return $json;
+        }
+
+        $vehicles = [];
+        $currentVehicle = null;
+
+        foreach ($entries as $e) {
+            if (($e['feature'] ?? '') === 'Model') {
+                if ($currentVehicle) {
+                    $vehicles[] = $currentVehicle;
+                }
+                $currentVehicle = ['name' => $e['value'], 'type' => 'Oryginal'];
+            } elseif (($e['feature'] ?? '') === 'Typ' && $currentVehicle) {
+                $currentVehicle['type'] = $e['value'];
+            }
+        }
+        if ($currentVehicle) {
+            $vehicles[] = $currentVehicle;
+        }
+
+        if (empty($vehicles)) {
+            return $json;
+        }
+
+        return implode(' | ', array_map(
+            fn($v) => $v['name'] . ' (' . $v['type'] . ')',
+            $vehicles
+        ));
     }
 }

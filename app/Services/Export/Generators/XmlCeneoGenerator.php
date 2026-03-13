@@ -284,6 +284,12 @@ class XmlCeneoGenerator implements FeedGeneratorInterface
             $attrs['Waga'] = number_format((float) $weight, 2, '.', '') . ' kg';
         }
 
+        // Vehicle compatibility
+        $vehicles = $product['compatible_vehicles'] ?? null;
+        if ($vehicles !== null && $vehicles !== '') {
+            $attrs['Kompatybilne pojazdy'] = $vehicles;
+        }
+
         if (empty($attrs)) {
             return;
         }

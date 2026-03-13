@@ -153,6 +153,18 @@ class XmlGoogleShoppingGenerator implements FeedGeneratorInterface
         $weight = $this->formatWeight($product['weight'] ?? null);
         $this->writeGoogleElement($xml, 'shipping_weight', $weight);
 
+        // Vehicle compatibility as product_detail (Google custom attribute)
+        $vehicles = $product['compatible_vehicles'] ?? null;
+        if ($vehicles !== null && $vehicles !== '') {
+            $xml->startElement('g:product_detail');
+            $xml->writeElement('g:section_name', 'Dopasowania');
+            $xml->writeElement('g:attribute_name', 'Kompatybilne pojazdy');
+            $xml->startElement('g:attribute_value');
+            $xml->writeCdata($vehicles);
+            $xml->endElement(); // </g:attribute_value>
+            $xml->endElement(); // </g:product_detail>
+        }
+
         $xml->endElement(); // </item>
     }
 

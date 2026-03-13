@@ -32,7 +32,8 @@
         'resources/css/products/import-panel.css',
         'resources/css/products/import-modals.css',
         'resources/css/components/category-preview-modal.css',
-        'resources/css/admin/location-manager.css'
+        'resources/css/admin/location-manager.css',
+        'resources/css/admin/export-filter-browser.css'
     ])
 
     {{-- Alpine.js is included with Livewire 3.x - no need to load separately --}}

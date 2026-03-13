@@ -31,10 +31,44 @@ class ProductExportService
         return !empty($filterConfig) ? $this->applyFilters($query, $filterConfig) : $query;
     }
 
-    /** Wykonuje query i mapuje na flat arrays. */
+    /** Wykonuje query i mapuje na flat arrays. Chunks to limit memory. */
     public function getProducts(ExportProfile $profile): array
     {
+        $selectedFields = $this->getSelectedFieldKeys($profile);
+        $hasCompat = false;
+        foreach ($selectedFields as $f) {
+            if (str_starts_with($f, 'compatible_') || str_starts_with($f, 'compatibility_')) {
+                $hasCompat = true;
+                break;
+            }
+        }
+
+        // Chunked processing for profiles with heavy relations (compatibility: 37K+ records)
+        if ($hasCompat) {
+            return $this->getProductsChunked($profile);
+        }
+
         return $this->applyFieldSelection($this->buildQuery($profile)->get(), $profile);
+    }
+
+    /** Chunked product loading to avoid memory exhaustion with heavy relations. */
+    private function getProductsChunked(ExportProfile $profile, int $chunkSize = 50): array
+    {
+        $rows = [];
+        $selectedFields = $this->getSelectedFieldKeys($profile);
+        $this->warmCaches($selectedFields);
+
+        $this->buildQuery($profile)->chunk($chunkSize, function ($products) use (&$rows, $selectedFields) {
+            foreach ($products as $product) {
+                $row = [];
+                foreach ($selectedFields as $fieldKey) {
+                    $row[$fieldKey] = $this->resolveFieldValue($product, $fieldKey);
+                }
+                $rows[] = $row;
+            }
+        });
+
+        return $rows;
     }
 
     /** Stosuje filtry z filter_config. */
@@ -147,6 +181,15 @@ class ProductExportService
             };
         }
 
+        // search_query - text search by SKU or name
+        if (!empty($filterConfig['search_query'])) {
+            $search = '%' . $filterConfig['search_query'] . '%';
+            $query->where(function (Builder $q) use ($search) {
+                $q->where('sku', 'LIKE', $search)
+                  ->orWhere('name', 'LIKE', $search);
+            });
+        }
+
         // excluded_product_ids - remove individually excluded products
         if (!empty($filterConfig['excluded_product_ids'])) {
             $query->whereNotIn('products.id', (array) $filterConfig['excluded_product_ids']);
@@ -254,7 +297,7 @@ class ProductExportService
             return $compat->isEmpty() ? null : $compat->pluck('compatibility_type')->filter()->unique()->implode(', ');
         }
         if ($fieldKey === 'compatibility_full') {
-            return !empty($product->getCompatibilityExportFormat()) ? json_encode($product->getCompatibilityExportFormat(), JSON_UNESCAPED_UNICODE) : null;
+            return $this->resolveCompatibilityFull($product);
         }
 
         // Location fields (warehouse_location_{code})
@@ -372,6 +415,35 @@ class ProductExportService
         return null;
     }
 
+    /**
+     * Build compatibility_full JSON from eager-loaded relation (avoids N+1 queries).
+     * Matches getCompatibilityExportFormat() output but uses pre-loaded data.
+     */
+    private function resolveCompatibilityFull(Product $product): ?string
+    {
+        $compat = $product->relationLoaded('vehicleCompatibility')
+            ? $product->vehicleCompatibility
+            : $product->vehicleCompatibility()->get();
+
+        if ($compat->isEmpty()) {
+            return null;
+        }
+
+        $entries = [];
+        foreach ($compat as $c) {
+            $vehicleName = $c->vehicleModel->name ?? $c->vehicleModel?->getFullName() ?? 'N/A';
+            $type = $c->compatibilityAttribute?->name ?? 'Standard';
+
+            $entries[] = ['feature' => 'Model', 'value' => $vehicleName];
+
+            if ($type !== 'Standard') {
+                $entries[] = ['feature' => 'Typ', 'value' => $type];
+            }
+        }
+
+        return !empty($entries) ? json_encode($entries, JSON_UNESCAPED_UNICODE) : null;
+    }
+
     // === Eager Loading ===
 
     private function resolveEagerLoading(array $fields): array
@@ -419,6 +491,7 @@ class ProductExportService
         }
         if ($flags['compat']) {
             $load[] = 'vehicleCompatibility.vehicleModel';
+            $load[] = 'vehicleCompatibility.compatibilityAttribute';
         }
         if ($flags['partners']) {
             $load[] = 'manufacturerRelation:id,name';
@@ -447,7 +520,24 @@ class ProductExportService
         }
 
         // Keyed array {'sku' => true, ...} vs flat array ['sku', ...]
-        return array_is_list($config) ? array_values($config) : array_keys(array_filter($config));
+        $fields = array_is_list($config) ? array_values($config) : array_keys(array_filter($config));
+
+        // PS XML generator needs compatibility_full for <product_features> associations.
+        // Auto-inject it when any compatibility field is selected and format is xml_prestashop.
+        if ($profile->format === 'xml_prestashop' && !in_array('compatibility_full', $fields, true)) {
+            $hasCompat = false;
+            foreach ($fields as $f) {
+                if (str_starts_with($f, 'compatible_') || str_starts_with($f, 'compatibility_')) {
+                    $hasCompat = true;
+                    break;
+                }
+            }
+            if ($hasCompat) {
+                $fields[] = 'compatibility_full';
+            }
+        }
+
+        return $fields;
     }
 
     private function resolveFieldLabel(string $fieldKey, array $allFields): string
