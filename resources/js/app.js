@@ -114,6 +114,16 @@ window.ppmDiagnostics = {
 // Initialize diagnostics immediately
 window.ppmDiagnostics.init();
 
+// Global click handler: close all teleported dropdowns when clicking outside
+document.addEventListener('click', (e) => {
+    // Skip if clicking inside a teleported dropdown
+    if (e.target.closest('.product-status-dropdown, .user-profile-dropdown')) return;
+    // Skip if clicking a status badge button (it handles its own toggle)
+    if (e.target.closest('.product-status-badge')) return;
+    // Dispatch close event for all dropdowns
+    window.dispatchEvent(new CustomEvent('close-all-dropdowns'));
+}, true);
+
 /**
  * Register Alpine stores and data components.
  * PP.0.6 FIX: Handle case when livewire:init already fired before app.js loaded.

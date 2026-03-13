@@ -276,6 +276,71 @@
 }
 
 /* ========================================
+   USER PROFILE DROPDOWN
+   ======================================== */
+
+.user-profile-dropdown {
+    background: linear-gradient(135deg, rgba(31, 41, 55, 0.98), rgba(17, 24, 39, 0.98));
+    border: 1px solid rgba(224, 172, 126, 0.3);
+    backdrop-filter: blur(12px);
+}
+
+/* ========================================
+   SIDEBAR COLLAPSED STATE
+   ======================================== */
+
+/* Section titles: hide text, keep icon centered */
+.sidebar-collapsed .sidebar-section-title {
+    justify-content: center;
+    padding-left: 0;
+    padding-right: 0;
+    font-size: 0;
+    overflow: hidden;
+}
+
+.sidebar-collapsed .sidebar-section-title svg {
+    margin-right: 0;
+    font-size: initial;
+}
+
+/* Compact padding for collapsed sidebar */
+.sidebar-collapsed .px-4 {
+    padding-left: 0.5rem;
+    padding-right: 0.5rem;
+}
+
+/* ========================================
+   SIDEBAR LINK - NO ACCESS STATE
+   ======================================== */
+
+/* Links without permission - dimmed with no interaction */
+.sidebar-link-no-access {
+    opacity: 0.4;
+    pointer-events: none;
+    position: relative;
+}
+
+/* Lock icon overlay for no-access links */
+.sidebar-link-no-access::after {
+    content: '\f023'; /* Font Awesome lock icon */
+    font-family: 'Font Awesome 6 Free';
+    font-weight: 900;
+    font-size: 0.5rem;
+    position: absolute;
+    top: 0.35rem;
+    right: 0.5rem;
+    color: #ef4444;
+    opacity: 0.7;
+}
+
+/* In collapsed mode, show lock as small overlay on icon */
+.sidebar-collapsed .sidebar-link-no-access::after {
+    top: 0.25rem;
+    right: 0.25rem;
+    font-size: 0.45rem;
+}
+
+/* ========================================
    SIDEBAR GRID LAYOUT SUPPORT
    ======================================== */
 

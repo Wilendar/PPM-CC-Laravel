@@ -1,5 +1,5 @@
 {{-- Header Section --}}
-<div class="sticky top-0 z-40 glass-effect border-b border-primary shadow-lg">
+<div class="sticky top-0 z-40 glass-effect border-b border-primary shadow-lg" x-data>
     <div class="px-4 sm:px-6 lg:px-8 py-4">
         {{-- Title & Action Bar --}}
         <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">

@@ -38,9 +38,9 @@
          @product-hover.window="onProductHover($event.detail.id)">
 
         {{-- Left Panel --}}
-        <template x-if="panelSide === 'left'">
+        <div x-show="panelSide === 'left'" x-cloak>
             @include('livewire.products.listing.partials.category-panel', ['side' => 'left'])
-        </template>
+        </div>
 
         <div class="product-list-with-panel__content px-4 sm:px-6 lg:px-8 py-6">
             @if($viewMode === 'table')
@@ -51,9 +51,9 @@
         </div>
 
         {{-- Right Panel --}}
-        <template x-if="panelSide === 'right'">
+        <div x-show="panelSide === 'right'" x-cloak>
             @include('livewire.products.listing.partials.category-panel', ['side' => 'right'])
-        </template>
+        </div>
     </div>
 
     @include('livewire.products.listing.partials.preview-modal')

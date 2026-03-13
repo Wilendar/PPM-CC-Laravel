@@ -7127,6 +7127,32 @@ hex-color-picker {
     border: 1px solid rgba(251, 146, 60, 0.25);
 }
 
+/* Collapsed sidebar: "Wkrotce" becomes small clock icon */
+.sidebar-collapsed .sidebar-link-disabled::after {
+    content: '\f017'; /* Font Awesome clock icon */
+    font-family: 'Font Awesome 6 Free';
+    font-weight: 400;
+    font-size: 0.5rem;
+    right: 0.15rem;
+    top: 0.2rem;
+    transform: none;
+    padding: 0;
+    background: none;
+    border: none;
+    letter-spacing: 0;
+    color: rgba(251, 146, 60, 0.7);
+}
+
+/* Collapsed sidebar: no-access lock icon */
+.sidebar-collapsed .sidebar-link-no-access::after {
+    right: 0.15rem;
+    top: 0.2rem;
+    transform: none;
+    padding: 0;
+    background: none;
+    border: none;
+}
+
 /* ========================================
    VEHICLE FEATURE MANAGEMENT MODALS
    Fix for transparent modal background

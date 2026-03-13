@@ -238,8 +238,18 @@
                 $statusColor = $productStatusObj?->color ?? ($product->is_active ? '#22c55e' : '#ef4444');
             @endphp
             @if($this->userCan('update'))
-            <div x-data="{ open: false }" class="relative">
-                <button @click="open = !open" type="button"
+            <div x-data="{ open: false, dropStyle: '' }"
+                 @close-all-dropdowns.window="open = false"
+                 class="relative">
+                <button @click="
+                    const wasOpen = open;
+                    $dispatch('close-all-dropdowns');
+                    if (!wasOpen) {
+                        const r = $event.currentTarget.getBoundingClientRect();
+                        dropStyle = 'position:fixed;top:' + (r.bottom + 4) + 'px;left:' + r.left + 'px;z-index:9999;';
+                    }
+                    open = !wasOpen;
+                " type="button"
                         class="product-status-badge inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-colors hover:opacity-80"
                         style="background-color: {{ $statusColor }}20; color: {{ $statusColor }}; border: 1px solid {{ $statusColor }}40;">
                     <span class="w-2 h-2 rounded-full flex-shrink-0" style="background-color: {{ $statusColor }}"></span>
@@ -248,17 +258,20 @@
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
                     </svg>
                 </button>
-                <div x-show="open" @click.away="open = false" x-transition x-cloak
-                     class="product-status-dropdown absolute left-0 mt-1 w-44 bg-gray-800 border border-gray-600 rounded-lg shadow-xl z-20">
-                    @foreach($this->availableProductStatuses as $availStatus)
-                        <button wire:click="changeProductStatus({{ $product->id }}, {{ $availStatus['id'] }})"
-                                @click="open = false" type="button"
-                                class="w-full flex items-center gap-2 px-3 py-2 text-xs text-gray-300 hover:bg-gray-700 transition-colors first:rounded-t-lg last:rounded-b-lg">
-                            <span class="w-2 h-2 rounded-full flex-shrink-0" style="background-color: {{ $availStatus['color'] }}"></span>
-                            {{ $availStatus['name'] }}
-                        </button>
-                    @endforeach
-                </div>
+                <template x-teleport="body">
+                    <div x-show="open" @click.away="open = false" x-transition x-cloak
+                         class="product-status-dropdown w-44 bg-gray-800 border border-gray-600 rounded-lg shadow-xl"
+                         :style="dropStyle">
+                        @foreach($this->availableProductStatuses as $availStatus)
+                            <button wire:click="changeProductStatus({{ $product->id }}, {{ $availStatus['id'] }})"
+                                    @click="open = false" type="button"
+                                    class="w-full flex items-center gap-2 px-3 py-2 text-xs text-gray-300 hover:bg-gray-700 transition-colors first:rounded-t-lg last:rounded-b-lg">
+                                <span class="w-2 h-2 rounded-full flex-shrink-0" style="background-color: {{ $availStatus['color'] }}"></span>
+                                {{ $availStatus['name'] }}
+                            </button>
+                        @endforeach
+                    </div>
+                </template>
             </div>
             @else
             <span class="product-status-badge inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium"
