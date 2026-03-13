@@ -122,6 +122,7 @@ class Product extends Model
         'ean',
         'tax_rate',
         'is_active',
+        'product_status_id',
         'is_variant_master',
         'is_featured',
         'available_from',
@@ -217,6 +218,16 @@ class Product extends Model
                 $product->slug = $product->generateUniqueSlug($product->name);
             }
         });
+
+        // Auto-compute is_active from product status
+        static::saving(function ($product) {
+            if ($product->isDirty('product_status_id') && $product->product_status_id) {
+                $status = ProductStatus::find($product->product_status_id);
+                if ($status) {
+                    $product->is_active = $status->is_active_equivalent;
+                }
+            }
+        });
     }
 
     /*
@@ -263,6 +274,14 @@ class Product extends Model
     public function importerRelation(): BelongsTo
     {
         return $this->belongsTo(BusinessPartner::class, 'importer_id');
+    }
+
+    /**
+     * Product status relationship
+     */
+    public function productStatus(): BelongsTo
+    {
+        return $this->belongsTo(ProductStatus::class, 'product_status_id');
     }
 
     /*
@@ -396,6 +415,14 @@ class Product extends Model
     public function scopeActive(Builder $query): Builder
     {
         return $query->where('is_active', true);
+    }
+
+    /**
+     * Scope: Filter by product status slug
+     */
+    public function scopeWithStatus(Builder $query, string $slug): Builder
+    {
+        return $query->whereHas('productStatus', fn (Builder $q) => $q->where('slug', $slug));
     }
 
     /**

@@ -53,11 +53,39 @@ trait ProductListQuickActions
             return;
         }
 
-        $product->is_active = !$product->is_active;
+        // Toggle: find opposite status
+        $newActiveEquivalent = !$product->is_active;
+        $newStatus = \App\Models\ProductStatus::where('is_active_equivalent', $newActiveEquivalent)->first();
+
+        if ($newStatus) {
+            $product->product_status_id = $newStatus->id;
+        }
+        $product->is_active = $newActiveEquivalent;
         $product->save();
 
         $status = $product->is_active ? 'aktywowany' : 'deaktywowany';
         $this->dispatch('success', message: "Produkt został {$status}");
+    }
+
+    public function changeProductStatus(int $productId, int $statusId): void
+    {
+        $product = Product::find($productId);
+        if (!$product) {
+            $this->dispatch('error', message: 'Produkt nie został znaleziony');
+            return;
+        }
+
+        $status = \App\Models\ProductStatus::find($statusId);
+        if (!$status) {
+            $this->dispatch('error', message: 'Status nie został znaleziony');
+            return;
+        }
+
+        $product->product_status_id = $statusId;
+        $product->is_active = $status->is_active_equivalent;
+        $product->save();
+
+        $this->dispatch('success', message: "Status produktu zmieniony na: {$status->name}");
     }
 
     public function toggleVariantStatus(int $variantId): void

@@ -49,20 +49,107 @@ class ProductExportService
             $query->whereHas('categories', fn (Builder $q) => $q->whereIn('categories.id', $ids));
         }
 
-        if (!empty($filterConfig['manufacturer'])) {
+        // Backward compat: stary manufacturer (string) -> lookup
+        if (!empty($filterConfig['manufacturer']) && empty($filterConfig['manufacturer_ids'])) {
             $val = $filterConfig['manufacturer'];
             is_array($val) ? $query->whereIn('manufacturer', $val) : $query->where('manufacturer', $val);
         }
 
-        if (isset($filterConfig['has_stock']) && $filterConfig['has_stock'] !== '') {
+        // Nowe: manufacturer_ids (multiselect z BusinessPartner)
+        if (!empty($filterConfig['manufacturer_ids'])) {
+            $query->whereIn('manufacturer_id', (array) $filterConfig['manufacturer_ids']);
+        }
+
+        // supplier_ids
+        if (!empty($filterConfig['supplier_ids'])) {
+            $query->whereIn('supplier_id', (array) $filterConfig['supplier_ids']);
+        }
+
+        // product_type_id
+        if (!empty($filterConfig['product_type_id'])) {
+            $query->where('product_type_id', $filterConfig['product_type_id']);
+        }
+
+        // has_stock (backward compat - preferowany jest stock_status)
+        if (isset($filterConfig['has_stock']) && $filterConfig['has_stock'] !== '' && empty($filterConfig['stock_status'])) {
             $has = filter_var($filterConfig['has_stock'], FILTER_VALIDATE_BOOLEAN);
             $stockCb = fn (Builder $q) => $q->where('available_quantity', '>', 0);
             $has ? $query->whereHas('activeStock', $stockCb) : $query->whereDoesntHave('activeStock', $stockCb);
         }
 
+        // stock_status (in_stock/low_stock/out_of_stock)
+        if (!empty($filterConfig['stock_status'])) {
+            match ($filterConfig['stock_status']) {
+                'in_stock' => $query->whereHas('activeStock', fn (Builder $q) => $q->where('available_quantity', '>', 0)),
+                'low_stock' => $query->whereHas('activeStock', fn (Builder $q) => $q->where('available_quantity', '>', 0)->where('available_quantity', '<=', 5)),
+                'out_of_stock' => $query->where(function (Builder $q) {
+                    $q->whereDoesntHave('activeStock')
+                      ->orWhereHas('activeStock', fn (Builder $sq) => $sq->where('available_quantity', '<=', 0));
+                }),
+                default => null,
+            };
+        }
+
+        // warehouse_ids
+        if (!empty($filterConfig['warehouse_ids'])) {
+            $query->whereHas('activeStock', fn (Builder $q) => $q->whereIn('warehouse_id', (array) $filterConfig['warehouse_ids'])->where('available_quantity', '>', 0));
+        }
+
+        // price_min/price_max + price_group_id
+        if (!empty($filterConfig['price_min']) || !empty($filterConfig['price_max'])) {
+            $query->whereHas('validPrices', function (Builder $q) use ($filterConfig) {
+                if (!empty($filterConfig['price_group_id'])) {
+                    $q->where('price_group_id', $filterConfig['price_group_id']);
+                }
+                if (!empty($filterConfig['price_min'])) {
+                    $q->where('price_net', '>=', (float) $filterConfig['price_min']);
+                }
+                if (!empty($filterConfig['price_max'])) {
+                    $q->where('price_net', '<=', (float) $filterConfig['price_max']);
+                }
+            });
+        }
+
         if (!empty($filterConfig['shop_ids'])) {
             $shopIds = (array) $filterConfig['shop_ids'];
             $query->whereHas('shopData', fn (Builder $q) => $q->whereIn('shop_id', $shopIds)->where('is_published', true));
+        }
+
+        // erp_connection_ids
+        if (!empty($filterConfig['erp_connection_ids'])) {
+            $query->whereHas('erpData', fn (Builder $q) => $q->whereIn('erp_connection_id', (array) $filterConfig['erp_connection_ids']));
+        }
+
+        // date_from/date_to + date_type
+        $dateCol = ($filterConfig['date_type'] ?? 'created_at') === 'updated_at' ? 'updated_at' : 'created_at';
+        if (!empty($filterConfig['date_from'])) {
+            $query->where($dateCol, '>=', $filterConfig['date_from']);
+        }
+        if (!empty($filterConfig['date_to'])) {
+            $query->where($dateCol, '<=', $filterConfig['date_to'] . ' 23:59:59');
+        }
+
+        // media_filter
+        if (!empty($filterConfig['media_filter'])) {
+            match ($filterConfig['media_filter']) {
+                'with_images' => $query->whereHas('media'),
+                'without_images' => $query->whereDoesntHave('media'),
+                default => null,
+            };
+        }
+
+        // has_compatibility
+        if (!empty($filterConfig['has_compatibility'])) {
+            match ($filterConfig['has_compatibility']) {
+                'with' => $query->whereHas('vehicleCompatibility'),
+                'without' => $query->whereDoesntHave('vehicleCompatibility'),
+                default => null,
+            };
+        }
+
+        // excluded_product_ids - remove individually excluded products
+        if (!empty($filterConfig['excluded_product_ids'])) {
+            $query->whereNotIn('products.id', (array) $filterConfig['excluded_product_ids']);
         }
 
         return $query;
@@ -121,6 +208,12 @@ class ProductExportService
             return is_bool($value) ? ($value ? 'TAK' : 'NIE') : $value;
         }
 
+        // Dynamic product status name (from ProductStatus relation, fallback to is_active)
+        if ($fieldKey === 'status_name') {
+            return $product->productStatus?->name
+                ?? ($product->is_active ? 'Aktywny' : 'Nieaktywny');
+        }
+
         // Pricing
         if (str_starts_with($fieldKey, 'price_net_') || str_starts_with($fieldKey, 'price_gross_')) {
             return $this->resolvePriceField($product, $fieldKey);
@@ -146,6 +239,55 @@ class ProductExportService
         if ($fieldKey === 'image_urls_all') {
             $media = $product->relationLoaded('media') ? $product->media : $product->media()->active()->get();
             return $media->isEmpty() ? null : $media->pluck('url')->implode(' | ');
+        }
+
+        // Compatibility fields
+        if ($fieldKey === 'compatible_vehicles') {
+            $compat = $product->relationLoaded('vehicleCompatibility') ? $product->vehicleCompatibility : $product->vehicleCompatibility()->get();
+            return $compat->isEmpty() ? null : $compat->map(fn ($c) => ($c->vehicleModel->name ?? 'N/A'))->implode(' | ');
+        }
+        if ($fieldKey === 'compatible_vehicles_count') {
+            return $product->relationLoaded('vehicleCompatibility') ? $product->vehicleCompatibility->count() : $product->vehicleCompatibility()->count();
+        }
+        if ($fieldKey === 'compatibility_types') {
+            $compat = $product->relationLoaded('vehicleCompatibility') ? $product->vehicleCompatibility : $product->vehicleCompatibility()->get();
+            return $compat->isEmpty() ? null : $compat->pluck('compatibility_type')->filter()->unique()->implode(', ');
+        }
+        if ($fieldKey === 'compatibility_full') {
+            return !empty($product->getCompatibilityExportFormat()) ? json_encode($product->getCompatibilityExportFormat(), JSON_UNESCAPED_UNICODE) : null;
+        }
+
+        // Location fields (warehouse_location_{code})
+        if (str_starts_with($fieldKey, 'warehouse_location_')) {
+            return $this->resolveLocationField($product, $fieldKey);
+        }
+
+        // Partner fields
+        if ($fieldKey === 'manufacturer_name') {
+            $rel = $product->relationLoaded('manufacturerRelation') ? $product->manufacturerRelation : $product->manufacturerRelation;
+            return $rel?->name;
+        }
+        if ($fieldKey === 'supplier_name') {
+            $rel = $product->relationLoaded('supplierRelation') ? $product->supplierRelation : $product->supplierRelation;
+            return $rel?->name;
+        }
+        if ($fieldKey === 'importer_name') {
+            $rel = $product->relationLoaded('importerRelation') ? $product->importerRelation : $product->importerRelation;
+            return $rel?->name;
+        }
+        if ($fieldKey === 'product_type_name') {
+            $rel = $product->relationLoaded('productType') ? $product->productType : $product->productType;
+            return $rel?->name;
+        }
+
+        // Feature fields
+        if ($fieldKey === 'features_list') {
+            $features = $product->relationLoaded('features') ? $product->features : $product->features()->get();
+            return $features->isEmpty() ? null : $features->map(fn ($f) => ($f->featureType->name ?? '?') . ': ' . ($f->featureValue->value ?? $f->custom_value ?? ''))->implode(' | ');
+        }
+        if ($fieldKey === 'feature_groups') {
+            $features = $product->relationLoaded('features') ? $product->features : $product->features()->get();
+            return $features->isEmpty() ? null : $features->map(fn ($f) => $f->featureType->name ?? null)->filter()->unique()->implode(', ');
         }
 
         return null;
@@ -209,12 +351,37 @@ class ProductExportService
         return $primary ? $primary->getFullPath() : $cats->first()?->name;
     }
 
+    private function resolveLocationField(Product $product, string $fieldKey): ?string
+    {
+        $whCode = substr($fieldKey, 19); // strlen('warehouse_location_') = 19
+
+        $stocks = $product->relationLoaded('activeStock')
+            ? $product->activeStock
+            : $product->activeStock()->with('warehouse')->get();
+
+        foreach ($stocks as $stock) {
+            $code = $stock->relationLoaded('warehouse') ? ($stock->warehouse->code ?? null) : null;
+            if ($code === null && $this->warehouseCache !== null) {
+                $code = ($this->warehouseCache[$stock->warehouse_id] ?? null)?->code;
+            }
+            if ($code === $whCode) {
+                return $stock->warehouse_location ?: $stock->bin_location ?: $stock->location;
+            }
+        }
+
+        return null;
+    }
+
     // === Eager Loading ===
 
     private function resolveEagerLoading(array $fields): array
     {
         $load = [];
-        $flags = ['pricing' => false, 'stock' => false, 'cats' => false, 'media' => false];
+        $flags = [
+            'pricing' => false, 'stock' => false, 'cats' => false, 'media' => false,
+            'compat' => false, 'locations' => false, 'partners' => false, 'features' => false,
+            'status' => false,
+        ];
 
         foreach ($fields as $f) {
             if (str_starts_with($f, 'price_net_') || str_starts_with($f, 'price_gross_')) {
@@ -225,13 +392,23 @@ class ProductExportService
                 $flags['cats'] = true;
             } elseif ($f === 'image_url_main' || $f === 'image_urls_all') {
                 $flags['media'] = true;
+            } elseif (str_starts_with($f, 'compatible_') || str_starts_with($f, 'compatibility_')) {
+                $flags['compat'] = true;
+            } elseif (str_starts_with($f, 'warehouse_location_')) {
+                $flags['locations'] = true;
+            } elseif (in_array($f, ['manufacturer_name', 'supplier_name', 'importer_name', 'product_type_name'])) {
+                $flags['partners'] = true;
+            } elseif ($f === 'features_list' || $f === 'feature_groups') {
+                $flags['features'] = true;
+            } elseif ($f === 'status_name') {
+                $flags['status'] = true;
             }
         }
 
         if ($flags['pricing']) {
             $load[] = 'validPrices.priceGroup:id,name,code';
         }
-        if ($flags['stock']) {
+        if ($flags['stock'] || $flags['locations']) {
             $load[] = 'activeStock.warehouse:id,name,code';
         }
         if ($flags['cats']) {
@@ -239,6 +416,22 @@ class ProductExportService
         }
         if ($flags['media']) {
             $load[] = 'media';
+        }
+        if ($flags['compat']) {
+            $load[] = 'vehicleCompatibility.vehicleModel';
+        }
+        if ($flags['partners']) {
+            $load[] = 'manufacturerRelation:id,name';
+            $load[] = 'supplierRelation:id,name';
+            $load[] = 'importerRelation:id,name';
+            $load[] = 'productType:id,name';
+        }
+        if ($flags['features']) {
+            $load[] = 'features.featureType';
+            $load[] = 'features.featureValue';
+        }
+        if ($flags['status']) {
+            $load[] = 'productStatus:id,name,slug,color';
         }
 
         return $load;
@@ -274,7 +467,7 @@ class ProductExportService
             if (str_starts_with($f, 'price_net_') || str_starts_with($f, 'price_gross_')) {
                 $needsPrice = true;
             }
-            if (str_starts_with($f, 'stock_') || str_starts_with($f, 'reserved_')) {
+            if (str_starts_with($f, 'stock_') || str_starts_with($f, 'reserved_') || str_starts_with($f, 'warehouse_location_')) {
                 $needsStock = true;
             }
         }

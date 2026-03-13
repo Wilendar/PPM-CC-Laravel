@@ -931,3 +931,44 @@ select.border-green-600:hover {
 select.border-yellow-600:hover {
     border-color: #b45309 !important; /* Amber-700 */
 }
+
+/* ========================================
+   PRODUCT STATUS DROPDOWN
+   ======================================== */
+
+.product-status-select {
+    background: rgba(55, 65, 81, 0.5);
+    border: 1px solid rgba(75, 85, 99, 0.5);
+    color: #e5e7eb;
+}
+
+.product-status-select:hover {
+    background: rgba(55, 65, 81, 0.8);
+}
+
+.product-status-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    display: inline-block;
+    flex-shrink: 0;
+}
+
+.product-status-option:first-child {
+    border-radius: 0.5rem 0.5rem 0 0;
+}
+
+.product-status-option:last-child {
+    border-radius: 0 0 0.5rem 0.5rem;
+}
+
+/* Teleported status dropdown (escapes overflow:hidden containers) */
+.product-status-teleport-dropdown {
+    position: fixed;
+    width: 12rem;
+    background: rgb(31, 41, 55);
+    border: 1px solid rgb(75, 85, 99);
+    border-radius: 0.5rem;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.4), 0 8px 10px -6px rgba(0, 0, 0, 0.3);
+    z-index: 9999;
+}

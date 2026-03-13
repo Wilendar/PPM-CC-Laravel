@@ -3,6 +3,7 @@
 namespace App\Http\Livewire\Products\Listing\Traits;
 
 use App\Models\Product;
+use App\Models\ProductStatus;
 use App\Models\Category;
 use App\Models\ProductType;
 use App\Models\PriceGroup;
@@ -197,6 +198,7 @@ trait ProductListFilters
         $query = Product::query()
             ->with([
                 'productType:id,name,slug',
+                'productStatus:id,name,slug,color,is_active_equivalent',
                 'shopData:id,product_id,shop_id,sync_status,is_published,last_sync_at,name,short_description,long_description,weight,height,width,length,tax_rate,is_active',
                 'shopData.shop:id,name,label_color,label_icon',
                 'erpData:id,product_id,erp_connection_id,sync_status,name,short_description,long_description,weight,height,width,length,tax_rate,is_active',
@@ -214,7 +216,7 @@ trait ProductListFilters
                 'variants.attributes.attributeValue:id,label,code'
             ])
             ->select([
-                'id', 'sku', 'name', 'product_type_id', 'manufacturer',
+                'id', 'sku', 'name', 'product_type_id', 'product_status_id', 'manufacturer',
                 'supplier_code', 'is_active', 'is_variant_master',
                 'short_description', 'long_description',
                 'weight', 'height', 'width', 'length', 'tax_rate',
@@ -245,7 +247,13 @@ trait ProductListFilters
 
         // SECURITY: Only apply status filter if user has status_read permission
         if ($this->statusFilter !== 'all' && $this->userCan('status_read')) {
-            $query->where('is_active', $this->statusFilter === 'active');
+            if ($this->statusFilter === 'active') {
+                $query->where('is_active', true);
+            } elseif ($this->statusFilter === 'inactive') {
+                $query->where('is_active', false);
+            } elseif (is_numeric($this->statusFilter)) {
+                $query->where('product_status_id', (int) $this->statusFilter);
+            }
         } elseif ($this->statusFilter !== 'all') {
             $this->statusFilter = 'all';
         }
@@ -562,6 +570,12 @@ trait ProductListFilters
         return Warehouse::active()
             ->ordered()
             ->get(['id', 'name', 'code', 'is_default']);
+    }
+
+    #[Computed]
+    public function availableProductStatuses(): array
+    {
+        return ProductStatus::getForSelect();
     }
 
     #[Computed]

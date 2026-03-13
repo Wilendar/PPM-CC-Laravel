@@ -76,6 +76,20 @@ class CategoryPicker extends Component
      */
     public ?int $shopId = null;
 
+    /**
+     * Whether to show "Nowa" (create category) button
+     *
+     * @var bool
+     */
+    public bool $showCreateButton = true;
+
+    /**
+     * Auto-select children when parent is toggled
+     *
+     * @var bool
+     */
+    public bool $enableChildAutoSelect = false;
+
     /*
     |--------------------------------------------------------------------------
     | LIVEWIRE LIFECYCLE METHODS
@@ -88,10 +102,12 @@ class CategoryPicker extends Component
      * @param string $context Unique context identifier
      * @param int|null $shopId Optional shop filter
      */
-    public function mount(string $context = 'default', ?int $shopId = null): void
+    public function mount(string $context = 'default', ?int $shopId = null, bool $showCreateButton = true, bool $enableChildAutoSelect = false): void
     {
         $this->context = $context;
         $this->shopId = $shopId;
+        $this->showCreateButton = $showCreateButton;
+        $this->enableChildAutoSelect = $enableChildAutoSelect;
 
         Log::info('🟢 CategoryPicker: MOUNTED', [
             'livewire_id' => $this->getId(),
@@ -166,7 +182,12 @@ class CategoryPicker extends Component
      */
     public function toggleCategory(int $categoryId): void
     {
-        $beforeState = $this->selectedCategories;
+        // Delegate to child-aware version if enabled
+        if ($this->enableChildAutoSelect) {
+            $this->toggleCategoryWithChildren($categoryId);
+            return;
+        }
+
         $wasSelected = in_array($categoryId, $this->selectedCategories, true);
 
         if ($wasSelected) {
@@ -174,24 +195,85 @@ class CategoryPicker extends Component
             $this->selectedCategories = array_values(
                 array_filter($this->selectedCategories, fn($id) => $id !== $categoryId)
             );
-            $action = 'REMOVED';
         } else {
             // Add to selection
             $this->selectedCategories[] = $categoryId;
-            $action = 'ADDED';
         }
 
-        Log::info('🔄 CategoryPicker: Category toggled', [
-            'livewire_id' => $this->getId(),
+        Log::debug('CategoryPicker: Category toggled', [
             'context' => $this->context,
             'category_id' => $categoryId,
-            'action' => $action,
-            'before_state' => $beforeState,
-            'after_state' => $this->selectedCategories,
-            'before_count' => count($beforeState),
-            'after_count' => count($this->selectedCategories),
-            'timestamp' => now()->format('Y-m-d H:i:s.u'),
+            'action' => $wasSelected ? 'REMOVED' : 'ADDED',
+            'selected_count' => count($this->selectedCategories),
         ]);
+
+        $this->dispatch('category-selection-changed', selectedIds: $this->selectedCategories);
+    }
+
+    /**
+     * Toggle category with all descendants (children, grandchildren, etc.)
+     * Uses recursive descendant lookup for efficient hierarchy handling.
+     *
+     * @param int $categoryId PPM category ID
+     */
+    public function toggleCategoryWithChildren(int $categoryId): void
+    {
+        $category = Category::find($categoryId);
+        if (!$category) {
+            return;
+        }
+
+        $wasSelected = in_array($categoryId, $this->selectedCategories, true);
+
+        // Recursively get ALL descendants (not just direct children)
+        $allDescendantIds = $this->getAllDescendantIds($categoryId);
+
+        $idsToToggle = array_merge([$categoryId], $allDescendantIds);
+
+        if ($wasSelected) {
+            // Remove category + all descendants
+            $this->selectedCategories = array_values(
+                array_filter($this->selectedCategories, fn($id) => !in_array($id, $idsToToggle, true))
+            );
+        } else {
+            // Add category + all descendants
+            foreach ($idsToToggle as $id) {
+                if (!in_array($id, $this->selectedCategories, true)) {
+                    $this->selectedCategories[] = $id;
+                }
+            }
+        }
+
+        Log::debug('CategoryPicker: Category toggled with children', [
+            'context' => $this->context,
+            'category_id' => $categoryId,
+            'action' => $wasSelected ? 'REMOVED' : 'ADDED',
+            'descendants_count' => count($allDescendantIds),
+            'selected_count' => count($this->selectedCategories),
+        ]);
+
+        $this->dispatch('category-selection-changed', selectedIds: $this->selectedCategories);
+    }
+
+    /**
+     * Get all descendant category IDs recursively.
+     *
+     * @param int $parentId
+     * @return array
+     */
+    private function getAllDescendantIds(int $parentId): array
+    {
+        $childIds = Category::where('parent_id', $parentId)
+            ->where('is_active', true)
+            ->pluck('id')
+            ->toArray();
+
+        $allIds = $childIds;
+        foreach ($childIds as $childId) {
+            $allIds = array_merge($allIds, $this->getAllDescendantIds($childId));
+        }
+
+        return $allIds;
     }
 
     /**
@@ -222,6 +304,8 @@ class CategoryPicker extends Component
             'count' => count($this->selectedCategories),
             'context' => $this->context,
         ]);
+
+        $this->dispatch('category-selection-changed', selectedIds: $this->selectedCategories);
     }
 
     /**
@@ -234,6 +318,8 @@ class CategoryPicker extends Component
         Log::info('CategoryPicker: Deselected all categories', [
             'context' => $this->context,
         ]);
+
+        $this->dispatch('category-selection-changed', selectedIds: $this->selectedCategories);
     }
 
     /**

@@ -65,6 +65,11 @@ class ProductParametersManager extends Component
             'icon' => 'map',
             'description' => 'Mapowanie kategorii PrestaShop na typy produktow PPM',
         ],
+        'product-statuses' => [
+            'label' => 'Statusy produktow',
+            'icon' => 'flag',
+            'description' => 'Zarzadzaj statusami produktow i ich mapowaniem do integracji',
+        ],
     ];
 
     /**

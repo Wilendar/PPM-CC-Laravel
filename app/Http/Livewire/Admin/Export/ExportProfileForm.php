@@ -25,7 +25,8 @@ use App\Services\Export\ProductExportService;
  * Architecture:
  * - Main component: lifecycle, navigation, save logic
  * - ProfileFormFields trait: field selection operations
- * - ProfileFormFilters trait: filter management
+ * - ProfileFormFilters trait: basic filter management (active, categories, shops)
+ * - ProfileFormAdvancedFilters trait: advanced filters (manufacturer, stock, price, etc.)
  *
  * @package App\Http\Livewire\Admin\Export
  */
@@ -33,6 +34,8 @@ class ExportProfileForm extends Component
 {
     use Traits\ProfileFormFields;
     use Traits\ProfileFormFilters;
+    use Traits\ProfileFormAdvancedFilters;
+    use Traits\ProfileFormCategoryProducts;
 
     /*
     |--------------------------------------------------------------------------
@@ -105,6 +108,7 @@ class ExportProfileForm extends Component
 
         $this->initFields();
         $this->initFilters();
+        $this->initAdvancedFilters();
         $this->initPriceGroupsAndWarehouses();
 
         if ($profile) {
@@ -422,6 +426,11 @@ class ExportProfileForm extends Component
 
         // Load filters
         $this->loadFiltersFromProfile($profile);
+
+        // Load products for selected categories (after filters are loaded)
+        if (!empty($this->filterCategoryIds)) {
+            $this->loadCategoryProducts();
+        }
 
         // Load price groups & warehouses
         $this->selectedPriceGroups = array_map('strval', $profile->price_groups ?? []);

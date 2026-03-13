@@ -98,6 +98,7 @@ class ExportProfileService
                 'label' => 'Status',
                 'fields' => [
                     'is_active'         => ['label' => 'Aktywny', 'type' => 'boolean'],
+                    'status_name'       => ['label' => 'Status produktu', 'type' => 'string'],
                     'is_featured'       => ['label' => 'Wyrozniony', 'type' => 'boolean'],
                     'is_variant_master' => ['label' => 'Posiada warianty', 'type' => 'boolean'],
                     'created_at'        => ['label' => 'Data utworzenia', 'type' => 'datetime'],
@@ -127,6 +128,32 @@ class ExportProfileService
                     'image_urls_all' => ['label' => 'Wszystkie zdjecia URL', 'type' => 'text'],
                 ],
             ],
+            'compatibility' => [
+                'label' => 'Dopasowania pojazdow',
+                'fields' => [
+                    'compatible_vehicles'       => ['label' => 'Kompatybilne pojazdy (lista)', 'type' => 'text'],
+                    'compatible_vehicles_count' => ['label' => 'Liczba kompatybilnych pojazdow', 'type' => 'integer'],
+                    'compatibility_types'       => ['label' => 'Typy kompatybilnosci', 'type' => 'string'],
+                    'compatibility_full'        => ['label' => 'Pelne dane kompatybilnosci', 'type' => 'text'],
+                ],
+            ],
+            'locations' => $this->buildLocationFields(),
+            'partners' => [
+                'label' => 'Partnerzy biznesowi',
+                'fields' => [
+                    'manufacturer_name' => ['label' => 'Nazwa producenta (relacja)', 'type' => 'string'],
+                    'supplier_name'     => ['label' => 'Dostawca', 'type' => 'string'],
+                    'importer_name'     => ['label' => 'Importer', 'type' => 'string'],
+                    'product_type_name' => ['label' => 'Typ produktu', 'type' => 'string'],
+                ],
+            ],
+            'features' => [
+                'label' => 'Cechy produktu',
+                'fields' => [
+                    'features_list'  => ['label' => 'Cechy produktu (lista)', 'type' => 'text'],
+                    'feature_groups' => ['label' => 'Grupy cech', 'type' => 'string'],
+                ],
+            ],
         ];
     }
 
@@ -138,13 +165,34 @@ class ExportProfileService
                 'label' => 'Status aktywnosci', 'type' => 'select',
                 'options' => ['' => 'Wszystkie', 'true' => 'Tylko aktywne', 'false' => 'Tylko nieaktywne'],
             ],
-            'category_ids' => ['label' => 'Kategorie', 'type' => 'multiselect'],
-            'manufacturer' => ['label' => 'Producent', 'type' => 'text'],
-            'has_stock' => [
+            'category_ids'     => ['label' => 'Kategorie', 'type' => 'multiselect'],
+            'manufacturer_ids' => ['label' => 'Producent', 'type' => 'multiselect'],
+            'supplier_ids'     => ['label' => 'Dostawca', 'type' => 'multiselect'],
+            'product_type_id'  => ['label' => 'Typ produktu', 'type' => 'select'],
+            'stock_status' => [
                 'label' => 'Stan magazynowy', 'type' => 'select',
-                'options' => ['' => 'Wszystkie', 'true' => 'Tylko z dostepnym stanem', 'false' => 'Tylko bez stanu'],
+                'options' => ['' => 'Wszystkie', 'in_stock' => 'Na stanie', 'low_stock' => 'Niski stan', 'out_of_stock' => 'Brak na stanie'],
             ],
-            'shop_ids' => ['label' => 'Sklepy PrestaShop', 'type' => 'multiselect'],
+            'warehouse_ids'    => ['label' => 'Magazyny', 'type' => 'multiselect'],
+            'price_min'        => ['label' => 'Cena minimalna', 'type' => 'number'],
+            'price_max'        => ['label' => 'Cena maksymalna', 'type' => 'number'],
+            'price_group_id'   => ['label' => 'Grupa cenowa', 'type' => 'select'],
+            'erp_connection_ids' => ['label' => 'Integracje ERP', 'type' => 'multiselect'],
+            'shop_ids'         => ['label' => 'Sklepy PrestaShop', 'type' => 'multiselect'],
+            'date_from'        => ['label' => 'Data od', 'type' => 'date'],
+            'date_to'          => ['label' => 'Data do', 'type' => 'date'],
+            'date_type' => [
+                'label' => 'Typ daty', 'type' => 'select',
+                'options' => ['created_at' => 'Data utworzenia', 'updated_at' => 'Data aktualizacji'],
+            ],
+            'media_filter' => [
+                'label' => 'Media', 'type' => 'select',
+                'options' => ['' => 'Wszystkie', 'with_images' => 'Ze zdjeciami', 'without_images' => 'Bez zdjec'],
+            ],
+            'has_compatibility' => [
+                'label' => 'Dopasowania', 'type' => 'select',
+                'options' => ['' => 'Wszystkie', 'with' => 'Z dopasowaniami', 'without' => 'Bez dopasowan'],
+            ],
         ];
     }
 
@@ -183,5 +231,15 @@ class ExportProfileService
         }
 
         return ['label' => 'Stany magazynowe', 'fields' => $fields];
+    }
+
+    private function buildLocationFields(): array
+    {
+        $fields = [];
+        foreach (Warehouse::active()->ordered()->get(['id', 'name', 'code']) as $wh) {
+            $fields['warehouse_location_' . $wh->code] = ['label' => 'Lokalizacja - ' . $wh->name, 'type' => 'string'];
+        }
+
+        return ['label' => 'Lokalizacje magazynowe', 'fields' => $fields];
     }
 }

@@ -14,6 +14,8 @@ use App\Services\ERP\SubiektGT\SubiektQueryBuilder;
 use App\Services\ERP\SubiektGT\SubiektDataTransformer;
 use App\Services\ERP\SubiektGT\SubiektRestApiClient;
 use App\Services\ERP\SubiektGT\SubiektVariantResolver;
+use App\Models\ProductStatus;
+use App\Models\ProductStatusIntegrationMapping;
 use App\Models\ProductVariant;
 use App\Models\VariantPrice;
 use App\Models\VariantStock;
@@ -1985,6 +1987,49 @@ class SubiektGTService implements ERPSyncServiceInterface
     }
 
     /**
+     * Match product status based on Subiekt GT active flag
+     *
+     * Finds a ProductStatus whose integration mapping for subiekt_gt
+     * matches the given active state. Falls back to default status.
+     *
+     * @param bool $isActiveInSubiekt Whether product is active in Subiekt GT
+     * @return int|null ProductStatus ID or null
+     */
+    protected function matchProductStatus(bool $isActiveInSubiekt): ?int
+    {
+        $mapping = ProductStatusIntegrationMapping::where('integration_type', 'subiekt_gt')
+            ->where('maps_to_active', $isActiveInSubiekt)
+            ->first();
+
+        return $mapping?->product_status_id
+            ?? ProductStatus::getDefault()?->id;
+    }
+
+    /**
+     * Assign default product status to newly imported product
+     *
+     * Uses saveQuietly() to avoid triggering observers during import.
+     *
+     * @param Product $product Product instance
+     * @param bool|null $isActiveInErp Active state from Subiekt GT (null = use default)
+     */
+    protected function assignDefaultProductStatus(Product $product, ?bool $isActiveInErp = null): void
+    {
+        if (!$product->product_status_id) {
+            if ($isActiveInErp !== null) {
+                $statusId = $this->matchProductStatus($isActiveInErp);
+            } else {
+                $statusId = ProductStatus::getDefault()?->id;
+            }
+
+            if ($statusId) {
+                $product->product_status_id = $statusId;
+                $product->saveQuietly();
+            }
+        }
+    }
+
+    /**
      * Find or create PPM product from Subiekt data.
      *
      * @param array $ppmData Transformed product data
@@ -2013,7 +2058,7 @@ class SubiektGTService implements ERPSyncServiceInterface
 
         // Create new product if allowed
         if ($createMissing && !empty($ppmData['sku'])) {
-            return Product::create([
+            $product = Product::create([
                 'sku' => $ppmData['sku'],
                 'ean' => $ppmData['ean'] ?? null,
                 'name' => $ppmData['name'] ?? 'Imported from Subiekt GT',
@@ -2021,6 +2066,12 @@ class SubiektGTService implements ERPSyncServiceInterface
                 'weight' => $ppmData['weight'] ?? null,
                 'is_active' => $ppmData['is_active'] ?? true,
             ]);
+
+            // Assign product status based on Subiekt GT active flag
+            $isActiveInErp = $ppmData['is_active'] ?? true;
+            $this->assignDefaultProductStatus($product, (bool) $isActiveInErp);
+
+            return $product;
         }
 
         return null;

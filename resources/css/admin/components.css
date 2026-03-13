@@ -10458,3 +10458,15 @@ hex-color-picker {
     width: 1rem;
     height: 1rem;
 }
+
+/* === Product Status Badge & Dropdown === */
+.product-status-badge {
+    cursor: default;
+    white-space: nowrap;
+}
+button.product-status-badge {
+    cursor: pointer;
+}
+.product-status-dropdown {
+    min-width: 10rem;
+}

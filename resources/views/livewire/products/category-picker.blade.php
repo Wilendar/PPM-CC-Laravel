@@ -3,7 +3,7 @@
 {{-- CRITICAL FIX: Pass selectedCategories to Alpine.js to avoid Livewire lifecycle in nested Blade components --}}
 <div class="category-picker-container"
      wire:key="picker-{{ $context }}"
-     x-data="{ selectedCategories: @js($selectedCategories) }">
+     x-data="{ selectedCategories: $wire.entangle('selectedCategories') }">
     <!-- Search & Filters Header -->
     <div class="category-picker-header">
         <div class="flex items-center justify-between gap-4 mb-4">
@@ -30,6 +30,7 @@
 
             <!-- Action Buttons -->
             <div class="flex items-center gap-2">
+                @if($showCreateButton)
                 <button @click="$dispatch('create-category-requested')"
                         class="px-3 py-1.5 text-xs font-semibold text-white bg-green-600 hover:bg-green-700 rounded-lg transition-colors duration-200 flex items-center gap-1">
                     <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
@@ -37,6 +38,7 @@
                     </svg>
                     <span>Nowa</span>
                 </button>
+                @endif
                 <button wire:click="selectAll"
                         class="category-picker-btn-secondary">
                     <svg class="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">

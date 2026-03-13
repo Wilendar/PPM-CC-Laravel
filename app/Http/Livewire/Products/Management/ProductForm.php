@@ -3,6 +3,7 @@
 namespace App\Http\Livewire\Products\Management;
 
 use Livewire\Component;
+use Livewire\Attributes\Computed;
 use Livewire\Attributes\Renderless;
 use App\Models\Product;
 use App\Models\ProductType;
@@ -136,6 +137,7 @@ class ProductForm extends Component
     public string $supplier_code = '';
     public string $ean = '';
     public bool $is_active = true;
+    public ?int $product_status_id = null;
     public bool $is_variant_master = false;
     public int $sort_order = 0;
     public bool $is_featured = false;
@@ -1047,6 +1049,8 @@ class ProductForm extends Component
             $this->length = null;
             $this->tax_rate = 23.00;
             $this->is_active = true;
+            $defaultStatus = \App\Models\ProductStatus::getDefault();
+            $this->product_status_id = $defaultStatus?->id;
             $this->is_variant_master = false;
             $this->sort_order = 0;
             $this->defaultCategories = ['selected' => [], 'primary' => null];
@@ -1270,6 +1274,7 @@ class ProductForm extends Component
         $this->supplier_code = $this->product->supplier_code ?? '';
         $this->ean = $this->product->ean ?? '';
         $this->is_active = $this->product->is_active;
+        $this->product_status_id = $this->product->product_status_id;
         $this->is_variant_master = $this->product->is_variant_master;
         $this->is_featured = $this->product->is_featured;
         $this->sort_order = $this->product->sort_order;
@@ -1397,6 +1402,7 @@ class ProductForm extends Component
                 'length' => $this->length,
                 'tax_rate' => $this->tax_rate,
                 'is_active' => $this->is_active,
+                'product_status_id' => $this->product_status_id,
                 'is_variant_master' => $this->is_variant_master,
                 'is_featured' => $this->is_featured,
                 'sort_order' => $this->sort_order,
@@ -2313,6 +2319,35 @@ class ProductForm extends Component
 
         $statusText = $newStatus ? 'aktywny' : 'nieaktywny';
         $this->successMessage = "Status produktu został zmieniony na: {$statusText}";
+    }
+
+    /**
+     * Get available product statuses for dropdown select
+     */
+    #[Computed]
+    public function availableStatuses(): array
+    {
+        return \App\Models\ProductStatus::getForSelect();
+    }
+
+    /**
+     * Change product status via dropdown (replaces checkbox toggle)
+     */
+    public function changeProductStatus(int $statusId): void
+    {
+        $status = \App\Models\ProductStatus::find($statusId);
+        if (!$status) {
+            return;
+        }
+
+        $this->product_status_id = $statusId;
+        $this->is_active = $status->is_active_equivalent;
+
+        if ($this->isEditMode && $this->product) {
+            $this->updateOnly();
+        }
+
+        $this->successMessage = "Status produktu zmieniony na: {$status->name}";
     }
 
     /**
@@ -5054,6 +5089,7 @@ class ProductForm extends Component
 
             // === STATUS & SETTINGS ===
             'is_active' => $this->is_active,
+            'product_status_id' => $this->product_status_id,
             'is_variant_master' => $this->is_variant_master,
             'is_featured' => $this->is_featured,
             'sort_order' => $this->sort_order,
@@ -5163,6 +5199,7 @@ class ProductForm extends Component
 
             // === STATUS & SETTINGS ===
             'is_active' => $this->is_active,
+            'product_status_id' => $this->product_status_id,
             'is_variant_master' => $this->is_variant_master,
             'is_featured' => $this->is_featured,
             'sort_order' => $this->sort_order,
@@ -5562,6 +5599,7 @@ class ProductForm extends Component
                 ? ($this->shopTaxRateOverrides[$this->activeShopId] ?? $this->tax_rate)
                 : $this->tax_rate,
             'is_active' => $this->is_active,
+            'product_status_id' => $this->product_status_id,
             'is_variant_master' => $this->is_variant_master,
             'is_featured' => $this->is_featured,
             'sort_order' => $this->sort_order,
@@ -6238,6 +6276,7 @@ class ProductForm extends Component
                         'available_from' => $this->available_from ? \Carbon\Carbon::parse($this->available_from) : null,
                         'available_to' => $this->available_to ? \Carbon\Carbon::parse($this->available_to) : null,
                         'is_active' => $this->is_active,
+                        'product_status_id' => $this->product_status_id,
                         'is_variant_master' => $this->is_variant_master,
                         'is_featured' => $this->is_featured,
                         'sort_order' => $this->sort_order,
@@ -6274,6 +6313,7 @@ class ProductForm extends Component
                         'available_from' => $this->available_from ? \Carbon\Carbon::parse($this->available_from) : null,
                         'available_to' => $this->available_to ? \Carbon\Carbon::parse($this->available_to) : null,
                         'is_active' => $this->is_active,
+                        'product_status_id' => $this->product_status_id,
                         'is_variant_master' => $this->is_variant_master,
                         'is_featured' => $this->is_featured,
                         'sort_order' => $this->sort_order,
@@ -8863,6 +8903,7 @@ class ProductForm extends Component
                     ? \Carbon\Carbon::parse($changes['available_to'])
                     : $this->product->available_to,
                 'is_active' => $changes['is_active'] ?? $this->product->is_active,
+                'product_status_id' => $changes['product_status_id'] ?? $this->product->product_status_id,
                 'is_variant_master' => $changes['is_variant_master'] ?? $this->product->is_variant_master,
                 'is_featured' => $changes['is_featured'] ?? $this->product->is_featured,
                 'sort_order' => $changes['sort_order'] ?? $this->product->sort_order,
@@ -8955,6 +8996,7 @@ class ProductForm extends Component
                     ? \Carbon\Carbon::parse($changes['available_to'])
                     : null,
                 'is_active' => $changes['is_active'] ?? true,
+                'product_status_id' => $changes['product_status_id'] ?? \App\Models\ProductStatus::getDefault()?->id,
                 'is_variant_master' => $changes['is_variant_master'] ?? false,
                 'is_featured' => $changes['is_featured'] ?? false,
                 'sort_order' => $changes['sort_order'] ?? 0,

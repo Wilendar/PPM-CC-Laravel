@@ -127,8 +127,12 @@ trait ProductListBulkActions
             return;
         }
 
+        $activeStatus = \App\Models\ProductStatus::where('is_active_equivalent', true)->first();
         $count = Product::whereIn('id', $this->selectedProducts)
-            ->update(['is_active' => true]);
+            ->update([
+                'is_active' => true,
+                'product_status_id' => $activeStatus?->id,
+            ]);
 
         $this->dispatch('success', message: "Aktywowano {$count} " . ($count == 1 ? 'produkt' : 'produkty'));
         $this->resetSelection();
@@ -143,10 +147,39 @@ trait ProductListBulkActions
             return;
         }
 
+        $inactiveStatus = \App\Models\ProductStatus::where('is_active_equivalent', false)->first();
         $count = Product::whereIn('id', $this->selectedProducts)
-            ->update(['is_active' => false]);
+            ->update([
+                'is_active' => false,
+                'product_status_id' => $inactiveStatus?->id,
+            ]);
 
         $this->dispatch('success', message: "Dezaktywowano {$count} " . ($count == 1 ? 'produkt' : 'produkty'));
+        $this->resetSelection();
+    }
+
+    public function bulkChangeStatus(int $statusId): void
+    {
+        $this->authorizeAction('update');
+
+        if (empty($this->selectedProducts)) {
+            $this->dispatch('error', message: 'Nie zaznaczono żadnych produktów');
+            return;
+        }
+
+        $status = \App\Models\ProductStatus::find($statusId);
+        if (!$status) {
+            $this->dispatch('error', message: 'Status nie został znaleziony');
+            return;
+        }
+
+        $count = Product::whereIn('id', $this->selectedProducts)
+            ->update([
+                'product_status_id' => $statusId,
+                'is_active' => $status->is_active_equivalent,
+            ]);
+
+        $this->dispatch('success', message: "Zmieniono status {$count} produktów na: {$status->name}");
         $this->resetSelection();
     }
 
@@ -219,7 +252,7 @@ trait ProductListBulkActions
 
         try {
             $products = Product::whereIn('id', $this->selectedProducts)
-                ->with(['categories', 'validPrices.priceGroup', 'activeStock'])
+                ->with(['categories', 'validPrices.priceGroup', 'activeStock', 'productStatus'])
                 ->orderBy('sku')
                 ->get();
 
@@ -238,7 +271,7 @@ trait ProductListBulkActions
                     $this->escapeCsv($product->sku),
                     $this->escapeCsv($product->name),
                     $this->escapeCsv($primaryCategory?->name ?? '-'),
-                    $product->is_active ? 'Aktywny' : 'Nieaktywny',
+                    $product->productStatus?->name ?? ($product->is_active ? 'Aktywny' : 'Nieaktywny'),
                     $product->total_stock ?? 0,
                     $retailPrice ? number_format((float) $retailPrice->price_net, 2, ',', '') : '-',
                     $dealerPrice ? number_format((float) $dealerPrice->price_net, 2, ',', '') : '-',

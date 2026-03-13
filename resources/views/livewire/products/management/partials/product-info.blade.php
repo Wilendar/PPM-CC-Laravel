@@ -16,13 +16,49 @@
             </div>
             <div class="flex justify-between items-center py-2 border-b border-gray-700">
                 <span class="text-dark-muted">Status:</span>
-                <span class="text-dark-primary">
-                    @if($is_active ?? false)
-                        <i class="fas fa-check-circle text-green-400 mr-1"></i> Aktywny
-                    @else
-                        <i class="fas fa-times-circle text-red-400 mr-1"></i> Nieaktywny
-                    @endif
-                </span>
+                <div x-data="{
+                    open: false,
+                    posTop: '0px', posLeft: '0px',
+                    toggle() {
+                        if (!this.open) {
+                            const r = this.$refs.btn.getBoundingClientRect();
+                            const s = document.documentElement.clientWidth / window.innerWidth;
+                            this.posTop = (r.bottom / s + 4) + 'px';
+                            this.posLeft = ((r.right / s) - 192) + 'px';
+                        }
+                        this.open = !this.open;
+                    }
+                }">
+                    @php
+                        $currentStatus = \App\Models\ProductStatus::find($product_status_id);
+                    @endphp
+                    <button x-ref="btn" @click="toggle()" type="button"
+                            class="product-status-select inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors hover:bg-gray-700">
+                        <span class="product-status-dot" style="background-color: {{ $currentStatus?->color ?? '#6b7280' }}"></span>
+                        {{ $currentStatus?->name ?? 'Brak statusu' }}
+                        <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                        </svg>
+                    </button>
+                    <template x-teleport="body">
+                        <div x-show="open" @click.away="open = false" x-transition
+                             class="product-status-teleport-dropdown"
+                             :style="'top:' + posTop + ';left:' + posLeft">
+                            @foreach($this->availableStatuses as $status)
+                                <button wire:click="changeProductStatus({{ $status['id'] }})"
+                                        @click="open = false" type="button"
+                                        class="product-status-option w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-300 hover:bg-gray-700 transition-colors
+                                               {{ ($product_status_id ?? null) == $status['id'] ? 'bg-gray-700/50' : '' }}">
+                                    <span class="product-status-dot" style="background-color: {{ $status['color'] }}"></span>
+                                    {{ $status['name'] }}
+                                    @if(!$status['is_active_equivalent'])
+                                        <span class="ml-auto text-xs text-red-400">(nieaktywny)</span>
+                                    @endif
+                                </button>
+                            @endforeach
+                        </div>
+                    </template>
+                </div>
             </div>
             @if(!empty($exportedShops))
                 <div class="flex justify-between items-start py-2 border-b border-gray-700">

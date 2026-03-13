@@ -407,22 +407,8 @@ document.addEventListener('livewire:init', () => {
     });
 
     // Listen for confirmation events
-    Livewire.on('confirm-status-change', (event) => {
-        const data = event[0] || event;
-        const message = data.message;
-        const newStatus = data.newStatus;
-
-        if (confirm(message)) {
-            // User confirmed - proceed with status change
-            @this.call('confirmStatusChange', newStatus);
-        } else {
-            // User cancelled - keep checkbox in current state
-            const checkbox = document.getElementById('is_active');
-            if (checkbox) {
-                checkbox.checked = !newStatus; // Revert to original state
-            }
-        }
-    });
+    // Status change handled by dropdown in product-info partial
+    // Legacy confirm-status-change listener removed (replaced by changeProductStatus)
 
     // Prevent accidental navigation with unsaved changes
     // FIX 2025-11-21 (ETAP_07b Fix #9): Skip check if saveAndClose() set skipBeforeUnload flag

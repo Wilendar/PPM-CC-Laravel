@@ -131,7 +131,8 @@ class ProductTransformer
                 'depth' => (float) ($this->getEffectiveValue($shopData, $product, 'length') ?? 0),
 
                 // Status and visibility
-                'active' => $this->getEffectiveValue($shopData, $product, 'is_active') ? 1 : 0,
+                // Priority: shop-specific override > status integration mapping > fallback is_active
+                'active' => $this->getIntegrationActiveState($shopData, $product, 'prestashop') ? 1 : 0,
                 'available_for_order' => 1,
                 'show_price' => 1,
                 'visibility' => 'both', // both|catalog|search|none
@@ -218,6 +219,35 @@ class ProductTransformer
 
         // Fallback to product default value
         return $product->$field;
+    }
+
+    /**
+     * Get integration active state based on product status mapping
+     *
+     * Priority:
+     *  1. Shop-specific override (ProductShopData.is_active) - HIGHEST
+     *  2. ProductStatus integration mapping (maps_to_active per integration type)
+     *  3. Fallback to product is_active boolean - LOWEST
+     *
+     * @param mixed $shopData ProductShopData instance or null
+     * @param Product $product Product instance
+     * @param string $integrationType Integration type key (prestashop, baselinker, subiekt_gt)
+     * @return bool Whether the product should be active in this integration
+     */
+    private function getIntegrationActiveState($shopData, Product $product, string $integrationType = 'prestashop'): bool
+    {
+        // Priority 1: Shop-specific override (ProductShopData.is_active)
+        if ($shopData && isset($shopData->is_active) && $shopData->is_active !== null) {
+            return (bool) $shopData->is_active;
+        }
+
+        // Priority 2: Status integration mapping
+        if ($product->productStatus) {
+            return $product->productStatus->isActiveFor($integrationType);
+        }
+
+        // Priority 3: Fallback to is_active boolean
+        return (bool) $product->is_active;
     }
 
     /**
