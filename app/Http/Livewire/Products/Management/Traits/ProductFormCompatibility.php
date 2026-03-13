@@ -315,60 +315,58 @@ trait ProductFormCompatibility
         // Orphaned = in selections but not in tiles
         $orphanedIds = array_diff($selectedIds, $activeTileIds);
 
-        if (empty($orphanedIds)) {
-            return;
-        }
+        if (!empty($orphanedIds)) {
+            // Try loading from products table
+            $foundProducts = Product::whereIn('id', $orphanedIds)
+                ->get(['id', 'name', 'manufacturer', 'sku'])
+                ->keyBy('id');
 
-        // Try loading from products table
-        $foundProducts = Product::whereIn('id', $orphanedIds)
-            ->get(['id', 'name', 'manufacturer', 'sku'])
-            ->keyBy('id');
+            // For IDs not found in products, try metadata from vehicle_compatibility
+            $notFoundIds = array_diff($orphanedIds, $foundProducts->keys()->toArray());
 
-        // For IDs not found in products, try metadata from vehicle_compatibility
-        $notFoundIds = array_diff($orphanedIds, $foundProducts->keys()->toArray());
+            $metadataVehicles = [];
+            if (!empty($notFoundIds) && $this->product?->id) {
+                $metadataRecords = VehicleCompatibility::where('product_id', $this->product->id)
+                    ->whereIn('vehicle_model_id', $notFoundIds)
+                    ->whereNotNull('metadata')
+                    ->get(['vehicle_model_id', 'metadata']);
 
-        $metadataVehicles = [];
-        if (!empty($notFoundIds) && $this->product?->id) {
-            $metadataRecords = VehicleCompatibility::where('product_id', $this->product->id)
-                ->whereIn('vehicle_model_id', $notFoundIds)
-                ->whereNotNull('metadata')
-                ->get(['vehicle_model_id', 'metadata']);
-
-            foreach ($metadataRecords as $record) {
-                $meta = $record->metadata;
-                if (!empty($meta['ps_vehicle_name'])) {
-                    $metadataVehicles[$record->vehicle_model_id] = [
-                        'id' => $record->vehicle_model_id,
-                        'name' => $meta['ps_vehicle_name'],
-                        'manufacturer' => $meta['ps_vehicle_manufacturer'] ?? 'Nieznany',
-                        'sku' => $meta['ps_vehicle_sku'] ?? null,
-                        'source' => 'metadata',
-                    ];
+                foreach ($metadataRecords as $record) {
+                    $meta = $record->metadata;
+                    if (!empty($meta['ps_vehicle_name'])) {
+                        $metadataVehicles[$record->vehicle_model_id] = [
+                            'id' => $record->vehicle_model_id,
+                            'name' => $meta['ps_vehicle_name'],
+                            'manufacturer' => $meta['ps_vehicle_manufacturer'] ?? 'Nieznany',
+                            'sku' => $meta['ps_vehicle_sku'] ?? null,
+                            'source' => 'metadata',
+                        ];
+                    }
                 }
             }
-        }
 
-        // Build archived vehicles array
-        foreach ($orphanedIds as $vehicleId) {
-            if ($foundProducts->has($vehicleId)) {
-                $p = $foundProducts->get($vehicleId);
-                $this->archivedVehicles[$vehicleId] = [
-                    'id' => $p->id,
-                    'name' => $p->name,
-                    'manufacturer' => $p->manufacturer ?? 'Nieznany',
-                    'sku' => $p->sku,
-                    'source' => 'db',
-                ];
-            } elseif (isset($metadataVehicles[$vehicleId])) {
-                $this->archivedVehicles[$vehicleId] = $metadataVehicles[$vehicleId];
-            } else {
-                $this->archivedVehicles[$vehicleId] = [
-                    'id' => $vehicleId,
-                    'name' => "Pojazd #$vehicleId (usuniety)",
-                    'manufacturer' => 'Nieznany',
-                    'sku' => null,
-                    'source' => 'missing',
-                ];
+            // Build archived vehicles array from orphaned IDs
+            foreach ($orphanedIds as $vehicleId) {
+                if ($foundProducts->has($vehicleId)) {
+                    $p = $foundProducts->get($vehicleId);
+                    $this->archivedVehicles[$vehicleId] = [
+                        'id' => $p->id,
+                        'name' => $p->name,
+                        'manufacturer' => $p->manufacturer ?? 'Nieznany',
+                        'sku' => $p->sku,
+                        'source' => 'db',
+                    ];
+                } elseif (isset($metadataVehicles[$vehicleId])) {
+                    $this->archivedVehicles[$vehicleId] = $metadataVehicles[$vehicleId];
+                } else {
+                    $this->archivedVehicles[$vehicleId] = [
+                        'id' => $vehicleId,
+                        'name' => "Pojazd #$vehicleId (usuniety)",
+                        'manufacturer' => 'Nieznany',
+                        'sku' => null,
+                        'source' => 'missing',
+                    ];
+                }
             }
         }
 
@@ -387,8 +385,7 @@ trait ProductFormCompatibility
         Log::debug('ProductFormCompatibility::detectArchivedVehicles', [
             'product_id' => $this->product?->id,
             'orphaned_count' => count($orphanedIds),
-            'found_in_db' => $foundProducts->count(),
-            'found_in_metadata' => count($metadataVehicles),
+            'archived_count' => count($this->archivedVehicles),
             'phantom_count' => count($this->phantomCompatibilities),
         ]);
     }
