@@ -91,6 +91,7 @@
                         :hasIssues="$shopInfo['hasIssues']"
                         :issues="$status->shopIssues[$shopId] ?? []"
                         :syncStatus="$shopInfo['syncStatus'] ?? null"
+                        :fieldDiscrepancies="$status->fieldDiscrepancies['shop_' . $shopId] ?? []"
                         type="shop"
                     />
                 @endforeach
@@ -104,6 +105,7 @@
                         :hasIssues="$erpInfo['hasIssues']"
                         :issues="$status->erpIssues[$erpId] ?? []"
                         :syncStatus="$erpInfo['syncStatus'] ?? null"
+                        :fieldDiscrepancies="$status->fieldDiscrepancies['erp_' . $erpId] ?? []"
                         type="erp"
                     />
                 @endforeach

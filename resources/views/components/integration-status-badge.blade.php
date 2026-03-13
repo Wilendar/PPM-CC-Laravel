@@ -50,9 +50,11 @@
     @see Plan_Projektu/synthetic-mixing-thunder.md (section 11.7)
 --}}
 
-@props(['name', 'color', 'icon', 'hasIssues' => true, 'issues' => [], 'type' => 'shop', 'syncStatus' => null])
+@props(['name', 'color', 'icon', 'hasIssues' => true, 'issues' => [], 'type' => 'shop', 'syncStatus' => null, 'fieldDiscrepancies' => []])
 
 @php
+    use App\DTOs\ProductStatusDTO;
+
     // Issue labels in Polish
     $issueLabels = [
         'basic' => 'Dane podstawowe',
@@ -77,10 +79,27 @@
     if ($isSyncing) {
         $tooltipText = "{$name}: " . ($syncStatusLabels[$syncStatus] ?? 'Synchronizacja...');
     } elseif ($hasIssues && !empty($issues)) {
-        $tooltipIssues = collect($issues)
-            ->map(fn($issue) => $issueLabels[$issue] ?? $issue)
-            ->join(', ');
-        $tooltipText = "{$name}: {$tooltipIssues}";
+        $allFieldLabels = ProductStatusDTO::getFieldLabels();
+        $tooltipParts = collect($issues)->map(function ($issue) use ($issueLabels, $fieldDiscrepancies, $allFieldLabels) {
+            $label = $issueLabels[$issue] ?? $issue;
+            // For basic/physical issues, append discrepant field names
+            if (in_array($issue, ['basic', 'physical']) && !empty($fieldDiscrepancies)) {
+                $relevantFields = [];
+                $basicFields = ['name', 'manufacturer', 'tax_rate', 'is_active'];
+                $physicalFields = ['weight', 'height', 'width', 'length'];
+                $checkFields = ($issue === 'basic') ? $basicFields : $physicalFields;
+                foreach ($fieldDiscrepancies as $field => $values) {
+                    if (in_array($field, $checkFields)) {
+                        $relevantFields[] = $allFieldLabels[$field] ?? $field;
+                    }
+                }
+                if (!empty($relevantFields)) {
+                    $label .= ' (' . implode(', ', $relevantFields) . ')';
+                }
+            }
+            return $label;
+        });
+        $tooltipText = "{$name}: " . $tooltipParts->join(', ');
     } else {
         $tooltipText = "{$name} - OK";
     }

@@ -25,6 +25,7 @@
     $severity = $status->getSeverity();
     $issueLabels = ProductStatusDTO::getIssueLabels();
     $issueColors = ProductStatusDTO::getIssueColors();
+    $fieldLabels = ProductStatusDTO::getFieldLabels();
 
     // Severity colors
     $severityConfig = match($severity) {
@@ -163,6 +164,8 @@
                                         $shopData = $product->shopData->firstWhere('shop_id', $shopId);
                                         $shop = $shopData?->shop;
                                         $shopColor = $shop?->label_color ?? '#06b6d4';
+                                        $integrationKey = "shop_{$shopId}";
+                                        $discrepancies = $status->fieldDiscrepancies[$integrationKey] ?? [];
                                     @endphp
                                     <li class="text-xs">
                                         <div class="flex items-center gap-1.5 mb-1">
@@ -172,6 +175,22 @@
                                         <ul class="ml-3.5 space-y-0.5 text-gray-400">
                                             @foreach($issues as $issue)
                                                 <li>• {{ $issueLabels[$issue] ?? $issue }}</li>
+                                                @if(in_array($issue, ['basic', 'physical']) && !empty($discrepancies))
+                                                    @foreach($discrepancies as $dField => $dValues)
+                                                        @php
+                                                            $isBasicField = in_array($dField, ['name', 'manufacturer', 'tax_rate', 'is_active']);
+                                                            $isPhysicalField = in_array($dField, ['weight', 'height', 'width', 'length']);
+                                                            $showForIssue = ($issue === 'basic' && $isBasicField) || ($issue === 'physical' && $isPhysicalField);
+                                                        @endphp
+                                                        @if($showForIssue)
+                                                            <li class="ml-2 text-gray-500">
+                                                                <span class="text-gray-300">{{ $fieldLabels[$dField] ?? $dField }}:</span>
+                                                                PPM: <span class="text-orange-400">{{ ProductStatusDTO::formatFieldValue($dValues['ppm'], $dField) }}</span>
+                                                                → PS: <span class="text-yellow-400">{{ ProductStatusDTO::formatFieldValue($dValues['integration'], $dField) }}</span>
+                                                            </li>
+                                                        @endif
+                                                    @endforeach
+                                                @endif
                                             @endforeach
                                         </ul>
                                     </li>
@@ -190,6 +209,8 @@
                                         $erpData = $product->erpData->firstWhere('erp_connection_id', $erpId);
                                         $erp = $erpData?->erpConnection;
                                         $erpColor = $erp?->label_color ?? '#f97316';
+                                        $integrationKey = "erp_{$erpId}";
+                                        $discrepancies = $status->fieldDiscrepancies[$integrationKey] ?? [];
                                     @endphp
                                     <li class="text-xs">
                                         <div class="flex items-center gap-1.5 mb-1">
@@ -199,6 +220,22 @@
                                         <ul class="ml-3.5 space-y-0.5 text-gray-400">
                                             @foreach($issues as $issue)
                                                 <li>• {{ $issueLabels[$issue] ?? $issue }}</li>
+                                                @if(in_array($issue, ['basic', 'physical']) && !empty($discrepancies))
+                                                    @foreach($discrepancies as $dField => $dValues)
+                                                        @php
+                                                            $isBasicField = in_array($dField, ['name', 'manufacturer', 'tax_rate', 'is_active']);
+                                                            $isPhysicalField = in_array($dField, ['weight', 'height', 'width', 'length']);
+                                                            $showForIssue = ($issue === 'basic' && $isBasicField) || ($issue === 'physical' && $isPhysicalField);
+                                                        @endphp
+                                                        @if($showForIssue)
+                                                            <li class="ml-2 text-gray-500">
+                                                                <span class="text-gray-300">{{ $fieldLabels[$dField] ?? $dField }}:</span>
+                                                                PPM: <span class="text-orange-400">{{ ProductStatusDTO::formatFieldValue($dValues['ppm'], $dField) }}</span>
+                                                                → ERP: <span class="text-yellow-400">{{ ProductStatusDTO::formatFieldValue($dValues['integration'], $dField) }}</span>
+                                                            </li>
+                                                        @endif
+                                                    @endforeach
+                                                @endif
                                             @endforeach
                                         </ul>
                                     </li>

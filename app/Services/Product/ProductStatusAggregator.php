@@ -82,6 +82,12 @@ class ProductStatusAggregator
     private ?int $b2bShopId = null;
 
     /**
+     * Cached PS manufacturer ID → name mapping
+     * @var array<int, string>|null
+     */
+    private ?array $psManufacturerNames = null;
+
+    /**
      * Aggregate statuses for a collection of products (batch processing)
      *
      * @param Collection<Product> $products
@@ -285,15 +291,16 @@ class ProductStatusAggregator
 
         foreach ($product->shopData as $shopData) {
             $shopId = $shopData->shop_id;
+            $integrationKey = "shop_{$shopId}";
             $isB2bShop = ($shopId === $this->getB2bShopId());
 
-            // BUG#4 REVISED: Skip non-description checks for synced non-B2B shops
-            $skipNonDescChecks = ($shopData->sync_status === 'synced');
+            // BUG#4 GRANULAR: Only skip sync-dependent checks (images, attributes, compatibility)
+            // Basic and physical checks always run to detect name/manufacturer discrepancies
+            $skipSyncDependentChecks = ($shopData->sync_status === 'synced');
 
             // --- DESCRIPTION CHECKS (B2B-aware logic) ---
             if ($this->isMonitoringEnabled('descriptions')) {
                 if ($isB2bShop) {
-                    // B2B shop: compare with default - flag if different
                     $descFields = $this->getMonitoredDescFields();
                     foreach ($descFields as $field) {
                         if ($this->hasFieldDiscrepancy($product, $shopData, $field)) {
@@ -302,37 +309,42 @@ class ProductStatusAggregator
                         }
                     }
                 } else {
-                    // Non-B2B shop: only flag if either description is missing
                     if ($this->hasMissingDescriptions($shopData)) {
                         $status->addShopIssue($shopId, ProductStatusDTO::ISSUE_MISSING_DESC);
                     }
                 }
             }
 
-            // --- NON-DESCRIPTION CHECKS (keep BUG#4 skip for synced) ---
-            if ($skipNonDescChecks) {
-                continue;
-            }
-
-            // Check basic data discrepancies
+            // --- BASIC DATA CHECKS (ALWAYS - not affected by sync status) ---
             if ($this->isMonitoringEnabled('basic')) {
                 $basicFields = $this->getMonitoredBasicFields();
+                $hasBasicIssue = false;
                 foreach ($basicFields as $field) {
-                    if ($this->hasFieldDiscrepancy($product, $shopData, $field)) {
-                        $status->addShopIssue($shopId, ProductStatusDTO::ISSUE_BASIC_DATA);
-                        break;
+                    if ($this->collectFieldDiscrepancy($product, $shopData, $field, $integrationKey, $status)) {
+                        $hasBasicIssue = true;
                     }
+                }
+                if ($hasBasicIssue) {
+                    $status->addShopIssue($shopId, ProductStatusDTO::ISSUE_BASIC_DATA);
                 }
             }
 
-            // Check physical properties discrepancies
+            // --- PHYSICAL CHECKS (ALWAYS - not affected by sync status) ---
             if ($this->isMonitoringEnabled('physical')) {
+                $hasPhysicalIssue = false;
                 foreach (self::DEFAULT_PHYSICAL_FIELDS as $field) {
-                    if ($this->hasFieldDiscrepancy($product, $shopData, $field)) {
-                        $status->addShopIssue($shopId, ProductStatusDTO::ISSUE_PHYSICAL);
-                        break;
+                    if ($this->collectFieldDiscrepancy($product, $shopData, $field, $integrationKey, $status)) {
+                        $hasPhysicalIssue = true;
                     }
                 }
+                if ($hasPhysicalIssue) {
+                    $status->addShopIssue($shopId, ProductStatusDTO::ISSUE_PHYSICAL);
+                }
+            }
+
+            // --- SYNC-DEPENDENT CHECKS (skip for synced shops) ---
+            if ($skipSyncDependentChecks) {
+                continue;
             }
 
             // Check images mapping
@@ -369,15 +381,19 @@ class ProductStatusAggregator
 
         foreach ($product->erpData as $erpData) {
             $erpId = $erpData->erp_connection_id;
+            $integrationKey = "erp_{$erpId}";
 
-            // Check basic data discrepancies
+            // Check basic data discrepancies (collect ALL fields)
             if ($this->isMonitoringEnabled('basic')) {
                 $basicFields = $this->getMonitoredBasicFields();
+                $hasBasicIssue = false;
                 foreach ($basicFields as $field) {
-                    if ($this->hasFieldDiscrepancy($product, $erpData, $field)) {
-                        $status->addErpIssue($erpId, ProductStatusDTO::ISSUE_BASIC_DATA);
-                        break;
+                    if ($this->collectFieldDiscrepancy($product, $erpData, $field, $integrationKey, $status)) {
+                        $hasBasicIssue = true;
                     }
+                }
+                if ($hasBasicIssue) {
+                    $status->addErpIssue($erpId, ProductStatusDTO::ISSUE_BASIC_DATA);
                 }
             }
 
@@ -388,13 +404,16 @@ class ProductStatusAggregator
                 }
             }
 
-            // Check physical properties discrepancies
+            // Check physical properties discrepancies (collect ALL fields)
             if ($this->isMonitoringEnabled('physical')) {
+                $hasPhysicalIssue = false;
                 foreach (self::DEFAULT_PHYSICAL_FIELDS as $field) {
-                    if ($this->hasFieldDiscrepancy($product, $erpData, $field)) {
-                        $status->addErpIssue($erpId, ProductStatusDTO::ISSUE_PHYSICAL);
-                        break;
+                    if ($this->collectFieldDiscrepancy($product, $erpData, $field, $integrationKey, $status)) {
+                        $hasPhysicalIssue = true;
                     }
+                }
+                if ($hasPhysicalIssue) {
+                    $status->addErpIssue($erpId, ProductStatusDTO::ISSUE_PHYSICAL);
                 }
             }
         }
@@ -583,6 +602,65 @@ class ProductStatusAggregator
         }
 
         return $result;
+    }
+
+    /**
+     * Check field discrepancy and collect values for popover display.
+     * Returns true if discrepancy found, false otherwise.
+     */
+    private function collectFieldDiscrepancy(
+        Product $product,
+        $integrationData,
+        string $field,
+        string $integrationKey,
+        ProductStatusDTO $status
+    ): bool {
+        $rawIntegrationValue = $integrationData->{$field} ?? null;
+
+        // For manufacturer: resolve PS ID to name before comparing
+        $resolvedIntegrationValue = $rawIntegrationValue;
+        if ($field === 'manufacturer' && is_numeric($rawIntegrationValue) && $rawIntegrationValue !== null) {
+            $resolvedIntegrationValue = $this->resolveManufacturerName((int) $rawIntegrationValue)
+                ?? $rawIntegrationValue;
+        }
+
+        $productValue = $this->normalizeValue($product->{$field} ?? null, $field);
+        $integrationValue = $this->normalizeValue($resolvedIntegrationValue, $field);
+
+        // NULL in integration = inherited, not a discrepancy
+        if ($integrationValue === null) {
+            return false;
+        }
+
+        if ($productValue !== $integrationValue) {
+            $status->addFieldDiscrepancy(
+                $integrationKey,
+                $field,
+                $product->{$field} ?? null,
+                $resolvedIntegrationValue
+            );
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * Resolve PrestaShop manufacturer ID to business partner name.
+     * Uses cached lookup loaded once per batch.
+     */
+    private function resolveManufacturerName(int $psManufacturerId): ?string
+    {
+        if ($this->psManufacturerNames === null) {
+            $this->psManufacturerNames = \App\Models\BusinessPartner::query()
+                ->join('business_partner_shop', 'business_partners.id', '=', 'business_partner_shop.business_partner_id')
+                ->where('business_partners.type', 'manufacturer')
+                ->whereNotNull('business_partner_shop.ps_manufacturer_id')
+                ->pluck('business_partners.name', 'business_partner_shop.ps_manufacturer_id')
+                ->toArray();
+        }
+
+        return $this->psManufacturerNames[$psManufacturerId] ?? null;
     }
 
     /**

@@ -199,9 +199,9 @@ trait ProductListFilters
             ->with([
                 'productType:id,name,slug',
                 'productStatus:id,name,slug,color,is_active_equivalent',
-                'shopData:id,product_id,shop_id,sync_status,is_published,last_sync_at,name,short_description,long_description,weight,height,width,length,tax_rate,is_active',
+                'shopData:id,product_id,shop_id,sync_status,is_published,last_sync_at,name,manufacturer,short_description,long_description,weight,height,width,length,tax_rate,is_active',
                 'shopData.shop:id,name,label_color,label_icon',
-                'erpData:id,product_id,erp_connection_id,sync_status,name,short_description,long_description,weight,height,width,length,tax_rate,is_active',
+                'erpData:id,product_id,erp_connection_id,sync_status,name,manufacturer,short_description,long_description,weight,height,width,length,tax_rate,is_active',
                 'erpData.erpConnection:id,instance_name,erp_type,label_color,label_icon',
                 'prices:id,product_id,price_group_id,price_net,price_gross',
                 'prices.priceGroup:id,name,code,is_active,is_default',

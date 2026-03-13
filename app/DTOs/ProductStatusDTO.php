@@ -85,6 +85,13 @@ class ProductStatusDTO
     public array $variantIssues = [];
 
     /**
+     * Per-integration field discrepancies with PPM vs integration values
+     * @var array<string, array<string, array{ppm: mixed, integration: mixed}>>
+     * Example: ['shop_1' => ['name' => ['ppm' => 'Osłona', 'integration' => 'Cover']]]
+     */
+    public array $fieldDiscrepancies = [];
+
+    /**
      * Extra metadata for display
      * @var array<string, mixed>
      */
@@ -451,6 +458,88 @@ class ProductStatusDTO
     }
 
     /**
+     * Add a field discrepancy for a specific integration
+     *
+     * @param string $integrationKey e.g. 'shop_1', 'erp_3'
+     * @param string $field e.g. 'name', 'manufacturer'
+     * @param mixed $ppmValue Value in PPM
+     * @param mixed $integrationValue Value in integration
+     */
+    public function addFieldDiscrepancy(string $integrationKey, string $field, mixed $ppmValue, mixed $integrationValue): self
+    {
+        if (!isset($this->fieldDiscrepancies[$integrationKey])) {
+            $this->fieldDiscrepancies[$integrationKey] = [];
+        }
+        $this->fieldDiscrepancies[$integrationKey][$field] = [
+            'ppm' => $ppmValue,
+            'integration' => $integrationValue,
+        ];
+        return $this;
+    }
+
+    /**
+     * Get Polish labels for monitored fields
+     */
+    public static function getFieldLabels(): array
+    {
+        return [
+            'name' => 'Nazwa',
+            'manufacturer' => 'Producent',
+            'tax_rate' => 'Stawka VAT',
+            'is_active' => 'Aktywny',
+            'weight' => 'Waga',
+            'height' => 'Wysokość',
+            'width' => 'Szerokość',
+            'length' => 'Długość',
+        ];
+    }
+
+    /**
+     * Format a field value for display in popover
+     */
+    public static function formatFieldValue(mixed $value, string $field): string
+    {
+        if ($value === null || $value === '') {
+            return '(brak)';
+        }
+
+        if (in_array($field, ['is_active'])) {
+            return $value ? 'Tak' : 'Nie';
+        }
+
+        if ($field === 'tax_rate') {
+            return number_format((float) $value, 2) . '%';
+        }
+
+        if (in_array($field, ['weight', 'height', 'width', 'length'])) {
+            return number_format((float) $value, 2);
+        }
+
+        if (is_string($value) && mb_strlen($value) > 60) {
+            return mb_substr($value, 0, 57) . '...';
+        }
+
+        return (string) $value;
+    }
+
+    /**
+     * Get discrepant field names for an integration (for tooltip display)
+     *
+     * @param string $integrationKey e.g. 'shop_1'
+     * @return array<string> Polish field labels
+     */
+    public function getDiscrepantFieldLabels(string $integrationKey): array
+    {
+        $fields = $this->fieldDiscrepancies[$integrationKey] ?? [];
+        $labels = self::getFieldLabels();
+
+        return array_map(
+            fn(string $field) => $labels[$field] ?? $field,
+            array_keys($fields)
+        );
+    }
+
+    /**
      * Convert to array for JSON serialization
      */
     public function toArray(): array
@@ -461,6 +550,7 @@ class ProductStatusDTO
             'shop_issues' => $this->shopIssues,
             'erp_issues' => $this->erpIssues,
             'variant_issues' => $this->variantIssues,
+            'field_discrepancies' => $this->fieldDiscrepancies,
             'connected_shops' => $this->connectedShops,
             'connected_erps' => $this->connectedErps,
             'metadata' => $this->metadata,
