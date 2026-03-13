@@ -39,6 +39,15 @@
                 Zamiennik: {{ $counts['zamiennik'] }}
             </span>
 
+            @if($counts['archived'] > 0)
+                <span class="inline-flex items-center px-2.5 py-1 text-xs font-medium rounded-full bg-gray-700/30 text-gray-300 border border-gray-600/50">
+                    <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+                    </svg>
+                    Archiwalne: {{ $counts['archived'] }}
+                </span>
+            @endif
+
             {{-- Active Shop Indicator --}}
             @if(isset($selectedShop) && $selectedShop !== null && isset($availableShops))
                 @php
@@ -135,6 +144,12 @@
             <span class="w-4 h-4 rounded border-2 border-dashed mr-2 compat-legend-suggestion"></span>
             <span>Sugestia AI</span>
         </div>
+        @if(count($archivedVehicles) > 0)
+            <div class="flex items-center">
+                <span class="w-4 h-4 rounded mr-2 compat-legend-archived"></span>
+                <span>Archiwalne - pojazd nieaktywny w PPM</span>
+            </div>
+        @endif
     </div>
 
     {{-- Vehicle Tiles by Brand --}}
@@ -261,6 +276,58 @@
                     @endunless
                 </div>
             @endforeach
+
+            {{-- Archived Vehicles Section --}}
+            @if(count($archivedVehicles) > 0)
+                <div class="archived-tiles-separator">
+                    <span class="archived-tiles-separator__line"></span>
+                    <span class="archived-tiles-separator__label">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+                        </svg>
+                        Archiwalne ({{ count($archivedVehicles) }})
+                    </span>
+                    <span class="archived-tiles-separator__line"></span>
+                </div>
+
+                <div class="vehicle-tiles-grid">
+                    @foreach($archivedVehicles as $vehicleId => $vehicle)
+                        @php
+                            $isOriginal = in_array($vehicleId, $compatibilityOriginal);
+                            $isZamiennik = in_array($vehicleId, $compatibilityZamiennik);
+                            $isBoth = $isOriginal && $isZamiennik;
+                            $tileClass = $isBoth ? 'vehicle-tile--selected-both' : ($isOriginal ? 'vehicle-tile--selected-original' : ($isZamiennik ? 'vehicle-tile--selected-zamiennik' : ''));
+                        @endphp
+                        <div wire:key="compat-archived-{{ $vehicleId }}"
+                             wire:click="toggleCompatibilityVehicle({{ $vehicleId }})"
+                             class="vehicle-tile vehicle-tile--archived {{ $tileClass }}">
+                            <span class="vehicle-tile__archived-badge">ARCHIWALNE</span>
+                            <div class="vehicle-tile__content">
+                                <span class="vehicle-tile__brand">{{ $vehicle['manufacturer'] }}</span>
+                                <span class="vehicle-tile__model">{{ $vehicle['name'] }}</span>
+                                @if(!empty($vehicle['sku']))
+                                    <span class="vehicle-tile__sku text-[10px] text-gray-500">{{ $vehicle['sku'] }}</span>
+                                @endif
+                            </div>
+
+                            {{-- Selection Indicator --}}
+                            @if($isBoth)
+                                <div class="vehicle-tile__indicator vehicle-tile__indicator--both">
+                                    <span>O+Z</span>
+                                </div>
+                            @elseif($isOriginal)
+                                <div class="vehicle-tile__indicator vehicle-tile__indicator--original">
+                                    <span>O</span>
+                                </div>
+                            @elseif($isZamiennik)
+                                <div class="vehicle-tile__indicator vehicle-tile__indicator--zamiennik">
+                                    <span>Z</span>
+                                </div>
+                            @endif
+                        </div>
+                    @endforeach
+                </div>
+            @endif
         </div>
     @else
         {{-- Empty State --}}

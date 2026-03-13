@@ -1,10 +1,10 @@
 # PPM - Jobs & Workers Documentation
 
-> **Wersja:** 3.2
-> **Data:** 2026-03-11
+> **Wersja:** 3.3
+> **Data:** 2026-03-13
 > **Status:** Production Ready
-> **Changelog:** v3.2: Delta sync (price change tracking + stock checksums), removed duplicate change detection scheduler, crontab queue fix (erp-sync), SyncJob::create() required fields documented
-> **Previous:** v3.1: SyncJob heartbeat monitoring, ERP scheduler dedup fix, manual ERP sync buttons, cancel removes from queue, queue name alignment, active jobs priority sorting
+> **Changelog:** v3.3: FIX PullSingleProductFromPrestaShop sync_status stuck on pending (ppm_wins strategy), FIX Alpine polling not starting for bulk sync/pull/auto-sync (missing dispatch('job-started'))
+> **Previous:** v3.2: Delta sync (price change tracking + stock checksums), removed duplicate change detection scheduler, crontab queue fix (erp-sync), SyncJob::create() required fields documented
 
 ---
 
@@ -760,7 +760,34 @@ Tries: 1
 
 Przeznaczenie:
 - Pobiera jeden produkt ze WSZYSTKICH sklepow
-- Uzywa Bus::batch()
+- Uzywa Bus::batch() z PullSingleProductFromPrestaShop per shop
+- pullFromAllShops() ustawia sync_status=pending PRZED dispatch
+- checkBulkPullJobStatus() monitoruje ukonczenie (sync_status !== pending)
+```
+
+#### PullSingleProductFromPrestaShop
+```
+Sciezka: app/Jobs/PrestaShop/PullSingleProductFromPrestaShop.php
+Kolejka: default
+Timeout: 300s
+Tries: 3
+Backoff: 30s, 60s, 300s
+
+Przeznaczenie:
+- Pull danych jednego produktu z PrestaShop API
+- Stosuje ConflictResolver (ppm_wins / prestashop_wins / manual)
+- Import cen (specific_prices), stanow magazynowych (stock_availables)
+- Import kompatybilnosci pojazdow (dla czesci zamiennych)
+- Graceful 404 handling (unlink produktu)
+
+Wyniki ConflictResolver:
+- should_update=true → sync_status='synced' + dane zaktualizowane
+- should_update=false + konflikty → sync_status='conflict' + conflict_log
+- should_update=false + brak konfliktow → sync_status='synced' (FIX v3.3)
+
+FIX v3.3: Wczesniej przypadek "brak konfliktow, strategia blokuje"
+(np. ppm_wins) NIE aktualizowal sync_status → zostawal 'pending'
+po bulk pull → checkBulkPullJobStatus() nigdy nie wykrywal ukonczenia.
 ```
 
 #### SyncShopVariantsToPrestaShopJob (ETAP_14 + v1.8 Per-Variant Cover)
@@ -925,9 +952,37 @@ Tracking:
 #### Inne PrestaShop Jobs
 - `DeleteProductFromPrestaShop` - Usuwanie produktu
 - `AnalyzeMissingCategories` - Analiza brakujacych kategorii
-- `PullSingleProductFromPrestaShop` - Pull jednego produktu
 - `SyncProductsJob` - Legacy batch sync
 - `ExpirePendingCategoryPreview` - Wygasanie preview kategorii
+
+#### Job Polling UI (Alpine.js + Livewire) - FIX v3.3
+```
+Architektura:
+- Alpine.js setInterval(5s) → $wire.checkJobStatus() → sprawdza DB → aktualizuje status
+- Event 'job-started' → Alpine startPolling() → polling aktywny
+- Event 'job-completed' / 'job-failed' → Alpine stopPolling()
+- x-init: $nextTick sprawdza isJobActive() na mount (persistence po F5)
+
+KRYTYCZNE: Kazda metoda ustawiajaca activeJobStatus='pending' MUSI rowniez:
+  $this->dispatch('job-started');
+Bez tego Alpine NIGDY nie zacznie pollowac checkJobStatus().
+
+Metody z dispatch('job-started'):
+- syncSingleShop()           ✅ (od poczatku)
+- syncAllShops()             ✅ (FIX v3.3 - brakowalo)
+- pullFromAllShops()         ✅ (FIX v3.3 - brakowalo)
+- savePendingChangesToShop() ✅ (FIX v3.3 - brakowalo, tylko gdy !$skipJobTracking)
+
+checkJobStatus() routing:
+- activeJobType='sync' + !activeJobId → checkBulkSyncJobStatus()
+- activeJobType='pull' + !activeJobId → checkBulkPullJobStatus()
+- activeJobId set → query jobs/failed_jobs table by ID
+
+checkBulkPullJobStatus() completion detection:
+- Sprawdza sync_status !== 'pending' na WSZYSTKICH connected shops
+- Wymaga ze PullSingleProductFromPrestaShop ZAWSZE ustawi sync_status
+  na wartosc inna niz 'pending' (synced/conflict/error)
+```
 
 ---
 

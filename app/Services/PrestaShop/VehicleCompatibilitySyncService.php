@@ -400,10 +400,28 @@ class VehicleCompatibilitySyncService
             ->value('vehicle_product_id');
 
         if ($vehicleId) {
-            $result['vehicle_id'] = (int) $vehicleId;
-            // Get PS name from cache or API for logging
-            $result['ps_name'] = $this->getFeatureValueName($featureValueId);
-            return $result;
+            // Verify mapped product is actually a vehicle (pojazd type)
+            $isVehicle = Product::where('id', $vehicleId)
+                ->where('product_type_id', function ($q) {
+                    $q->select('id')->from('product_types')->where('slug', 'pojazd')->limit(1);
+                })
+                ->exists();
+
+            if ($isVehicle) {
+                $result['vehicle_id'] = (int) $vehicleId;
+                $result['ps_name'] = $this->getFeatureValueName($featureValueId);
+                return $result;
+            }
+
+            // Bad mapping - delete it and fall through to name search
+            Log::warning('[COMPAT SYNC] Removing invalid mapping (non-vehicle product)', [
+                'feature_value_id' => $featureValueId,
+                'mapped_product_id' => $vehicleId,
+            ]);
+            DB::table('vehicle_feature_value_mappings')
+                ->where('prestashop_feature_value_id', $featureValueId)
+                ->where('shop_id', $shopId)
+                ->delete();
         }
 
         // Try to match by name from PrestaShop
@@ -681,11 +699,30 @@ class VehicleCompatibilitySyncService
             ->value('vehicle_product_id');
 
         if ($vehicleId) {
-            Log::debug('[COMPAT SYNC] Found vehicle from mapping table', [
+            // Verify mapped product is actually a vehicle (pojazd type)
+            $isVehicle = Product::where('id', $vehicleId)
+                ->where('product_type_id', function ($q) {
+                    $q->select('id')->from('product_types')->where('slug', 'pojazd')->limit(1);
+                })
+                ->exists();
+
+            if ($isVehicle) {
+                Log::debug('[COMPAT SYNC] Found vehicle from mapping table', [
+                    'feature_value_id' => $featureValueId,
+                    'vehicle_id' => $vehicleId,
+                ]);
+                return (int) $vehicleId;
+            }
+
+            // Bad mapping - delete and fall through
+            Log::warning('[COMPAT SYNC] Removing invalid mapping (non-vehicle product)', [
                 'feature_value_id' => $featureValueId,
-                'vehicle_id' => $vehicleId,
+                'mapped_product_id' => $vehicleId,
             ]);
-            return (int) $vehicleId;
+            DB::table('vehicle_feature_value_mappings')
+                ->where('prestashop_feature_value_id', $featureValueId)
+                ->where('shop_id', $shopId)
+                ->delete();
         }
 
         // Try to match by name from PrestaShop
@@ -973,6 +1010,21 @@ class VehicleCompatibilitySyncService
         int $featureValueId,
         int $shopId
     ): void {
+        // Safety: only save mapping for actual vehicle products
+        $isVehicle = Product::where('id', $vehicleProductId)
+            ->where('product_type_id', function ($q) {
+                $q->select('id')->from('product_types')->where('slug', 'pojazd')->limit(1);
+            })
+            ->exists();
+
+        if (!$isVehicle) {
+            Log::warning('[COMPAT SYNC] Refusing to save mapping for non-vehicle product', [
+                'product_id' => $vehicleProductId,
+                'feature_id' => $featureId,
+            ]);
+            return;
+        }
+
         try {
             DB::table('vehicle_feature_value_mappings')->updateOrInsert(
                 [

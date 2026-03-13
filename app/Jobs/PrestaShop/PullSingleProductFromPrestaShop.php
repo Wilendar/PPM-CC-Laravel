@@ -150,8 +150,11 @@ class PullSingleProductFromPrestaShop implements ShouldQueue
                     ]);
                 } else {
                     // No conflicts, just different strategy (e.g., ppm_wins)
+                    // FIX: Must set sync_status to 'synced' so checkBulkPullJobStatus()
+                    // detects completion (it checks sync_status !== 'pending')
                     $shopData->update([
                         'last_pulled_at' => now(),
+                        'sync_status' => 'synced',
                     ]);
 
                     Log::info('Update skipped by conflict resolution strategy', [

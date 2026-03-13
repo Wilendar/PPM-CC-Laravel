@@ -332,9 +332,9 @@ class ProductForm extends Component
      * Active job ID for real-time monitoring via wire:poll
      * NULL when no job is active
      *
-     * @var int|null
+     * @var int|string|null Supports both job ID (int) and batch ID (string UUID)
      */
-    public ?int $activeJobId = null;
+    public int|string|null $activeJobId = null;
 
     /**
      * Current status of active job
@@ -7885,6 +7885,9 @@ class ProductForm extends Component
             $this->activeJobStatus = 'pending';
             // NOTE: activeJobId would require batch tracking - deferred to future enhancement
 
+            // FIX: Notify Alpine to start polling (was missing - polling never started)
+            $this->dispatch('job-started');
+
             // FIX 2025-11-25: Use 'info' not 'success' - actual success shown by Alpine panel after job completes
             $this->dispatch('info', message: "Rozpoczęto aktualizację produktu na {$shops->count()} sklepach");
 
@@ -7976,6 +7979,9 @@ class ProductForm extends Component
             $this->activeJobType = 'pull';
             $this->jobCreatedAt = now()->toIso8601String();
             $this->activeJobStatus = 'pending';
+
+            // FIX: Notify Alpine to start polling (was missing - polling never started)
+            $this->dispatch('job-started');
 
             // FIX 2025-11-25: Use 'info' not 'success' - actual success shown by Alpine panel after job completes
             $this->dispatch('info', message: "Rozpoczęto wczytywanie danych ze {$shops->count()} sklepów");
@@ -9479,6 +9485,9 @@ class ProductForm extends Component
                     $this->activeJobType = 'sync';
                     $this->jobCreatedAt = now()->toIso8601String();
                     $this->activeJobStatus = 'pending';
+
+                    // FIX: Notify Alpine to start polling (was missing)
+                    $this->dispatch('job-started');
                 }
 
                 Log::info('Auto-dispatched sync job after shop data save (from pending changes)', [

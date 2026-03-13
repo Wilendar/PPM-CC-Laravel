@@ -104,6 +104,12 @@ trait ProductFormCompatibility
      */
     public array $dismissedSuggestionIds = [];
 
+    /**
+     * Archived vehicles - exist in compatibility but not in active tiles
+     * Format: [vehicleId => ['id'=>X, 'name'=>'...', 'manufacturer'=>'...', 'sku'=>'...', 'source'=>'db|metadata']]
+     */
+    public array $archivedVehicles = [];
+
     /*
     |--------------------------------------------------------------------------
     | COMPATIBILITY LOADING
@@ -235,6 +241,100 @@ trait ProductFormCompatibility
 
         $shopId = $this->selectedShop ?? null;
         $this->loadAvailableVehicles($shopId);
+        $this->detectArchivedVehicles();
+    }
+
+    /**
+     * Detect archived vehicles - IDs in compatibility arrays but not in active tiles
+     */
+    protected function detectArchivedVehicles(): void
+    {
+        $this->archivedVehicles = [];
+
+        // Collect all vehicle IDs from compatibility selections
+        $selectedIds = array_unique(array_merge(
+            $this->compatibilityOriginal,
+            $this->compatibilityZamiennik
+        ));
+
+        if (empty($selectedIds)) {
+            return;
+        }
+
+        // Collect all vehicle IDs from active tiles (flat)
+        $activeTileIds = [];
+        foreach ($this->vehiclesByBrand as $vehicles) {
+            foreach ($vehicles as $v) {
+                $activeTileIds[] = $v['id'];
+            }
+        }
+
+        // Orphaned = in selections but not in tiles
+        $orphanedIds = array_diff($selectedIds, $activeTileIds);
+
+        if (empty($orphanedIds)) {
+            return;
+        }
+
+        // Try loading from products table
+        $foundProducts = Product::whereIn('id', $orphanedIds)
+            ->get(['id', 'name', 'manufacturer', 'sku'])
+            ->keyBy('id');
+
+        // For IDs not found in products, try metadata from vehicle_compatibility
+        $notFoundIds = array_diff($orphanedIds, $foundProducts->keys()->toArray());
+
+        $metadataVehicles = [];
+        if (!empty($notFoundIds) && $this->product?->id) {
+            $metadataRecords = VehicleCompatibility::where('product_id', $this->product->id)
+                ->whereIn('vehicle_model_id', $notFoundIds)
+                ->whereNotNull('metadata')
+                ->get(['vehicle_model_id', 'metadata']);
+
+            foreach ($metadataRecords as $record) {
+                $meta = $record->metadata;
+                if (!empty($meta['ps_vehicle_name'])) {
+                    $metadataVehicles[$record->vehicle_model_id] = [
+                        'id' => $record->vehicle_model_id,
+                        'name' => $meta['ps_vehicle_name'],
+                        'manufacturer' => $meta['ps_vehicle_manufacturer'] ?? 'Nieznany',
+                        'sku' => $meta['ps_vehicle_sku'] ?? null,
+                        'source' => 'metadata',
+                    ];
+                }
+            }
+        }
+
+        // Build archived vehicles array
+        foreach ($orphanedIds as $vehicleId) {
+            if ($foundProducts->has($vehicleId)) {
+                $p = $foundProducts->get($vehicleId);
+                $this->archivedVehicles[$vehicleId] = [
+                    'id' => $p->id,
+                    'name' => $p->name,
+                    'manufacturer' => $p->manufacturer ?? 'Nieznany',
+                    'sku' => $p->sku,
+                    'source' => 'db',
+                ];
+            } elseif (isset($metadataVehicles[$vehicleId])) {
+                $this->archivedVehicles[$vehicleId] = $metadataVehicles[$vehicleId];
+            } else {
+                $this->archivedVehicles[$vehicleId] = [
+                    'id' => $vehicleId,
+                    'name' => "Pojazd #$vehicleId (usuniety)",
+                    'manufacturer' => 'Nieznany',
+                    'sku' => null,
+                    'source' => 'missing',
+                ];
+            }
+        }
+
+        Log::debug('ProductFormCompatibility::detectArchivedVehicles', [
+            'product_id' => $this->product?->id,
+            'orphaned_count' => count($orphanedIds),
+            'found_in_db' => $foundProducts->count(),
+            'found_in_metadata' => count($metadataVehicles),
+        ]);
     }
 
     /**
@@ -248,6 +348,7 @@ trait ProductFormCompatibility
         $this->vehiclesByBrand = [];
         $this->vehicleSearch = '';
         $this->vehicleBrandFilter = '';
+        $this->archivedVehicles = [];
     }
 
     /*
@@ -488,6 +589,7 @@ trait ProductFormCompatibility
                 $this->compatibilityZamiennik
             ))),
             'pending' => count($this->compatibilityPendingChanges),
+            'archived' => count($this->archivedVehicles),
         ];
     }
 
@@ -541,11 +643,20 @@ trait ProductFormCompatibility
                 $deleteQuery->delete();
 
                 // Insert Original selections
+                $defaultShopId = $shopId ?? $this->getDefaultShopId();
                 foreach ($this->compatibilityOriginal as $vehicleId) {
+                    if (!Product::where('id', $vehicleId)->exists()) {
+                        Log::warning('ProductFormCompatibility: Skipping archived vehicle in save', [
+                            'product_id' => $this->product->id,
+                            'vehicle_id' => $vehicleId,
+                            'type' => 'original',
+                        ]);
+                        continue;
+                    }
                     VehicleCompatibility::create([
                         'product_id' => $this->product->id,
                         'vehicle_model_id' => $vehicleId,
-                        'shop_id' => $shopId ?? $this->getDefaultShopId(),
+                        'shop_id' => $defaultShopId,
                         'compatibility_attribute_id' => $originalAttr->id,
                         'compatibility_source_id' => 1, // Manual
                         'verified' => true,
@@ -560,11 +671,18 @@ trait ProductFormCompatibility
                     if (in_array($vehicleId, $this->compatibilityOriginal)) {
                         continue;
                     }
-
+                    if (!Product::where('id', $vehicleId)->exists()) {
+                        Log::warning('ProductFormCompatibility: Skipping archived vehicle in save', [
+                            'product_id' => $this->product->id,
+                            'vehicle_id' => $vehicleId,
+                            'type' => 'zamiennik',
+                        ]);
+                        continue;
+                    }
                     VehicleCompatibility::create([
                         'product_id' => $this->product->id,
                         'vehicle_model_id' => $vehicleId,
-                        'shop_id' => $shopId ?? $this->getDefaultShopId(),
+                        'shop_id' => $defaultShopId,
                         'compatibility_attribute_id' => $zamiennikAttr->id,
                         'compatibility_source_id' => 1, // Manual
                         'verified' => true,
