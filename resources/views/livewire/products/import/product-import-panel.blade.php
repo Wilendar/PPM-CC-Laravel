@@ -498,7 +498,7 @@
                         </select>
                         <span>z {{ $this->pendingProducts->total() }}</span>
                     </div>
-                    {{ $this->pendingProducts->links() }}
+                    {{ $this->pendingProducts->links('components.pagination-compact') }}
                 </div>
             </div>
         @endif

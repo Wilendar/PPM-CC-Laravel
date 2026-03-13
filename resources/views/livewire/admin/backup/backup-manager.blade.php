@@ -291,7 +291,7 @@
 
                 <!-- Pagination -->
                 <div class="mt-6">
-                    {{ $backups->links() }}
+                    {{ $backups->links('components.pagination-compact') }}
                 </div>
 
             @elseif($activeTab === 'create')

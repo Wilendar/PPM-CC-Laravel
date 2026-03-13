@@ -372,7 +372,7 @@
 
         @if($priceGroups->hasPages())
         <div class="px-6 py-4 border-t border-gray-700">
-            {{ $priceGroups->links() }}
+            {{ $priceGroups->links('components.pagination-compact') }}
         </div>
         @endif
     </div>

@@ -400,7 +400,7 @@
 
             <!-- Pagination -->
             <div class="mt-4">
-                {{ $connections->links() }}
+                {{ $connections->links('components.pagination-compact') }}
             </div>
         @endif
     </div>

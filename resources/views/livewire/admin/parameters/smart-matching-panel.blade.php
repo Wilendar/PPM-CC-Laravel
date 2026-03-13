@@ -467,7 +467,7 @@
 
             @if($this->allAliases->hasPages())
                 <div class="mt-3">
-                    {{ $this->allAliases->links() }}
+                    {{ $this->allAliases->links('components.pagination-compact') }}
                 </div>
             @endif
         </div>

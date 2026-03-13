@@ -183,7 +183,7 @@
 
             {{-- Pagination --}}
             <div class="compat-parts-pagination">
-                {{ $parts->links() }}
+                {{ $parts->links('components.pagination-compact') }}
             </div>
         </div>
 

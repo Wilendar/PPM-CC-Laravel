@@ -292,7 +292,7 @@
         {{-- Pagination --}}
         @if($this->filteredTemplates->hasPages())
             <div class="mt-6">
-                {{ $this->filteredTemplates->links() }}
+                {{ $this->filteredTemplates->links('components.pagination-compact') }}
             </div>
         @endif
     @else

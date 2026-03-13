@@ -404,7 +404,7 @@
     {{-- Pagination --}}
     @if($this->profiles->hasPages())
         <div class="mt-6">
-            {{ $this->profiles->links() }}
+            {{ $this->profiles->links('components.pagination-compact') }}
         </div>
     @endif
 
@@ -575,7 +575,7 @@
         {{-- Logs Pagination --}}
         @if($this->logs->hasPages())
             <div class="mt-6">
-                {{ $this->logs->links() }}
+                {{ $this->logs->links('components.pagination-compact') }}
             </div>
         @endif
     </div>

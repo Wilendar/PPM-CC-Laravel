@@ -735,7 +735,7 @@
 
                         <!-- Pagination -->
                         <div class="px-6 py-4 border-t border-mpp-accent">
-                            {{ $shops->links() }}
+                            {{ $shops->links('components.pagination-compact') }}
                         </div>
 
                     @else
@@ -771,7 +771,7 @@
             <!-- Pagination -->
             @if($shops->hasPages())
             <div class="mt-6">
-                {{ $shops->links() }}
+                {{ $shops->links('components.pagination-compact') }}
             </div>
             @endif
     </div>

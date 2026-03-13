@@ -221,7 +221,7 @@
     {{-- Pagination --}}
     @if ($this->sessions->hasPages())
         <div class="mt-6">
-            {{ $this->sessions->links() }}
+            {{ $this->sessions->links('components.pagination-compact') }}
         </div>
     @endif
 

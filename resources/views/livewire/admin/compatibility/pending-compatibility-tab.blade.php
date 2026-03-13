@@ -108,7 +108,7 @@
 
             {{-- Pagination --}}
             <div class="compat-parts-pagination">
-                {{ $pendingParts->links() }}
+                {{ $pendingParts->links('components.pagination-compact') }}
             </div>
         </div>
 

@@ -192,7 +192,7 @@
     {{-- Pagination --}}
     @if($this->brakProducts && $this->brakProducts->hasPages())
         <div class="mt-4 border-t border-gray-700 pt-4">
-            {{ $this->brakProducts->links() }}
+            {{ $this->brakProducts->links('components.pagination-compact') }}
         </div>
     @endif
 </div>

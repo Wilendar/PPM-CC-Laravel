@@ -388,7 +388,7 @@
                         </div>
 
                         <div class="mt-4">
-                            {{ $alerts->links() }}
+                            {{ $alerts->links('components.pagination-compact') }}
                         </div>
                     </div>
                 @endif

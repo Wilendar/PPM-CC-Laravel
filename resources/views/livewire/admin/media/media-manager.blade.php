@@ -316,7 +316,7 @@
                 </div>
 
                 <div class="mt-6">
-                    {{ $products->links() }}
+                    {{ $products->links('components.pagination-compact') }}
                 </div>
             @else
                 <div class="text-center py-12 text-gray-400">
@@ -556,7 +556,7 @@
                         @endif
                     </div>
                     <div>
-                        {{ $orphanedMedia->links() }}
+                        {{ $orphanedMedia->links('components.pagination-compact') }}
                     </div>
                 </div>
             @else

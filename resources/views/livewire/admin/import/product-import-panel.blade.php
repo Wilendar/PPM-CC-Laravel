@@ -323,7 +323,7 @@
         {{-- Pagination --}}
         @if ($pendingProducts->hasPages())
             <div class="pagination-wrapper">
-                {{ $pendingProducts->links() }}
+                {{ $pendingProducts->links('components.pagination-compact') }}
             </div>
         @endif>
     </div>

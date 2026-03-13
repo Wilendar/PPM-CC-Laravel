@@ -326,7 +326,7 @@
 
             {{-- Pagination --}}
             <div class="px-4 py-3 border-t border-gray-700">
-                {{ $this->logs->links() }}
+                {{ $this->logs->links('components.pagination-compact') }}
             </div>
         @endif
     </div>

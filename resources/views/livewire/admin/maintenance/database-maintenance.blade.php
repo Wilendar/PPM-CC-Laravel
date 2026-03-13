@@ -313,7 +313,7 @@
 
                 <!-- Pagination -->
                 <div class="mt-6">
-                    {{ $tasks->links() }}
+                    {{ $tasks->links('components.pagination-compact') }}
                 </div>
 
             @elseif($activeTab === 'create')

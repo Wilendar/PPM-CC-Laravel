@@ -216,7 +216,7 @@
 
         {{-- Pagination --}}
         <div class="enterprise-card p-4">
-            {{ $solutions->links() }}
+            {{ $solutions->links('components.pagination-compact') }}
         </div>
     @else
         {{-- Empty State --}}

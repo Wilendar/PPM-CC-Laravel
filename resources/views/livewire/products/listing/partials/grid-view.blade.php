@@ -129,7 +129,7 @@
         </div>
 
         <div>
-            {{ $products->links() }}
+            {{ $products->links('components.pagination-compact') }}
         </div>
     </div>
 @endif

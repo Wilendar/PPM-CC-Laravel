@@ -141,7 +141,7 @@
             {{-- Pagination --}}
             @if($reports->hasPages())
                 <div class="mt-6">
-                    {{ $reports->links() }}
+                    {{ $reports->links('components.pagination-compact') }}
                 </div>
             @endif
         </div>

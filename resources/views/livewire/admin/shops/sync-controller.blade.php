@@ -1679,7 +1679,7 @@
             <!-- Pagination -->
             @if($shops->hasPages())
                 <div class="px-6 py-4 border-t border-gray-600">
-                    {{ $shops->links() }}
+                    {{ $shops->links('components.pagination-compact') }}
                 </div>
             @endif
         </div>
@@ -2896,7 +2896,7 @@
                 {{-- NEW: PAGINATION (BUG #9 FIX #7) --}}
                 @if($recentSyncJobs->hasPages())
                     <div class="mt-4 border-t border-gray-600 pt-4">
-                        {{ $recentSyncJobs->links() }}
+                        {{ $recentSyncJobs->links('components.pagination-compact') }}
                     </div>
                 @endif
             </div>

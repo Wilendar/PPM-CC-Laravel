@@ -233,7 +233,7 @@
 
                 {{-- Pagination --}}
                 <div class="mt-6">
-                    {{ $this->notifications->links() }}
+                    {{ $this->notifications->links('components.pagination-compact') }}
                 </div>
 
             @else

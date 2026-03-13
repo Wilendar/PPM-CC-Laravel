@@ -190,7 +190,7 @@
                         </div>
                         
                         <div class="mt-4">
-                            {{ $products->links() }}
+                            {{ $products->links('components.pagination-compact') }}
                         </div>
                     </div>
                 </div>

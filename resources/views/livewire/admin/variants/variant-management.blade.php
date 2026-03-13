@@ -251,7 +251,7 @@
 
     {{-- Pagination --}}
     <div class="mt-6">
-        {{ $this->variants->links() }}
+        {{ $this->variants->links('components.pagination-compact') }}
     </div>
 
     {{-- Auto-generate Modal (Alpine.js x-show) --}}

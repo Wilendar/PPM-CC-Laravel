@@ -164,7 +164,7 @@
     {{-- Pagination --}}
     @if($this->entityProducts && $this->entityProducts->hasPages())
         <div class="mt-4 border-t border-gray-700 pt-4">
-            {{ $this->entityProducts->links() }}
+            {{ $this->entityProducts->links('components.pagination-compact') }}
         </div>
     @endif
 </div>

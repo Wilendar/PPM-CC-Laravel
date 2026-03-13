@@ -383,7 +383,7 @@
             <!-- Pagination -->
             @if($recentLogs->hasPages())
                 <div class="px-6 py-4 border-t border-gray-200">
-                    {{ $recentLogs->links() }}
+                    {{ $recentLogs->links('components.pagination-compact') }}
                 </div>
             @endif
 

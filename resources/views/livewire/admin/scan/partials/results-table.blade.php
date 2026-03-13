@@ -211,7 +211,7 @@
         {{-- Pagination --}}
         @if($results->hasPages())
             <div class="px-4 py-3 border-t border-gray-700 bg-gray-800/50">
-                {{ $results->links() }}
+                {{ $results->links('components.pagination-compact') }}
             </div>
         @endif
     @endif
