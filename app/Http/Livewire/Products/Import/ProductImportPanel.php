@@ -125,6 +125,12 @@ class ProductImportPanel extends Component
         if (!request()->has('priceDisplayMode') && isset($prefs['priceDisplayMode'])) {
             $this->priceDisplayMode = $prefs['priceDisplayMode'];
         }
+
+        // Handle editPending URL param (from phantom vehicle "Utworz pojazd" button)
+        $editPendingId = request()->query('editPending');
+        if ($editPendingId) {
+            $this->dispatch('openImportModal', pendingProductId: (int) $editPendingId);
+        }
     }
 
     /**

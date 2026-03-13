@@ -2067,6 +2067,51 @@
     z-index: 2;
 }
 
+/* Phantom hover overlay - "Utworz pojazd" button */
+.archived-tile-hover-overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.6);
+    opacity: 0;
+    transition: opacity 0.2s ease;
+    border-radius: 8px;
+    z-index: 3;
+    pointer-events: none;
+}
+
+.vehicle-tile--archived:hover .archived-tile-hover-overlay {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.archived-tile-create-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 6px 12px;
+    font-size: 11px;
+    font-weight: 600;
+    color: #fff;
+    background: var(--ppm-secondary, #059669);
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.15s ease, transform 0.15s ease;
+}
+
+.archived-tile-create-btn:hover {
+    background: var(--ppm-secondary-dark, #047857);
+    transform: scale(1.05);
+}
+
+.archived-tile-create-btn svg {
+    width: 14px;
+    height: 14px;
+}
+
 /* Archived tiles separator */
 .archived-tiles-separator {
     display: flex;

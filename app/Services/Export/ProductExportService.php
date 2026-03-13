@@ -284,13 +284,20 @@ class ProductExportService
             return $media->isEmpty() ? null : $media->pluck('url')->implode(' | ');
         }
 
-        // Compatibility fields
+        // Compatibility fields (includes phantom records from PS import)
         if ($fieldKey === 'compatible_vehicles') {
             $compat = $product->relationLoaded('vehicleCompatibility') ? $product->vehicleCompatibility : $product->vehicleCompatibility()->get();
-            return $compat->isEmpty() ? null : $compat->map(fn ($c) => ($c->vehicleModel->name ?? 'N/A'))->implode(' | ');
+            return $compat->isEmpty() ? null : $compat->map(function ($c) {
+                if ($c->vehicle_model_id !== null) {
+                    return $c->vehicleModel->name ?? 'N/A';
+                }
+                // Phantom: use PS vehicle name from metadata
+                return $c->metadata['ps_vehicle_name'] ?? 'N/A';
+            })->implode(' | ');
         }
         if ($fieldKey === 'compatible_vehicles_count') {
-            return $product->relationLoaded('vehicleCompatibility') ? $product->vehicleCompatibility->count() : $product->vehicleCompatibility()->count();
+            $compat = $product->relationLoaded('vehicleCompatibility') ? $product->vehicleCompatibility : $product->vehicleCompatibility()->get();
+            return $compat->count();
         }
         if ($fieldKey === 'compatibility_types') {
             $compat = $product->relationLoaded('vehicleCompatibility') ? $product->vehicleCompatibility : $product->vehicleCompatibility()->get();
@@ -431,7 +438,12 @@ class ProductExportService
 
         $entries = [];
         foreach ($compat as $c) {
-            $vehicleName = $c->vehicleModel->name ?? $c->vehicleModel?->getFullName() ?? 'N/A';
+            if ($c->vehicle_model_id !== null) {
+                $vehicleName = $c->vehicleModel->name ?? $c->vehicleModel?->getFullName() ?? 'N/A';
+            } else {
+                // Phantom: use PS vehicle name from metadata
+                $vehicleName = $c->metadata['ps_vehicle_name'] ?? 'N/A';
+            }
             $type = $c->compatibilityAttribute?->name ?? 'Standard';
 
             $entries[] = ['feature' => 'Model', 'value' => $vehicleName];

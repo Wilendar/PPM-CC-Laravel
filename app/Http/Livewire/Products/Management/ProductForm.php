@@ -7927,12 +7927,14 @@ class ProductForm extends Component
         // CRITICAL FIX (2025-11-18): Auto-save pending changes BEFORE pull
         // Prevents data loss when user has unsaved changes
         try {
-            $this->saveAllPendingChanges();
+            // CRITICAL FIX: skipSyncJob=true prevents SyncProductToPrestaShop dispatch
+            // which would PUSH PPM data to PS, overwriting PS features BEFORE pull
+            $this->saveAllPendingChanges(skipSyncJob: true);
 
             // Reset Livewire dirty tracking (prevents browser "unsaved changes" warning)
             $this->dispatch('$commit');
 
-            Log::info('[ETAP_13 AUTO-SAVE] Pending changes saved before bulk pull', [
+            Log::info('[ETAP_13 AUTO-SAVE] Pending changes saved before bulk pull (sync skipped)', [
                 'product_id' => $this->product->id,
                 'active_shop_id' => $this->activeShopId,
             ]);
@@ -8785,7 +8787,7 @@ class ProductForm extends Component
      * Save all pending changes across all contexts (default + all shops)
      * This ensures no user changes are lost regardless of which tab they're currently on
      */
-    public function saveAllPendingChanges(): void
+    public function saveAllPendingChanges(bool $skipSyncJob = false): void
     {
         $this->isSaving = true;
         $this->successMessage = '';
@@ -8817,7 +8819,7 @@ class ProductForm extends Component
                     $this->savePendingChangesToProduct($changes);
                 } else {
                     // Save to specific shop (contextKey is shopId)
-                    $this->savePendingChangesToShop((int)$contextKey, $changes);
+                    $this->savePendingChangesToShop((int)$contextKey, $changes, skipSyncJob: $skipSyncJob);
                 }
             }
 
@@ -9173,7 +9175,7 @@ class ProductForm extends Component
      * @param bool $skipJobTracking FIX 2025-11-25: When true, skip job tracking UI
      *             (job still dispatches but UI doesn't show progress - used for saveAndClose redirect)
      */
-    private function savePendingChangesToShop(int $shopId, array $changes, bool $skipJobTracking = false): void
+    private function savePendingChangesToShop(int $shopId, array $changes, bool $skipJobTracking = false, bool $skipSyncJob = false): void
     {
         if (!$this->product) {
             Log::warning('Cannot save shop data - no product exists', ['shop_id' => $shopId]);
@@ -9459,7 +9461,7 @@ class ProductForm extends Component
         try {
             $shop = \App\Models\PrestaShopShop::find($shopId);
 
-            if ($shop && $shop->connection_status === 'connected' && $shop->is_active) {
+            if ($shop && $shop->connection_status === 'connected' && $shop->is_active && !$skipSyncJob) {
                 // FIX 2026-02-06: Pass pending media changes from session (same as dispatchSyncJobsForAllShops)
                 // Without this, sync job doesn't know about new images checked in gallery shop tab
                 $sessionKey = "pending_media_sync_{$this->product->id}";

@@ -293,35 +293,58 @@
                 <div class="vehicle-tiles-grid">
                     @foreach($archivedVehicles as $vehicleId => $vehicle)
                         @php
-                            $isOriginal = in_array($vehicleId, $compatibilityOriginal);
-                            $isZamiennik = in_array($vehicleId, $compatibilityZamiennik);
+                            $isPhantom = ($vehicle['source'] ?? '') === 'phantom';
+                            $isOriginal = !$isPhantom && in_array($vehicleId, $compatibilityOriginal);
+                            $isZamiennik = !$isPhantom && in_array($vehicleId, $compatibilityZamiennik);
                             $isBoth = $isOriginal && $isZamiennik;
                             $tileClass = $isBoth ? 'vehicle-tile--selected-both' : ($isOriginal ? 'vehicle-tile--selected-original' : ($isZamiennik ? 'vehicle-tile--selected-zamiennik' : ''));
                         @endphp
                         <div wire:key="compat-archived-{{ $vehicleId }}"
-                             wire:click="toggleCompatibilityVehicle({{ $vehicleId }})"
+                             @if(!$isPhantom) wire:click="toggleCompatibilityVehicle({{ $vehicleId }})" @endif
                              class="vehicle-tile vehicle-tile--archived {{ $tileClass }}">
-                            <span class="vehicle-tile__archived-badge">ARCHIWALNE</span>
+                            <span class="vehicle-tile__archived-badge">
+                                {{ $isPhantom ? 'PHANTOM' : 'ARCHIWALNE' }}
+                            </span>
                             <div class="vehicle-tile__content">
                                 <span class="vehicle-tile__brand">{{ $vehicle['manufacturer'] }}</span>
                                 <span class="vehicle-tile__model">{{ $vehicle['name'] }}</span>
                                 @if(!empty($vehicle['sku']))
                                     <span class="vehicle-tile__sku text-[10px] text-gray-500">{{ $vehicle['sku'] }}</span>
                                 @endif
+                                @if($isPhantom && !empty($vehicle['type']))
+                                    <span class="vehicle-tile__sku text-[10px] {{ $vehicle['type'] === 'original' ? 'text-blue-400' : 'text-orange-400' }}">
+                                        {{ $vehicle['type'] === 'original' ? 'Oryginal' : 'Zamiennik' }}
+                                    </span>
+                                @endif
                             </div>
 
-                            {{-- Selection Indicator --}}
-                            @if($isBoth)
-                                <div class="vehicle-tile__indicator vehicle-tile__indicator--both">
-                                    <span>O+Z</span>
-                                </div>
-                            @elseif($isOriginal)
-                                <div class="vehicle-tile__indicator vehicle-tile__indicator--original">
-                                    <span>O</span>
-                                </div>
-                            @elseif($isZamiennik)
-                                <div class="vehicle-tile__indicator vehicle-tile__indicator--zamiennik">
-                                    <span>Z</span>
+                            {{-- Selection Indicator (non-phantom only) --}}
+                            @if(!$isPhantom)
+                                @if($isBoth)
+                                    <div class="vehicle-tile__indicator vehicle-tile__indicator--both">
+                                        <span>O+Z</span>
+                                    </div>
+                                @elseif($isOriginal)
+                                    <div class="vehicle-tile__indicator vehicle-tile__indicator--original">
+                                        <span>O</span>
+                                    </div>
+                                @elseif($isZamiennik)
+                                    <div class="vehicle-tile__indicator vehicle-tile__indicator--zamiennik">
+                                        <span>Z</span>
+                                    </div>
+                                @endif
+                            @endif
+
+                            {{-- Phantom: hover overlay with "Utworz pojazd" button --}}
+                            @if($isPhantom)
+                                <div class="archived-tile-hover-overlay">
+                                    <button type="button" class="archived-tile-create-btn"
+                                            wire:click.stop="createVehicleFromArchived('{{ $vehicleId }}')">
+                                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                                        </svg>
+                                        Utworz pojazd
+                                    </button>
                                 </div>
                             @endif
                         </div>

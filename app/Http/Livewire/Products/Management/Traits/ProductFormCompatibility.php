@@ -110,6 +110,12 @@ trait ProductFormCompatibility
      */
     public array $archivedVehicles = [];
 
+    /**
+     * Phantom compatibility records (vehicle doesn't exist in PPM)
+     * Format: ['phantom_DB_ID' => ['name' => ..., 'manufacturer' => ..., 'type' => 'original|zamiennik', 'metadata' => ...]]
+     */
+    public array $phantomCompatibilities = [];
+
     /*
     |--------------------------------------------------------------------------
     | COMPATIBILITY LOADING
@@ -146,15 +152,33 @@ trait ProductFormCompatibility
 
             $compatibilities = $query->get();
 
-            // Populate selection arrays
-            $this->compatibilityOriginal = $compatibilities
+            // Separate phantom records (vehicle_model_id is null)
+            $phantomRecords = $compatibilities->filter(fn($c) => $c->vehicle_model_id === null);
+            $regularRecords = $compatibilities->filter(fn($c) => $c->vehicle_model_id !== null);
+
+            // Build phantom compatibilities array
+            $this->phantomCompatibilities = [];
+            foreach ($phantomRecords as $phantom) {
+                $meta = $phantom->metadata ?? [];
+                $type = $phantom->compatibilityAttribute?->code === 'original' ? 'original' : 'zamiennik';
+                $this->phantomCompatibilities['phantom_' . $phantom->id] = [
+                    'id' => $phantom->id,
+                    'name' => $meta['ps_vehicle_name'] ?? "Phantom #{$phantom->id}",
+                    'manufacturer' => $meta['ps_vehicle_manufacturer'] ?? 'Nieznany',
+                    'type' => $type,
+                    'metadata' => $meta,
+                ];
+            }
+
+            // Populate selection arrays (only regular records with vehicle_model_id)
+            $this->compatibilityOriginal = $regularRecords
                 ->filter(fn($c) => $c->compatibilityAttribute?->code === 'original')
                 ->pluck('vehicle_model_id')
                 ->unique()
                 ->values()
                 ->toArray();
 
-            $this->compatibilityZamiennik = $compatibilities
+            $this->compatibilityZamiennik = $regularRecords
                 ->filter(fn($c) => $c->compatibilityAttribute?->code === 'replacement')
                 ->pluck('vehicle_model_id')
                 ->unique()
@@ -172,11 +196,19 @@ trait ProductFormCompatibility
 
             $this->compatibilityPendingChanges = [];
 
+            // If phantom records exist and vehicles already loaded, re-detect archived
+            if (!empty($this->phantomCompatibilities) && !empty($this->vehiclesByBrand)) {
+                $this->detectArchivedVehicles();
+            }
+
             Log::debug('ProductFormCompatibility::loadCompatibilityData', [
                 'product_id' => $this->product->id,
                 'shop_id' => $shopId,
                 'original_count' => count($this->compatibilityOriginal),
                 'zamiennik_count' => count($this->compatibilityZamiennik),
+                'phantom_count' => count($this->phantomCompatibilities),
+                'total_records' => $compatibilities->count(),
+                'archived_count' => count($this->archivedVehicles),
             ]);
 
         } catch (\Exception $e) {
@@ -235,8 +267,19 @@ trait ProductFormCompatibility
      */
     public function loadVehiclesIfNeeded(): void
     {
+        Log::debug('loadVehiclesIfNeeded called', [
+            'product_id' => $this->product?->id,
+            'vehiclesByBrand_empty' => empty($this->vehiclesByBrand),
+            'phantom_count' => count($this->phantomCompatibilities),
+            'archived_count' => count($this->archivedVehicles),
+        ]);
+
         if (!empty($this->vehiclesByBrand)) {
-            return; // Already loaded
+            // Vehicles already loaded but phantom may need re-detection
+            if (!empty($this->phantomCompatibilities) && empty($this->archivedVehicles)) {
+                $this->detectArchivedVehicles();
+            }
+            return;
         }
 
         $shopId = $this->selectedShop ?? null;
@@ -257,7 +300,7 @@ trait ProductFormCompatibility
             $this->compatibilityZamiennik
         ));
 
-        if (empty($selectedIds)) {
+        if (empty($selectedIds) && empty($this->phantomCompatibilities)) {
             return;
         }
 
@@ -329,11 +372,24 @@ trait ProductFormCompatibility
             }
         }
 
+        // Add phantom records as archived with 'phantom' source
+        foreach ($this->phantomCompatibilities as $key => $phantom) {
+            $this->archivedVehicles[$key] = [
+                'id' => $phantom['id'],
+                'name' => $phantom['name'],
+                'manufacturer' => $phantom['manufacturer'],
+                'sku' => null,
+                'source' => 'phantom',
+                'type' => $phantom['type'],
+            ];
+        }
+
         Log::debug('ProductFormCompatibility::detectArchivedVehicles', [
             'product_id' => $this->product?->id,
             'orphaned_count' => count($orphanedIds),
             'found_in_db' => $foundProducts->count(),
             'found_in_metadata' => count($metadataVehicles),
+            'phantom_count' => count($this->phantomCompatibilities),
         ]);
     }
 
@@ -349,6 +405,7 @@ trait ProductFormCompatibility
         $this->vehicleSearch = '';
         $this->vehicleBrandFilter = '';
         $this->archivedVehicles = [];
+        $this->phantomCompatibilities = [];
     }
 
     /*
@@ -581,13 +638,16 @@ trait ProductFormCompatibility
      */
     public function getCompatibilityCounts(): array
     {
+        $phantomOriginal = collect($this->phantomCompatibilities)->where('type', 'original')->count();
+        $phantomZamiennik = collect($this->phantomCompatibilities)->where('type', 'zamiennik')->count();
+
         return [
-            'original' => count($this->compatibilityOriginal),
-            'zamiennik' => count($this->compatibilityZamiennik),
+            'original' => count($this->compatibilityOriginal) + $phantomOriginal,
+            'zamiennik' => count($this->compatibilityZamiennik) + $phantomZamiennik,
             'total' => count(array_unique(array_merge(
                 $this->compatibilityOriginal,
                 $this->compatibilityZamiennik
-            ))),
+            ))) + count($this->phantomCompatibilities),
             'pending' => count($this->compatibilityPendingChanges),
             'archived' => count($this->archivedVehicles),
         ];
@@ -636,7 +696,9 @@ trait ProductFormCompatibility
                 }
 
                 // Delete existing compatibility for this product+shop
-                $deleteQuery = VehicleCompatibility::where('product_id', $this->product->id);
+                // Preserve phantom records (vehicle_model_id is null)
+                $deleteQuery = VehicleCompatibility::where('product_id', $this->product->id)
+                    ->whereNotNull('vehicle_model_id');
                 if ($shopId) {
                     $deleteQuery->where('shop_id', $shopId);
                 }
@@ -718,6 +780,40 @@ trait ProductFormCompatibility
     protected function getDefaultShopId(): int
     {
         return \App\Models\PrestaShopShop::where('is_active', true)->orderBy('id')->value('id') ?? 1;
+    }
+
+    /**
+     * Create a PendingProduct from an archived/phantom vehicle and redirect to import
+     */
+    public function createVehicleFromArchived(string $vehicleKey): void
+    {
+        if (!isset($this->archivedVehicles[$vehicleKey])) {
+            session()->flash('error', 'Nie znaleziono danych archiwalnego pojazdu.');
+            return;
+        }
+
+        $vehicle = $this->archivedVehicles[$vehicleKey];
+
+        // Find product_type_id for 'pojazd'
+        $vehicleTypeId = \App\Models\ProductType::where('slug', 'pojazd')->value('id');
+        if (!$vehicleTypeId) {
+            session()->flash('error', 'Brak typu produktu "pojazd" w systemie.');
+            return;
+        }
+
+        $pendingProduct = \App\Models\PendingProduct::create([
+            'name' => $vehicle['name'],
+            'manufacturer' => $vehicle['manufacturer'],
+            'product_type_id' => $vehicleTypeId,
+            'imported_by' => auth()->id(),
+            'compatibility_data' => [
+                'created_from_phantom' => true,
+                'source_product_id' => $this->product?->id,
+                'original_vehicle_key' => $vehicleKey,
+            ],
+        ]);
+
+        $this->redirect('/admin/products/import?editPending=' . $pendingProduct->id);
     }
 
     /*

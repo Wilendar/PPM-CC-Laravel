@@ -16,7 +16,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  *
  * @property int $id
  * @property int $product_id Part (czesc zamienna)
- * @property int $vehicle_model_id Vehicle product (pojazd) - NOW points to products!
+ * @property int|null $vehicle_model_id Vehicle product (pojazd) - NOW points to products! Nullable for phantom records.
  * @property int $shop_id Per-shop compatibility (ETAP_05d)
  * @property int|null $compatibility_attribute_id Typ dopasowania (original/replacement)
  * @property int $compatibility_source_id Źródło informacji
@@ -215,11 +215,49 @@ class VehicleCompatibility extends Model
         return $query->where('confidence_score', '>=', $minScore);
     }
 
+    /**
+     * Scope: Only phantom records (vehicle doesn't exist in PPM)
+     */
+    public function scopePhantom($query)
+    {
+        return $query->whereNull('vehicle_model_id');
+    }
+
+    /**
+     * Scope: Only records with actual vehicle reference
+     */
+    public function scopeWithVehicle($query)
+    {
+        return $query->whereNotNull('vehicle_model_id');
+    }
+
     /*
     |--------------------------------------------------------------------------
     | METHODS
     |--------------------------------------------------------------------------
     */
+
+    /**
+     * Check if this is a phantom record (no vehicle in PPM)
+     */
+    public function isPhantom(): bool
+    {
+        return $this->vehicle_model_id === null;
+    }
+
+    /**
+     * Get display name - from relation or metadata
+     */
+    public function getVehicleDisplayName(): string
+    {
+        if ($this->vehicleProduct) {
+            return $this->vehicleProduct->name;
+        }
+
+        // Phantom: read from metadata
+        $meta = $this->metadata ?? [];
+        return $meta['ps_vehicle_name'] ?? "Phantom #{$this->id}";
+    }
 
     /**
      * Verify this compatibility record

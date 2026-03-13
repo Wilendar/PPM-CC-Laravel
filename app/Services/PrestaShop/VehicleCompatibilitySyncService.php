@@ -139,6 +139,11 @@ class VehicleCompatibilitySyncService
         $zamiennikVehicles = [];
 
         foreach ($compatibilities as $compat) {
+            // Skip phantom records - handled separately below
+            if ($compat->vehicle_model_id === null) {
+                continue;
+            }
+
             $vehicleName = $this->getVehicleDisplayName($compat->vehicleProduct);
             $featureId = $this->mapTypeToFeatureId($compat->compatibilityAttribute->code ?? 'original');
             $featureValueId = $this->getOrCreateFeatureValue(
@@ -170,6 +175,48 @@ class VehicleCompatibilitySyncService
             } elseif ($type === CompatibilityAttribute::CODE_REPLACEMENT) {
                 $zamiennikVehicles[$featureValueId] = $vehicleName;
             }
+        }
+
+        // PHANTOM RECORDS: Include PS-imported vehicles without PPM match
+        // These preserve original PrestaShop features data during push
+        $phantomRecords = $compatibilities->filter(fn($c) => $c->vehicle_model_id === null);
+        foreach ($phantomRecords as $phantom) {
+            $meta = $phantom->metadata ?? [];
+            $psVehicleName = $meta['ps_vehicle_name'] ?? null;
+            $psFeatureValueId = $meta['ps_feature_value_id'] ?? null;
+
+            if (!$psVehicleName) {
+                continue;
+            }
+
+            $attributeCode = $phantom->compatibilityAttribute->code ?? 'original';
+            $featureId = $this->mapTypeToFeatureId($attributeCode);
+
+            // Use stored PS feature_value_id or lookup/create by name
+            $featureValueId = $psFeatureValueId
+                ? (int) $psFeatureValueId
+                : $this->getOrCreateFeatureValue($featureId, $psVehicleName, $shopId);
+
+            if (!$featureValueId) {
+                Log::warning('[COMPAT SYNC] Could not resolve phantom feature value', [
+                    'ps_vehicle_name' => $psVehicleName,
+                    'feature_id' => $featureId,
+                ]);
+                continue;
+            }
+
+            if ($attributeCode === CompatibilityAttribute::CODE_ORIGINAL) {
+                $originalVehicles[$featureValueId] = $psVehicleName;
+            } elseif ($attributeCode === CompatibilityAttribute::CODE_REPLACEMENT) {
+                $zamiennikVehicles[$featureValueId] = $psVehicleName;
+            }
+
+            Log::debug('[COMPAT SYNC] Included phantom record in PS export', [
+                'product_id' => $product->id,
+                'ps_vehicle_name' => $psVehicleName,
+                'feature_value_id' => $featureValueId,
+                'type' => $attributeCode,
+            ]);
         }
 
         // Add Original feature associations
@@ -311,7 +358,7 @@ class VehicleCompatibilitySyncService
             if (!$vehicleProductId) {
                 // Track missing vehicle for reporting
                 $featureNames = [
-                    self::FEATURE_ORYGINAL => 'Oryginał',
+                    self::FEATURE_ORYGINAL => 'Oryginal',
                     self::FEATURE_ZAMIENNIK => 'Zamiennik',
                 ];
                 $missingVehicles[] = [
@@ -320,13 +367,56 @@ class VehicleCompatibilitySyncService
                     'feature_value_id' => $featureValueId,
                 ];
 
-                Log::warning('[COMPAT SYNC] Missing vehicle in PPM - cannot import', [
+                Log::warning('[COMPAT SYNC] Missing vehicle in PPM - saving as phantom', [
                     'product_id' => $product->id,
                     'product_sku' => $product->sku,
                     'ps_vehicle_name' => $psVehicleName,
                     'feature_type' => $featureNames[$featureId] ?? 'Unknown',
                     'feature_value_id' => $featureValueId,
                 ]);
+
+                // Determine attribute ID for phantom too
+                $attributeId = match ($featureId) {
+                    self::FEATURE_ORYGINAL => $originalAttrId,
+                    self::FEATURE_ZAMIENNIK => $zamiennikAttrId,
+                    default => $originalAttrId,
+                };
+
+                // Find existing phantom by feature_value_id to avoid duplicates
+                $existingPhantom = VehicleCompatibility::where('product_id', $product->id)
+                    ->whereNull('vehicle_model_id')
+                    ->where('shop_id', $shopId)
+                    ->where('compatibility_attribute_id', $attributeId)
+                    ->get()
+                    ->first(fn($r) => ($r->metadata['ps_feature_value_id'] ?? null) == $featureValueId);
+
+                $phantomData = [
+                    'compatibility_attribute_id' => $attributeId,
+                    'compatibility_source_id' => $sourceId,
+                    'is_suggested' => false,
+                    'metadata' => [
+                        'imported_from_ps' => true,
+                        'ps_feature_id' => $featureId,
+                        'ps_feature_value_id' => $featureValueId,
+                        'ps_vehicle_name' => $psVehicleName,
+                        'ps_vehicle_manufacturer' => $this->extractManufacturer($psVehicleName),
+                        'imported_at' => now()->toIso8601String(),
+                        'is_phantom' => true,
+                    ],
+                ];
+
+                if ($existingPhantom) {
+                    $existingPhantom->update($phantomData);
+                    $imported->push($existingPhantom);
+                } else {
+                    $phantomCompat = VehicleCompatibility::create(array_merge($phantomData, [
+                        'product_id' => $product->id,
+                        'vehicle_model_id' => null,
+                        'shop_id' => $shopId,
+                    ]));
+                    $imported->push($phantomCompat);
+                }
+
                 continue;
             }
 
@@ -472,6 +562,16 @@ class VehicleCompatibilitySyncService
         }
 
         return $result;
+    }
+
+    /**
+     * Extract manufacturer name from vehicle name (first word)
+     * e.g. "KAYO K5 300 SM" -> "KAYO", "MRF eJOY 500 MX" -> "MRF"
+     */
+    protected function extractManufacturer(string $name): string
+    {
+        $parts = explode(' ', trim($name), 2);
+        return $parts[0] ?? 'Unknown';
     }
 
     /**

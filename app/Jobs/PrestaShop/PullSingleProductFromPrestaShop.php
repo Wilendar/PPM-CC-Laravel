@@ -226,6 +226,8 @@ class PullSingleProductFromPrestaShop implements ShouldQueue
             if ($this->product->productType?->slug === 'czesc-zamienna') {
                 try {
                     $compatSyncService = app(\App\Services\PrestaShop\VehicleCompatibilitySyncService::class);
+                    $compatSyncService->setClient($client);
+                    $compatSyncService->setShop($this->shop);
                     $importedCompat = $compatSyncService->importFromPrestaShopFeatures(
                         $psData,
                         $this->product,
