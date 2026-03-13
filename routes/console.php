@@ -399,6 +399,17 @@ Schedule::call(function () use ($shouldSyncNow, $dispatchSyncJob) {
   ->withoutOverlapping();
 
 // ==========================================
+// PRODUCT STATUS: STOCK DEPLETION CHECK
+// ==========================================
+// Auto-transition products from "active until depleted" statuses
+// when stock on monitored warehouse drops to 0
+
+Schedule::job(new \App\Jobs\Products\CheckStockDepletionJob)
+    ->everyFiveMinutes()
+    ->withoutOverlapping()
+    ->name('product-status:check-stock-depletion');
+
+// ==========================================
 // IMPORT PANEL: SCHEDULED PUBLICATION
 // ==========================================
 // FAZA 9.5: Auto-publish pending products at scheduled_publish_at time
